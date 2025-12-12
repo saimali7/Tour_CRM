@@ -50,12 +50,35 @@ export const organizations = pgTable("organizations", {
 export type OrganizationStatus = "active" | "suspended" | "deleted";
 export type OrganizationPlan = "free" | "starter" | "pro" | "enterprise";
 
+export interface TaxSettings {
+  enabled: boolean;
+  name: string; // e.g., "VAT", "Sales Tax", "GST"
+  rate: number; // Percentage, e.g., 20 for 20%
+  taxId?: string; // Business tax ID for invoices
+  includeInPrice: boolean; // true = prices include tax, false = tax added at checkout
+  applyToFees: boolean; // Apply tax to booking fees as well
+}
+
+export interface BookingWindowSettings {
+  // Minimum notice required before a tour starts (in hours)
+  minimumNoticeHours: number;
+  // Maximum advance booking window (in days, 0 = unlimited)
+  maximumAdvanceDays: number;
+  // Whether to allow same-day bookings
+  allowSameDayBooking: boolean;
+  // Cut-off time for same-day bookings (24h format, e.g., "12:00")
+  sameDayCutoffTime?: string;
+}
+
 export interface OrganizationSettings {
   // Booking settings
   defaultCurrency?: string;
   defaultLanguage?: string;
   requirePhoneNumber?: boolean;
   requireAddress?: boolean;
+
+  // Booking window/availability settings
+  bookingWindow?: BookingWindowSettings;
 
   // Notification settings
   emailNotifications?: boolean;
@@ -64,6 +87,9 @@ export interface OrganizationSettings {
   // Booking policies
   cancellationPolicy?: string;
   refundPolicy?: string;
+
+  // Tax settings
+  tax?: TaxSettings;
 
   // Custom fields (org can add their own)
   customFields?: Record<string, unknown>;

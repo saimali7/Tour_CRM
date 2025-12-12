@@ -1,7 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { db } from "@tour/database";
+import { db, eq, and } from "@tour/database";
 import { users, organizationMembers, organizations } from "@tour/database/schema";
-import { eq, and } from "drizzle-orm";
 
 export interface OrgContext {
   organizationId: string;

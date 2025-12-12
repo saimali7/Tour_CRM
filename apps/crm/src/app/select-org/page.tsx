@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { getUserOrganizations } from "@/lib/auth";
 import Link from "next/link";
+import type { Route } from "next";
 import { Building2, ChevronRight } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
@@ -9,7 +10,7 @@ export default async function SelectOrgPage() {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect("/sign-in");
+    redirect("/sign-in" as Route);
   }
 
   const orgs = await getUserOrganizations();
@@ -18,7 +19,7 @@ export default async function SelectOrgPage() {
     redirect("/");
   }
 
-  if (orgs.length === 1) {
+  if (orgs.length === 1 && orgs[0]) {
     redirect(`/org/${orgs[0].slug}`);
   }
 

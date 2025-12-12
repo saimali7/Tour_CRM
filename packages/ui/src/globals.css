@@ -57,3 +57,142 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* React Big Calendar Styles */
+.rbc-calendar {
+  @apply bg-white rounded-lg border border-gray-200 p-4;
+  font-family: inherit;
+}
+
+.rbc-header {
+  @apply py-2 text-sm font-medium text-gray-600 border-b border-gray-200;
+}
+
+.rbc-today {
+  @apply bg-blue-50;
+}
+
+.rbc-off-range-bg {
+  @apply bg-gray-50;
+}
+
+.rbc-toolbar {
+  @apply flex flex-wrap gap-4 mb-4 items-center justify-between;
+}
+
+.rbc-toolbar-label {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.rbc-btn-group {
+  @apply flex;
+}
+
+.rbc-btn-group button {
+  @apply px-3 py-1.5 text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors;
+}
+
+.rbc-btn-group button:first-child {
+  @apply rounded-l-lg;
+}
+
+.rbc-btn-group button:last-child {
+  @apply rounded-r-lg;
+}
+
+.rbc-btn-group button.rbc-active {
+  @apply bg-blue-600 text-white border-blue-600;
+}
+
+.rbc-month-view {
+  @apply border border-gray-200 rounded-lg overflow-hidden;
+}
+
+.rbc-month-row {
+  @apply border-b border-gray-100 last:border-b-0;
+}
+
+.rbc-date-cell {
+  @apply text-right p-1 text-sm text-gray-600;
+}
+
+.rbc-date-cell.rbc-now {
+  @apply font-bold text-blue-600;
+}
+
+.rbc-event {
+  @apply rounded px-1.5 py-0.5 text-xs font-medium border-0;
+}
+
+.rbc-event.rbc-selected {
+  @apply ring-2 ring-blue-400 ring-offset-1;
+}
+
+.rbc-event-content {
+  @apply truncate;
+}
+
+.rbc-day-slot .rbc-event {
+  @apply border-l-2;
+}
+
+.rbc-time-view {
+  @apply border border-gray-200 rounded-lg overflow-hidden;
+}
+
+.rbc-time-header {
+  @apply border-b border-gray-200;
+}
+
+.rbc-time-content {
+  @apply border-t border-gray-200;
+}
+
+.rbc-time-slot {
+  @apply text-xs text-gray-500;
+}
+
+.rbc-current-time-indicator {
+  @apply bg-red-500;
+}
+
+.rbc-agenda-view {
+  @apply border border-gray-200 rounded-lg overflow-hidden;
+}
+
+.rbc-agenda-table {
+  @apply w-full;
+}
+
+.rbc-agenda-table thead tr th {
+  @apply py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-200;
+}
+
+.rbc-agenda-table tbody tr {
+  @apply hover:bg-gray-50;
+}
+
+.rbc-agenda-table tbody tr td {
+  @apply py-3 px-3 text-sm text-gray-700 border-b border-gray-100;
+}
+
+.rbc-agenda-empty {
+  @apply p-8 text-center text-gray-500;
+}
+
+/* Schedule status colors */
+.schedule-status-scheduled {
+  @apply bg-blue-100 text-blue-800 border-l-blue-600;
+}
+
+.schedule-status-in_progress {
+  @apply bg-yellow-100 text-yellow-800 border-l-yellow-600;
+}
+
+.schedule-status-completed {
+  @apply bg-green-100 text-green-800 border-l-green-600;
+}
+
+.schedule-status-cancelled {
+  @apply bg-red-100 text-red-800 border-l-red-600;
+}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { getUserOrganizations } from "@/lib/auth";
 import Link from "next/link";
+import type { Route } from "next";
 import { Building2, Plus } from "lucide-react";
 
 export default async function HomePage() {
@@ -24,13 +25,13 @@ export default async function HomePage() {
           </p>
           <div className="flex gap-4 justify-center">
             <Link
-              href="/sign-in"
+              href={"/sign-in" as Route}
               className="inline-flex items-center rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
             >
               Sign In
             </Link>
             <Link
-              href="/sign-up"
+              href={"/sign-up" as Route}
               className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-6 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Sign Up
@@ -45,7 +46,7 @@ export default async function HomePage() {
   const orgs = await getUserOrganizations();
 
   // If user has exactly one org, redirect to it
-  if (orgs.length === 1) {
+  if (orgs.length === 1 && orgs[0]) {
     redirect(`/org/${orgs[0].slug}`);
   }
 
@@ -69,7 +70,7 @@ export default async function HomePage() {
           administrator to get invited, or create a new organization.
         </p>
         <Link
-          href="/onboarding"
+          href={"/onboarding" as Route}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
         >
           <Plus className="h-4 w-4" />

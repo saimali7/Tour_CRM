@@ -17,8 +17,11 @@ A **multi-tenant tour operations platform** designed to:
 | `SYSTEM_DESIGN.md` | Multi-tenant architecture, organization model, three-layer platform design, monorepo structure |
 | `ARCHITECTURE.md` | Domain model, database schema, API design, tech stack decisions with rationale |
 | `FEATURES.md` | Feature specifications by phase, app ownership (CRM vs Web), acceptance criteria |
+| **`PROGRESS.md`** | **Implementation status tracker - single source of truth for what's done vs pending** |
 
 **Always consult these documents before making architectural decisions.**
+
+> **Important:** `PROGRESS.md` is the project management tool. Update it after completing any feature. Check it before starting new work.
 
 ## Three-Layer Platform Model
 
@@ -254,7 +257,31 @@ Per-organization roles:
 3. **Web App** - Subdomain routing, theming, booking checkout
 4. **Platform Scale** - Onboarding, subscription billing, feature flags
 
-## Commands (When Code Exists)
+---
+
+## Implementation Status
+
+> **Detailed tracking in [`PROGRESS.md`](./PROGRESS.md)** - Single source of truth for all implementation status.
+
+### Quick Status (December 2025)
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| **0** | Foundation | ✅ COMPLETE | 98% |
+| **1** | Core Booking Engine | 🔄 IN PROGRESS | 70% |
+| **2-6** | CRM Features | ⏳ NOT STARTED | 0% |
+| **7-11** | Web App & SaaS | ⏳ FUTURE | 0% |
+
+### Current Sprint Priorities
+
+1. **Calendar View** (Phase 1.2) - Schedule visualization
+2. **Activity Log** (Phase 1.4) - Audit trail for bookings
+3. **Refund Processing** (Phase 1.4) - Stripe refund integration
+4. **Email Notifications** - Booking confirmations/cancellations
+
+> See `PROGRESS.md` for detailed feature breakdowns, completion percentages, and task lists.
+
+## Commands
 
 ```bash
 pnpm install              # Install all dependencies

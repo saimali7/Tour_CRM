@@ -55,6 +55,11 @@ async function addMember() {
   // If only one user, add them automatically
   const user = users[0];
 
+  if (!user) {
+    console.error("❌ No users found after query.");
+    process.exit(1);
+  }
+
   // Check if already a member
   const existingMembership = await db.query.organizationMembers.findFirst({
     where: (members, { and, eq }) =>

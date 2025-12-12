@@ -8,3 +8,5 @@ export * from "./tours";
 export * from "./guides";
 export * from "./schedules";
 export * from "./bookings";
+export * from "./activity-logs";
+export * from "./refunds";

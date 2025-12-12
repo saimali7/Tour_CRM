@@ -21,7 +21,15 @@
       "Bash(pnpm list:*)",
       "Bash(pnpm db:seed:*)",
       "Bash(pnpm --filter @tour/database db:add-member:*)",
-      "Bash(ln:*)"
+      "Bash(ln:*)",
+      "Bash(ls:*)",
+      "Bash(pnpm test:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(xargs ls:*)",
+      "Bash(curl:*)",
+      "Bash(pnpm build:*)"
     ]
   }
 }

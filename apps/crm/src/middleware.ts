@@ -1,10 +1,13 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Routes that don't require authentication
+// Routes that don't require authentication at middleware level
+// Note: tRPC handles its own auth via protectedProcedure
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",
+  "/api/trpc(.*)",
+  // Note: /onboarding requires auth (will redirect to sign-in if not logged in)
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

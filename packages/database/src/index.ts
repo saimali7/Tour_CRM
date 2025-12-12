@@ -28,3 +28,6 @@ export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
 // Re-export schema and types
 export * from "./schema";
 export type { InferSelectModel, InferInsertModel } from "drizzle-orm";
+
+// Re-export drizzle-orm helpers to ensure single instance across monorepo
+export { eq, and, or, not, gt, gte, lt, lte, ne, sql, desc, asc, isNull, isNotNull, inArray, notInArray, like, ilike, between, count } from "drizzle-orm";

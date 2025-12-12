@@ -1,51 +1,387 @@
-import { getOrgContext } from "@/lib/auth";
-import { Calendar, Plus } from "lucide-react";
+"use client";
+
+import { trpc } from "@/lib/trpc";
+import { Calendar, Plus, Edit, Trash2, Eye, X, Users, Clock, List, CalendarDays } from "lucide-react";
 import Link from "next/link";
+import type { Route } from "next";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
+import { ScheduleCalendar, getCalendarDateRange } from "@/components/schedules/schedule-calendar";
 
-interface SchedulesPageProps {
-  params: Promise<{ slug: string }>;
-}
+type StatusFilter = "all" | "scheduled" | "in_progress" | "completed" | "cancelled";
+type ViewMode = "list" | "calendar";
+type CalendarView = "month" | "week" | "day" | "agenda";
 
-export default async function SchedulesPage({ params }: SchedulesPageProps) {
-  const { slug } = await params;
-  await getOrgContext(slug);
+export default function SchedulesPage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const slug = params.slug as string;
+
+  // View state
+  const initialView = (searchParams.get("view") as ViewMode) || "list";
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
+  const [calendarView, setCalendarView] = useState<CalendarView>("month");
+  const [calendarDate, setCalendarDate] = useState(new Date());
+
+  // List view state
+  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [tourFilter, setTourFilter] = useState<string | undefined>(undefined);
+
+  // Calculate date range for calendar view
+  const calendarDateRange = useMemo(
+    () => getCalendarDateRange(calendarDate),
+    [calendarDate]
+  );
+
+  const { data: toursData } = trpc.tour.list.useQuery({
+    pagination: { page: 1, limit: 100 },
+    filters: { status: "active" },
+  });
+
+  // Query for list view - paginated
+  const listQuery = trpc.schedule.list.useQuery(
+    {
+      pagination: { page, limit: 20 },
+      filters: {
+        status: statusFilter === "all" ? undefined : statusFilter,
+        tourId: tourFilter,
+      },
+      sort: { field: "startsAt", direction: "asc" },
+    },
+    { enabled: viewMode === "list" }
+  );
+
+  // Query for calendar view - full date range
+  const calendarQuery = trpc.schedule.list.useQuery(
+    {
+      pagination: { page: 1, limit: 500 },
+      filters: {
+        dateRange: calendarDateRange,
+        tourId: tourFilter,
+        status: statusFilter === "all" ? undefined : statusFilter,
+      },
+      sort: { field: "startsAt", direction: "asc" },
+    },
+    { enabled: viewMode === "calendar" }
+  );
+
+  const data = viewMode === "list" ? listQuery.data : calendarQuery.data;
+  const isLoading = viewMode === "list" ? listQuery.isLoading : calendarQuery.isLoading;
+  const error = viewMode === "list" ? listQuery.error : calendarQuery.error;
+
+  const utils = trpc.useUtils();
+
+  const deleteMutation = trpc.schedule.delete.useMutation({
+    onSuccess: () => {
+      utils.schedule.list.invalidate();
+    },
+  });
+
+  const cancelMutation = trpc.schedule.cancel.useMutation({
+    onSuccess: () => {
+      utils.schedule.list.invalidate();
+    },
+  });
+
+  const handleDelete = (id: string) => {
+    if (confirm("Are you sure you want to delete this schedule?")) {
+      deleteMutation.mutate({ id });
+    }
+  };
+
+  const handleCancel = (id: string) => {
+    if (confirm("Are you sure you want to cancel this schedule?")) {
+      cancelMutation.mutate({ id });
+    }
+  };
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", mode);
+    router.replace(`${url.pathname}${url.search}` as Route);
+  };
+
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(date));
+  };
+
+  const formatTime = (date: Date) => {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date(date));
+  };
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+        <p className="text-red-600">Error loading schedules: {error.message}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Schedules</h1>
-          <p className="text-gray-500 mt-1">
-            Schedule tour times and manage availability
-          </p>
+          <p className="text-gray-500 mt-1">Schedule tour times and manage availability</p>
         </div>
-        <Link
-          href={`/org/${slug}/schedules/new`}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Schedule
-        </Link>
-      </div>
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex rounded-lg border border-gray-300 bg-white p-1">
+            <button
+              onClick={() => handleViewModeChange("list")}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                viewMode === "list"
+                  ? "bg-primary text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <List className="h-4 w-4" />
+              List
+            </button>
+            <button
+              onClick={() => handleViewModeChange("calendar")}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                viewMode === "calendar"
+                  ? "bg-primary text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <CalendarDays className="h-4 w-4" />
+              Calendar
+            </button>
+          </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white">
-        <div className="p-12 text-center">
-          <Calendar className="mx-auto h-12 w-12 text-gray-300" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">
-            No schedules yet
-          </h3>
-          <p className="mt-2 text-gray-500">
-            Create a tour first, then schedule specific times for it.
-          </p>
           <Link
-            href={`/org/${slug}/tours/new`}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+            href={`/org/${slug}/schedules/new` as Route}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Create a Tour First
+            Add Schedule
           </Link>
         </div>
       </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4">
+        <div className="flex gap-2">
+          {(["all", "scheduled", "in_progress", "completed", "cancelled"] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => {
+                setStatusFilter(status);
+                setPage(1);
+              }}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                statusFilter === status
+                  ? "bg-primary text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {status === "in_progress" ? "In Progress" : status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={tourFilter || ""}
+          onChange={(e) => {
+            setTourFilter(e.target.value || undefined);
+            setPage(1);
+          }}
+          className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">All Tours</option>
+          {toursData?.data.map((tour) => (
+            <option key={tour.id} value={tour.id}>
+              {tour.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div className="rounded-lg border border-gray-200 bg-white p-12">
+          <div className="flex justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
+        </div>
+      ) : viewMode === "calendar" ? (
+        /* Calendar View */
+        <ScheduleCalendar
+          schedules={data?.data || []}
+          currentDate={calendarDate}
+          onDateChange={setCalendarDate}
+          view={calendarView}
+          onViewChange={setCalendarView}
+        />
+      ) : data?.data.length === 0 ? (
+        <div className="rounded-lg border border-gray-200 bg-white">
+          <div className="p-12 text-center">
+            <Calendar className="mx-auto h-12 w-12 text-gray-300" />
+            <h3 className="mt-4 text-lg font-medium text-gray-900">
+              No schedules yet
+            </h3>
+            <p className="mt-2 text-gray-500">
+              Create a tour first, then schedule specific times for it.
+            </p>
+            <Link
+              href={`/org/${slug}/schedules/new` as Route}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add Schedule
+            </Link>
+          </div>
+        </div>
+      ) : (
+        /* List View */
+        <>
+          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Tour / Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Availability
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {data?.data.map((schedule) => (
+                  <tr key={schedule.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {schedule.tour?.name || "Unknown Tour"}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatDate(schedule.startsAt)}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Clock className="h-4 w-4" />
+                        {formatTime(schedule.startsAt)} - {formatTime(schedule.endsAt)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          schedule.status === "scheduled"
+                            ? "bg-blue-100 text-blue-800"
+                            : schedule.status === "in_progress"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : schedule.status === "completed"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {schedule.status === "in_progress" ? "In Progress" : schedule.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Users className="h-4 w-4" />
+                        {schedule.bookedCount ?? 0} / {schedule.maxParticipants}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {schedule.price ? `$${parseFloat(schedule.price).toFixed(2)}` : "-"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/org/${slug}/schedules/${schedule.id}` as Route}
+                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                          title="View"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                        <Link
+                          href={`/org/${slug}/schedules/${schedule.id}/edit` as Route}
+                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                          title="Edit"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Link>
+                        {schedule.status === "scheduled" && (
+                          <button
+                            onClick={() => handleCancel(schedule.id)}
+                            className="p-1.5 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded"
+                            title="Cancel"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(schedule.id)}
+                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {data && data.totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                Showing {(page - 1) * 20 + 1} to{" "}
+                {Math.min(page * 20, data.total)} of {data.total} schedules
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                  disabled={page >= data.totalPages}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

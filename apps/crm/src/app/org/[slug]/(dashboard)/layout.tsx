@@ -10,6 +10,7 @@ import {
   UserCircle,
   Settings,
 } from "lucide-react";
+import { DashboardProviders } from "./providers";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -97,7 +98,9 @@ export default async function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <div className="p-6">{children}</div>
+        <div className="p-6">
+          <DashboardProviders orgSlug={slug}>{children}</DashboardProviders>
+        </div>
       </main>
     </div>
   );
