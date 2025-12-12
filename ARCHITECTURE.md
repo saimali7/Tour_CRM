@@ -40,10 +40,10 @@ This is not a generic CRM with tour features bolted on, but a system designed fr
 |----------|--------|-------------------|
 | **Repository Structure** | Turborepo monorepo | Shared code, atomic changes, single CI pipeline |
 | **Applications** | 2 Next.js 15 apps | Independent deployment, optimized bundles per audience |
-| **Frontend Framework** | Next.js 15 (App Router) | React ecosystem maturity, server components for speed, Vercel deployment simplicity |
+| **Frontend Framework** | Next.js 15 (App Router) | React ecosystem maturity, server components for speed |
 | **Backend/API** | tRPC (internal) + REST (external) | End-to-end type safety internally, standards for partners |
-| **Database** | PostgreSQL via Supabase | Relational integrity essential for bookings, real-time capabilities, excellent DX |
-| **Deployment** | Vercel (apps) + Supabase (data) | Minimal ops overhead, scales automatically, predictable costs |
+| **Database** | Supabase (PostgreSQL) | Managed DB, real-time, RLS, storage included |
+| **Deployment** | Hostinger VPS + Coolify | Self-hosted apps, cost-effective, git-push deploys |
 | **Background Jobs** | Inngest | Event-driven workflows, retries, observability without infrastructure |
 | **Communications** | Resend (email) + Twilio (SMS/WhatsApp) | Modern APIs, reliable delivery, good DX |
 | **Payments** | Stripe | Industry standard, handles complexity of refunds/disputes |
@@ -781,7 +781,7 @@ interface RefundProcessed extends BaseEvent {
 │                                                                             │
 │   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                    │
 │   │  Supabase   │    │   Inngest   │    │    Redis    │                    │
-│   │ (PostgreSQL)│    │   (Jobs)    │    │   (Cache)   │                    │
+│   │ (DB+Storage)│    │   (Jobs)    │    │   (Cache)   │                    │
 │   └─────────────┘    └─────────────┘    └─────────────┘                    │
 │                                                                             │
 │   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                    │
@@ -803,7 +803,7 @@ interface RefundProcessed extends BaseEvent {
 | **Ecosystem** | Massive (React) | Good (React) | Growing |
 | **Hiring** | Easiest | Moderate | Harder |
 | **Server Components** | Yes (mature) | No | No |
-| **Deployment** | Vercel (optimized) | Flexible | Flexible |
+| **Deployment** | Coolify (self-hosted) | Flexible | Flexible |
 | **Learning resources** | Abundant | Good | Good |
 
 For a small team building a business-critical tool, the React ecosystem's maturity is decisive. When you need a complex data table, date picker, or chart library, there are battle-tested React options. The hiring pool matters too—React developers are plentiful.
@@ -846,24 +846,26 @@ const booking = await trpc.booking.getById.query({ id: 'abc' });
 - Public API for partners (future phase)
 - External integrations that expect REST
 
-#### Database: PostgreSQL via Supabase
+#### Database: Supabase (PostgreSQL)
 
 **Why Supabase:**
 
 1. **PostgreSQL**: The right choice for transactional, relational data. Bookings need ACID guarantees, foreign keys, and complex queries.
 
-2. **Managed**: We don't want to manage Postgres. Supabase handles backups, scaling, and high availability.
+2. **Managed Service**: Automatic backups, point-in-time recovery, connection pooling handled.
 
 3. **Real-time**: Built-in real-time subscriptions for live dashboards without additional infrastructure.
 
-4. **Row Level Security**: Database-level authorization as a safety net.
+4. **Row Level Security**: First-class RLS support makes multi-tenant isolation easier.
 
-5. **Good DX**: Dashboard for debugging, easy local development with CLI.
+5. **Storage Included**: S3-compatible storage with CDN for tour images.
+
+6. **Free Tier**: Generous free plan for development and initial launch (500MB DB, 1GB storage).
 
 **Considered alternatives:**
-- **PlanetScale**: MySQL-based, excellent for scale but we don't need Vitess sharding yet. No foreign keys is a dealbreaker for booking integrity.
-- **Neon**: Strong PostgreSQL option, but Supabase's additional features (auth, storage, real-time) provide more value.
-- **Self-hosted**: Not worth the operational burden for a small team.
+- **Self-hosted PostgreSQL**: More control but adds operational burden.
+- **PlanetScale**: MySQL-based, no foreign keys is a dealbreaker for booking integrity.
+- **Neon**: Strong PostgreSQL option, but Supabase's additional features (storage, real-time) provide more value.
 
 #### ORM: Drizzle
 
@@ -930,11 +932,11 @@ export const sendBookingConfirmation = inngest.createFunction(
 - **AWS SQS/Lambda**: Overkill complexity for our scale
 - **Temporal**: Powerful but complex for this use case
 
-#### Caching: Upstash Redis
+#### Caching: Redis (Self-Hosted via Coolify)
 
 For session storage, rate limiting, and caching frequently-accessed data (tour availability, pricing).
 
-Upstash is serverless Redis—no connection management headaches, pay-per-request pricing, works great with edge functions.
+Self-hosted Redis via Coolify provides the same capabilities with full control and no external dependencies. Configured with persistence for session durability.
 
 #### Payments: Stripe
 
@@ -1036,9 +1038,9 @@ tour-platform/
 
 ### Authentication & Authorization
 
-**Auth Provider: Supabase Auth or Clerk**
+**Auth Provider: Clerk + Custom Lightweight Auth**
 
-Recommendation: **Clerk** for the admin side, **custom lightweight auth** for customer-facing booking.
+Using **Clerk** for the admin side, **custom lightweight auth** (magic links) for customer-facing booking.
 
 **Why Clerk for admin:**
 - Handles MFA, SSO, team invitations
@@ -2947,107 +2949,167 @@ export async function invalidateAvailabilityCache(scheduleId: string) {
 └───────────────────────────────┬─────────────────────────────────────────────┘
                                 │
                                 ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                               VERCEL                                         │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                        Next.js Application                           │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │   │
-│  │  │ Edge Runtime │  │ Serverless   │  │ Static Assets│              │   │
-│  │  │ (Middleware) │  │ Functions    │  │ (Global CDN) │              │   │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘              │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                     │
-│  │   Preview    │  │  Production  │  │   Staging    │                     │
-│  │ Deployments  │  │  Environment │  │ Environment  │                     │
-│  └──────────────┘  └──────────────┘  └──────────────┘                     │
-└───────────────────────────────┬─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                       HOSTINGER VPS + COOLIFY                                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                          COOLIFY (PaaS Layer)                           │  │
+│  │                     Git Push → Auto Deploy Pipeline                     │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                     TRAEFIK (Reverse Proxy)                             │  │
+│  │            Auto SSL via Let's Encrypt • Subdomain Routing              │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                  │                                            │
+│       ┌──────────────────────────┼──────────────────────────┐                │
+│       │                          │                          │                │
+│       ▼                          ▼                          ▼                │
+│  ┌──────────────┐         ┌──────────────┐         ┌──────────────┐         │
+│  │   CRM APP    │         │   WEB APP    │         │   WORKER     │         │
+│  │  (Next.js)   │         │  (Next.js)   │         │  (Inngest)   │         │
+│  └──────────────┘         └──────────────┘         └──────────────┘         │
+│                                  │                                            │
+│  ┌───────────────────────────────┴────────────────────────────────────────┐  │
+│  │                        SELF-HOSTED (COOLIFY)                            │  │
+│  │                                                                          │  │
+│  │                        ┌─────────────┐                                  │  │
+│  │                        │    Redis    │                                  │  │
+│  │                        │    Cache    │                                  │  │
+│  │                        └─────────────┘                                  │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
                                 │
-        ┌───────────────────────┼───────────────────────┐
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌───────────────┐      ┌───────────────┐      ┌───────────────┐
-│   SUPABASE    │      │    INNGEST    │      │ UPSTASH REDIS │
-│               │      │               │      │               │
-│ ┌───────────┐ │      │ ┌───────────┐ │      │ ┌───────────┐ │
-│ │PostgreSQL │ │      │ │ Functions │ │      │ │   Cache   │ │
-│ │           │ │      │ │           │ │      │ │           │ │
-│ │• Tables   │ │      │ │• Booking  │ │      │ │• Sessions │ │
-│ │• RLS      │ │      │ │  workflows│ │      │ │• Rate     │ │
-│ │• Realtime │ │      │ │• Reminders│ │      │ │  limiting │ │
-│ │           │ │      │ │• Reports  │ │      │ │• Avail-   │ │
-│ │           │ │      │ │           │ │      │ │  ability  │ │
-│ └───────────┘ │      │ └───────────┘ │      │ └───────────┘ │
-│               │      │               │      │               │
-│ ┌───────────┐ │      │ ┌───────────┐ │      └───────────────┘
-│ │  Storage  │ │      │ │  Dashboard│ │
-│ │ (Images)  │ │      │ │ (Observ.) │ │
-│ └───────────┘ │      │ └───────────┘ │
-└───────────────┘      └───────────────┘
+        ┌───────────────────────┴───────────────────────────┐
+        │                 EXTERNAL SERVICES                  │
+        │                                                    │
+        │  ┌─────────┐  ┌─────────┐  ┌─────────┐           │
+        │  │ STRIPE  │  │ RESEND  │  │ TWILIO  │           │
+        │  │Payments │  │ Email   │  │SMS/Voice│           │
+        │  └─────────┘  └─────────┘  └─────────┘           │
+        │                                                    │
+        │  ┌─────────┐  ┌─────────┐  ┌─────────┐           │
+        │  │ CLERK   │  │ SENTRY  │  │ INNGEST │           │
+        │  │  Auth   │  │ Errors  │  │ (Cloud) │           │
+        │  └─────────┘  └─────────┘  └─────────┘           │
+        │                                                    │
+        │  ┌─────────────────────────────────────────┐     │
+        │  │               SUPABASE                   │     │
+        │  │  PostgreSQL │ Storage │ Realtime         │     │
+        │  └─────────────────────────────────────────┘     │
+        └────────────────────────────────────────────────────┘
+```
 
-                ┌───────────────────────────────────────┐
-                │           EXTERNAL SERVICES           │
-                │                                       │
-                │  ┌─────────┐ ┌─────────┐ ┌─────────┐ │
-                │  │ STRIPE  │ │ RESEND  │ │ TWILIO  │ │
-                │  │Payments │ │ Email   │ │SMS/Voice│ │
-                │  └─────────┘ └─────────┘ └─────────┘ │
-                │                                       │
-                │  ┌─────────┐ ┌─────────┐             │
-                │  │ CLERK   │ │ SENTRY  │             │
-                │  │  Auth   │ │ Errors  │             │
-                │  └─────────┘ └─────────┘             │
-                └───────────────────────────────────────┘
+### Why Hybrid Architecture (Coolify + Supabase)?
+
+| Component | Where | Why |
+|-----------|-------|-----|
+| **Apps (CRM, Web)** | Hostinger VPS + Coolify | Cost-effective, git-push deploys |
+| **Redis** | Self-hosted (Coolify) | Session storage, caching, no egress costs |
+| **PostgreSQL** | Supabase | Managed backups, RLS, connection pooling |
+| **Storage** | Supabase | CDN included, no setup required |
+| **Realtime** | Supabase | Built-in WebSocket for live updates |
+
+**Benefits:**
+- **Low starting cost**: Supabase free tier + ~$15-40/mo VPS
+- **Less ops burden**: Database managed, apps self-hosted
+- **Best of both worlds**: Control over compute, managed data layer
+
+### Coolify Services Configuration
+
+```yaml
+# Managed via Coolify UI - shown here for reference
+# Note: Database & Storage on Supabase (external)
+
+# Redis Cache (self-hosted for sessions & caching)
+redis:
+  image: redis:7-alpine
+  command: redis-server --appendonly yes
+  volumes:
+    - redis_data:/data
+
+# CRM App (Next.js) - deployed via git push
+# Web App (Next.js) - deployed via git push
+# Inngest Worker - deployed via git push
 ```
 
 ### Environment Configuration
 
 ```bash
 # .env.local (development)
-# .env.production (production - set in Vercel)
+# .env.production (set in Coolify dashboard)
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_WEB_URL=http://localhost:3001
 NODE_ENV=development
 
-# Database (Supabase)
-DATABASE_URL=postgresql://postgres:password@db.xxx.supabase.co:5432/postgres
-DIRECT_URL=postgresql://postgres:password@db.xxx.supabase.co:5432/postgres
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
-SUPABASE_SERVICE_ROLE_KEY=xxx
+# Supabase (Database + Storage)
+DATABASE_URL=postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres
+DIRECT_URL=postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres
+NEXT_PUBLIC_SUPABASE_URL=https://[project].supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx
+SUPABASE_SERVICE_ROLE_KEY=eyJxxx
 
-# Auth (Clerk)
+# Redis (self-hosted via Coolify)
+REDIS_URL=redis://localhost:6379
+
+# Auth (Clerk - external service)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_xxx
 CLERK_SECRET_KEY=sk_xxx
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 
-# Payments (Stripe)
+# Payments (Stripe - external service)
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_xxx
 STRIPE_SECRET_KEY=sk_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 
-# Email (Resend)
+# Email (Resend - external service)
 RESEND_API_KEY=re_xxx
 EMAIL_FROM=bookings@tourcompany.com
 
-# SMS (Twilio)
+# SMS (Twilio - external service)
 TWILIO_ACCOUNT_SID=xxx
 TWILIO_AUTH_TOKEN=xxx
 TWILIO_PHONE_NUMBER=+1xxx
 
-# Background Jobs (Inngest)
+# Background Jobs (Inngest - cloud service)
 INNGEST_EVENT_KEY=xxx
 INNGEST_SIGNING_KEY=xxx
+INNGEST_DEV=true  # For local development
 
-# Cache (Upstash Redis)
-UPSTASH_REDIS_URL=https://xxx.upstash.io
-UPSTASH_REDIS_TOKEN=xxx
-
-# Monitoring (Sentry)
+# Monitoring (Sentry - external service)
 NEXT_PUBLIC_SENTRY_DSN=https://xxx@sentry.io/xxx
 SENTRY_AUTH_TOKEN=xxx
+```
+
+### Recommended Hostinger VPS Specs
+
+| Environment | Plan | Specs | Monthly Cost |
+|-------------|------|-------|--------------|
+| **Development** | KVM 1 | 4GB RAM, 2 vCPU, 100GB SSD | ~$10 |
+| **Staging** | KVM 2 | 8GB RAM, 4 vCPU, 200GB SSD | ~$20 |
+| **Production** | KVM 4 | 16GB RAM, 8 vCPU, 400GB SSD | ~$40 |
+| **Production+** | KVM 8 | 32GB RAM, 8 vCPU, 400GB SSD | ~$80 |
+
+### Backup Strategy
+
+**Supabase Backups (Automatic):**
+- Free tier: Daily backups, 7-day retention
+- Pro tier: Point-in-time recovery (PITR)
+- Pro tier: Can download manual backups from dashboard
+
+**Redis Backups (Self-hosted - if needed):**
+```bash
+# Redis RDB snapshot (via Coolify scheduled task)
+redis-cli BGSAVE
+cp /data/dump.rdb /backups/redis/dump_$(date +%Y%m%d).rdb
+
+# Upload to external storage (optional - Redis data is cache/sessions)
+rclone copy /backups/redis b2:tourcrm-backups/redis/
 ```
 
 ### CI/CD Pipeline (GitHub Actions)
@@ -3196,17 +3258,19 @@ export function captureBookingError(
 
 | Service | Tier | Estimated Cost | Notes |
 |---------|------|----------------|-------|
-| **Vercel** | Pro | $20 | Handles most startups |
-| **Supabase** | Pro | $25 | 8GB database, 250GB bandwidth |
+| **Hostinger VPS** | KVM 2-4 | $15-40 | Apps + Redis (4-8 vCPU, 8-16GB RAM) |
+| **Coolify** | Self-hosted | $0 | Open-source PaaS |
+| **Supabase** | Free → Pro | $0-25 | Free: 500MB DB, 1GB storage |
+| **Redis** | Self-hosted | $0 | Included in VPS |
 | **Clerk** | Free → Pro | $0-25 | Free up to 10k MAU |
 | **Inngest** | Free → Pro | $0-50 | Free tier generous |
-| **Upstash** | Pay-as-you-go | ~$10 | Low volume initially |
 | **Resend** | Free → Pro | $0-20 | Free tier: 3k/month |
 | **Twilio** | Pay-as-you-go | ~$50 | Depends on SMS volume |
 | **Stripe** | 2.9% + 30¢ | Variable | Per transaction |
 | **Sentry** | Team | $26 | Error tracking |
 | **Cloudflare** | Free | $0 | DNS + basic protection |
-| **Total** | | **~$150-250** | Before transaction fees |
+| **Total (Start)** | | **~$15-40** | Free tiers for most services |
+| **Total (Scale)** | | **~$150-250** | After upgrading to paid tiers |
 
 ---
 
@@ -3241,7 +3305,7 @@ Deliverables:
 │
 ├── CI/CD
 │   ├── GitHub Actions workflow
-│   ├── Vercel deployment
+│   ├── Coolify deployment
 │   └── Preview deployments
 │
 └── Monitoring
@@ -3412,7 +3476,7 @@ Deliverables:
 │   └── Export to CSV
 │
 ├── Real-time Updates
-│   ├── Supabase realtime
+│   ├── Supabase Realtime
 │   ├── Live booking notifications
 │   └── Capacity changes
 │
@@ -3498,7 +3562,866 @@ Phase 10: Advanced Features
 | 5 | 2 weeks | Reporting | Dashboard with key metrics |
 | 6 | 2 weeks | Polish | Ready for real users |
 
-**Total: ~15 weeks to MVP**
+**Total: ~15 weeks to CRM MVP, ~22 weeks to Web App, ~27 weeks to SaaS**
+
+---
+
+## Analytics Architecture
+
+### Analytics Strategy
+
+For a cutting-edge platform, analytics must be first-class—not an afterthought. We implement a three-tier approach:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          ANALYTICS ARCHITECTURE                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐           │
+│  │  First-Party    │   │  Product        │   │  Business       │           │
+│  │  Event Store    │   │  Analytics      │   │  Intelligence   │           │
+│  │  (PostgreSQL)   │   │  (PostHog)      │   │  (Metabase)     │           │
+│  └────────┬────────┘   └────────┬────────┘   └────────┬────────┘           │
+│           │                     │                     │                     │
+│           │  Critical events    │  User behavior      │  Reports &          │
+│           │  for attribution    │  & funnels          │  dashboards         │
+│           │                     │                     │                     │
+└───────────┼─────────────────────┼─────────────────────┼─────────────────────┘
+            │                     │                     │
+            └──────────┬──────────┴──────────┬──────────┘
+                       │                     │
+                       ▼                     ▼
+              Revenue Attribution    Conversion Optimization
+```
+
+### Event Taxonomy
+
+All analytics events follow a consistent structure:
+
+```typescript
+interface AnalyticsEvent {
+  // Identity
+  eventId: string;              // Unique event ID (CUID2)
+  eventName: string;            // e.g., 'tour.viewed', 'booking.started'
+
+  // Context
+  organizationId: string;       // Multi-tenant scoping
+  sessionId: string;            // Browser session
+  userId?: string;              // If authenticated
+  customerId?: string;          // If identified customer
+
+  // Attribution
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  referrer?: string;
+  landingPage?: string;
+
+  // Device
+  deviceType: 'desktop' | 'mobile' | 'tablet';
+  browser: string;
+  os: string;
+
+  // Event-specific
+  properties: Record<string, unknown>;
+
+  // Timing
+  timestamp: Date;
+  clientTimestamp: Date;
+}
+```
+
+### Critical Events (First-Party Storage)
+
+These events are stored in PostgreSQL for attribution and revenue analysis:
+
+```typescript
+// Booking funnel events
+type FunnelEvent =
+  | 'page.viewed'           // Any page view
+  | 'tour.viewed'           // Tour detail page
+  | 'tour.availability_checked' // Checked dates
+  | 'booking.started'       // Started checkout
+  | 'booking.contact_entered'   // Entered contact info
+  | 'booking.payment_initiated' // Started payment
+  | 'booking.completed'     // Payment successful
+  | 'booking.abandoned';    // Left without completing
+
+// Engagement events
+type EngagementEvent =
+  | 'tour.wishlisted'
+  | 'tour.shared'
+  | 'review.viewed'
+  | 'email.opened'
+  | 'email.clicked';
+```
+
+### Analytics Events Table
+
+```sql
+CREATE TABLE analytics_events (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organization_id TEXT NOT NULL REFERENCES organizations(id),
+
+  -- Event identity
+  event_name TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  user_id TEXT,
+  customer_id TEXT REFERENCES customers(id),
+
+  -- Attribution (captured on first event of session)
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  utm_content TEXT,
+  utm_term TEXT,
+  referrer TEXT,
+  landing_page TEXT,
+
+  -- Device
+  device_type TEXT,
+  browser TEXT,
+  os TEXT,
+  ip_hash TEXT,  -- Hashed for privacy
+
+  -- Event data
+  properties JSONB DEFAULT '{}',
+
+  -- Related entities
+  tour_id TEXT,
+  schedule_id TEXT,
+  booking_id TEXT,
+
+  -- Timing
+  client_timestamp TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes for common queries
+CREATE INDEX analytics_events_org_name_idx
+  ON analytics_events (organization_id, event_name, created_at DESC);
+CREATE INDEX analytics_events_session_idx
+  ON analytics_events (session_id, created_at);
+CREATE INDEX analytics_events_customer_idx
+  ON analytics_events (customer_id, created_at DESC);
+CREATE INDEX analytics_events_booking_funnel_idx
+  ON analytics_events (organization_id, created_at DESC)
+  WHERE event_name IN ('tour.viewed', 'booking.started', 'booking.completed');
+
+-- Partition by month for performance (implement when data volume warrants)
+```
+
+### Conversion Funnel Queries
+
+```sql
+-- Conversion funnel for a period
+WITH funnel AS (
+  SELECT
+    session_id,
+    MAX(CASE WHEN event_name = 'tour.viewed' THEN 1 ELSE 0 END) as viewed,
+    MAX(CASE WHEN event_name = 'booking.started' THEN 1 ELSE 0 END) as started,
+    MAX(CASE WHEN event_name = 'booking.contact_entered' THEN 1 ELSE 0 END) as contact,
+    MAX(CASE WHEN event_name = 'booking.payment_initiated' THEN 1 ELSE 0 END) as payment,
+    MAX(CASE WHEN event_name = 'booking.completed' THEN 1 ELSE 0 END) as completed
+  FROM analytics_events
+  WHERE organization_id = $1
+    AND created_at BETWEEN $2 AND $3
+  GROUP BY session_id
+)
+SELECT
+  COUNT(*) as total_sessions,
+  SUM(viewed) as viewed_tour,
+  SUM(started) as started_checkout,
+  SUM(contact) as entered_contact,
+  SUM(payment) as initiated_payment,
+  SUM(completed) as completed_booking,
+  ROUND(100.0 * SUM(started) / NULLIF(SUM(viewed), 0), 2) as view_to_start_rate,
+  ROUND(100.0 * SUM(completed) / NULLIF(SUM(started), 0), 2) as start_to_complete_rate
+FROM funnel;
+```
+
+### Attribution Queries
+
+```sql
+-- Revenue attribution by source
+SELECT
+  COALESCE(ae.utm_source, 'direct') as source,
+  COALESCE(ae.utm_medium, 'none') as medium,
+  COUNT(DISTINCT b.id) as bookings,
+  SUM(b.total_amount) as revenue,
+  AVG(b.total_amount) as avg_order_value,
+  COUNT(DISTINCT ae.session_id) as sessions,
+  ROUND(100.0 * COUNT(DISTINCT b.id) / NULLIF(COUNT(DISTINCT ae.session_id), 0), 2) as conversion_rate
+FROM analytics_events ae
+LEFT JOIN bookings b ON b.id = ae.booking_id AND b.status = 'confirmed'
+WHERE ae.organization_id = $1
+  AND ae.created_at BETWEEN $2 AND $3
+  AND ae.event_name = 'booking.started'  -- First touch of booking funnel
+GROUP BY ae.utm_source, ae.utm_medium
+ORDER BY revenue DESC;
+```
+
+### Third-Party Analytics Integration
+
+```typescript
+// lib/analytics.ts
+import posthog from 'posthog-js';
+
+export const analytics = {
+  // Initialize on client
+  init(organizationId: string) {
+    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+      api_host: 'https://app.posthog.com',
+      loaded: (posthog) => {
+        posthog.register({ organization_id: organizationId });
+      },
+    });
+  },
+
+  // Track event (sends to PostHog + our backend)
+  async track(eventName: string, properties: Record<string, unknown> = {}) {
+    // PostHog for user behavior
+    posthog.capture(eventName, properties);
+
+    // Our backend for attribution (critical events only)
+    if (CRITICAL_EVENTS.includes(eventName)) {
+      await fetch('/api/analytics/track', {
+        method: 'POST',
+        body: JSON.stringify({ eventName, properties }),
+      });
+    }
+  },
+
+  // Identify user
+  identify(customerId: string, traits: Record<string, unknown> = {}) {
+    posthog.identify(customerId, traits);
+  },
+};
+
+const CRITICAL_EVENTS = [
+  'tour.viewed',
+  'booking.started',
+  'booking.contact_entered',
+  'booking.payment_initiated',
+  'booking.completed',
+  'booking.abandoned',
+];
+```
+
+---
+
+## SEO Architecture
+
+### SEO Strategy for Web App
+
+The Web App must be SEO-optimized from day one. Tour operators depend on organic search traffic.
+
+### Technical SEO Implementation
+
+```typescript
+// app/web/layout.tsx
+export const metadata: Metadata = {
+  metadataBase: new URL('https://book.tourcompany.com'),
+  title: {
+    template: '%s | Tour Company',
+    default: 'Tour Company - Amazing Tours',
+  },
+  description: 'Book incredible tours with Tour Company',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'Tour Company',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+```
+
+### Dynamic Metadata per Page
+
+```typescript
+// app/web/tours/[slug]/page.tsx
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const tour = await getTourBySlug(params.slug);
+
+  return {
+    title: tour.metaTitle || tour.name,
+    description: tour.metaDescription || tour.shortDescription,
+    openGraph: {
+      title: tour.name,
+      description: tour.shortDescription,
+      images: [{ url: tour.coverImage, width: 1200, height: 630 }],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: tour.name,
+      description: tour.shortDescription,
+      images: [tour.coverImage],
+    },
+  };
+}
+```
+
+### Structured Data (Schema.org)
+
+```typescript
+// components/TourStructuredData.tsx
+export function TourStructuredData({ tour, schedules }: Props) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'TouristAttraction',
+    name: tour.name,
+    description: tour.fullDescription,
+    image: tour.gallery,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: tour.meetingPointAddress,
+    },
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: tour.meetingPointLat,
+      longitude: tour.meetingPointLng,
+    },
+    aggregateRating: tour.reviewCount > 0 ? {
+      '@type': 'AggregateRating',
+      ratingValue: tour.averageRating,
+      reviewCount: tour.reviewCount,
+    } : undefined,
+    offers: schedules.map(schedule => ({
+      '@type': 'Offer',
+      url: `https://book.tourcompany.com/tours/${tour.slug}?date=${schedule.date}`,
+      price: schedule.lowestPrice,
+      priceCurrency: 'USD',
+      availability: schedule.availableSpots > 0
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/SoldOut',
+      validFrom: new Date().toISOString(),
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  );
+}
+```
+
+### Sitemap Generation
+
+```typescript
+// app/web/sitemap.ts
+import { MetadataRoute } from 'next';
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const tours = await getActiveTours();
+  const categories = await getCategories();
+
+  const tourUrls = tours.map((tour) => ({
+    url: `https://book.tourcompany.com/tours/${tour.slug}`,
+    lastModified: tour.updatedAt,
+    changeFrequency: 'daily' as const,
+    priority: 0.8,
+  }));
+
+  const categoryUrls = categories.map((cat) => ({
+    url: `https://book.tourcompany.com/tours/category/${cat.slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.6,
+  }));
+
+  return [
+    {
+      url: 'https://book.tourcompany.com',
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 1,
+    },
+    {
+      url: 'https://book.tourcompany.com/tours',
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.9,
+    },
+    ...tourUrls,
+    ...categoryUrls,
+  ];
+}
+```
+
+### Robots.txt
+
+```typescript
+// app/web/robots.ts
+import { MetadataRoute } from 'next';
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: '*',
+      allow: '/',
+      disallow: ['/api/', '/booking/payment/', '/admin/'],
+    },
+    sitemap: 'https://book.tourcompany.com/sitemap.xml',
+  };
+}
+```
+
+---
+
+## Performance Architecture
+
+### Performance Targets
+
+| Metric | Target | Critical Path |
+|--------|--------|---------------|
+| **LCP** (Largest Contentful Paint) | < 2.5s | Tour images, page content |
+| **FID** (First Input Delay) | < 100ms | JavaScript hydration |
+| **CLS** (Cumulative Layout Shift) | < 0.1 | Image dimensions, fonts |
+| **TTFB** (Time to First Byte) | < 500ms | Server response |
+| **FCP** (First Contentful Paint) | < 1.5s | Initial render |
+
+### Caching Strategy
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CACHING LAYERS                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Browser          CDN (Cloudflare)       Redis (Self-hosted)  Database      │
+│  ────────         ────────────────       ──────────────────   ────────      │
+│                                                                              │
+│  • Static assets  • Static pages         • Availability       • Source of   │
+│    (immutable)    • Cached pages           (60s TTL)           truth        │
+│  • API responses  • Tour detail          • Pricing            • Queries     │
+│    (stale-while-    pages                  (5 min TTL)                       │
+│     revalidate)   • Tour listings        • Session data                     │
+│                                          • Rate limits                       │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Caching Implementation
+
+```typescript
+// Availability caching with stale-while-revalidate
+const AVAILABILITY_CACHE_TTL = 60; // 1 minute
+const AVAILABILITY_STALE_TTL = 300; // 5 minutes stale allowed
+
+export async function getAvailability(tourId: string, dateRange: DateRange) {
+  const cacheKey = `availability:${tourId}:${dateRange.start}:${dateRange.end}`;
+
+  // Try cache
+  const cached = await redis.get<CachedAvailability>(cacheKey);
+
+  if (cached) {
+    const age = Date.now() - cached.timestamp;
+
+    // Fresh data
+    if (age < AVAILABILITY_CACHE_TTL * 1000) {
+      return cached.data;
+    }
+
+    // Stale but usable - return stale, revalidate in background
+    if (age < AVAILABILITY_STALE_TTL * 1000) {
+      // Don't await - fire and forget
+      revalidateAvailability(tourId, dateRange, cacheKey);
+      return cached.data;
+    }
+  }
+
+  // No cache or too stale - fetch fresh
+  return fetchAndCacheAvailability(tourId, dateRange, cacheKey);
+}
+
+// Invalidate on booking
+export async function invalidateAvailabilityCache(scheduleId: string) {
+  const schedule = await db.query.schedules.findFirst({
+    where: eq(schedules.id, scheduleId),
+  });
+
+  if (schedule) {
+    // Pattern-based invalidation
+    const pattern = `availability:${schedule.tourId}:*`;
+    const keys = await redis.keys(pattern);
+    if (keys.length > 0) {
+      await redis.del(...keys);
+    }
+  }
+}
+```
+
+### Image Optimization
+
+```typescript
+// next.config.ts
+const config: NextConfig = {
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
+};
+
+// Component usage
+<Image
+  src={tour.coverImage}
+  alt={tour.name}
+  width={800}
+  height={600}
+  priority={isAboveFold}
+  placeholder="blur"
+  blurDataURL={tour.coverImageBlur}
+/>
+```
+
+### Database Performance
+
+```typescript
+// Connection pooling for serverless
+import { Pool } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle(pool, { schema });
+
+// Query optimization patterns
+// Use select() for specific columns instead of findFirst/findMany
+const bookings = await db
+  .select({
+    id: bookingsTable.id,
+    reference: bookingsTable.referenceNumber,
+    status: bookingsTable.status,
+    total: bookingsTable.totalAmount,
+  })
+  .from(bookingsTable)
+  .where(eq(bookingsTable.customerId, customerId))
+  .orderBy(desc(bookingsTable.createdAt))
+  .limit(10);
+```
+
+### Bundle Optimization
+
+```typescript
+// Lazy load heavy components
+const CalendarView = dynamic(() => import('@/components/CalendarView'), {
+  loading: () => <CalendarSkeleton />,
+  ssr: false, // Client-only for performance
+});
+
+const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), {
+  loading: () => <EditorSkeleton />,
+  ssr: false,
+});
+```
+
+---
+
+## Additional Database Tables
+
+### Tables Missing from Core Schema
+
+#### Reviews Table
+
+```sql
+CREATE TABLE reviews (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+
+  tour_id TEXT NOT NULL REFERENCES tours(id) ON DELETE CASCADE,
+  booking_id TEXT REFERENCES bookings(id) ON DELETE SET NULL,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+
+  -- Rating
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  title TEXT,
+  content TEXT,
+
+  -- Media
+  photos TEXT[] DEFAULT '{}',
+
+  -- Moderation
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'rejected', 'flagged')),
+  moderated_at TIMESTAMPTZ,
+  moderated_by TEXT,
+  rejection_reason TEXT,
+
+  -- Response
+  response TEXT,
+  response_at TIMESTAMPTZ,
+  response_by TEXT,
+
+  -- Verification
+  is_verified_purchase BOOLEAN NOT NULL DEFAULT false,
+
+  -- Display
+  is_featured BOOLEAN NOT NULL DEFAULT false,
+  helpful_count INTEGER NOT NULL DEFAULT 0,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT reviews_one_per_booking UNIQUE (booking_id)
+);
+
+CREATE INDEX reviews_org_tour_idx ON reviews (organization_id, tour_id, status);
+CREATE INDEX reviews_org_status_idx ON reviews (organization_id, status);
+CREATE INDEX reviews_tour_rating_idx ON reviews (tour_id, rating) WHERE status = 'approved';
+```
+
+#### Abandoned Carts Table
+
+```sql
+CREATE TABLE abandoned_carts (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+
+  -- Customer (may not exist yet)
+  email TEXT NOT NULL,
+  customer_id TEXT REFERENCES customers(id),
+
+  -- Session
+  session_id TEXT NOT NULL,
+
+  -- Cart contents
+  tour_id TEXT NOT NULL REFERENCES tours(id),
+  schedule_id TEXT REFERENCES schedules(id),
+  variant_id TEXT REFERENCES tour_variants(id),
+
+  line_items JSONB NOT NULL DEFAULT '[]',
+  subtotal_amount INTEGER NOT NULL,
+  subtotal_currency TEXT NOT NULL DEFAULT 'USD',
+
+  -- Checkout progress
+  last_step TEXT NOT NULL DEFAULT 'cart',  -- cart, contact, payment
+  contact_info JSONB,
+
+  -- Attribution
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+
+  -- Recovery
+  recovery_token TEXT UNIQUE,
+  recovery_emails_sent INTEGER NOT NULL DEFAULT 0,
+  last_recovery_email_at TIMESTAMPTZ,
+
+  -- Outcome
+  recovered_at TIMESTAMPTZ,
+  recovered_booking_id TEXT REFERENCES bookings(id),
+  expired_at TIMESTAMPTZ,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX abandoned_carts_org_email_idx ON abandoned_carts (organization_id, email);
+CREATE INDEX abandoned_carts_recovery_idx ON abandoned_carts (organization_id, recovered_at)
+  WHERE recovered_at IS NULL AND expired_at IS NULL;
+CREATE INDEX abandoned_carts_token_idx ON abandoned_carts (recovery_token);
+```
+
+#### Wishlists Table
+
+```sql
+CREATE TABLE wishlists (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+
+  -- Owner (customer or anonymous)
+  customer_id TEXT REFERENCES customers(id),
+  session_id TEXT,
+  email TEXT,  -- For anonymous with email provided
+
+  tour_id TEXT NOT NULL REFERENCES tours(id) ON DELETE CASCADE,
+
+  -- Notifications
+  notify_price_drop BOOLEAN NOT NULL DEFAULT true,
+  notify_availability BOOLEAN NOT NULL DEFAULT true,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT wishlists_unique_customer_tour UNIQUE (customer_id, tour_id),
+  CONSTRAINT wishlists_unique_session_tour UNIQUE (session_id, tour_id)
+);
+
+CREATE INDEX wishlists_customer_idx ON wishlists (customer_id);
+CREATE INDEX wishlists_tour_idx ON wishlists (tour_id);
+```
+
+#### Availability Alerts Table
+
+```sql
+CREATE TABLE availability_alerts (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+
+  email TEXT NOT NULL,
+  customer_id TEXT REFERENCES customers(id),
+
+  tour_id TEXT NOT NULL REFERENCES tours(id) ON DELETE CASCADE,
+  schedule_id TEXT REFERENCES schedules(id) ON DELETE CASCADE,  -- Specific date
+
+  -- Notification status
+  notified_at TIMESTAMPTZ,
+  booking_id TEXT REFERENCES bookings(id),  -- If they booked
+
+  expires_at TIMESTAMPTZ NOT NULL,  -- Auto-expire after date passes
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX availability_alerts_schedule_idx
+  ON availability_alerts (schedule_id) WHERE notified_at IS NULL;
+```
+
+#### Tour FAQs Table
+
+```sql
+CREATE TABLE tour_faqs (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  tour_id TEXT NOT NULL REFERENCES tours(id) ON DELETE CASCADE,
+
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_published BOOLEAN NOT NULL DEFAULT true,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX tour_faqs_tour_idx ON tour_faqs (tour_id, sort_order);
+```
+
+#### Tour Inclusions/Exclusions Table
+
+```sql
+CREATE TABLE tour_inclusions (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  tour_id TEXT NOT NULL REFERENCES tours(id) ON DELETE CASCADE,
+
+  type TEXT NOT NULL CHECK (type IN ('inclusion', 'exclusion')),
+  text TEXT NOT NULL,
+  icon TEXT,  -- Optional icon identifier
+
+  sort_order INTEGER NOT NULL DEFAULT 0,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX tour_inclusions_tour_idx ON tour_inclusions (tour_id, type, sort_order);
+```
+
+#### Cancellation Policies Table
+
+```sql
+CREATE TABLE cancellation_policies (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+
+  name TEXT NOT NULL,
+  description TEXT,
+
+  -- Rules as JSON array
+  -- [{hoursBeforeTour: 168, refundPercentage: 100}, {hoursBeforeTour: 72, refundPercentage: 50}, ...]
+  rules JSONB NOT NULL DEFAULT '[]',
+
+  is_default BOOLEAN NOT NULL DEFAULT false,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Add FK to tours
+ALTER TABLE tours
+  ADD COLUMN cancellation_policy_id TEXT REFERENCES cancellation_policies(id);
+```
+
+#### Notification Preferences Table
+
+```sql
+CREATE TABLE notification_preferences (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+
+  -- Can be for staff or customer
+  user_id TEXT,  -- Clerk user ID for staff
+  customer_id TEXT REFERENCES customers(id),
+
+  -- Channels
+  email_enabled BOOLEAN NOT NULL DEFAULT true,
+  sms_enabled BOOLEAN NOT NULL DEFAULT true,
+  push_enabled BOOLEAN NOT NULL DEFAULT true,
+
+  -- Email preferences (for customers)
+  marketing_emails BOOLEAN NOT NULL DEFAULT false,
+  booking_emails BOOLEAN NOT NULL DEFAULT true,
+  reminder_emails BOOLEAN NOT NULL DEFAULT true,
+  review_requests BOOLEAN NOT NULL DEFAULT true,
+
+  -- Staff notification preferences
+  new_booking_notify BOOLEAN NOT NULL DEFAULT true,
+  cancellation_notify BOOLEAN NOT NULL DEFAULT true,
+  low_availability_notify BOOLEAN NOT NULL DEFAULT true,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT notification_prefs_owner CHECK (
+    (user_id IS NOT NULL AND customer_id IS NULL) OR
+    (user_id IS NULL AND customer_id IS NOT NULL)
+  )
+);
+```
+
+### Additional Fields for Existing Tables
+
+```sql
+-- Add attribution fields to customers
+ALTER TABLE customers ADD COLUMN country TEXT;
+ALTER TABLE customers ADD COLUMN acquisition_channel TEXT;
+ALTER TABLE customers ADD COLUMN acquisition_campaign TEXT;
+ALTER TABLE customers ADD COLUMN lifetime_value INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE customers ADD COLUMN booking_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE customers ADD COLUMN last_booking_at TIMESTAMPTZ;
+ALTER TABLE customers ADD COLUMN risk_score INTEGER;  -- No-show prediction
+
+-- Add attribution fields to bookings
+ALTER TABLE bookings ADD COLUMN utm_source TEXT;
+ALTER TABLE bookings ADD COLUMN utm_medium TEXT;
+ALTER TABLE bookings ADD COLUMN utm_campaign TEXT;
+ALTER TABLE bookings ADD COLUMN device_type TEXT;
+ALTER TABLE bookings ADD COLUMN browser TEXT;
+ALTER TABLE bookings ADD COLUMN checkout_started_at TIMESTAMPTZ;
+ALTER TABLE bookings ADD COLUMN checkout_completed_at TIMESTAMPTZ;
+
+-- Add review aggregates to tours
+ALTER TABLE tours ADD COLUMN average_rating DECIMAL(3,2);
+ALTER TABLE tours ADD COLUMN review_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tours ADD COLUMN popularity_score INTEGER NOT NULL DEFAULT 0;
+
+-- Add more tour fields
+ALTER TABLE tours ADD COLUMN highlights TEXT[] DEFAULT '{}';
+ALTER TABLE tours ADD COLUMN difficulty_level TEXT CHECK (difficulty_level IN ('easy', 'moderate', 'challenging'));
+ALTER TABLE tours ADD COLUMN accessibility_info TEXT;
+ALTER TABLE tours ADD COLUMN languages TEXT[] DEFAULT '{"en"}';
+```
 
 ---
 
@@ -3519,14 +4442,15 @@ Phase 10: Advanced Features
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
-| Framework | Next.js, Remix, SvelteKit | Next.js | React ecosystem, Vercel DX, hiring |
+| Framework | Next.js, Remix, SvelteKit | Next.js | React ecosystem, excellent DX, hiring |
 | API | REST, GraphQL, tRPC | tRPC | Type safety, small team, internal use |
-| Database | PostgreSQL, MySQL, MongoDB | PostgreSQL | Relational integrity for bookings |
-| Hosting | Supabase, PlanetScale, Neon | Supabase | Real-time, storage, good DX |
-| Deployment | Vercel, Railway, Fly.io | Vercel | Next.js optimization, simplicity |
+| Database | Supabase, PlanetScale, Neon | Supabase | Managed PostgreSQL, real-time, storage |
+| Hosting | Vercel, Railway, Self-hosted | Hostinger VPS + Coolify | Cost-effective for apps |
+| Storage | S3, Cloudinary, Supabase | Supabase Storage | Included with DB, CDN |
 | Jobs | BullMQ, Inngest, Temporal | Inngest | Observability, no infra, step functions |
-| Auth | Clerk, Auth.js, Supabase Auth | Clerk | Admin features, team management |
-| ORM | Prisma, Drizzle, Kysely | Drizzle | SQL-like, edge-ready, light |
+| Auth | Clerk, Auth.js, Lucia | Clerk | Admin features, team management |
+| ORM | Prisma, Drizzle, Kysely | Drizzle | SQL-like, works everywhere, light |
+| Cache | Upstash, Redis self-hosted | Redis (self-hosted) | Full control, session storage |
 
 ### C. Security Considerations
 
@@ -3556,8 +4480,10 @@ Phase 10: Advanced Features
 - [tRPC Documentation](https://trpc.io/docs)
 - [Drizzle ORM](https://orm.drizzle.team/)
 - [Supabase Documentation](https://supabase.com/docs)
+- [Coolify Documentation](https://coolify.io/docs)
 - [Inngest Documentation](https://www.inngest.com/docs)
 - [Stripe API Reference](https://stripe.com/docs/api)
+- [Clerk Documentation](https://clerk.com/docs)
 
 ---
 

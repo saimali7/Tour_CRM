@@ -1563,9 +1563,9 @@ export class PaymentService {
 │   │                      SHARED INFRASTRUCTURE                           │  │
 │   │                                                                      │  │
 │   │   ┌───────────────┐  ┌───────────────┐  ┌───────────────┐          │  │
-│   │   │   Supabase    │  │    Upstash    │  │    Inngest    │          │  │
-│   │   │               │  │               │  │               │          │  │
-│   │   │  PostgreSQL   │  │    Redis      │  │  Background   │          │  │
+│   │   │   Supabase    │  │     Redis     │  │    Inngest    │          │  │
+│   │   │               │  │ (Self-hosted) │  │               │          │  │
+│   │   │  PostgreSQL   │  │               │  │  Background   │          │  │
 │   │   │  (multi-      │  │    (cache)    │  │    Jobs       │          │  │
 │   │   │   tenant)     │  │               │  │               │          │  │
 │   │   │               │  │  org-prefixed │  │  org-aware    │          │  │
@@ -1590,11 +1590,18 @@ export class PaymentService {
 
 ```bash
 # ─────────────────────────────────────────────────────────────
-# PLATFORM (Your Infrastructure)
+# SUPABASE (Database + Storage)
 # ─────────────────────────────────────────────────────────────
-DATABASE_URL=                        # Supabase PostgreSQL
-UPSTASH_REDIS_URL=
-UPSTASH_REDIS_TOKEN=
+DATABASE_URL=                        # Supabase PostgreSQL connection string
+DIRECT_URL=                          # Supabase direct connection (for migrations)
+NEXT_PUBLIC_SUPABASE_URL=            # Supabase project URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=       # Supabase anonymous key
+SUPABASE_SERVICE_ROLE_KEY=           # Supabase service role key (server-side only)
+
+# ─────────────────────────────────────────────────────────────
+# HOSTINGER VPS + COOLIFY (Apps + Cache)
+# ─────────────────────────────────────────────────────────────
+REDIS_URL=                           # Redis (self-hosted via Coolify)
 INNGEST_EVENT_KEY=
 INNGEST_SIGNING_KEY=
 
@@ -1729,7 +1736,7 @@ Week 1-2: Infrastructure
 ├── Database schema with organizationId on all tables
 ├── Clerk integration with organizations
 ├── Basic org context in services
-└── Deploy to Vercel
+└── Deploy to Coolify (Hostinger VPS)
 
 Week 3-4: Core CRM Features
 ├── Organization dashboard
@@ -1796,6 +1803,341 @@ Week 15+: Growth Features
 ├── Advanced reporting
 ├── Integrations (OTAs, etc.)
 └── Mobile apps (future)
+```
+
+---
+
+## Web App Conversion Architecture
+
+The Web App is a customer acquisition channel. Its success is measured by conversion rate. This architecture ensures conversion optimization is built-in, not bolted on.
+
+### Conversion Optimization Stack
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CONVERSION OPTIMIZATION ARCHITECTURE                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   DATA COLLECTION                ANALYSIS                    ACTION         │
+│   ───────────────                ────────                    ──────         │
+│                                                                              │
+│   ┌─────────────┐              ┌─────────────┐            ┌─────────────┐  │
+│   │ First-Party │              │ Funnel      │            │ A/B Tests   │  │
+│   │ Analytics   │─────────────▶│ Analysis    │───────────▶│ & Changes   │  │
+│   └─────────────┘              └─────────────┘            └─────────────┘  │
+│                                                                              │
+│   ┌─────────────┐              ┌─────────────┐            ┌─────────────┐  │
+│   │ PostHog/    │              │ Attribution │            │ Personalize │  │
+│   │ Mixpanel    │─────────────▶│ Modeling    │───────────▶│ Experience  │  │
+│   └─────────────┘              └─────────────┘            └─────────────┘  │
+│                                                                              │
+│   ┌─────────────┐              ┌─────────────┐            ┌─────────────┐  │
+│   │ Heatmaps/   │              │ Drop-off    │            │ Recovery    │  │
+│   │ Sessions    │─────────────▶│ Diagnosis   │───────────▶│ Campaigns   │  │
+│   └─────────────┘              └─────────────┘            └─────────────┘  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Analytics Tooling Strategy
+
+| Tool | Purpose | Implementation |
+|------|---------|----------------|
+| **PostHog** | Product analytics, feature flags, A/B tests | Self-hosted or cloud |
+| **First-Party DB** | Attribution, revenue tracking | PostgreSQL |
+| **Microsoft Clarity** | Free heatmaps, session recordings | Script injection |
+| **Google Analytics 4** | SEO traffic, acquisition channels | Standard setup |
+
+### Conversion Features Built Into Architecture
+
+#### 1. Social Proof System
+
+```typescript
+// Real-time social proof events via Supabase Realtime
+interface SocialProofEvent {
+  type: 'booking_made' | 'viewing_now' | 'low_availability';
+  tourId: string;
+  data: {
+    // For booking_made
+    city?: string;
+    firstName?: string;
+    minutesAgo?: number;
+    // For viewing_now
+    viewerCount?: number;
+    // For low_availability
+    spotsRemaining?: number;
+  };
+}
+
+// Subscribe to org-specific channel
+const channel = supabase
+  .channel(`social-proof:${organizationId}`)
+  .on('broadcast', { event: 'social_proof' }, handleSocialProof)
+  .subscribe();
+```
+
+#### 2. Urgency & Scarcity
+
+```typescript
+// Availability with urgency indicators
+interface AvailabilityWithUrgency {
+  scheduleId: string;
+  spotsAvailable: number;
+  totalCapacity: number;
+  urgencyLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  urgencyMessage?: string;
+}
+
+function calculateUrgency(spots: number, capacity: number): UrgencyLevel {
+  const percentRemaining = spots / capacity;
+  if (percentRemaining <= 0.1) return 'critical';  // "Last 2 spots!"
+  if (percentRemaining <= 0.25) return 'high';     // "Only 5 left"
+  if (percentRemaining <= 0.5) return 'medium';    // "Selling fast"
+  return 'none';
+}
+```
+
+#### 3. Abandoned Cart Recovery System
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    ABANDONED CART RECOVERY FLOW                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   User starts          Cart saved to DB         Email sequence triggered    │
+│   checkout             with session ID          via Inngest                 │
+│       │                     │                        │                       │
+│       ▼                     ▼                        ▼                       │
+│   ┌────────┐           ┌────────┐              ┌────────────┐               │
+│   │ Email  │           │ Cart   │              │ Email #1   │               │
+│   │ entered│──────────▶│ stored │─── 15min ──▶│ "You left  │               │
+│   └────────┘           └────────┘              │  something"│               │
+│                             │                  └────────────┘               │
+│                             │                        │                       │
+│                             │                  24hr  │                       │
+│                             │                        ▼                       │
+│                             │                  ┌────────────┐               │
+│                             │                  │ Email #2   │               │
+│                             │                  │ "Still     │               │
+│                             │                  │  thinking?"│               │
+│                             │                  └────────────┘               │
+│                             │                        │                       │
+│   User returns with        │                  72hr  │                       │
+│   unique recovery link─────┴──────────────────────▶ │                       │
+│       │                                              ▼                       │
+│       │                                        ┌────────────┐               │
+│       │                                        │ Email #3   │               │
+│       ▼                                        │ "Last      │               │
+│   Cart auto-filled,                           │  chance"   │               │
+│   checkout resumed                            └────────────┘               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 4. Trust Signal Architecture
+
+```typescript
+// Trust signals displayed throughout checkout
+interface TrustSignals {
+  // Organization level
+  businessVerified: boolean;
+  yearsInBusiness: number;
+  totalBookings: number;
+
+  // Tour level
+  reviewCount: number;
+  averageRating: number;
+  recentBookings24h: number;
+
+  // Checkout level
+  securePayment: true;
+  freeCancellation?: {
+    until: Date;
+    percentage: number;
+  };
+  instantConfirmation: boolean;
+}
+```
+
+### Performance Requirements for Conversion
+
+| Page | LCP Target | Why It Matters |
+|------|------------|----------------|
+| Tour Listing | < 2.0s | First impression, bounce risk |
+| Tour Detail | < 2.5s | Decision page, must feel fast |
+| Checkout | < 1.5s | Payment friction = abandonment |
+| Confirmation | < 1.0s | Reinforce good decision |
+
+---
+
+## Real-Time Collaboration Architecture
+
+Modern CRMs require real-time features to avoid conflicts and provide awareness of team activity.
+
+### Real-Time Features
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       REAL-TIME ARCHITECTURE                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   SUPABASE REALTIME                                                         │
+│   ─────────────────                                                         │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────────┐ │
+│   │ Channel: org:{organizationId}                                        │ │
+│   │                                                                       │ │
+│   │ Events:                                                              │ │
+│   │ • booking.created    → Dashboard update, notification               │ │
+│   │ • booking.updated    → Reflect changes to all viewers              │ │
+│   │ • booking.cancelled  → Update lists, capacity                      │ │
+│   │ • schedule.updated   → Calendar refresh                            │ │
+│   │ • presence.update    → Show who's viewing what                     │ │
+│   └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│   PRESENCE                                                                  │
+│   ────────                                                                  │
+│                                                                              │
+│   ┌──────────────────────────────────────────────────────────────────────┐ │
+│   │ Track users viewing:                                                 │ │
+│   │ • Booking detail pages → Prevent edit conflicts                    │ │
+│   │ • Schedule calendar   → Show who's scheduling                      │ │
+│   │ • Customer profiles   → Avoid duplicate outreach                   │ │
+│   └──────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Presence Implementation
+
+```typescript
+// Real-time presence for CRM
+interface PresenceState {
+  odileId: string;
+  name: string;
+  avatar: string;
+  location: {
+    type: 'booking' | 'schedule' | 'customer' | 'tour';
+    id: string;
+  };
+  lastSeen: Date;
+}
+
+// Track presence on entity pages
+function usePresence(entityType: string, entityId: string) {
+  const { user } = useAuth();
+  const channel = useRef<RealtimeChannel>();
+
+  useEffect(() => {
+    channel.current = supabase.channel(`presence:${organizationId}`);
+
+    channel.current
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.current!.presenceState();
+        // Filter to users viewing same entity
+        const viewers = Object.values(state)
+          .flat()
+          .filter(p => p.location.type === entityType && p.location.id === entityId);
+        setOtherViewers(viewers);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.current!.track({
+            userId: user.id,
+            name: user.name,
+            avatar: user.avatar,
+            location: { type: entityType, id: entityId },
+          });
+        }
+      });
+
+    return () => { channel.current?.unsubscribe(); };
+  }, [entityType, entityId]);
+}
+```
+
+### Optimistic Updates with Conflict Resolution
+
+```typescript
+// Optimistic update pattern for bookings
+async function updateBooking(bookingId: string, updates: BookingUpdate) {
+  // 1. Optimistic update
+  queryClient.setQueryData(['booking', bookingId], (old) => ({
+    ...old,
+    ...updates,
+    _optimistic: true,
+  }));
+
+  try {
+    // 2. Server update with version check
+    const result = await trpc.booking.update.mutate({
+      id: bookingId,
+      ...updates,
+      expectedVersion: currentVersion,  // Optimistic locking
+    });
+
+    // 3. Confirm update
+    queryClient.setQueryData(['booking', bookingId], result);
+
+  } catch (error) {
+    if (error.code === 'VERSION_CONFLICT') {
+      // 4. Handle conflict - show what changed
+      showConflictDialog({
+        yourChanges: updates,
+        serverState: error.currentState,
+        changedBy: error.changedBy,
+      });
+    }
+
+    // 5. Rollback optimistic update
+    queryClient.invalidateQueries(['booking', bookingId]);
+  }
+}
+```
+
+### Activity Feed Architecture
+
+```sql
+-- Activity log for real-time feed
+CREATE TABLE activity_log (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES organizations(id),
+
+  -- Who
+  user_id TEXT NOT NULL,
+  user_name TEXT NOT NULL,
+
+  -- What
+  action TEXT NOT NULL,  -- 'created', 'updated', 'cancelled', etc.
+  entity_type TEXT NOT NULL,  -- 'booking', 'schedule', 'customer', etc.
+  entity_id TEXT NOT NULL,
+  entity_name TEXT,  -- Denormalized for display
+
+  -- Details
+  changes JSONB,  -- What changed (for updates)
+  metadata JSONB,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Trigger to broadcast new activities
+CREATE OR REPLACE FUNCTION broadcast_activity()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM pg_notify(
+    'activity:' || NEW.organization_id,
+    json_build_object(
+      'id', NEW.id,
+      'action', NEW.action,
+      'entity_type', NEW.entity_type,
+      'entity_id', NEW.entity_id,
+      'user_name', NEW.user_name,
+      'created_at', NEW.created_at
+    )::text
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 ```
 
 ---

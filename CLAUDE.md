@@ -48,18 +48,58 @@ Shared Infrastructure            → Database, cache, jobs, external APIs (all o
 | Layer | Choice | Rationale |
 |-------|--------|-----------|
 | **Monorepo** | Turborepo + pnpm | Shared code, atomic changes, single CI |
-| **Framework** | Next.js 15 (App Router) | React ecosystem maturity, Server Components, Vercel deployment |
+| **Framework** | Next.js 15 (App Router) | React ecosystem maturity, Server Components |
 | **Internal API** | tRPC | End-to-end type safety, compiler catches integration bugs |
 | **External API** | REST | Standards for partners, webhooks |
-| **Database** | PostgreSQL via Supabase | Relational integrity for bookings, RLS, real-time |
-| **ORM** | Drizzle | SQL-like syntax, small bundle, edge-compatible |
+| **Database** | Supabase (PostgreSQL) | Managed DB, real-time, RLS, storage included |
+| **ORM** | Drizzle | SQL-like syntax, small bundle, works everywhere |
 | **Auth (Staff)** | Clerk with Organizations | Multi-tenant auth, RBAC, team management |
 | **Auth (Customers)** | Magic link | Lightweight, customers don't need full accounts |
 | **Payments** | Stripe Connect | Per-organization payment processing, platform fees |
 | **Background Jobs** | Inngest | Event-driven workflows, retries, observability |
 | **Email** | Resend | Modern API, React Email templates |
 | **SMS** | Twilio | WhatsApp Business API support |
-| **Cache** | Upstash Redis | Serverless, edge-compatible |
+| **Cache** | Redis (self-hosted) | Session storage, availability caching |
+| **Hosting** | Hostinger VPS + Coolify | Self-hosted apps, cost-effective |
+| **Storage** | Supabase Storage | CDN included, org-scoped buckets |
+| **Reverse Proxy** | Traefik (via Coolify) | Auto SSL, load balancing |
+
+## Infrastructure Architecture (Hybrid)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     HOSTINGER VPS + COOLIFY                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │   CRM App   │  │   Web App   │  │   Inngest   │             │
+│  │  (Next.js)  │  │  (Next.js)  │  │   Worker    │             │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘             │
+│         │                │                │                     │
+│         └────────────────┼────────────────┘                     │
+│                          │                                       │
+│  ┌───────────────────────┴───────────────────────┐              │
+│  │              Traefik (Reverse Proxy)          │              │
+│  │         Auto SSL, Subdomain Routing           │              │
+│  └───────────────────────────────────────────────┘              │
+│                          │                                       │
+│            ┌─────────────┴─────────────┐                        │
+│            │          Redis            │                        │
+│            │      (Cache/Sessions)     │                        │
+│            └───────────────────────────┘                        │
+│                                                                  │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         SUPABASE                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │ PostgreSQL  │  │   Storage   │  │  Realtime   │             │
+│  │  Database   │  │  (Images)   │  │  (WebSocket)│             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## Multi-Tenant Data Model
 

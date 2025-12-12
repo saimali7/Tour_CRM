@@ -50,16 +50,60 @@ The platform consists of **two applications** serving different audiences:
 
 ### Phase Timeline
 
-| Phase | Name | Duration | Focus |
-|-------|------|----------|-------|
-| **0** | Foundation | 2 weeks | Infrastructure, auth, scaffolding |
-| **1** | Core Booking Engine | 3 weeks | Tours, schedules, bookings, payments |
-| **2** | Customer & Communications | 2 weeks | CRM, email, SMS automation |
-| **3** | Guide Operations | 2 weeks | Guides, assignments, manifests |
-| **4** | Pricing & Promotions | 2 weeks | Advanced pricing, promo codes |
-| **5** | Reporting & Analytics | 2 weeks | Dashboard, reports, insights |
-| **6** | Polish & Optimization | 2 weeks | Performance, UX, testing |
-| **7+** | Future Expansion | Ongoing | API, integrations, mobile |
+**Strategy: CRM First, Web App Second, SaaS Last**
+
+The CRM is the core product that runs your tour business. The Web App is a customer acquisition channel. SaaS/API features enable selling to other operators. We build in this order to:
+1. Validate core operations work perfectly before adding customer-facing complexity
+2. Run your business on the CRM while Web App is being built
+3. Prove product-market fit before investing in multi-tenant SaaS infrastructure
+
+| Phase | Name | Duration | Focus | App |
+|-------|------|----------|-------|-----|
+| **0** | Foundation | 2 weeks | Infrastructure, auth, scaffolding | Core |
+| **1** | Core CRM & Booking | 3 weeks | Tours, schedules, bookings, payments | 🖥️ CRM |
+| **2** | Customer & Communications | 2 weeks | CRM features, email, SMS automation | 🖥️ CRM |
+| **3** | Guide Operations | 2 weeks | Guides, assignments, manifests | 🖥️ CRM |
+| **4** | Pricing & Promotions | 2 weeks | Advanced pricing, promo codes | 🖥️ CRM |
+| **5** | Reporting & Analytics | 2 weeks | Dashboard, reports, CRM intelligence | 🖥️ CRM |
+| **6** | CRM Polish | 2 weeks | Performance, UX, testing | 🖥️ CRM |
+| — | **CRM COMPLETE** | — | *Your business can run fully on CRM* | — |
+| **7** | Web App Foundation | 2 weeks | Public site scaffolding, SEO | 🌐 Web |
+| **8** | Web App Booking Flow | 3 weeks | High-conversion booking experience | 🌐 Web |
+| **9** | Web App Optimization | 2 weeks | Conversion features, A/B testing | 🌐 Web |
+| — | **WEB APP COMPLETE** | — | *Full customer acquisition channel* | — |
+| **10** | SaaS Platform | 3 weeks | Multi-tenant onboarding, billing | 🔧 Platform |
+| **11** | Public API | 2 weeks | REST API for partners, OTA integrations | 🔧 Platform |
+| **12+** | Expansion | Ongoing | Mobile app, advanced integrations | All |
+
+### Development Priority Order
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 0-6: CRM (Your Business Operations)                      │
+│  ═══════════════════════════════════════════                    │
+│  • Run your tour business end-to-end                            │
+│  • Manual bookings (phone, walk-in, admin)                      │
+│  • Full operations: guides, schedules, payments                 │
+│  • Complete reporting and analytics                             │
+│  • Can operate WITHOUT Web App                                  │
+├─────────────────────────────────────────────────────────────────┤
+│  PHASE 7-9: Web App (Customer Acquisition)                      │
+│  ═══════════════════════════════════════════                    │
+│  • Public booking website                                       │
+│  • High-conversion checkout                                     │
+│  • SEO, social proof, reviews                                   │
+│  • Abandoned cart recovery                                      │
+│  • OPTIONAL per organization                                    │
+├─────────────────────────────────────────────────────────────────┤
+│  PHASE 10-11: SaaS Platform (Scale to Other Operators)          │
+│  ═══════════════════════════════════════════════════            │
+│  • Multi-tenant onboarding                                      │
+│  • Subscription billing (Stripe)                                │
+│  • Public REST API                                              │
+│  • OTA integrations (Viator, GetYourGuide)                      │
+│  • White-label capabilities                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Success Metrics
 
@@ -180,7 +224,7 @@ This phase establishes the technical foundation for a multi-tenant platform. No 
 **What:** Supabase project with multi-tenant schema.
 
 **Includes:**
-- Supabase project creation
+- Supabase project creation (free tier to start)
 - Drizzle ORM configuration in `@tour/database`
 - **Organizations table** (the tenant root)
 - Core table migrations with `organization_id` on all tenant tables
@@ -262,9 +306,21 @@ This phase establishes the technical foundation for a multi-tenant platform. No 
 ## Phase 1: Core Booking Engine
 
 **Duration:** 3 weeks
-**Goal:** End-to-end booking flow working
+**Goal:** End-to-end booking flow working with high-conversion foundation
 
-This is the heart of the system. A customer can browse tours, select a time, and complete a booking with payment.
+This is the heart of the system. A customer can browse tours, select a time, and complete a booking with payment. **Critical:** Even in Phase 1, we build conversion optimization into the foundation—not as an afterthought.
+
+### Conversion Foundation (Built Into Phase 1)
+
+Every feature in Phase 1 includes conversion-optimized implementation:
+
+| Feature | Conversion Element |
+|---------|-------------------|
+| Tour Listing | Urgency indicators, social proof badges |
+| Tour Detail | Trust signals, scarcity messaging |
+| Availability | Real-time spots remaining |
+| Checkout | Progress indicator, express payment |
+| Confirmation | Share buttons, referral hooks |
 
 ---
 
@@ -309,6 +365,14 @@ This is the heart of the system. A customer can browse tours, select a time, and
 | Status | Select | Yes | Draft/Active/Archived |
 | Meta Title | Text | No | SEO, max 60 chars |
 | Meta Description | Text | No | SEO, max 160 chars |
+| **Inclusions** | List | Yes | What's included |
+| **Exclusions** | List | No | What's not included |
+| **Highlights** | List | Yes | Key selling points (3-5) |
+| **Requirements** | Text | No | Physical requirements, age limits |
+| **Accessibility Info** | Text | No | Wheelchair access, etc. |
+| **Difficulty Level** | Select | No | Easy/Moderate/Challenging |
+| **Languages Offered** | Multi-select | Yes | Tour languages |
+| **Cancellation Policy** | Select | Yes | Link to policy |
 
 **Categories:**
 - Walking
@@ -404,7 +468,7 @@ This is the heart of the system. A customer can browse tours, select a time, and
 - Generate sizes: 400px, 800px, 1200px
 - Strip EXIF data
 - Max upload: 5MB per image
-- Store in Supabase Storage with CDN
+- Store in Supabase Storage with built-in CDN
 
 ---
 
@@ -570,11 +634,22 @@ This is the heart of the system. A customer can browse tours, select a time, and
 **Acceptance Criteria:**
 - [ ] Grid view of active tours
 - [ ] Tour card: image, name, short description, starting price, duration
-- [ ] Filter by category
-- [ ] Sort by: price, duration, popularity
+- [ ] Filter by category, duration, price range, date availability
+- [ ] Sort by: price, duration, popularity, rating
 - [ ] Responsive (mobile-first)
-- [ ] Loading states
+- [ ] Loading states with skeleton UI
 - [ ] Empty state if no tours
+- [ ] **Infinite scroll or pagination**
+- [ ] **"Flexible dates" search option**
+
+**Conversion Elements (Required):**
+- [ ] **Rating badge** on each card (★ 4.8)
+- [ ] **Review count** ("124 reviews")
+- [ ] **"Popular" or "Bestseller" badge** for top tours
+- [ ] **"X spots left today"** urgency indicator
+- [ ] **"Free cancellation"** badge where applicable
+- [ ] **Starting price** with "from" prefix
+- [ ] **Quick view** on hover (desktop)
 
 ---
 
@@ -588,13 +663,34 @@ This is the heart of the system. A customer can browse tours, select a time, and
 **Acceptance Criteria:**
 - [ ] Full description with rich formatting
 - [ ] Image gallery with lightbox
-- [ ] Meeting point with map
-- [ ] Duration and what's included
+- [ ] Meeting point with interactive map
+- [ ] Duration and what's included/excluded
 - [ ] Price breakdown by tier
-- [ ] Availability calendar
-- [ ] Select date and book CTA
-- [ ] Social sharing (future)
-- [ ] Related tours (future)
+- [ ] Availability calendar (inline)
+- [ ] Select date and book CTA (sticky on mobile)
+- [ ] Social sharing buttons
+- [ ] Related/similar tours section
+
+**Trust & Conversion Elements (Required):**
+- [ ] **Aggregate rating** prominently displayed (★ 4.8 from 124 reviews)
+- [ ] **Recent reviews section** (3-5 featured reviews)
+- [ ] **"Booked X times in last 24 hours"** social proof
+- [ ] **"X people viewing now"** live indicator
+- [ ] **Highlights section** with icons (key selling points)
+- [ ] **What's included** checklist with ✓ icons
+- [ ] **What's not included** with clear messaging
+- [ ] **Cancellation policy** clearly stated
+- [ ] **"Questions? Contact us"** chat/contact link
+- [ ] **Trust badges** (secure payment, verified business)
+- [ ] **Photo reviews** from customers
+- [ ] **FAQ accordion** for common questions
+- [ ] **Sticky booking bar** on scroll (price + CTA)
+
+**SEO Elements:**
+- [ ] Structured data (Tour, Event, Offer schemas)
+- [ ] Breadcrumb navigation
+- [ ] Canonical URL
+- [ ] Open Graph tags for social sharing
 
 ---
 
@@ -610,9 +706,18 @@ This is the heart of the system. A customer can browse tours, select a time, and
 - [ ] Clear indication of sold-out dates
 - [ ] Select date to see time slots
 - [ ] Show remaining spots per slot
-- [ ] Show price per slot
+- [ ] Show price per slot (with seasonal adjustments)
 - [ ] Variant selector if multiple exist
-- [ ] Real-time updates (poll or websocket)
+- [ ] Real-time updates (WebSocket preferred)
+- [ ] **"I'm flexible" date search** (±3 days)
+- [ ] **Best price indicator** across dates
+
+**Conversion Elements (Required):**
+- [ ] **Low availability warning** ("Only 2 spots left!" in red/orange)
+- [ ] **Selling fast indicator** ("🔥 Selling fast")
+- [ ] **Price comparison** when seasonal pricing differs
+- [ ] **"Most popular time"** badge on high-demand slots
+- [ ] **Instant confirmation** badge
 
 **Display Format:**
 ```
@@ -621,10 +726,10 @@ January 2025
 Morning (09:00)              Afternoon (14:00)
 ───────────────────────────────────────────
 Mon 6   ✓ 8 spots  $45      ✓ 12 spots  $45
-Tue 7   ✓ 5 spots  $45      ✓ 10 spots  $45
+Tue 7   ✓ 5 spots  $45      ✓ 10 spots  $45  ⭐ Most Popular
 Wed 8   ✓ 12 spots $45      ✗ Sold Out
-Thu 9   ✓ 3 spots  $45      ✓ 7 spots   $45
-Fri 10  ✗ Sold Out          ✓ 2 spots   $45
+Thu 9   🔥 3 spots $45      ✓ 7 spots   $45
+Fri 10  ✗ Sold Out          ⚠️ 2 spots  $45  Last chance!
 ```
 
 ---
@@ -673,6 +778,18 @@ Fri 10  ✗ Sold Out          ✓ 2 spots   $45
 - [ ] Maintain state if navigating back
 - [ ] Mobile-optimized layout
 - [ ] Accessibility compliant
+- [ ] **Guest checkout** (no account required)
+- [ ] **Auto-save progress** (localStorage)
+- [ ] **Express checkout** (Apple Pay, Google Pay)
+
+**Conversion Optimization (Required):**
+- [ ] **Order summary sidebar** (sticky on desktop)
+- [ ] **Trust badges** near payment button
+- [ ] **Secure payment** messaging
+- [ ] **Money-back guarantee** if applicable
+- [ ] **"Free cancellation until X"** reminder
+- [ ] **Estimated confirmation time** ("Instant confirmation")
+- [ ] **Exit intent detection** (show offer or save cart)
 
 ---
 
@@ -739,6 +856,7 @@ Total                     $115.92 USD
 - Credit/Debit cards
 - Apple Pay
 - Google Pay
+- **Buy Now Pay Later** (Klarna, Affirm - Phase 2)
 
 **Acceptance Criteria:**
 - [ ] Stripe Elements integration
@@ -747,6 +865,17 @@ Total                     $115.92 USD
 - [ ] Loading state during processing
 - [ ] Handle payment failures gracefully
 - [ ] Timeout handling
+- [ ] **Payment method icons** displayed
+- [ ] **"Secure checkout"** badge
+- [ ] **3D Secure support** for fraud prevention
+
+**Conversion Tracking (Required):**
+- [ ] Track `checkout.started` event
+- [ ] Track `payment.attempted` event
+- [ ] Track `payment.failed` with reason
+- [ ] Track `payment.succeeded` event
+- [ ] **Capture UTM parameters** for attribution
+- [ ] **Device/browser info** for debugging
 
 ---
 
@@ -787,10 +916,28 @@ Confirmation sent to john@example.com
 **Acceptance Criteria:**
 - [ ] Reference number prominently displayed
 - [ ] All booking details shown
-- [ ] Meeting point with clear instructions
-- [ ] Add to Calendar (Google, Apple, Outlook)
+- [ ] Meeting point with clear instructions + Google Maps link
+- [ ] Add to Calendar (Google, Apple, Outlook, .ics download)
 - [ ] Print-friendly version
 - [ ] Link to manage booking
+- [ ] **Mobile ticket with QR code** for check-in
+- [ ] **Share booking** buttons (WhatsApp, Email, Copy link)
+- [ ] **What to bring** section
+- [ ] **Weather forecast** for tour day
+
+**Post-Booking Engagement (Required):**
+- [ ] **"Book another tour"** or browse similar CTA
+- [ ] **Referral program prompt** ("Share with friends, get $10 off")
+- [ ] **Social share buttons** ("Share your upcoming adventure!")
+- [ ] **Newsletter signup** (if not already subscribed)
+
+**Confirmation Email Must Include:**
+- [ ] QR code/mobile ticket
+- [ ] Meeting point with Google Maps link
+- [ ] What to bring/wear recommendations
+- [ ] Cancellation policy reminder
+- [ ] Contact information for questions
+- [ ] Calendar attachment (.ics file)
 
 ---
 
@@ -1026,7 +1173,145 @@ Confirmation sent to john@example.com
 ## Phase 2: Customer & Communications
 
 **Duration:** 2 weeks
-**Goal:** CRM functionality and automated communications
+**Goal:** CRM functionality, automated communications, and conversion recovery
+
+---
+
+### 2.0 Conversion Recovery & Re-engagement (Critical)
+
+These features are **essential for high conversion** and should be built early in Phase 2.
+
+#### 2.0.1 Abandoned Cart Recovery
+
+**Priority:** P0 - Critical
+
+**User Story:**
+> As a Business Owner, I want to automatically recover customers who started but didn't complete bookings.
+
+**Tracking Requirements:**
+- [ ] Capture checkout start (email collected)
+- [ ] Store cart state (tour, date, participants, price)
+- [ ] Track last step reached
+- [ ] Calculate cart value
+
+**Automated Recovery Sequence:**
+
+| Timing | Channel | Content |
+|--------|---------|---------|
+| 15 minutes | Email | "You left something behind" + cart contents |
+| 24 hours | Email | "Still interested?" + limited-time offer (optional) |
+| 72 hours | Email | "Last chance" + urgency messaging |
+| 15 minutes | SMS (if opted in) | "Complete your booking" + link |
+
+**Email #1 Content (15 min):**
+- Tour name and image
+- Selected date/time
+- Total price
+- "Complete your booking" CTA
+- Meeting point preview
+
+**Email #2 Content (24h):**
+- Above + "spots are filling up" (if true)
+- Optional discount code (configurable)
+- Customer support contact
+
+**Email #3 Content (72h):**
+- Final reminder
+- Show what they'll miss (highlights)
+- Alternative dates if original sold out
+
+**Acceptance Criteria:**
+- [ ] Abandoned carts tracked in database
+- [ ] Inngest workflows for timed emails
+- [ ] Unique recovery links (one-click resume)
+- [ ] Stop sequence if booking completed
+- [ ] Track recovery conversions
+- [ ] A/B test email subject lines
+- [ ] Dashboard showing recovery rate
+
+**Metrics to Track:**
+- Cart abandonment rate
+- Recovery email open rate
+- Recovery conversion rate
+- Revenue recovered
+
+---
+
+#### 2.0.2 Browse Abandonment
+
+**Priority:** P1 - High
+
+**User Story:**
+> As a Business Owner, I want to re-engage visitors who viewed tours but didn't book.
+
+**Trigger:** Identified visitor (has email from previous booking) views tour but leaves.
+
+**Sequence:**
+| Timing | Content |
+|--------|---------|
+| 4 hours | "Still thinking about [Tour Name]?" |
+| 3 days | "Tours filling up for [dates they viewed]" |
+
+**Acceptance Criteria:**
+- [ ] Track page views for identified users
+- [ ] Trigger browse abandonment for tours viewed 2+ times
+- [ ] Personalize with viewed tour content
+- [ ] Respect email frequency limits
+
+---
+
+#### 2.0.3 Wishlist / Save for Later
+
+**Priority:** P1 - High
+
+**User Story:**
+> As a Customer, I want to save tours I'm interested in so I can book later.
+
+**Acceptance Criteria:**
+- [ ] "Save" button on tour cards and detail pages
+- [ ] Heart icon toggle (visual feedback)
+- [ ] Works without account (cookie/localStorage)
+- [ ] Prompts for email to save across devices
+- [ ] Wishlist page to view saved tours
+- [ ] **Price drop alerts** for wishlisted tours
+- [ ] **Availability alerts** when dates open up
+- [ ] Weekly digest of wishlisted tours
+
+---
+
+#### 2.0.4 Price Drop Alerts
+
+**Priority:** P2 - Medium
+
+**User Story:**
+> As a Customer, I want to be notified when a tour I'm interested in goes on sale.
+
+**Acceptance Criteria:**
+- [ ] Track tours customers are interested in
+- [ ] Detect promotional pricing or seasonal drops
+- [ ] Send immediate email when price drops
+- [ ] Include new price vs old price
+- [ ] Direct link to book
+
+---
+
+#### 2.0.5 Back-in-Stock / Availability Alerts
+
+**Priority:** P1 - High
+
+**User Story:**
+> As a Customer, I want to be notified when a sold-out tour has availability.
+
+**Trigger Points:**
+- Customer tried to book sold-out date
+- Customer explicitly requested notification
+
+**Acceptance Criteria:**
+- [ ] "Notify me" button on sold-out dates
+- [ ] Collect email (or use existing)
+- [ ] Immediate notification when spots open
+- [ ] First-come-first-served priority booking link
+- [ ] Auto-expire notification requests after date passes
 
 ---
 
@@ -1963,6 +2248,269 @@ Priority: 2
 
 ---
 
+### 5.4 CRM Intelligence & Automation (Cutting-Edge)
+
+These features differentiate from basic CRMs and enable data-driven operations.
+
+#### 5.4.1 Customer Scoring & Segmentation
+
+**Priority:** P1 - High
+
+**User Story:**
+> As a Business Owner, I want customers automatically scored and segmented to prioritize high-value relationships.
+
+**Customer Score Components:**
+
+| Factor | Weight | Criteria |
+|--------|--------|----------|
+| Lifetime Value | 30% | Total spend to date |
+| Booking Frequency | 25% | Bookings per year |
+| Recency | 20% | Days since last booking |
+| Engagement | 15% | Email opens, site visits |
+| Referrals | 10% | Friends referred |
+
+**Automatic Segments:**
+- **VIP** (Score 80+): High value, frequent booker
+- **Loyal** (Score 60-79): Regular customer, good value
+- **Promising** (Score 40-59): Growing relationship
+- **At Risk** (Score 20-39): Was active, declining engagement
+- **Dormant** (Score <20): No recent activity
+
+**Acceptance Criteria:**
+- [ ] Automatic score calculation (nightly job)
+- [ ] Segment assignment based on score
+- [ ] Segment history tracking
+- [ ] Custom segment rules
+- [ ] Segment-based email targeting
+- [ ] Dashboard widget showing segment distribution
+
+---
+
+#### 5.4.2 Customer Lifetime Value (CLV) Prediction
+
+**Priority:** P2 - Medium
+
+**User Story:**
+> As a Business Owner, I want to predict customer lifetime value to inform acquisition spending.
+
+**CLV Model Inputs:**
+- Historical booking patterns
+- Average order value
+- Booking frequency
+- Customer acquisition source
+- Engagement metrics
+
+**Display:**
+- Predicted 12-month CLV
+- Historical CLV
+- CLV by acquisition channel
+- CLV trends over time
+
+**Acceptance Criteria:**
+- [ ] Calculate historical CLV per customer
+- [ ] Simple predictive model (based on similar customer behavior)
+- [ ] CLV displayed on customer profile
+- [ ] CLV in customer list (sortable)
+- [ ] CLV by source in reports
+
+---
+
+#### 5.4.3 Predictive No-Show Detection
+
+**Priority:** P2 - Medium
+
+**User Story:**
+> As an Operations Manager, I want to identify high-risk bookings so I can proactively confirm attendance.
+
+**Risk Factors:**
+- Previous no-shows
+- Last-minute booking
+- No email opens/confirmations
+- Payment status
+- Party size
+- Lead time (very long or very short)
+
+**Risk Actions:**
+- [ ] Flag high-risk bookings in list
+- [ ] Trigger extra confirmation SMS/call
+- [ ] Suggest overbooking for high-risk schedules
+
+**Acceptance Criteria:**
+- [ ] Risk score per booking (Low/Medium/High)
+- [ ] Visual indicator on booking list
+- [ ] Automated outreach workflow for high risk
+- [ ] Track actual no-show rate vs predicted
+
+---
+
+#### 5.4.4 Demand Forecasting
+
+**Priority:** P3 - Low (Phase 7+)
+
+**User Story:**
+> As an Operations Manager, I want to predict demand to optimize scheduling and pricing.
+
+**Forecast Based On:**
+- Historical booking patterns
+- Seasonality
+- Day of week
+- Local events (manual input)
+- Weather (API integration)
+
+**Outputs:**
+- Predicted bookings by tour/date
+- Suggested capacity adjustments
+- Dynamic pricing recommendations
+- Guide staffing suggestions
+
+---
+
+#### 5.4.5 Automated Re-engagement Campaigns
+
+**Priority:** P1 - High
+
+**User Story:**
+> As a Business Owner, I want automatic campaigns to re-engage lapsed customers.
+
+**Trigger Campaigns:**
+
+| Segment | Trigger | Action |
+|---------|---------|--------|
+| At Risk | 60 days since booking | "We miss you" email |
+| Dormant | 120 days since booking | Win-back offer |
+| Post-Tour | 1 day after | Review request |
+| Post-Tour | 14 days after | "Book again" with similar tours |
+| Birthday | On birthday (if known) | Birthday discount |
+| Anniversary | 1 year since first booking | Loyalty thank you |
+
+**Acceptance Criteria:**
+- [ ] Configurable trigger conditions
+- [ ] Email template per campaign
+- [ ] A/B testing for subject lines
+- [ ] Campaign performance tracking
+- [ ] Suppression rules (frequency limits)
+- [ ] Opt-out handling
+
+---
+
+#### 5.4.6 Revenue Attribution Dashboard
+
+**Priority:** P1 - High
+
+**User Story:**
+> As a Business Owner, I want to understand which marketing channels actually drive revenue, not just traffic.
+
+**Attribution Models:**
+- First touch (acquisition source)
+- Last touch (booking source)
+- Linear (equal credit across touchpoints)
+
+**Tracked Channels:**
+- Organic Search
+- Paid Search (Google Ads)
+- Social (Facebook, Instagram)
+- Email Marketing
+- Referral/Affiliate
+- OTA (Viator, GetYourGuide)
+- Direct
+
+**Dashboard Metrics:**
+- Revenue by channel
+- ROI by channel (if spend data provided)
+- Conversion rate by channel
+- Average order value by channel
+- Customer quality by channel (repeat rate, CLV)
+
+**Acceptance Criteria:**
+- [ ] UTM parameter capture on all bookings
+- [ ] Attribution model selection
+- [ ] Revenue attribution dashboard
+- [ ] Channel comparison charts
+- [ ] Export data for external analysis
+
+---
+
+#### 5.4.7 Operational Efficiency Metrics
+
+**Priority:** P2 - Medium
+
+**User Story:**
+> As a Business Owner, I want to understand operational efficiency to optimize resources.
+
+**Metrics:**
+- **Tour Profitability**: Revenue - (Guide cost + overhead) per tour
+- **Guide Utilization**: Hours worked vs hours available
+- **Capacity Utilization**: Booked spots vs available spots
+- **Schedule Efficiency**: Tours at optimal capacity vs undersold
+- **Cancellation Cost**: Lost revenue from cancellations
+- **No-Show Rate**: By tour, day of week, booking source
+
+**Recommendations:**
+- Tours to discontinue (consistently undersold)
+- Time slots to adjust (low utilization patterns)
+- Guides to prioritize (high performer identification)
+- Capacity adjustments (increase/decrease based on demand)
+
+---
+
+### 5.5 Conversion Analytics (Web App)
+
+#### 5.5.1 Conversion Funnel Dashboard
+
+**Priority:** P0 - Critical
+
+**User Story:**
+> As a Business Owner, I want to see where customers drop off in the booking flow.
+
+**Funnel Stages:**
+1. Site Visit
+2. Tour View
+3. Availability Check
+4. Add to Cart / Start Checkout
+5. Contact Info Entered
+6. Payment Initiated
+7. Payment Completed
+
+**Metrics Per Stage:**
+- Visitor count
+- Drop-off rate
+- Conversion to next stage
+- Time spent at stage
+- Segment by device/source
+
+**Acceptance Criteria:**
+- [ ] Visual funnel chart
+- [ ] Click to drill into drop-off details
+- [ ] Compare periods
+- [ ] Segment by traffic source
+- [ ] Segment by device type
+- [ ] Alerts for unusual drop-off spikes
+
+---
+
+#### 5.5.2 A/B Testing Framework
+
+**Priority:** P2 - Medium (Phase 7+)
+
+**User Story:**
+> As a Business Owner, I want to test different experiences to optimize conversion.
+
+**Test Types:**
+- Pricing display
+- CTA button text/color
+- Page layouts
+- Email subject lines
+- Checkout flow variants
+
+**Acceptance Criteria:**
+- [ ] Create experiment with variants
+- [ ] Traffic allocation
+- [ ] Statistical significance calculation
+- [ ] Auto-winner declaration
+- [ ] Integration with analytics
+
+---
+
 ## Phase 6: Polish & Optimization
 
 **Duration:** 2 weeks
@@ -2118,34 +2666,383 @@ Priority: 2
 
 ---
 
-## Phase 7+: Future Expansion
+## Phase 7: Web App Foundation
 
-Features for post-MVP development based on business needs.
+**Duration:** 2 weeks
+**Goal:** Public booking website scaffolding with SEO foundation
+**Prerequisite:** CRM Phases 0-6 complete
+
+> **Note:** Your tour business is fully operational on CRM before this phase begins. The Web App adds a customer acquisition channel.
 
 ---
 
-### 7.1 Public API
+### 7.1 Web App Scaffolding
+
+**Priority:** P0 - Critical
+
+**Acceptance Criteria:**
+- [ ] Next.js app at `apps/web`
+- [ ] Subdomain routing middleware (`{org}.book.platform.com`)
+- [ ] Organization context from subdomain
+- [ ] Shared UI components from `@tour/ui`
+- [ ] Shared services from `@tour/services`
+- [ ] Basic layout (header, footer, nav)
+- [ ] Organization branding (logo, colors)
+
+---
+
+### 7.2 SEO Foundation
+
+**Priority:** P0 - Critical
+
+**Acceptance Criteria:**
+- [ ] Dynamic sitemap generation (`/sitemap.xml`)
+- [ ] Robots.txt configuration
+- [ ] Meta tag management (title, description per page)
+- [ ] Open Graph tags for social sharing
+- [ ] Structured data (Schema.org) for tours
+- [ ] Canonical URLs
+- [ ] Breadcrumb navigation
+
+**Structured Data Types:**
+- `TouristAttraction` for tours
+- `Event` for scheduled tours
+- `Offer` for pricing
+- `AggregateRating` for reviews
+- `Organization` for business info
+
+---
+
+### 7.3 Tour Listing Page (Web)
+
+**Priority:** P0 - Critical
+
+All conversion elements defined in Phase 1.3.1 apply here.
+
+**Additional Web-Specific:**
+- [ ] Server-side rendering for SEO
+- [ ] Category landing pages (`/tours/food`, `/tours/walking`)
+- [ ] Search functionality
+- [ ] Filter URL persistence (shareable filtered views)
+
+---
+
+### 7.4 Tour Detail Page (Web)
+
+**Priority:** P0 - Critical
+
+All conversion elements defined in Phase 1.3.2 apply here.
+
+**Additional Web-Specific:**
+- [ ] Schema.org markup for tour
+- [ ] Social share buttons
+- [ ] Related tours section
+- [ ] FAQ schema markup
+- [ ] Review schema markup
+
+---
+
+## Phase 8: Web App Booking Flow
+
+**Duration:** 3 weeks
+**Goal:** High-conversion booking experience
+
+---
+
+### 8.1 Public Booking Flow
+
+All features from Phase 1.3 (Availability, Booking Form, Pricing, Payment, Confirmation) apply here, implemented for the public web.
+
+**Additional Conversion Features:**
+- [ ] Exit intent detection
+- [ ] Progress auto-save (localStorage)
+- [ ] One-click resume from abandoned cart emails
+- [ ] Express checkout (Apple Pay, Google Pay)
+- [ ] Trust badges throughout checkout
+- [ ] Urgency messaging ("2 other people viewing")
+
+---
+
+### 8.2 Customer Account (Optional)
+
+**Priority:** P1 - High
+
+**User Story:**
+> As a returning customer, I want to save my info for faster checkout.
+
+**Features:**
+- [ ] Magic link login (no password)
+- [ ] Saved payment methods (Stripe)
+- [ ] Booking history
+- [ ] Upcoming tours
+- [ ] Wishlist / saved tours
+- [ ] Communication preferences
+
+**Note:** Guest checkout always available. Accounts are optional convenience.
+
+---
+
+### 8.3 Reviews & Ratings (Web Display)
+
+**Priority:** P0 - Critical (for conversion)
+
+**User Story:**
+> As a customer, I want to see reviews to trust the tour quality.
+
+**Display Features:**
+- [ ] Aggregate rating on tour cards
+- [ ] Review section on tour detail page
+- [ ] Filter reviews by rating
+- [ ] Sort by recency, helpfulness
+- [ ] Photo reviews
+- [ ] Verified purchase badge
+- [ ] Response from operator
+
+**Collection (CRM-side, Phase 5):**
+- Post-tour email requesting review
+- Rating + text + optional photos
+- Moderation workflow in CRM
+- Reply to reviews from CRM
+
+---
+
+### 8.4 Social Proof Features
+
+**Priority:** P0 - Critical
+
+**Acceptance Criteria:**
+- [ ] "X people booked today" counter
+- [ ] "Y people viewing now" (real-time or simulated)
+- [ ] Recent booking notifications ("John from NYC just booked")
+- [ ] Trust badges (secure payment, verified business)
+- [ ] Media mentions / awards if applicable
+
+---
+
+## Phase 9: Web App Optimization
+
+**Duration:** 2 weeks
+**Goal:** Conversion optimization and recovery
+
+---
+
+### 9.1 Abandoned Cart Recovery
+
+All features from Phase 2.0.1 implemented:
+- Timed email sequences
+- One-click cart resume
+- Recovery tracking dashboard
+
+---
+
+### 9.2 Conversion Analytics
+
+All features from Phase 5.5 implemented:
+- Funnel visualization
+- Drop-off analysis
+- Source attribution
+
+---
+
+### 9.3 A/B Testing
 
 **Priority:** P2 - Medium
 
-**User Story:**
-> As a Partner, I want API access to integrate with my systems.
+**Acceptance Criteria:**
+- [ ] Feature flag system (PostHog or custom)
+- [ ] Experiment creation UI
+- [ ] Traffic splitting
+- [ ] Statistical significance tracking
+- [ ] Winner selection
 
-**Endpoints:**
-- Query tour availability
-- Create bookings
-- Manage bookings
-- Receive webhooks
-
-**Features:**
-- API key management
-- Rate limiting
-- Documentation (OpenAPI)
-- Sandbox environment
+**Initial Tests:**
+- CTA button colors/text
+- Price display formats
+- Social proof placement
+- Checkout flow variations
 
 ---
 
-### 7.2 OTA Integrations
+### 9.4 Performance Optimization (Web)
+
+**Priority:** P0 - Critical
+
+**Core Web Vitals Targets:**
+- LCP (Largest Contentful Paint): < 2.5s
+- FID (First Input Delay): < 100ms
+- CLS (Cumulative Layout Shift): < 0.1
+
+**Acceptance Criteria:**
+- [ ] Image optimization (next/image, WebP)
+- [ ] Code splitting
+- [ ] Edge caching for tour pages
+- [ ] Prefetching for likely navigation
+- [ ] Bundle size monitoring
+
+---
+
+## Phase 10: SaaS Platform
+
+**Duration:** 3 weeks
+**Goal:** Multi-tenant onboarding and billing infrastructure
+**Prerequisite:** Your business running successfully on CRM + Web App
+
+> **Note:** This phase enables selling the platform to other tour operators.
+
+---
+
+### 10.1 Organization Onboarding
+
+**Priority:** P0 - Critical
+
+**User Story:**
+> As a new tour operator, I want to sign up and start using the platform quickly.
+
+**Onboarding Flow:**
+1. Sign up (email + password via Clerk)
+2. Create organization (business name, slug)
+3. Verify email
+4. Connect Stripe (for receiving payments)
+5. Basic settings (timezone, currency)
+6. Create first tour
+7. Dashboard
+
+**Acceptance Criteria:**
+- [ ] Self-service signup
+- [ ] Organization creation wizard
+- [ ] Stripe Connect onboarding
+- [ ] Welcome email sequence
+- [ ] Getting started checklist
+- [ ] Sample data option (demo tours)
+
+---
+
+### 10.2 Subscription Billing
+
+**Priority:** P0 - Critical
+
+**Billing Model:**
+
+| Plan | Price | Limits |
+|------|-------|--------|
+| **Free** | $0/mo | 50 bookings/mo, 1 user |
+| **Starter** | $49/mo | 200 bookings/mo, 3 users |
+| **Pro** | $149/mo | Unlimited bookings, 10 users |
+| **Enterprise** | Custom | Custom limits, SLA, support |
+
+**Platform Revenue Streams:**
+1. Monthly subscription (above)
+2. Transaction fee: 1-2% per booking (in addition to Stripe fees)
+3. Premium features (add-ons)
+
+**Acceptance Criteria:**
+- [ ] Stripe subscription integration
+- [ ] Plan selection during onboarding
+- [ ] Upgrade/downgrade flows
+- [ ] Usage tracking (bookings, users)
+- [ ] Overage handling or soft limits
+- [ ] Invoice generation
+- [ ] Payment failure handling
+- [ ] Dunning emails
+
+---
+
+### 10.3 Platform Admin (Super Admin)
+
+**Priority:** P0 - Critical
+
+**User Story:**
+> As a platform operator, I want to manage all organizations and monitor platform health.
+
+**Features:**
+- [ ] Organization list with search
+- [ ] Organization detail view
+- [ ] Impersonate organization (support)
+- [ ] Subscription management
+- [ ] Feature flags per organization
+- [ ] Platform-wide analytics
+- [ ] Revenue dashboard
+- [ ] Health monitoring
+
+---
+
+### 10.4 Feature Flags & Plan Limits
+
+**Priority:** P1 - High
+
+**Per-Plan Features:**
+
+| Feature | Free | Starter | Pro | Enterprise |
+|---------|------|---------|-----|------------|
+| Web App | No | Yes | Yes | Yes |
+| Custom Domain | No | No | Yes | Yes |
+| API Access | No | No | Yes | Yes |
+| White Label | No | No | No | Yes |
+| Priority Support | No | No | No | Yes |
+| SSO | No | No | No | Yes |
+
+**Acceptance Criteria:**
+- [ ] Feature flag service
+- [ ] Plan-based feature gating
+- [ ] Upgrade prompts when hitting limits
+- [ ] Grace periods for overages
+
+---
+
+## Phase 11: Public API & Integrations
+
+**Duration:** 2 weeks
+**Goal:** Enable external integrations and partner ecosystem
+
+---
+
+### 11.1 Public REST API
+
+**Priority:** P1 - High
+
+**Endpoints:**
+
+| Resource | Methods | Description |
+|----------|---------|-------------|
+| `/tours` | GET | List tours |
+| `/tours/{id}` | GET | Tour details |
+| `/tours/{id}/availability` | GET | Available dates/times |
+| `/bookings` | POST | Create booking |
+| `/bookings/{id}` | GET, PATCH, DELETE | Manage booking |
+| `/webhooks` | — | Event notifications |
+
+**Features:**
+- [ ] API key management (CRM settings)
+- [ ] Rate limiting (per API key)
+- [ ] Request logging
+- [ ] OpenAPI documentation
+- [ ] Sandbox environment
+- [ ] SDK generation (TypeScript, Python)
+
+---
+
+### 11.2 Webhook System
+
+**Priority:** P1 - High
+
+**Events:**
+- `booking.created`
+- `booking.confirmed`
+- `booking.cancelled`
+- `booking.modified`
+- `payment.received`
+- `schedule.cancelled`
+
+**Features:**
+- [ ] Webhook endpoint configuration (CRM)
+- [ ] Event selection
+- [ ] Retry logic (exponential backoff)
+- [ ] Delivery logs
+- [ ] Signature verification
+
+---
+
+### 11.3 OTA Integrations
 
 **Priority:** P2 - Medium
 
@@ -2156,186 +3053,144 @@ Features for post-MVP development based on business needs.
 - Booking.com Experiences
 
 **Features:**
-- Sync availability
-- Import bookings
-- Manage listings
-- Rate parity
+- [ ] Availability sync (outbound)
+- [ ] Booking import (inbound)
+- [ ] Rate management
+- [ ] Listing management
+- [ ] Channel-specific pricing
 
 ---
 
-### 7.3 Partner/Reseller Management
+### 11.4 Partner/Reseller Management
 
 **Priority:** P2 - Medium
 
 **User Story:**
-> As a Business Owner, I want to work with travel agents and resellers.
+> As a tour operator, I want to work with travel agents who sell my tours.
 
 **Features:**
-- Partner accounts
-- Commission tracking
-- Partner portal
-- Invoicing
-- Performance reports
+- [ ] Partner accounts
+- [ ] Partner-specific pricing/commission
+- [ ] Partner booking portal
+- [ ] Commission tracking
+- [ ] Partner performance reports
+- [ ] Invoice generation
 
 ---
 
-### 7.4 Waitlist
+## Phase 12+: Future Expansion
 
-**Priority:** P2 - Medium
-
-**User Story:**
-> As a Customer, I want to join a waitlist for sold-out tours.
-
-**Features:**
-- Join waitlist when sold out
-- Automatic notification when spot opens
-- Time-limited hold
-- Position in queue
+Features for long-term development based on market needs.
 
 ---
 
-### 7.5 Reviews & Feedback
+### 12.1 Mobile Applications
 
-**Priority:** P2 - Medium
-
-**User Story:**
-> As a Business Owner, I want to collect and display customer reviews.
-
-**Features:**
-- Post-tour rating request
-- Star rating + text review
-- Moderation workflow
-- Display on tour page
-- Aggregate ratings
-
----
-
-### 7.6 Add-ons & Extras
-
-**Priority:** P2 - Medium
-
-**User Story:**
-> As a Customer, I want to add extras like lunch or photos to my booking.
-
-**Features:**
-- Define add-ons per tour
-- Pricing per add-on
-- Select at checkout
-- Track on manifest
-
----
-
-### 7.7 Pickup/Transportation
-
-**Priority:** P2 - Medium
-
-**User Story:**
-> As a Customer, I want hotel pickup included with my tour.
-
-**Features:**
-- Define pickup zones
-- Pickup pricing
-- Customer enters hotel
-- Pickup schedule for driver
-- Pickup time calculation
-
----
-
-### 7.8 Custom/Private Tour Requests
-
-**Priority:** P2 - Medium
-
-**User Story:**
-> As a Customer, I want to request a custom tour experience.
-
-**Features:**
-- Inquiry form
-- Request details
-- Quote workflow
-- Convert to booking
-
----
-
-### 7.9 Mobile App
-
-**Priority:** P3 - Low
-
-**Guide App:**
+**Guide App (React Native):**
 - View schedule
 - View manifests
 - Offline access
 - GPS check-in
 - Push notifications
+- Chat with operations
 
 **Customer App:**
 - Browse and book
 - Mobile tickets
-- In-tour navigation
 - Push notifications
+- In-tour features (GPS, audio guides)
 
 ---
 
-### 7.10 Advanced Features (Backlog)
+### 12.2 Advanced Features (Backlog)
 
-- Multi-currency support
-- Multi-language UI
-- Multi-language tour content
-- Dynamic pricing (demand-based)
-- Loyalty program
-- Affiliate tracking
-- Multi-location support
-- Franchise model
-- Resource management (vehicles, equipment)
-- Weather-based operations
+| Feature | Description |
+|---------|-------------|
+| **Multi-currency** | Price tours in multiple currencies |
+| **Multi-language** | UI and tour content translation |
+| **Dynamic pricing** | Demand-based price adjustments |
+| **Loyalty program** | Points, rewards, tiers |
+| **Affiliate tracking** | Track referral sources |
+| **Gift cards** | Purchase and redeem |
+| **Waitlist** | Join queue for sold-out tours |
+| **Add-ons/Extras** | Lunch, photos, upgrades |
+| **Pickup/Transport** | Hotel pickup coordination |
+| **Custom tour requests** | Quote and booking workflow |
+| **Resource management** | Vehicles, equipment tracking |
+| **Weather integration** | Auto-alerts for outdoor tours |
+| **AI recommendations** | Personalized tour suggestions |
+| **Voice booking** | Alexa/Google Assistant |
 
 ---
 
 ## Feature Index
 
-### By Module
+### By Application & Phase
+
+**🖥️ CRM Application (Phases 0-6)**
 
 | Module | Phase | Features |
 |--------|-------|----------|
+| **Foundation** | 0 | Auth, DB, Infrastructure |
 | **Tour Management** | 1 | Tour CRUD, Variants, Media, Pricing Tiers |
 | **Schedule Management** | 1 | Creation, Calendar, Status, Capacity |
-| **Booking Engine** | 1 | Public flow, Admin management, Self-service |
+| **Admin Booking** | 1 | Admin booking management, Manual creation |
 | **Customer Management** | 2 | Profiles, History, Tags, Notes, Export |
-| **Communications** | 2 | Email, SMS, Templates, Automation, History |
+| **Communications** | 2 | Email, SMS, Templates, Automation |
+| **Conversion Recovery** | 2 | Abandoned cart, Wishlist, Alerts |
 | **Guide Operations** | 3 | Profiles, Availability, Portal, Manifests |
 | **Pricing** | 4 | Seasonal, Group, Early Bird, Promo Codes |
 | **Reporting** | 5 | Dashboard, Revenue, Bookings, Capacity |
-| **Settings** | 1-2 | Business, Booking, Payment, Tax, Users |
+| **CRM Intelligence** | 5 | Scoring, CLV, Predictions, Attribution |
+| **Settings** | 1-6 | Business, Booking, Payment, Tax, Users |
+
+**🌐 Web Application (Phases 7-9)**
+
+| Module | Phase | Features |
+|--------|-------|----------|
+| **Web Foundation** | 7 | Scaffolding, SEO, Structured Data |
+| **Tour Pages** | 7 | Listing, Detail, Social Proof |
+| **Booking Flow** | 8 | Checkout, Payment, Confirmation |
+| **Customer Accounts** | 8 | Magic link, History, Wishlist |
+| **Reviews** | 8 | Display, Collection, Moderation |
+| **Optimization** | 9 | A/B Testing, Performance, Analytics |
+
+**🔧 SaaS Platform (Phases 10-11)**
+
+| Module | Phase | Features |
+|--------|-------|----------|
+| **Onboarding** | 10 | Signup, Org creation, Stripe Connect |
+| **Billing** | 10 | Subscriptions, Plans, Usage |
+| **Platform Admin** | 10 | Super admin, Monitoring |
+| **Public API** | 11 | REST API, Documentation, SDKs |
+| **Webhooks** | 11 | Event system, Delivery |
+| **Integrations** | 11 | OTA, Partners, Resellers |
 
 ### By Priority
 
-**P0 - Critical (MVP Blockers):**
+**P0 - Critical (CRM MVP):**
 - Tour CRUD (1.1.1)
 - Tour Variants (1.1.2)
 - Pricing Tiers (1.1.4)
 - Schedule Creation (1.2.1)
 - Schedule Status (1.2.4)
 - Capacity Management (1.2.5)
-- Availability Display (1.3.3)
-- Booking Form (1.3.4)
-- Payment Processing (1.3.6)
-- Booking Confirmation (1.3.7)
 - Booking List (1.4.1)
 - Booking Cancellation (1.4.5)
-- Self-Service Cancellation (1.5.2)
+- Manual Booking Creation (1.4.3)
 - Payment Settings (1.6.3)
+- Conversion Funnel Dashboard (5.5.1)
 
-**P1 - High (MVP Required):**
+**P1 - High (CRM Required):**
 - Tour Media (1.1.3)
 - Auto Schedule Generation (1.2.2)
 - Schedule Calendar (1.2.3)
-- Tour Listing Page (1.3.1)
-- Tour Detail Page (1.3.2)
 - Booking Detail View (1.4.2)
-- Manual Booking (1.4.3)
 - Booking Modification (1.4.4)
 - Customer List (2.1.1)
 - Customer Profile (2.1.2)
 - Customer Export (2.1.6)
+- Abandoned Cart Recovery (2.0.1)
 - Email Templates (2.2.1)
 - Automated Emails (2.2.2)
 - SMS Setup (2.3.1)
@@ -2349,30 +3204,61 @@ Features for post-MVP development based on business needs.
 - Dashboard (5.1.1, 5.1.2)
 - Revenue Report (5.2.1)
 - Booking Report (5.2.2)
+- Customer Scoring (5.4.1)
+- Re-engagement Campaigns (5.4.5)
+- Revenue Attribution (5.4.6)
 - Audit Trail (6.4.2)
 
-**P2 - Medium (Post-MVP):**
+**P0 - Critical (Web App):**
+- Web Scaffolding (7.1)
+- SEO Foundation (7.2)
+- Tour Listing (7.3)
+- Tour Detail (7.4)
+- Public Booking Flow (8.1)
+- Reviews Display (8.3)
+- Social Proof (8.4)
+- Performance Optimization (9.4)
+
+**P0 - Critical (SaaS):**
+- Organization Onboarding (10.1)
+- Subscription Billing (10.2)
+- Platform Admin (10.3)
+
+**P1 - High (SaaS):**
+- Feature Flags (10.4)
+- Public REST API (11.1)
+- Webhook System (11.2)
+
+**P2 - Medium (Enhancements):**
 - Customer Notes (2.1.4)
 - Customer Tags (2.1.5)
-- Manual Email (2.2.3)
+- Browse Abandonment (2.0.2)
+- Wishlist (2.0.3)
+- Price Drop Alerts (2.0.4)
+- Availability Alerts (2.0.5)
 - Guide Portal (3.3.1-3.3.5)
 - Seasonal Pricing (4.1.1)
 - Group Discounts (4.1.2)
 - Capacity Report (5.2.3)
 - Customer Report (5.2.4)
+- CLV Prediction (5.4.2)
+- No-Show Detection (5.4.3)
+- Operational Efficiency (5.4.7)
 - Global Search (6.4.1)
 - Notification Center (6.4.3)
-- Public API (7.1)
-- OTA Integration (7.2)
-- Waitlist (7.4)
-- Reviews (7.5)
+- Customer Accounts (8.2)
+- A/B Testing (9.3)
+- OTA Integration (11.3)
+- Partner Management (11.4)
 
 **P3 - Low (Backlog):**
 - Early Bird Pricing (4.1.3)
 - Deposit Payments (4.3.1)
 - Gift Cards (4.3.2)
+- Demand Forecasting (5.4.4)
 - Guide Report (5.2.5)
-- Mobile App (7.9)
+- Mobile App (12.1)
+- Advanced Features (12.2)
 
 ---
 
