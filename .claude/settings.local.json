@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline --all)"
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline --all)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM remote -v)",
+      "Bash(pnpm --version:*)",
+      "Bash(node:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(find:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose ps:*)"
     ]
   }
 }

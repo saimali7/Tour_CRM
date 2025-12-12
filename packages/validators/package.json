@@ -1,0 +1,25 @@
+{
+  "name": "@tour/validators",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@tour/eslint-config": "workspace:*",
+    "@tour/typescript-config": "workspace:*",
+    "eslint": "^8.57.0",
+    "typescript": "^5.7.2"
+  }
+}
