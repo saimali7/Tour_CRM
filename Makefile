@@ -170,7 +170,7 @@ db-studio: ## Open Drizzle Studio
 
 db-seed: ## Seed database with test data
 	@echo "$(CYAN)Seeding database...$(RESET)"
-	@echo "$(YELLOW)TODO: Implement seed script$(RESET)"
+	pnpm db:seed
 
 # =============================================================================
 # Shortcuts

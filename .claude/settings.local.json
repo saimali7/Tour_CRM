@@ -18,7 +18,10 @@
       "Bash(xargs kill:*)",
       "Bash(pnpm db:push:*)",
       "Bash(pnpm add:*)",
-      "Bash(pnpm list:*)"
+      "Bash(pnpm list:*)",
+      "Bash(pnpm db:seed:*)",
+      "Bash(pnpm --filter @tour/database db:add-member:*)",
+      "Bash(ln:*)"
     ]
   }
 }

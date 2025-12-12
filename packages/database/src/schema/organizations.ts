@@ -69,6 +69,9 @@ export interface OrganizationSettings {
   customFields?: Record<string, unknown>;
 }
 
+// Relations are defined in the individual entity files to avoid circular imports
+// They reference back to organizations
+
 // Type helpers
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
