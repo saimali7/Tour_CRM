@@ -11,7 +11,14 @@
       "Bash(find:*)",
       "Bash(docker:*)",
       "Bash(docker-compose up:*)",
-      "Bash(docker-compose ps:*)"
+      "Bash(docker-compose ps:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pkill:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(pnpm db:push:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm list:*)"
     ]
   }
 }
