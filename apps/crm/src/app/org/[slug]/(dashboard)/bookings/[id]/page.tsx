@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams, useRouter } from "next/navigation";
+import { ActivityLogCard } from "@/components/activity-log/activity-log-list";
 
 export default function BookingDetailPage() {
   const params = useParams();
@@ -555,6 +556,14 @@ export default function BookingDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Activity Log */}
+      <ActivityLogCard
+        entityType="booking"
+        entityId={bookingId}
+        title="Activity History"
+        limit={15}
+      />
     </div>
   );
 }

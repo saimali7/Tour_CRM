@@ -306,10 +306,28 @@ export default function SchedulesPage() {
                         {schedule.status === "in_progress" ? "In Progress" : schedule.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Users className="h-4 w-4" />
-                        {schedule.bookedCount ?? 0} / {schedule.maxParticipants}
+                    <td className="px-6 py-4">
+                      <div className="w-full min-w-[140px]">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-gray-600">{schedule.bookedCount ?? 0} / {schedule.maxParticipants}</span>
+                          <span className={`font-medium ${
+                            ((schedule.bookedCount ?? 0) / schedule.maxParticipants) >= 1 ? 'text-red-600' :
+                            ((schedule.bookedCount ?? 0) / schedule.maxParticipants) >= 0.8 ? 'text-yellow-600' :
+                            'text-green-600'
+                          }`}>
+                            {Math.round(((schedule.bookedCount ?? 0) / schedule.maxParticipants) * 100)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              ((schedule.bookedCount ?? 0) / schedule.maxParticipants) >= 1 ? 'bg-red-500' :
+                              ((schedule.bookedCount ?? 0) / schedule.maxParticipants) >= 0.8 ? 'bg-yellow-500' :
+                              'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min(100, ((schedule.bookedCount ?? 0) / schedule.maxParticipants) * 100)}%` }}
+                          />
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

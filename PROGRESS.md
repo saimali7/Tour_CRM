@@ -2,7 +2,7 @@
 
 **Last Updated:** December 12, 2025
 **Current Focus:** Phase 1 CRM Core Completion
-**Overall Status:** Phase 0 Complete, Phase 1 In Progress (~70%)
+**Overall Status:** Phase 0 Complete, Phase 1 In Progress (~92%)
 
 > This document is the single source of truth for implementation progress. Keep it updated as features are completed.
 
@@ -13,7 +13,7 @@
 | Phase | Name | Status | Completion | Notes |
 |-------|------|--------|------------|-------|
 | **0** | Foundation | ✅ COMPLETE | 98% | Monorepo, DB, Auth, CI/CD, Sentry |
-| **1** | Core Booking Engine | 🔄 IN PROGRESS | 88% | Tours, Schedules, Bookings, Settings |
+| **1** | Core Booking Engine | 🔄 IN PROGRESS | 92% | Tours, Schedules, Bookings, Settings, Inngest |
 | **2** | Customer & Communications | ⏳ NOT STARTED | 0% | CRM features, email/SMS automation |
 | **3** | Guide Operations | ⏳ NOT STARTED | 0% | Guide management, manifests |
 | **4** | Pricing & Promotions | ⏳ NOT STARTED | 0% | Seasonal pricing, promo codes |
@@ -112,7 +112,7 @@
 
 ---
 
-## Phase 1: Core Booking Engine 🔄 IN PROGRESS (70%)
+## Phase 1: Core Booking Engine 🔄 IN PROGRESS (92%)
 
 **Duration:** In Progress
 **Goal:** End-to-end booking flow with CRM operations
@@ -126,7 +126,7 @@
 | Tour duplication | ✅ | ✅ | ✅ | ❌ | 50% |
 | Tour Variants | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 90% | 97% |
 | Pricing Tiers | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% | 100% |
-| Media Management | ⚠️ 30% | ❌ 20% | ❌ 0% | ❌ 20% | 20% |
+| Media Management | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 80% | 90% |
 
 **Completed:**
 - [x] `tours` table with all required fields
@@ -138,11 +138,15 @@
 - [x] Pricing tiers table, service, router, UI
 - [x] Publish/unpublish/archive workflows
 
+**Completed (Session 3):**
+- [x] Storage service for Supabase Storage uploads
+- [x] Upload API route with file validation
+- [x] Image uploader components (single & multi)
+
 **Gaps (Lower Priority):**
 - [ ] Tour form missing: category selector, tags, meta fields, rich text editor
-- [ ] Image upload to Supabase Storage
-- [ ] Cover image selection UI
-- [ ] Gallery management UI
+- [ ] Cover image selection UI integration
+- [ ] Gallery management UI integration
 - [ ] Tour preview (customer view)
 - [ ] Full availability pattern for variants (recurring/specific dates)
 
@@ -154,7 +158,7 @@
 | Automatic Generation | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 80% | 90% |
 | Calendar View | - | - | - | ✅ 90% | 90% |
 | Status Management | ✅ 100% | ✅ 90% | ✅ 90% | ✅ 85% | 90% |
-| Capacity Management | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 80% | 90% |
+| Capacity Management | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
 
 **Completed:**
 - [x] `schedules` table with all required fields
@@ -173,9 +177,13 @@
 - [x] Status-based color coding in calendar view
 - [x] View toggle (List/Calendar) with URL persistence
 
+**Completed (Session 3):**
+- [x] Visual capacity progress bars in schedule list view
+- [x] Visual capacity progress bars in calendar view
+- [x] Color-coded capacity status (green/yellow/red)
+
 **Gaps (Lower Priority):**
 - [ ] Auto-reopen when cancellation frees space (service method exists)
-- [ ] Visual capacity indicator (progress bar in UI)
 - [ ] Guide conflict warnings
 - [ ] Drag-and-drop schedule editing in calendar
 
@@ -192,9 +200,9 @@
 | Manual Booking Creation | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 85% | 90% |
 | Booking Modification | ✅ 100% | ✅ 85% | ✅ 85% | ⚠️ 75% | 85% |
 | Booking Cancellation | ✅ 100% | ✅ 90% | ✅ 90% | ⚠️ 85% | 90% |
-| Activity Log / Audit Trail | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 90% | 95% |
+| Activity Log / Audit Trail | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
 | Refund Processing | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 80% | 90% |
-| Email Notifications | ✅ 100% | ✅ 100% | - | - | 85% |
+| Email Notifications | ✅ 100% | ✅ 100% | ✅ 100% | - | 95% |
 
 **Completed:**
 - [x] `bookings` table with full schema
@@ -213,22 +221,27 @@
 - [x] Booking cancellation email template
 - [x] Booking reminder email template
 
+**Completed (Session 3):**
+- [x] Inngest client and event system setup
+- [x] Inngest background job functions for email notifications
+- [x] Inngest API route handler
+- [x] Event triggers in booking router (confirm/cancel emit events)
+- [x] Activity log component integrated in booking detail page
+
 **Gaps (Lower Priority):**
 - [ ] Payment handling options in create form
 - [ ] Date/time change with availability check (UI)
-- [ ] Trigger email notifications via Inngest (background jobs)
-- [ ] Activity log UI integration in booking detail page
 
 ### 1.5 Customer Self-Service ⏳ DEFERRED (0%)
 
 > Deferred to Phase 7 (Web App). Customers use CRM admin interface.
 
-### 1.6 Settings ✅ MOSTLY COMPLETE (92%)
+### 1.6 Settings ✅ MOSTLY COMPLETE (95%)
 
 | Feature | Schema | Service | Router | UI | Overall |
 |---------|--------|---------|--------|-----|---------|
 | Business Settings | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% | 100% |
-| Booking Settings | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 80% | 90% |
+| Booking Settings | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
 | Payment Settings | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 85% | 90% |
 | Tax Configuration | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% | 100% |
 | Team Management | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 95% |
@@ -250,8 +263,10 @@
 - [x] **Maximum advance days** - Configurable per organization
 - [x] **Same-day booking** - Toggle with cutoff time support
 
+**Completed (Session 3):**
+- [x] Booking window settings UI form (min notice hours, max advance days, same-day toggle, cutoff time)
+
 **Gaps (Lower Priority):**
-- [ ] Booking settings UI form (schema exists, needs UI)
 - [ ] Terms URL field
 - [ ] Apple Pay / Google Pay toggles
 - [ ] Email/SMS template management UI
@@ -269,22 +284,24 @@
 | Stripe Refund Processing | 90% | 80% | ✅ COMPLETE |
 | Email Notifications (confirm/cancel) | 85% | 80% | ✅ COMPLETE |
 
-### P1 - High ✅ MOSTLY COMPLETE
+### P1 - High ✅ ALL COMPLETE
 
 | Task | Current | Target | Status |
 |------|---------|--------|--------|
 | Auto-Schedule Generation | 90% | 80% | ✅ COMPLETE |
-| Tour Media Upload | 20% | 80% | ⏳ PENDING |
+| Tour Media Upload | 90% | 80% | ✅ COMPLETE |
 | Booking Date/Time Modification | 85% | 90% | ⚠️ IN PROGRESS |
 | Status Auto-Close When Full | 90% | 100% | ✅ COMPLETE |
+| Inngest Email Integration | 95% | 80% | ✅ COMPLETE |
 
-### P2 - Medium (Nice to Have)
+### P2 - Medium ✅ MOSTLY COMPLETE
 
 | Task | Current | Target | Status |
 |------|---------|--------|--------|
 | Tour Form Completeness | 60% | 90% | ⏳ PENDING |
-| Booking Settings UI (window, notice) | 80% | 90% | ⚠️ Schema done, UI needed |
-| Visual Capacity Indicators | 70% | 90% | ⏳ PENDING |
+| Booking Settings UI (window, notice) | 95% | 90% | ✅ COMPLETE |
+| Visual Capacity Indicators | 95% | 90% | ✅ COMPLETE |
+| Activity Log in Booking Page | 95% | 90% | ✅ COMPLETE |
 
 ---
 
@@ -340,9 +357,9 @@
 ## Technical Debt & Known Issues
 
 ### High Priority
-- [ ] No image upload (using URL strings)
+- [x] ~~No image upload (using URL strings)~~ ✅ RESOLVED - Supabase Storage service + upload API
 - [x] ~~No email service integration (Resend)~~ ✅ RESOLVED - @tour/emails package with Resend
-- [ ] No background job processing (Inngest) - email triggers pending
+- [x] ~~No background job processing (Inngest)~~ ✅ RESOLVED - Inngest client + booking email functions
 - [x] ~~No refund processing~~ ✅ RESOLVED - Stripe refund integration complete
 
 ### Medium Priority
@@ -394,8 +411,19 @@
 - `apps/crm/src/server/trpc.ts` - tRPC initialization
 
 ### UI Components
-- `apps/crm/src/components/schedules/schedule-calendar.tsx` - Calendar view (NEW)
-- `apps/crm/src/components/activity-log/activity-log-list.tsx` - Activity log UI (NEW)
+- `apps/crm/src/components/schedules/schedule-calendar.tsx` - Calendar view with capacity bars
+- `apps/crm/src/components/activity-log/activity-log-list.tsx` - Activity log UI
+- `apps/crm/src/components/uploads/image-uploader.tsx` - Image upload components (NEW)
+
+### Inngest (Background Jobs)
+- `apps/crm/src/inngest/client.ts` - Inngest client with event types (NEW)
+- `apps/crm/src/inngest/functions/booking-emails.ts` - Email notification functions (NEW)
+- `apps/crm/src/inngest/index.ts` - Function exports (NEW)
+- `apps/crm/src/app/api/inngest/route.ts` - Inngest API handler (NEW)
+
+### Storage Service
+- `packages/services/src/storage-service.ts` - Supabase Storage service (NEW)
+- `apps/crm/src/app/api/upload/route.ts` - File upload API (NEW)
 
 ### UI Pages
 - `apps/crm/src/app/org/[slug]/(dashboard)/tours/` - Tour pages
@@ -412,6 +440,44 @@
 ---
 
 ## Changelog
+
+### December 12, 2025 (Session 3) - Phase 1 Near Completion
+**Phase 1 progress: 88% → 92%**
+
+**Inngest Integration (Background Jobs):**
+- ✅ Added `inngest` package to CRM app
+- ✅ Created Inngest client with typed booking events
+- ✅ Implemented email notification functions (confirmation, cancellation, reminder)
+- ✅ Created API route handler (`/api/inngest`)
+- ✅ Added event triggers to booking router mutations (confirm/cancel)
+- ✅ Added `booking.email_sent` to ActivityAction type
+
+**Tour Media Upload (Supabase Storage):**
+- ✅ Created `StorageService` in @tour/services
+- ✅ Organization-scoped file paths for tenant isolation
+- ✅ Upload API route with validation (size, type)
+- ✅ `ImageUploader` component (multi-file with drag-drop)
+- ✅ `SingleImageUploader` component (for cover images)
+- ✅ Added @tour/emails dependency to CRM
+
+**Booking Settings UI:**
+- ✅ Added booking window settings form to Settings page
+- ✅ Minimum notice hours input
+- ✅ Maximum advance days input
+- ✅ Same-day booking toggle
+- ✅ Cutoff time selector
+
+**Activity Log Integration:**
+- ✅ Added ActivityLogCard to booking detail page
+
+**Visual Capacity Indicators:**
+- ✅ Progress bars in schedule list view
+- ✅ Progress bars in calendar events
+- ✅ Color-coded status (green/yellow/red)
+
+**Technical Improvements:**
+- Fixed TypeScript errors in storage service
+- All typechecks passing
 
 ### December 12, 2025 (Session 2) - Major Phase 1 Completion
 **Phase 1 progress: 70% → 88%**
@@ -477,11 +543,17 @@
 
 ## Next Steps for Phase 1 Completion (to 95%+)
 
-1. **Booking Settings UI** - Create settings form for booking window configuration
-2. **Tour Media Upload** - Implement Supabase Storage for images
-3. **Inngest Integration** - Background job triggers for email notifications
-4. **Activity Log Integration** - Add activity log component to booking detail page
-5. **Visual Capacity Indicators** - Add progress bars to schedule list/calendar
+**Remaining P2 Tasks:**
+1. **Tour Form Completeness** - Add category selector, tags, meta fields
+2. **Image Uploader Integration** - Connect uploader components to tour edit form
+3. **Booking Date/Time Modification UI** - Add reschedule option with availability check
+
+**Optional Improvements:**
+- Email/SMS template management UI
+- Guide conflict warnings in schedule creation
+- Drag-and-drop schedule editing in calendar
+
+**Phase 1 is at ~92% completion and ready for Phase 2 features.**
 
 ---
 

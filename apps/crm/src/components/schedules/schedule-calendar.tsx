@@ -141,14 +141,28 @@ export function ScheduleCalendar({
   const EventComponent = useCallback(
     ({ event }: { event: ScheduleEvent }) => {
       const availabilityText = `${event.bookedCount}/${event.maxParticipants}`;
+      const capacityPercent = (event.bookedCount / event.maxParticipants) * 100;
       const isFull = event.bookedCount >= event.maxParticipants;
+      const isAlmostFull = capacityPercent >= 80;
 
       return (
         <div className="flex flex-col gap-0.5 overflow-hidden">
           <span className="font-medium truncate">{event.title}</span>
-          <span className="text-xs opacity-80">
-            {availabilityText} {isFull && "(Full)"}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs opacity-80">
+              {availabilityText}
+            </span>
+            <div className="flex-1 min-w-[30px] bg-white/40 rounded-full h-1">
+              <div
+                className={`h-1 rounded-full ${
+                  isFull ? 'bg-red-600' :
+                  isAlmostFull ? 'bg-yellow-600' :
+                  'bg-green-600'
+                }`}
+                style={{ width: `${Math.min(100, capacityPercent)}%` }}
+              />
+            </div>
+          </div>
         </div>
       );
     },
@@ -158,7 +172,7 @@ export function ScheduleCalendar({
   const AgendaEventComponent = useCallback(
     ({ event }: { event: ScheduleEvent }) => {
       const colors = getStatusColors(event.status);
-      const availabilityText = `${event.bookedCount}/${event.maxParticipants}`;
+      const capacityPercent = (event.bookedCount / event.maxParticipants) * 100;
       const statusLabel =
         event.status === "in_progress" ? "In Progress" : event.status.charAt(0).toUpperCase() + event.status.slice(1);
 
@@ -170,7 +184,28 @@ export function ScheduleCalendar({
               <div className="text-xs text-gray-500">Guide: {event.guideName}</div>
             )}
           </div>
-          <div className="text-xs text-gray-500">{availabilityText}</div>
+          <div className="w-32">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-gray-600">{event.bookedCount}/{event.maxParticipants}</span>
+              <span className={`font-medium ${
+                capacityPercent >= 100 ? 'text-red-600' :
+                capacityPercent >= 80 ? 'text-yellow-600' :
+                'text-green-600'
+              }`}>
+                {Math.round(capacityPercent)}%
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div
+                className={`h-1.5 rounded-full ${
+                  capacityPercent >= 100 ? 'bg-red-500' :
+                  capacityPercent >= 80 ? 'bg-yellow-500' :
+                  'bg-green-500'
+                }`}
+                style={{ width: `${Math.min(100, capacityPercent)}%` }}
+              />
+            </div>
+          </div>
           <span
             className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
             style={{ backgroundColor: colors.bg, color: colors.text }}

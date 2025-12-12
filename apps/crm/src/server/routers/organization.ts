@@ -33,6 +33,13 @@ const taxSettingsSchema = z.object({
   applyToFees: z.boolean(),
 });
 
+const bookingWindowSettingsSchema = z.object({
+  minimumNoticeHours: z.number().min(0),
+  maximumAdvanceDays: z.number().min(0),
+  allowSameDayBooking: z.boolean(),
+  sameDayCutoffTime: z.string().optional(),
+});
+
 const updateSettingsSchema = z.object({
   defaultCurrency: z.string().optional(),
   defaultLanguage: z.string().optional(),
@@ -43,6 +50,7 @@ const updateSettingsSchema = z.object({
   cancellationPolicy: z.string().optional(),
   refundPolicy: z.string().optional(),
   tax: taxSettingsSchema.optional(),
+  bookingWindow: bookingWindowSettingsSchema.optional(),
 });
 
 export const organizationRouter = createRouter({

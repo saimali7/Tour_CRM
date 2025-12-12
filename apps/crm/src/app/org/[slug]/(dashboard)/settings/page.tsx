@@ -26,6 +26,7 @@ import {
   AlertCircle,
   CheckCircle2,
   XCircle,
+  Clock,
 } from "lucide-react";
 
 type SettingsTab = "business" | "booking" | "notifications" | "branding" | "team" | "payments";
@@ -166,6 +167,12 @@ export default function SettingsPage() {
     requireAddress: false,
     cancellationPolicy: "",
     refundPolicy: "",
+    bookingWindow: {
+      minimumNoticeHours: 2,
+      maximumAdvanceDays: 90,
+      allowSameDayBooking: true,
+      sameDayCutoffTime: "12:00",
+    },
   });
 
   const [notificationForm, setNotificationForm] = useState({
@@ -218,6 +225,12 @@ export default function SettingsPage() {
         requireAddress: settings.requireAddress || false,
         cancellationPolicy: settings.cancellationPolicy || "",
         refundPolicy: settings.refundPolicy || "",
+        bookingWindow: {
+          minimumNoticeHours: settings.bookingWindow?.minimumNoticeHours ?? 2,
+          maximumAdvanceDays: settings.bookingWindow?.maximumAdvanceDays ?? 90,
+          allowSameDayBooking: settings.bookingWindow?.allowSameDayBooking ?? true,
+          sameDayCutoffTime: settings.bookingWindow?.sameDayCutoffTime || "12:00",
+        },
       });
       setNotificationForm({
         emailNotifications: settings.emailNotifications ?? true,
@@ -549,6 +562,117 @@ export default function SettingsPage() {
                   <option value="de">German</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Booking Window
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Control when customers can make bookings
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Notice Hours
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={bookingForm.bookingWindow.minimumNoticeHours}
+                  onChange={(e) =>
+                    setBookingForm((prev) => ({
+                      ...prev,
+                      bookingWindow: {
+                        ...prev.bookingWindow,
+                        minimumNoticeHours: parseInt(e.target.value) || 0,
+                      },
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  How many hours before a tour can customers book
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Maximum Advance Days
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={bookingForm.bookingWindow.maximumAdvanceDays}
+                  onChange={(e) =>
+                    setBookingForm((prev) => ({
+                      ...prev,
+                      bookingWindow: {
+                        ...prev.bookingWindow,
+                        maximumAdvanceDays: parseInt(e.target.value) || 1,
+                      },
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  How far in advance can customers book
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bookingForm.bookingWindow.allowSameDayBooking}
+                  onChange={(e) =>
+                    setBookingForm((prev) => ({
+                      ...prev,
+                      bookingWindow: {
+                        ...prev.bookingWindow,
+                        allowSameDayBooking: e.target.checked,
+                      },
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-gray-700">
+                  Allow same-day booking
+                </span>
+              </label>
+
+              {bookingForm.bookingWindow.allowSameDayBooking && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Same-Day Cutoff Time
+                  </label>
+                  <input
+                    type="time"
+                    value={bookingForm.bookingWindow.sameDayCutoffTime}
+                    onChange={(e) =>
+                      setBookingForm((prev) => ({
+                        ...prev,
+                        bookingWindow: {
+                          ...prev.bookingWindow,
+                          sameDayCutoffTime: e.target.value,
+                        },
+                      }))
+                    }
+                    className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Latest time customers can book for same-day tours
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

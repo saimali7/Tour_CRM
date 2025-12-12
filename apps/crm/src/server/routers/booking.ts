@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { format } from "date-fns";
 import { createRouter, protectedProcedure } from "../trpc";
 import { createServices } from "@tour/services";
+import { inngest } from "@/inngest";
 
 const dateRangeSchema = z.object({
   from: z.coerce.date().optional(),
@@ -122,17 +124,68 @@ export const bookingRouter = createRouter({
     }),
 
   confirm: protectedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string(), sendConfirmationEmail: z.boolean().default(true) }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.booking.confirm(input.id);
+      const booking = await services.booking.confirm(input.id);
+
+      // Send confirmation email via Inngest if enabled
+      if (input.sendConfirmationEmail && booking.customer && booking.schedule && booking.tour) {
+        await inngest.send({
+          name: "booking/confirmed",
+          data: {
+            organizationId: ctx.orgContext.organizationId,
+            bookingId: booking.id,
+            customerId: booking.customerId,
+            customerEmail: booking.customer.email,
+            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+            bookingReference: booking.referenceNumber,
+            tourName: booking.tour.name,
+            tourDate: format(new Date(booking.schedule.startsAt), "MMMM d, yyyy"),
+            tourTime: format(new Date(booking.schedule.startsAt), "h:mm a"),
+            participants: booking.totalParticipants,
+            totalAmount: booking.total,
+            currency: booking.currency,
+          },
+        });
+      }
+
+      return booking;
     }),
 
   cancel: protectedProcedure
-    .input(z.object({ id: z.string(), reason: z.string().optional() }))
+    .input(z.object({
+      id: z.string(),
+      reason: z.string().optional(),
+      sendCancellationEmail: z.boolean().default(true),
+      refundAmount: z.string().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.booking.cancel(input.id, input.reason);
+      const booking = await services.booking.cancel(input.id, input.reason);
+
+      // Send cancellation email via Inngest if enabled
+      if (input.sendCancellationEmail && booking.customer && booking.schedule && booking.tour) {
+        await inngest.send({
+          name: "booking/cancelled",
+          data: {
+            organizationId: ctx.orgContext.organizationId,
+            bookingId: booking.id,
+            customerId: booking.customerId,
+            customerEmail: booking.customer.email,
+            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+            bookingReference: booking.referenceNumber,
+            tourName: booking.tour.name,
+            tourDate: format(new Date(booking.schedule.startsAt), "MMMM d, yyyy"),
+            tourTime: format(new Date(booking.schedule.startsAt), "h:mm a"),
+            cancellationReason: input.reason,
+            refundAmount: input.refundAmount,
+            currency: booking.currency,
+          },
+        });
+      }
+
+      return booking;
     }),
 
   markNoShow: protectedProcedure

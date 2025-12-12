@@ -17,7 +17,7 @@ const scheduleFilterSchema = z.object({
 
 const paginationSchema = z.object({
   page: z.number().min(1).default(1),
-  limit: z.number().min(1).max(100).default(50),
+  limit: z.number().min(1).max(500).default(50), // Higher max for calendar views
 });
 
 const sortSchema = z.object({

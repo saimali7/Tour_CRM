@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.87.1",
     "@tour/database": "workspace:*",
     "drizzle-orm": "^0.38.2"
   },

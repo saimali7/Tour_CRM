@@ -4,8 +4,19 @@ import { BookingCancellationEmail } from "./templates/booking-cancellation";
 import { BookingReminderEmail } from "./templates/booking-reminder";
 import * as React from "react";
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialize Resend client
+let resend: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resend) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error("RESEND_API_KEY environment variable is not set");
+    }
+    resend = new Resend(apiKey);
+  }
+  return resend;
+}
 
 export interface EmailResult {
   success: boolean;
@@ -81,7 +92,7 @@ export class EmailService {
    */
   async sendBookingConfirmation(data: BookingEmailData): Promise<EmailResult> {
     try {
-      const { data: result, error } = await resend.emails.send({
+      const { data: result, error } = await getResendClient().emails.send({
         from: this.fromEmail,
         to: data.customerEmail,
         replyTo: this.replyTo,
@@ -123,7 +134,7 @@ export class EmailService {
    */
   async sendBookingCancellation(data: CancellationEmailData): Promise<EmailResult> {
     try {
-      const { data: result, error } = await resend.emails.send({
+      const { data: result, error } = await getResendClient().emails.send({
         from: this.fromEmail,
         to: data.customerEmail,
         replyTo: this.replyTo,
@@ -168,7 +179,7 @@ export class EmailService {
           ? `Tomorrow: ${data.tourName} (${data.bookingReference})`
           : `Reminder: ${data.tourName} on ${data.tourDate}`;
 
-      const { data: result, error } = await resend.emails.send({
+      const { data: result, error } = await getResendClient().emails.send({
         from: this.fromEmail,
         to: data.customerEmail,
         replyTo: this.replyTo,
