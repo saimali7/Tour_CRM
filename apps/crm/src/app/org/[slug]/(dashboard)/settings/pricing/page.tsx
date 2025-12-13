@@ -16,6 +16,7 @@ import {
   Percent,
   AlertCircle,
 } from "lucide-react";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
 
 type PricingTab = "seasonal" | "groupDiscounts";
 
@@ -49,6 +50,7 @@ interface GroupDiscountForm {
 export default function PricingSettingsPage() {
   const [activeTab, setActiveTab] = useState<PricingTab>("seasonal");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const { confirm, ConfirmModal } = useConfirmModal();
 
   // Seasonal pricing state
   const [showSeasonalModal, setShowSeasonalModal] = useState(false);
@@ -414,12 +416,15 @@ export default function PricingSettingsPage() {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  "Are you sure you want to delete this seasonal pricing rule?"
-                                )
-                              ) {
+                            onClick={async () => {
+                              const confirmed = await confirm({
+                                title: "Delete Seasonal Pricing",
+                                description: "This will permanently delete this seasonal pricing rule. Tours will revert to their base prices during this date range. This action cannot be undone.",
+                                confirmLabel: "Delete Seasonal Pricing",
+                                variant: "destructive",
+                              });
+
+                              if (confirmed) {
                                 deleteSeasonalMutation.mutate({ id: season.id });
                               }
                             }}
@@ -549,12 +554,15 @@ export default function PricingSettingsPage() {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  "Are you sure you want to delete this group discount?"
-                                )
-                              ) {
+                            onClick={async () => {
+                              const confirmed = await confirm({
+                                title: "Delete Group Discount",
+                                description: "This will permanently delete this group discount tier. Groups will no longer receive this discount on new bookings. Existing bookings are not affected. This action cannot be undone.",
+                                confirmLabel: "Delete Group Discount",
+                                variant: "destructive",
+                              });
+
+                              if (confirmed) {
                                 deleteGroupMutation.mutate({ id: discount.id });
                               }
                             }}
@@ -1047,6 +1055,8 @@ export default function PricingSettingsPage() {
           </div>
         </div>
       )}
+
+      {ConfirmModal}
     </div>
   );
 }

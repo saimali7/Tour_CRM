@@ -1,6 +1,8 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, eq, and } from "@tour/database";
 import { users, organizationMembers, organizations } from "@tour/database/schema";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 
 export interface OrgContext {
   organizationId: string;
@@ -13,71 +15,109 @@ export interface OrgContext {
 /**
  * Get the current authenticated user from the database
  * Creates the user if they don't exist (syncs from Clerk)
+ *
+ * Wrapped with React cache() for request-level deduplication
  */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const { userId } = await auth();
 
   if (!userId) {
     return null;
   }
 
-  // Try to find existing user
-  let user = await db.query.users.findFirst({
-    where: eq(users.clerkId, userId),
-  });
+  // Try to find existing user - cached across requests
+  const user = await getCachedUser(userId);
 
-  // If user doesn't exist, sync from Clerk
-  if (!user) {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
-      return null;
-    }
-
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        clerkId: userId,
-        email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
-        firstName: clerkUser.firstName,
-        lastName: clerkUser.lastName,
-        avatarUrl: clerkUser.imageUrl,
-      })
-      .returning();
-
-    user = newUser;
+  if (user) {
+    return user;
   }
 
-  return user;
-}
+  // If user doesn't exist, sync from Clerk (rare path)
+  const clerkUser = await currentUser();
+  if (!clerkUser) {
+    return null;
+  }
+
+  const [newUser] = await db
+    .insert(users)
+    .values({
+      clerkId: userId,
+      email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+      avatarUrl: clerkUser.imageUrl,
+    })
+    .returning();
+
+  return newUser;
+});
+
+/**
+ * Cached user lookup - revalidates every 5 minutes or on-demand
+ */
+const getCachedUser = unstable_cache(
+  async (clerkId: string) => {
+    return db.query.users.findFirst({
+      where: eq(users.clerkId, clerkId),
+    });
+  },
+  ["user-by-clerk-id"],
+  { revalidate: 300, tags: ["user"] }
+);
+
+/**
+ * Cached organization lookup - revalidates every 5 minutes
+ */
+const getCachedOrganization = unstable_cache(
+  async (orgSlug: string) => {
+    return db.query.organizations.findFirst({
+      where: eq(organizations.slug, orgSlug),
+    });
+  },
+  ["org-by-slug"],
+  { revalidate: 300, tags: ["organization"] }
+);
+
+/**
+ * Cached membership lookup - revalidates every 5 minutes
+ */
+const getCachedMembership = unstable_cache(
+  async (orgId: string, userId: string) => {
+    return db.query.organizationMembers.findFirst({
+      where: and(
+        eq(organizationMembers.organizationId, orgId),
+        eq(organizationMembers.userId, userId),
+        eq(organizationMembers.status, "active")
+      ),
+    });
+  },
+  ["membership"],
+  { revalidate: 300, tags: ["membership"] }
+);
 
 /**
  * Get organization context for a given org slug
  * Validates that the current user has access to this organization
+ *
+ * Wrapped with React cache() for request-level deduplication
+ * Uses unstable_cache for cross-request caching of DB queries
  */
-export async function getOrgContext(orgSlug: string): Promise<OrgContext> {
+export const getOrgContext = cache(async (orgSlug: string): Promise<OrgContext> => {
   const user = await getCurrentUser();
 
   if (!user) {
     throw new Error("Unauthorized: No user found");
   }
 
-  // Get organization by slug
-  const org = await db.query.organizations.findFirst({
-    where: eq(organizations.slug, orgSlug),
-  });
+  // Get organization by slug - cached
+  const org = await getCachedOrganization(orgSlug);
 
   if (!org) {
     throw new Error("Organization not found");
   }
 
-  // Verify user has access to this organization
-  const membership = await db.query.organizationMembers.findFirst({
-    where: and(
-      eq(organizationMembers.organizationId, org.id),
-      eq(organizationMembers.userId, user.id),
-      eq(organizationMembers.status, "active")
-    ),
-  });
+  // Verify user has access to this organization - cached
+  const membership = await getCachedMembership(org.id, user.id);
 
   if (!membership) {
     // Check if user is super admin
@@ -93,7 +133,7 @@ export async function getOrgContext(orgSlug: string): Promise<OrgContext> {
     user,
     role: membership?.role ?? (user.isSuperAdmin ? "admin" : "support"),
   };
-}
+});
 
 /**
  * Get all organizations the current user has access to

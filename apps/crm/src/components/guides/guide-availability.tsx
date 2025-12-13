@@ -12,6 +12,8 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { toast } from "sonner";
 
 interface GuideAvailabilityProps {
   guideId: string;
@@ -29,6 +31,7 @@ const DAYS_OF_WEEK = [
 
 export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
   const utils = trpc.useUtils();
+  const confirmModal = useConfirmModal();
 
   // Fetch weekly availability
   const { data: weeklySlots, isLoading: loadingWeekly } =
@@ -67,6 +70,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
   const addSlotMutation = trpc.guideAvailability.addWeeklySlot.useMutation({
     onSuccess: () => {
       utils.guideAvailability.getWeeklyAvailability.invalidate({ guideId });
+      toast.success("Time slot added successfully");
       setIsAddingSlot(false);
       setNewSlot({
         dayOfWeek: 1,
@@ -75,17 +79,25 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
         isAvailable: true,
       });
     },
+    onError: (error) => {
+      toast.error(error.message || "Failed to add time slot");
+    },
   });
 
   const deleteSlotMutation = trpc.guideAvailability.deleteWeeklySlot.useMutation({
     onSuccess: () => {
       utils.guideAvailability.getWeeklyAvailability.invalidate({ guideId });
+      toast.success("Time slot deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete time slot");
     },
   });
 
   const createOverrideMutation = trpc.guideAvailability.createOverride.useMutation({
     onSuccess: () => {
       utils.guideAvailability.getOverrides.invalidate({ guideId });
+      toast.success("Date override added successfully");
       setIsAddingOverride(false);
       setNewOverride({
         date: "",
@@ -93,11 +105,18 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
         reason: "",
       });
     },
+    onError: (error) => {
+      toast.error(error.message || "Failed to add date override");
+    },
   });
 
   const deleteOverrideMutation = trpc.guideAvailability.deleteOverride.useMutation({
     onSuccess: () => {
       utils.guideAvailability.getOverrides.invalidate({ guideId });
+      toast.success("Date override deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete date override");
     },
   });
 
@@ -108,15 +127,22 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
     });
   };
 
-  const handleDeleteSlot = (id: string) => {
-    if (confirm("Are you sure you want to delete this time slot?")) {
+  const handleDeleteSlot = async (id: string) => {
+    const confirmed = await confirmModal.confirm({
+      title: "Delete Time Slot",
+      description: "This will permanently remove this weekly availability time slot. This action cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       deleteSlotMutation.mutate({ id });
     }
   };
 
   const handleAddOverride = () => {
     if (!newOverride.date) {
-      alert("Please select a date");
+      toast.error("Please select a date");
       return;
     }
 
@@ -130,8 +156,15 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
     });
   };
 
-  const handleDeleteOverride = (id: string) => {
-    if (confirm("Are you sure you want to delete this override?")) {
+  const handleDeleteOverride = async (id: string) => {
+    const confirmed = await confirmModal.confirm({
+      title: "Delete Override",
+      description: "This will remove this date override and restore the guide's regular weekly availability for this date.",
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       deleteOverrideMutation.mutate({ id });
     }
   };
@@ -529,6 +562,8 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
           )}
         </div>
       </div>
+
+      {confirmModal.ConfirmModal}
     </div>
   );
 }

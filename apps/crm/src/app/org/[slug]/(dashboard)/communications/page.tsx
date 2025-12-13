@@ -25,6 +25,7 @@ import {
   Search,
   Filter,
 } from "lucide-react";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
 
 type TabType = "history" | "email-templates" | "sms-templates" | "automations";
 
@@ -73,6 +74,7 @@ export default function CommunicationsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("history");
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<{id: string, type: "email" | "sms"} | null>(null);
+  const { confirm, ConfirmModal } = useConfirmModal();
   const [templateForm, setTemplateForm] = useState<TemplateFormData>({
     name: "",
     type: "booking_confirmation",
@@ -429,8 +431,15 @@ export default function CommunicationsPage() {
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            if (confirm("Are you sure you want to delete this template?")) {
+                          onClick={async () => {
+                            const confirmed = await confirm({
+                              title: "Delete Email Template",
+                              description: "This will permanently delete this email template. If this template is used in active automations, those automations will fail to send emails. This action cannot be undone.",
+                              confirmLabel: "Delete Template",
+                              variant: "destructive",
+                            });
+
+                            if (confirmed) {
                               deleteEmailTemplateMutation.mutate({ id: template.id });
                             }
                           }}
@@ -843,6 +852,8 @@ export default function CommunicationsPage() {
           </div>
         </div>
       )}
+
+      {ConfirmModal}
     </div>
   );
 }

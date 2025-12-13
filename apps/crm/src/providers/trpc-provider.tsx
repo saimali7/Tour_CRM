@@ -25,8 +25,14 @@ export function TRPCProvider({
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5 * 1000,
+            // Data stays fresh for 5 minutes - prevents unnecessary refetches
+            staleTime: 5 * 60 * 1000,
+            // Cache data for 30 minutes before garbage collection
+            gcTime: 30 * 60 * 1000,
             refetchOnWindowFocus: false,
+            // Retry failed queries with exponential backoff
+            retry: 2,
+            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
           },
         },
       })

@@ -21,6 +21,7 @@ All planning and design documents are in the `docs/` folder:
 | `docs/FEATURES.md` | Feature specifications by phase, app ownership (CRM vs Web), acceptance criteria |
 | **`docs/PROGRESS.md`** | **Implementation status tracker - single source of truth for what's done vs pending** |
 | `docs/SPRINT.md` | Current sprint goals, tasks, and priorities |
+| `docs/PHASE6_UX_OVERHAUL.md` | Phase 6 refactor details - design philosophy, feature list, technical approach |
 
 **Always consult these documents before making architectural decisions.**
 

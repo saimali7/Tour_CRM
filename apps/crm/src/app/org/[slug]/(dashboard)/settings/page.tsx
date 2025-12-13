@@ -28,6 +28,7 @@ import {
   XCircle,
   Clock,
 } from "lucide-react";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
 
 type SettingsTab = "business" | "booking" | "notifications" | "branding" | "team" | "payments";
 
@@ -36,6 +37,7 @@ export default function SettingsPage() {
   const slug = params.slug as string;
   const [activeTab, setActiveTab] = useState<SettingsTab>("business");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const { confirm, ConfirmModal } = useConfirmModal();
 
   const { data: organization, isLoading } = trpc.organization.get.useQuery();
   const { data: settings } = trpc.organization.getSettings.useQuery();
@@ -1037,8 +1039,15 @@ export default function SettingsPage() {
 
                       {member.role !== "owner" && (
                         <button
-                          onClick={() => {
-                            if (confirm("Are you sure you want to remove this member?")) {
+                          onClick={async () => {
+                            const confirmed = await confirm({
+                              title: "Remove Team Member",
+                              description: "This will remove this team member from your organization. They will lose access to all organization data and features. This action cannot be undone.",
+                              confirmLabel: "Remove Member",
+                              variant: "destructive",
+                            });
+
+                            if (confirmed) {
                               removeMemberMutation.mutate({ memberId: member.id });
                             }
                           }}
@@ -1199,12 +1208,15 @@ export default function SettingsPage() {
                     Open Stripe Dashboard
                   </button>
                   <button
-                    onClick={() => {
-                      if (
-                        confirm(
-                          "Are you sure you want to disconnect your Stripe account? You will not be able to accept payments until you reconnect."
-                        )
-                      ) {
+                    onClick={async () => {
+                      const confirmed = await confirm({
+                        title: "Disconnect Stripe Account",
+                        description: "Are you sure you want to disconnect your Stripe account? You will not be able to accept payments until you reconnect. This will not affect existing transactions or payouts.",
+                        confirmLabel: "Disconnect Stripe",
+                        variant: "destructive",
+                      });
+
+                      if (confirmed) {
                         disconnectStripeMutation.mutate();
                       }
                     }}
@@ -1655,6 +1667,8 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {ConfirmModal}
     </div>
   );
 }

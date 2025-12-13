@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import type { Route } from "next";
 import { trpc } from "@/lib/trpc";
 import { Loader2, X, Plus, User, Phone, Globe, Award, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 interface GuideFormProps {
   guide?: {
@@ -70,7 +71,11 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
   const createMutation = trpc.guide.create.useMutation({
     onSuccess: (newGuide) => {
       utils.guide.list.invalidate();
+      toast.success("Guide created successfully");
       router.push(`/org/${slug}/guides/${newGuide.id}` as Route);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create guide");
     },
   });
 
@@ -78,7 +83,11 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
     onSuccess: () => {
       utils.guide.list.invalidate();
       utils.guide.getById.invalidate({ id: guide?.id });
+      toast.success("Guide updated successfully");
       router.push(`/org/${slug}/guides/${guide?.id}` as Route);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update guide");
     },
   });
 

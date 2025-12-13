@@ -22,6 +22,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
 
 type StatusFilter = "all" | "active" | "inactive" | "expired";
 type DiscountType = "percentage" | "fixed";
@@ -51,6 +52,7 @@ export default function PromoCodesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const { confirm, ConfirmModal } = useConfirmModal();
 
   const [form, setForm] = useState<PromoCodeForm>({
     code: "",
@@ -187,8 +189,15 @@ export default function PromoCodesPage() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this promo code?")) {
+  const handleDelete = async (id: string) => {
+    const confirmed = await confirm({
+      title: "Delete Promo Code",
+      description: "This will permanently delete this promo code. Existing bookings using this code will not be affected, but customers will no longer be able to use it for new bookings. This action cannot be undone.",
+      confirmLabel: "Delete Promo Code",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       deleteMutation.mutate({ id });
     }
   };
@@ -814,6 +823,8 @@ export default function PromoCodesPage() {
           </div>
         </div>
       )}
+
+      {ConfirmModal}
     </div>
   );
 }

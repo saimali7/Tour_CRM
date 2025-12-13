@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { Loader2, X, Plus } from "lucide-react";
 import { SingleImageUploader, ImageUploader } from "@/components/uploads/image-uploader";
+import { toast } from "sonner";
 
 interface TourFormData {
   name: string;
@@ -115,7 +116,11 @@ export function TourForm({ tour }: TourFormProps) {
   const createMutation = trpc.tour.create.useMutation({
     onSuccess: () => {
       utils.tour.list.invalidate();
+      toast.success("Tour created successfully");
       router.push(`/org/${slug}/tours`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create tour");
     },
   });
 
@@ -123,7 +128,11 @@ export function TourForm({ tour }: TourFormProps) {
     onSuccess: () => {
       utils.tour.list.invalidate();
       utils.tour.getById.invalidate({ id: tour?.id });
+      toast.success("Tour updated successfully");
       router.push(`/org/${slug}/tours`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update tour");
     },
   });
 

@@ -1,37 +1,15 @@
 import { UserButton } from "@clerk/nextjs";
-import Link from "next/link";
 import { getOrgContext } from "@/lib/auth";
-import {
-  LayoutDashboard,
-  CalendarDays,
-  Users,
-  Map,
-  Calendar,
-  UserCircle,
-  Settings,
-  Mail,
-  Tag,
-  BarChart3,
-} from "lucide-react";
 import { DashboardProviders } from "./providers";
+import { CommandPalette } from "@/components/command-palette";
+import { SidebarNav } from "@/components/sidebar-nav";
+import { NavigationProgress } from "@/components/navigation-progress";
+import { Suspense } from "react";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
   params: Promise<{ slug: string }>;
 }
-
-const navigation = [
-  { name: "Dashboard", href: "", icon: LayoutDashboard },
-  { name: "Bookings", href: "/bookings", icon: CalendarDays },
-  { name: "Customers", href: "/customers", icon: Users },
-  { name: "Tours", href: "/tours", icon: Map },
-  { name: "Schedules", href: "/schedules", icon: Calendar },
-  { name: "Guides", href: "/guides", icon: UserCircle },
-  { name: "Promo Codes", href: "/promo-codes", icon: Tag },
-  { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Communications", href: "/communications", icon: Mail },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
 
 export default async function DashboardLayout({
   children,
@@ -42,6 +20,11 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Navigation Progress Bar */}
+      <Suspense fallback={null}>
+        <NavigationProgress />
+      </Suspense>
+
       {/* Sidebar */}
       <aside className="hidden w-64 flex-shrink-0 border-r border-gray-200 bg-white md:flex md:flex-col">
         {/* Logo & Org name */}
@@ -57,19 +40,13 @@ export default async function DashboardLayout({
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              href={`/org/${slug}${item.href}`}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-            >
-              <item.icon className="h-5 w-5 text-gray-400" />
-              {item.name}
-            </Link>
-          ))}
-        </nav>
+        {/* Global Search */}
+        <div className="px-3 py-3 border-b border-gray-200">
+          <CommandPalette orgSlug={slug} />
+        </div>
+
+        {/* Navigation - Client Component with active states */}
+        <SidebarNav orgSlug={slug} />
 
         {/* User section */}
         <div className="border-t border-gray-200 p-4">

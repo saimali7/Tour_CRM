@@ -23,6 +23,16 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useParams, useRouter } from "next/navigation";
 import { ActivityLogCard } from "@/components/activity-log/activity-log-list";
+import { useConfirmModal } from "@/components/ui/confirm-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export default function BookingDetailPage() {
   const params = useParams();
@@ -32,10 +42,13 @@ export default function BookingDetailPage() {
 
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState<"customer_request" | "booking_cancelled" | "other">("customer_request");
   const [refundNotes, setRefundNotes] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const confirmModal = useConfirmModal();
 
   const { data: booking, isLoading, error } = trpc.booking.getById.useQuery({ id: bookingId });
 
@@ -45,6 +58,10 @@ export default function BookingDetailPage() {
     onSuccess: () => {
       utils.booking.getById.invalidate({ id: bookingId });
       utils.booking.list.invalidate();
+      toast.success("Booking confirmed successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to confirm booking: ${error.message}`);
     },
   });
 
@@ -52,6 +69,10 @@ export default function BookingDetailPage() {
     onSuccess: () => {
       utils.booking.getById.invalidate({ id: bookingId });
       utils.booking.list.invalidate();
+      toast.success("Booking cancelled successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to cancel booking: ${error.message}`);
     },
   });
 
@@ -59,6 +80,10 @@ export default function BookingDetailPage() {
     onSuccess: () => {
       utils.booking.getById.invalidate({ id: bookingId });
       utils.booking.list.invalidate();
+      toast.success("Booking marked as completed");
+    },
+    onError: (error) => {
+      toast.error(`Failed to complete booking: ${error.message}`);
     },
   });
 
@@ -66,12 +91,20 @@ export default function BookingDetailPage() {
     onSuccess: () => {
       utils.booking.getById.invalidate({ id: bookingId });
       utils.booking.list.invalidate();
+      toast.success("Booking marked as no-show");
+    },
+    onError: (error) => {
+      toast.error(`Failed to mark as no-show: ${error.message}`);
     },
   });
 
   const updatePaymentMutation = trpc.booking.updatePaymentStatus.useMutation({
     onSuccess: () => {
       utils.booking.getById.invalidate({ id: bookingId });
+      toast.success("Payment status updated successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update payment: ${error.message}`);
     },
   });
 
@@ -115,33 +148,67 @@ export default function BookingDetailPage() {
     { enabled: !!booking && booking.status === "cancelled" }
   );
 
-  const handleConfirm = () => {
-    if (confirm("Confirm this booking?")) {
+  const handleConfirm = async () => {
+    const confirmed = await confirmModal.confirm({
+      title: "Confirm Booking",
+      description: "This will send a confirmation email to the customer and update the booking status.",
+      confirmLabel: "Confirm Booking",
+      variant: "default",
+    });
+
+    if (confirmed) {
       confirmMutation.mutate({ id: bookingId });
     }
   };
 
   const handleCancel = () => {
-    const reason = prompt("Cancellation reason (optional):");
-    if (reason !== null) {
-      cancelMutation.mutate({ id: bookingId, reason: reason || undefined });
-    }
+    setShowCancelDialog(true);
   };
 
-  const handleComplete = () => {
-    if (confirm("Mark this booking as completed?")) {
+  const handleCancelSubmit = () => {
+    cancelMutation.mutate({
+      id: bookingId,
+      reason: cancelReason || undefined
+    });
+    setShowCancelDialog(false);
+    setCancelReason("");
+  };
+
+  const handleComplete = async () => {
+    const confirmed = await confirmModal.confirm({
+      title: "Mark as Completed",
+      description: "This will mark the booking as completed. The tour has been successfully delivered.",
+      confirmLabel: "Mark Completed",
+      variant: "default",
+    });
+
+    if (confirmed) {
       completeMutation.mutate({ id: bookingId });
     }
   };
 
-  const handleNoShow = () => {
-    if (confirm("Mark this booking as no-show?")) {
+  const handleNoShow = async () => {
+    const confirmed = await confirmModal.confirm({
+      title: "Mark as No-Show",
+      description: "This will mark the booking as no-show. The customer did not attend the tour.",
+      confirmLabel: "Mark No-Show",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       noShowMutation.mutate({ id: bookingId });
     }
   };
 
-  const handleMarkPaid = () => {
-    if (confirm("Mark this booking as paid?")) {
+  const handleMarkPaid = async () => {
+    const confirmed = await confirmModal.confirm({
+      title: "Mark as Paid",
+      description: "This will update the payment status to paid. Make sure you have received the full payment.",
+      confirmLabel: "Mark as Paid",
+      variant: "default",
+    });
+
+    if (confirmed) {
       updatePaymentMutation.mutate({
         id: bookingId,
         paymentStatus: "paid",
@@ -906,6 +973,49 @@ export default function BookingDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Cancel Booking Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Booking</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The booking will be cancelled and the customer will be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium text-gray-700">Cancellation Reason (optional)</label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="w-full mt-2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              placeholder="Enter cancellation reason..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setShowCancelDialog(false);
+                setCancelReason("");
+              }}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Keep Booking
+            </button>
+            <button
+              onClick={handleCancelSubmit}
+              disabled={cancelMutation.isPending}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {cancelMutation.isPending ? "Cancelling..." : "Cancel Booking"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Modal */}
+      {confirmModal.ConfirmModal}
     </div>
   );
 }

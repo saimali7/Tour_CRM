@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   Calendar,
@@ -11,21 +11,27 @@ import {
   TrendingUp,
   BarChart3,
 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   StatCard,
   ActivityFeed,
   TodaySchedule,
   MetricCard,
   SimpleChart,
+  ActionableAlert,
+  AlertsPanel,
 } from "@/components/dashboard";
 
 type TabType = "operations" | "business";
 
 export default function DashboardPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const [activeTab, setActiveTab] = useState<TabType>("operations");
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+
+  const utils = trpc.useUtils();
 
   // Fetch dashboard data
   const {
@@ -43,6 +49,18 @@ export default function DashboardPage() {
   } = trpc.dashboard.getBusinessDashboard.useQuery({}, {
     enabled: activeTab === "business",
   });
+
+  // Mutations for alert actions
+  const cancelScheduleMutation = trpc.schedule.cancel.useMutation({
+    onSuccess: () => {
+      utils.dashboard.getOperationsDashboard.invalidate();
+      utils.schedule.list.invalidate();
+    },
+  });
+
+  const handleDismissAlert = (alertId: string) => {
+    setDismissedAlerts((prev) => new Set(prev).add(alertId));
+  };
 
   if (operationsError || businessError) {
     return (
@@ -97,6 +115,135 @@ export default function DashboardPage() {
             </div>
           ) : operationsData ? (
             <div className="space-y-6">
+              {/* Actionable Alerts Section */}
+              {(() => {
+                const alerts: React.ReactElement[] = [];
+
+                // Critical: Unassigned guides
+                const unassignedSchedules = operationsData.upcomingSchedules.filter(
+                  (s) => s.hasUnconfirmedGuide && !dismissedAlerts.has(`unassigned-${s.scheduleId}`)
+                );
+                unassignedSchedules.forEach((schedule) => {
+                  alerts.push(
+                    <ActionableAlert
+                      key={`unassigned-${schedule.scheduleId}`}
+                      id={`unassigned-${schedule.scheduleId}`}
+                      severity="critical"
+                      title={`${schedule.tourName} has no guide assigned`}
+                      description={`Scheduled for ${new Date(schedule.startsAt).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })} at ${new Date(schedule.startsAt).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}`}
+                      entityId={schedule.scheduleId}
+                      entityType="schedule"
+                      actions={[
+                        {
+                          label: "Assign Guide",
+                          onClick: () => router.push(`/org/${slug}/schedules/${schedule.scheduleId}`),
+                        },
+                        {
+                          label: "Cancel Schedule",
+                          variant: "destructive",
+                          onClick: () => {
+                            if (confirm(`Cancel ${schedule.tourName}? This will notify all booked customers.`)) {
+                              cancelScheduleMutation.mutate({ id: schedule.scheduleId });
+                            }
+                          },
+                          isLoading: cancelScheduleMutation.isPending,
+                        },
+                      ]}
+                      onDismiss={() => handleDismissAlert(`unassigned-${schedule.scheduleId}`)}
+                    />
+                  );
+                });
+
+                // Warning: Low capacity schedules (less than 30% booked and more than 2 days away)
+                const lowCapacitySchedules = operationsData.upcomingSchedules.filter((s) => {
+                  const utilization = s.maxParticipants > 0 ? (s.bookedCount / s.maxParticipants) * 100 : 0;
+                  const daysAway = Math.ceil((new Date(s.startsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  return (
+                    utilization < 30 &&
+                    daysAway > 2 &&
+                    !s.hasUnconfirmedGuide &&
+                    !dismissedAlerts.has(`low-capacity-${s.scheduleId}`)
+                  );
+                });
+                lowCapacitySchedules.slice(0, 2).forEach((schedule) => {
+                  const utilization = schedule.maxParticipants > 0
+                    ? Math.round((schedule.bookedCount / schedule.maxParticipants) * 100)
+                    : 0;
+                  alerts.push(
+                    <ActionableAlert
+                      key={`low-capacity-${schedule.scheduleId}`}
+                      id={`low-capacity-${schedule.scheduleId}`}
+                      severity="warning"
+                      title={`${schedule.tourName} has low bookings (${utilization}% full)`}
+                      description={`Only ${schedule.bookedCount} of ${schedule.maxParticipants} spots booked for ${new Date(schedule.startsAt).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })} at ${new Date(schedule.startsAt).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}`}
+                      entityId={schedule.scheduleId}
+                      entityType="schedule"
+                      actions={[
+                        {
+                          label: "View Schedule",
+                          onClick: () => router.push(`/org/${slug}/schedules/${schedule.scheduleId}`),
+                        },
+                        {
+                          label: "View Customers",
+                          variant: "secondary",
+                          onClick: () => router.push(`/org/${slug}/customers`),
+                        },
+                      ]}
+                      onDismiss={() => handleDismissAlert(`low-capacity-${schedule.scheduleId}`)}
+                    />
+                  );
+                });
+
+                // Info: Tours happening soon (within 2 hours)
+                const upcomingSoonSchedules = operationsData.upcomingSchedules.filter((s) => {
+                  const hoursAway = (new Date(s.startsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60);
+                  return (
+                    hoursAway > 0 &&
+                    hoursAway <= 2 &&
+                    s.bookedCount > 0 &&
+                    !s.hasUnconfirmedGuide &&
+                    !dismissedAlerts.has(`upcoming-soon-${s.scheduleId}`)
+                  );
+                });
+                upcomingSoonSchedules.slice(0, 1).forEach((schedule) => {
+                  const minutesAway = Math.round((new Date(schedule.startsAt).getTime() - new Date().getTime()) / (1000 * 60));
+                  alerts.push(
+                    <ActionableAlert
+                      key={`upcoming-soon-${schedule.scheduleId}`}
+                      id={`upcoming-soon-${schedule.scheduleId}`}
+                      severity="info"
+                      title={`${schedule.tourName} starts in ${minutesAway} minutes`}
+                      description={`${schedule.bookedCount} participant${schedule.bookedCount !== 1 ? "s" : ""} expected${schedule.guideName ? ` with ${schedule.guideName}` : ""}`}
+                      entityId={schedule.scheduleId}
+                      entityType="schedule"
+                      actions={[
+                        {
+                          label: "View Manifest",
+                          onClick: () => router.push(`/org/${slug}/schedules/${schedule.scheduleId}`),
+                        },
+                      ]}
+                      onDismiss={() => handleDismissAlert(`upcoming-soon-${schedule.scheduleId}`)}
+                    />
+                  );
+                });
+
+                return alerts.length > 0 ? <AlertsPanel>{alerts}</AlertsPanel> : null;
+              })()}
+
               {/* Key Stats */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <StatCard

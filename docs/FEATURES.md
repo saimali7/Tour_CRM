@@ -10,18 +10,19 @@
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Application Ownership](#application-ownership)
-3. [User Personas](#user-personas)
-4. [Phase 0: Foundation](#phase-0-foundation)
-5. [Phase 1: Core Booking Engine](#phase-1-core-booking-engine)
-6. [Phase 2: Customer & Communications](#phase-2-customer--communications)
-7. [Phase 3: Guide Operations](#phase-3-guide-operations)
-8. [Phase 4: Pricing & Promotions](#phase-4-pricing--promotions)
-9. [Phase 5: Reporting & Analytics](#phase-5-reporting--analytics)
-10. [Phase 6: Polish & Optimization](#phase-6-polish--optimization)
-11. [Phase 7+: Future Expansion](#phase-7-future-expansion)
-12. [Feature Index](#feature-index)
-13. [Non-Functional Requirements](#non-functional-requirements)
+2. [UX Standards & Interaction Patterns](#ux-standards--interaction-patterns)
+4. [Application Ownership](#application-ownership)
+5. [User Personas](#user-personas)
+6. [Phase 0: Foundation](#phase-0-foundation)
+7. [Phase 1: Core Booking Engine](#phase-1-core-booking-engine)
+8. [Phase 2: Customer & Communications](#phase-2-customer--communications)
+9. [Phase 3: Guide Operations](#phase-3-guide-operations)
+10. [Phase 4: Pricing & Promotions](#phase-4-pricing--promotions)
+11. [Phase 5: Reporting & Analytics](#phase-5-reporting--analytics)
+12. [Phase 6: UX Overhaul](#phase-6-ux-overhaul)
+13. [Phase 7+: Future Expansion](#phase-7-future-expansion)
+14. [Feature Index](#feature-index)
+15. [Non-Functional Requirements](#non-functional-requirements)
 
 ---
 
@@ -114,6 +115,132 @@ The CRM is the core product that runs your tour business. The Web App is a custo
 | System uptime | 99.9% | Monthly availability |
 | Page load (p95) | < 2s | Core Web Vitals |
 | Customer satisfaction | > 4.5/5 | Post-tour surveys |
+
+---
+
+## UX Standards & Interaction Patterns
+
+> **Philosophy:** The CRM is a unified system, not a collection of isolated pages. Every entity connects to related data, actions appear in context, and users never navigate away for simple operations.
+
+### Design Principles
+
+1. **Everything Connected** - No isolated pages; all entities link to related data
+2. **Search Everywhere** - `Cmd+K` accesses any entity from anywhere
+3. **Create Inline** - Never navigate away to create a related entity
+4. **Actions in Context** - Buttons appear where you need them
+5. **Consistent Patterns** - Same interaction model on every page
+
+### Required Interaction Patterns
+
+#### Pattern: Entity Selection
+- MUST use searchable Combobox (not plain `<select>`)
+- MUST include "Create New" option at bottom
+- MUST support keyboard navigation
+- MUST show recent selections
+
+#### Pattern: Entity Display
+- Clickable items MUST open slide-over (not navigate) for quick view
+- Related entities MUST be shown as clickable chips
+- Status MUST be shown with color-coded badges
+- Actions MUST appear on hover/focus
+
+#### Pattern: Confirmations
+- MUST use styled Modal component (not browser `confirm()`)
+- Destructive actions MUST require explicit confirmation
+- MUST explain consequences of action
+- MUST provide cancel option
+
+#### Pattern: Feedback
+- All mutations MUST show toast on success/error
+- Loading states MUST show skeleton/spinner
+- Empty states MUST show helpful message + action
+
+### User Stories by Workflow
+
+#### US-1: Walk-in/Phone Booking
+**As a** tour operator staff member
+**I want to** create a booking while on the phone with a customer
+**So that** I can complete the transaction without making them wait
+
+**Acceptance Criteria:**
+- [ ] Can search for existing customer by name/email/phone
+- [ ] Can create new customer inline without navigating away
+- [ ] Can search schedules by date and tour name
+- [ ] Can apply promo code with instant validation
+- [ ] Can complete booking in under 8 clicks
+- [ ] Confirmation shown immediately with option to book another
+
+#### US-2: Repeat Customer Booking
+**As a** tour operator staff member
+**I want to** quickly rebook a returning customer from their profile
+**So that** I can leverage their existing information
+
+**Acceptance Criteria:**
+- [ ] Customer profile shows "Quick Book" button
+- [ ] Past bookings show "Rebook" action
+- [ ] Rebook pre-fills: customer, tour, participant count, preferences
+- [ ] Only need to select new date/time
+- [ ] Can complete in 3-4 clicks
+
+#### US-3: Morning Operations Check
+**As an** operations manager
+**I want to** see and resolve today's issues at a glance
+**So that** I can ensure smooth tour operations
+
+**Acceptance Criteria:**
+- [ ] Dashboard shows critical alerts with severity
+- [ ] Each alert has inline action button (e.g., "Assign Guide")
+- [ ] Can assign guide without leaving dashboard
+- [ ] Can view manifest preview on hover
+- [ ] Can print all manifests with one click
+
+#### US-4: Customer Service Inquiry
+**As a** customer service representative
+**I want to** quickly find and modify a booking
+**So that** I can resolve customer inquiries efficiently
+
+**Acceptance Criteria:**
+- [ ] Can search bookings globally via `Cmd+K`
+- [ ] Search results show in slide-over (no navigation)
+- [ ] Can reschedule from slide-over
+- [ ] Can cancel with reason from slide-over
+- [ ] All changes show toast confirmation
+- [ ] Customer notified automatically
+
+#### US-5: Guide Assignment
+**As an** operations manager
+**I want to** assign guides to multiple schedules efficiently
+**So that** I can complete weekly planning quickly
+
+**Acceptance Criteria:**
+- [ ] Can view all unassigned schedules
+- [ ] Can see guide availability at a glance
+- [ ] Conflicts detected before assignment
+- [ ] Can assign via drag-drop or modal
+- [ ] Bulk assignment supported
+
+#### US-6: Quick Entity Lookup
+**As any** CRM user
+**I want to** find any record from anywhere
+**So that** I don't waste time navigating
+
+**Acceptance Criteria:**
+- [ ] `Cmd+K` available on every page
+- [ ] Searches bookings, customers, tours, schedules, guides
+- [ ] Results grouped by type
+- [ ] Recent items shown by default
+- [ ] Keyboard navigable
+
+### Success Metrics
+
+| Workflow | Before | Target |
+|----------|--------|--------|
+| Walk-in booking | 12+ clicks, 3-5 min | <8 clicks, 45 sec |
+| Repeat customer booking | 10+ clicks | 3-4 clicks |
+| Morning ops check | View only | Inline actions |
+| Guide assignment (per schedule) | 6 clicks | 1 drag-drop |
+| Customer service inquiry | 8+ clicks | 3-4 clicks |
+| Find any record | Navigate + search | `Cmd+K` instant |
 
 ---
 

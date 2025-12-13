@@ -17,6 +17,18 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { ConfirmModal, useConfirmModal } from "@/components/ui/confirm-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { NoBookingsEmpty, NoResultsEmpty } from "@/components/ui/empty-state";
 
 type StatusFilter = "all" | "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 type PaymentFilter = "all" | "pending" | "partial" | "paid" | "refunded" | "failed";
@@ -28,6 +40,10 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [search, setSearch] = useState("");
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const confirmModal = useConfirmModal();
 
   const { data, isLoading, error } = trpc.booking.list.useQuery({
     pagination: { page, limit: 20 },
@@ -47,6 +63,10 @@ export default function BookingsPage() {
     onSuccess: () => {
       utils.booking.list.invalidate();
       utils.booking.getStats.invalidate();
+      toast.success("Booking confirmed successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to confirm booking: ${error.message}`);
     },
   });
 
@@ -54,19 +74,40 @@ export default function BookingsPage() {
     onSuccess: () => {
       utils.booking.list.invalidate();
       utils.booking.getStats.invalidate();
+      toast.success("Booking cancelled successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to cancel booking: ${error.message}`);
     },
   });
 
-  const handleConfirm = (id: string) => {
-    if (confirm("Confirm this booking?")) {
+  const handleConfirm = async (id: string) => {
+    const confirmed = await confirmModal.confirm({
+      title: "Confirm Booking",
+      description: "This will send a confirmation email to the customer and update the booking status.",
+      confirmLabel: "Confirm Booking",
+      variant: "default",
+    });
+
+    if (confirmed) {
       confirmMutation.mutate({ id });
     }
   };
 
   const handleCancel = (id: string) => {
-    const reason = prompt("Cancellation reason (optional):");
-    if (reason !== null) {
-      cancelMutation.mutate({ id, reason: reason || undefined });
+    setBookingToCancel(id);
+    setShowCancelDialog(true);
+  };
+
+  const handleCancelSubmit = () => {
+    if (bookingToCancel) {
+      cancelMutation.mutate({
+        id: bookingToCancel,
+        reason: cancelReason || undefined
+      });
+      setShowCancelDialog(false);
+      setCancelReason("");
+      setBookingToCancel(null);
     }
   };
 
@@ -261,27 +302,14 @@ export default function BookingsPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12">
-          <div className="flex justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
-        </div>
+        <TableSkeleton rows={10} columns={7} />
       ) : data?.data.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white">
-          <div className="p-12 text-center">
-            <Ticket className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No bookings yet</h3>
-            <p className="mt-2 text-gray-500">
-              Create your first booking to get started.
-            </p>
-            <Link
-              href={`/org/${slug}/bookings/new` as Route}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              New Booking
-            </Link>
-          </div>
+          {search ? (
+            <NoResultsEmpty searchTerm={search} />
+          ) : (
+            <NoBookingsEmpty orgSlug={slug} />
+          )}
         </div>
       ) : (
         <>
@@ -379,6 +407,7 @@ export default function BookingsPage() {
                           href={`/org/${slug}/bookings/${booking.id}` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="View"
+                          aria-label="View booking details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
@@ -386,6 +415,7 @@ export default function BookingsPage() {
                           href={`/org/${slug}/bookings/${booking.id}/edit` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="Edit"
+                          aria-label="Edit booking"
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
@@ -394,6 +424,7 @@ export default function BookingsPage() {
                             onClick={() => handleConfirm(booking.id)}
                             className="p-1.5 text-green-500 hover:text-green-700 hover:bg-green-50 rounded"
                             title="Confirm"
+                            aria-label="Confirm booking"
                           >
                             <CheckCircle className="h-4 w-4" />
                           </button>
@@ -403,6 +434,7 @@ export default function BookingsPage() {
                             onClick={() => handleCancel(booking.id)}
                             className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                             title="Cancel"
+                            aria-label="Cancel booking"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -442,6 +474,50 @@ export default function BookingsPage() {
           )}
         </>
       )}
+
+      {/* Cancel Booking Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Booking</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The booking will be cancelled and the customer will be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium text-gray-700">Cancellation Reason (optional)</label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="w-full mt-2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              placeholder="Enter cancellation reason..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setShowCancelDialog(false);
+                setCancelReason("");
+                setBookingToCancel(null);
+              }}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Keep Booking
+            </button>
+            <button
+              onClick={handleCancelSubmit}
+              disabled={cancelMutation.isPending}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {cancelMutation.isPending ? "Cancelling..." : "Cancel Booking"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Modal */}
+      {confirmModal.ConfirmModal}
     </div>
   );
 }

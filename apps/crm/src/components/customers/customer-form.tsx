@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { Loader2, X, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 interface CustomerFormProps {
   customer?: {
@@ -57,7 +58,11 @@ export function CustomerForm({ customer }: CustomerFormProps) {
   const createMutation = trpc.customer.create.useMutation({
     onSuccess: () => {
       utils.customer.list.invalidate();
+      toast.success("Customer created successfully");
       router.push(`/org/${slug}/customers`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create customer");
     },
   });
 
@@ -65,7 +70,11 @@ export function CustomerForm({ customer }: CustomerFormProps) {
     onSuccess: () => {
       utils.customer.list.invalidate();
       utils.customer.getById.invalidate({ id: customer?.id });
+      toast.success("Customer updated successfully");
       router.push(`/org/${slug}/customers`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update customer");
     },
   });
 

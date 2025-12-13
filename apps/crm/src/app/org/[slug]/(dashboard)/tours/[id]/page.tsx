@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Edit, Clock, Users, DollarSign, MapPin, Calendar, Check, X, Plus, Trash2, GripVertical, Star, Layers } from "lucide-react";
+import { ArrowLeft, Edit, Clock, Users, DollarSign, MapPin, Calendar, Check, X, Plus, Trash2, GripVertical, Star, Layers, ExternalLink, Ticket } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { TourGuideQualifications } from "@/components/tours/tour-guide-qualifications";
+import { Button } from "@/components/ui/button";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { toast } from "sonner";
 
 interface PricingTierFormData {
   name: string;
@@ -68,8 +71,13 @@ const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function TourDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const tourId = params.id as string;
+
+  // Delete confirmation state
+  const [deletingTierId, setDeletingTierId] = useState<string | null>(null);
+  const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
 
   // Pricing tier modal state
   const [showTierModal, setShowTierModal] = useState(false);
@@ -89,6 +97,16 @@ export default function TourDetailPage() {
   );
   const { data: variants = [], isLoading: variantsLoading } = trpc.tour.listVariants.useQuery(
     { tourId },
+    { enabled: !!tourId }
+  );
+
+  // Get upcoming schedules for this tour
+  const { data: schedulesData } = trpc.schedule.list.useQuery(
+    {
+      filters: { tourId },
+      pagination: { limit: 10 },
+      sort: { field: "startsAt", direction: "asc" },
+    },
     { enabled: !!tourId }
   );
 
@@ -112,6 +130,11 @@ export default function TourDetailPage() {
   const deleteTierMutation = trpc.tour.deletePricingTier.useMutation({
     onSuccess: () => {
       utils.tour.listPricingTiers.invalidate({ tourId });
+      setDeletingTierId(null);
+      toast.success("Pricing tier deleted");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete pricing tier");
     },
   });
 
@@ -158,9 +181,9 @@ export default function TourDetailPage() {
     }
   };
 
-  const handleDeleteTier = (tierId: string) => {
-    if (confirm("Are you sure you want to delete this pricing tier?")) {
-      deleteTierMutation.mutate({ tierId });
+  const handleDeleteTier = () => {
+    if (deletingTierId) {
+      deleteTierMutation.mutate({ tierId: deletingTierId });
     }
   };
 
@@ -185,6 +208,11 @@ export default function TourDetailPage() {
   const deleteVariantMutation = trpc.tour.deleteVariant.useMutation({
     onSuccess: () => {
       utils.tour.listVariants.invalidate({ tourId });
+      setDeletingVariantId(null);
+      toast.success("Variant deleted");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete variant");
     },
   });
 
@@ -235,10 +263,14 @@ export default function TourDetailPage() {
     }
   };
 
-  const handleDeleteVariant = (variantId: string) => {
-    if (confirm("Are you sure you want to delete this variant?")) {
-      deleteVariantMutation.mutate({ variantId });
+  const handleDeleteVariant = () => {
+    if (deletingVariantId) {
+      deleteVariantMutation.mutate({ variantId: deletingVariantId });
     }
+  };
+
+  const handleCreateSchedule = () => {
+    router.push(`/org/${slug}/schedules/new?tourId=${tourId}` as Route);
   };
 
   const toggleVariantDay = (day: number) => {
@@ -508,7 +540,7 @@ export default function TourDetailPage() {
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteTier(tier.id)}
+                    onClick={() => setDeletingTierId(tier.id)}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     disabled={deleteTierMutation.isPending}
                   >
@@ -610,7 +642,7 @@ export default function TourDetailPage() {
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteVariant(variant.id)}
+                    onClick={() => setDeletingVariantId(variant.id)}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     disabled={deleteVariantMutation.isPending}
                   >
@@ -625,6 +657,93 @@ export default function TourDetailPage() {
 
       {/* Qualified Guides */}
       <TourGuideQualifications tourId={tourId} />
+
+      {/* Upcoming Schedules */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Upcoming Schedules</h2>
+            <p className="text-sm text-gray-500">
+              {schedulesData?.data?.length || 0} schedules
+            </p>
+          </div>
+          <Button onClick={handleCreateSchedule} size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Create Schedule
+          </Button>
+        </div>
+
+        {schedulesData?.data && schedulesData.data.length > 0 ? (
+          <div className="divide-y divide-gray-200">
+            {schedulesData.data.slice(0, 5).map((schedule) => {
+              const date = new Date(schedule.startsAt);
+              const dateStr = new Intl.DateTimeFormat("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              }).format(date);
+              const available = (schedule.maxParticipants || 0) - (schedule.bookedCount || 0);
+
+              return (
+                <div
+                  key={schedule.id}
+                  className="p-4 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">{dateStr}</span>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          schedule.status === "scheduled"
+                            ? "bg-blue-100 text-blue-800"
+                            : schedule.status === "completed"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {schedule.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {schedule.bookedCount || 0}/{schedule.maxParticipants} booked • {available} spots available
+                      {schedule.guide && ` • ${schedule.guide.firstName} ${schedule.guide.lastName}`}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/org/${slug}/schedules/${schedule.id}` as Route}
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    View
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-8 text-center">
+            <Ticket className="mx-auto h-12 w-12 text-gray-300" />
+            <p className="mt-4 text-gray-500">No schedules yet</p>
+            <Button onClick={handleCreateSchedule} variant="outline" className="mt-4 gap-2">
+              <Plus className="h-4 w-4" />
+              Create First Schedule
+            </Button>
+          </div>
+        )}
+
+        {schedulesData?.data && schedulesData.data.length > 5 && (
+          <div className="p-4 border-t border-gray-200 text-center">
+            <Link
+              href={`/org/${slug}/schedules?tourId=${tourId}` as Route}
+              className="text-sm text-primary hover:underline"
+            >
+              View all {schedulesData.data.length} schedules
+            </Link>
+          </div>
+        )}
+      </div>
 
       {/* Cancellation Policy */}
       {tour.cancellationPolicy && (
@@ -1064,6 +1183,30 @@ export default function TourDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Tier Confirmation Modal */}
+      <ConfirmModal
+        open={!!deletingTierId}
+        onOpenChange={(open) => !open && setDeletingTierId(null)}
+        title="Delete Pricing Tier"
+        description="Are you sure you want to delete this pricing tier? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDeleteTier}
+        isLoading={deleteTierMutation.isPending}
+      />
+
+      {/* Delete Variant Confirmation Modal */}
+      <ConfirmModal
+        open={!!deletingVariantId}
+        onOpenChange={(open) => !open && setDeletingVariantId(null)}
+        title="Delete Variant"
+        description="Are you sure you want to delete this variant? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDeleteVariant}
+        isLoading={deleteVariantMutation.isPending}
+      />
     </div>
   );
 }

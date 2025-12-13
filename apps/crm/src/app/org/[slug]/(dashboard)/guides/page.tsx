@@ -19,12 +19,16 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { NoGuidesEmpty, NoResultsEmpty } from "@/components/ui/empty-state";
 
 type StatusFilter = "all" | "active" | "inactive" | "on_leave";
 
 export default function GuidesPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const confirmModal = useConfirmModal();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -52,8 +56,15 @@ export default function GuidesPage() {
     },
   });
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this guide?")) {
+  const handleDelete = async (id: string) => {
+    const confirmed = await confirmModal.confirm({
+      title: "Delete Guide",
+      description: "This will permanently delete this guide and remove them from all future assignments. This action cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       deleteMutation.mutate({ id });
     }
   };
@@ -230,27 +241,14 @@ export default function GuidesPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12">
-          <div className="flex justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
-        </div>
+        <TableSkeleton rows={10} columns={6} />
       ) : data?.data.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white">
-          <div className="p-12 text-center">
-            <UserCircle className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No guides yet</h3>
-            <p className="mt-2 text-gray-500">
-              Add guides to assign them to scheduled tours.
-            </p>
-            <Link
-              href={`/org/${slug}/guides/new` as Route}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Guide
-            </Link>
-          </div>
+          {search ? (
+            <NoResultsEmpty searchTerm={search} />
+          ) : (
+            <NoGuidesEmpty orgSlug={slug} />
+          )}
         </div>
       ) : (
         <>
@@ -292,8 +290,8 @@ export default function GuidesPage() {
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                             <span className="text-primary font-medium">
-                              {guide.firstName[0]}
-                              {guide.lastName[0]}
+                              {guide.firstName?.[0] ?? ''}
+                              {guide.lastName?.[0] ?? ''}
                             </span>
                           </div>
                         )}
@@ -368,6 +366,7 @@ export default function GuidesPage() {
                           href={`/org/${slug}/guides/${guide.id}` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="View"
+                          aria-label="View guide details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
@@ -375,6 +374,7 @@ export default function GuidesPage() {
                           href={`/org/${slug}/guides/${guide.id}/edit` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="Edit"
+                          aria-label="Edit guide"
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
@@ -382,6 +382,7 @@ export default function GuidesPage() {
                           onClick={() => handleDelete(guide.id)}
                           className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                           title="Delete"
+                          aria-label="Delete guide"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -420,6 +421,8 @@ export default function GuidesPage() {
           )}
         </>
       )}
+
+      {confirmModal.ConfirmModal}
     </div>
   );
 }

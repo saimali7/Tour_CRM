@@ -27,6 +27,8 @@ import { analyticsRouter } from "./analytics";
 import { dashboardRouter } from "./dashboard";
 import { customerIntelligenceRouter } from "./customer-intelligence";
 import { reportsRouter } from "./reports";
+// Phase 6 routers
+import { searchRouter } from "./search";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -58,6 +60,8 @@ export const appRouter = createRouter({
   dashboard: dashboardRouter,
   customerIntelligence: customerIntelligenceRouter,
   reports: reportsRouter,
+  // Phase 6 routers
+  search: searchRouter,
 });
 
 export type AppRouter = typeof appRouter;

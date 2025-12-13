@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { User, AlertTriangle, Check, X, Loader2, UserCheck, UserX } from "lucide-react";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { toast } from "sonner";
 
 interface ScheduleGuideAssignmentProps {
   scheduleId: string;
@@ -21,6 +23,7 @@ export function ScheduleGuideAssignment({
 }: ScheduleGuideAssignmentProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedGuideId, setSelectedGuideId] = useState<string>("");
+  const confirmModal = useConfirmModal();
 
   const utils = trpc.useUtils();
 
@@ -49,9 +52,13 @@ export function ScheduleGuideAssignment({
     onSuccess: () => {
       utils.guideAssignment.getAssignmentsForSchedule.invalidate({ scheduleId });
       utils.schedule.getById.invalidate({ id: scheduleId });
+      toast.success("Guide assigned successfully");
       setIsAssigning(false);
       setSelectedGuideId("");
       onAssignmentChange?.();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to assign guide");
     },
   });
 
@@ -59,9 +66,13 @@ export function ScheduleGuideAssignment({
     onSuccess: () => {
       utils.guideAssignment.getAssignmentsForSchedule.invalidate({ scheduleId });
       utils.schedule.getById.invalidate({ id: scheduleId });
+      toast.success("Guide reassigned successfully");
       setIsAssigning(false);
       setSelectedGuideId("");
       onAssignmentChange?.();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to reassign guide");
     },
   });
 
@@ -69,7 +80,11 @@ export function ScheduleGuideAssignment({
     onSuccess: () => {
       utils.guideAssignment.getAssignmentsForSchedule.invalidate({ scheduleId });
       utils.schedule.getById.invalidate({ id: scheduleId });
+      toast.success("Guide assignment cancelled");
       onAssignmentChange?.();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to cancel assignment");
     },
   });
 
@@ -93,10 +108,17 @@ export function ScheduleGuideAssignment({
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!confirmedAssignment) return;
 
-    if (window.confirm("Are you sure you want to cancel this guide assignment?")) {
+    const confirmed = await confirmModal.confirm({
+      title: "Cancel Guide Assignment",
+      description: "This will remove the guide from this schedule. The guide will be notified of the cancellation.",
+      confirmLabel: "Cancel Assignment",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       cancelMutation.mutate({ id: confirmedAssignment.id });
     }
   };
@@ -341,6 +363,8 @@ export function ScheduleGuideAssignment({
           </div>
         </div>
       )}
+
+      {confirmModal.ConfirmModal}
     </div>
   );
 }

@@ -18,6 +18,10 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { NoCustomersEmpty, NoResultsEmpty } from "@/components/ui/empty-state";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { toast } from "sonner";
 
 type SourceFilter = "all" | "manual" | "website" | "api" | "import" | "referral";
 
@@ -27,6 +31,7 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const { confirm, ConfirmModal } = useConfirmModal();
 
   const { data, isLoading, error } = trpc.customer.list.useQuery({
     pagination: { page, limit: 20 },
@@ -45,11 +50,22 @@ export default function CustomersPage() {
     onSuccess: () => {
       utils.customer.list.invalidate();
       utils.customer.getStats.invalidate();
+      toast.success("Customer deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete customer: ${error.message}`);
     },
   });
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this customer?")) {
+  const handleDelete = async (id: string) => {
+    const confirmed = await confirm({
+      title: "Delete Customer",
+      description: "This will permanently delete this customer and all their associated data including bookings and notes. This action cannot be undone.",
+      confirmLabel: "Delete Customer",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       deleteMutation.mutate({ id });
     }
   };
@@ -180,27 +196,14 @@ export default function CustomersPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12">
-          <div className="flex justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
-        </div>
+        <TableSkeleton rows={10} columns={6} />
       ) : data?.data.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white">
-          <div className="p-12 text-center">
-            <Users className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No customers yet</h3>
-            <p className="mt-2 text-gray-500">
-              Customers will appear here when they book tours or are added manually.
-            </p>
-            <Link
-              href={`/org/${slug}/customers/new` as Route}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Customer
-            </Link>
-          </div>
+          {search ? (
+            <NoResultsEmpty searchTerm={search} />
+          ) : (
+            <NoCustomersEmpty orgSlug={slug} />
+          )}
         </div>
       ) : (
         <>
@@ -235,8 +238,8 @@ export default function CustomersPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                           <span className="text-primary font-medium">
-                            {customer.firstName[0]}
-                            {customer.lastName[0]}
+                            {customer.firstName?.[0] ?? ''}
+                            {customer.lastName?.[0] ?? ''}
                           </span>
                         </div>
                         <div>
@@ -306,6 +309,7 @@ export default function CustomersPage() {
                           href={`/org/${slug}/customers/${customer.id}` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="View"
+                          aria-label="View customer details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
@@ -313,6 +317,7 @@ export default function CustomersPage() {
                           href={`/org/${slug}/customers/${customer.id}/edit` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="Edit"
+                          aria-label="Edit customer"
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
@@ -320,6 +325,7 @@ export default function CustomersPage() {
                           onClick={() => handleDelete(customer.id)}
                           className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                           title="Delete"
+                          aria-label="Delete customer"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -358,6 +364,8 @@ export default function CustomersPage() {
           )}
         </>
       )}
+
+      {ConfirmModal}
     </div>
   );
 }

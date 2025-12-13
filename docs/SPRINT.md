@@ -2,14 +2,22 @@
 
 **Sprint Start:** December 14, 2025
 **Last Updated:** December 13, 2025
-**Status:** Planning
+**Status:** Active
 
 ---
 
-## Current Sprint: Sprint 7 - Production Deployment & Polish
+## Current Sprint: Sprint 7 - UX Overhaul (Unified System)
 
 ### Sprint Goal
-Deploy the CRM to production and implement essential polish features for a smooth launch.
+Transform the CRM from isolated feature modules into a unified, connected system where every workflow feels natural and efficient.
+
+### Why This Sprint
+The CRM has all features built (Phases 0-5) but they don't work together as a system:
+- Booking requires navigating away to create customer
+- Related data not visible on detail pages
+- No global search
+- Browser dialogs instead of proper modals
+- Too many clicks for common operations
 
 ### Prerequisites Complete
 - [x] Phase 0-5 implementation (Core CRM functionality)
@@ -25,42 +33,65 @@ Deploy the CRM to production and implement essential polish features for a smoot
 
 ## Sprint Backlog
 
-### Priority 1: Production Deployment
-| Task | Status | Owner | Notes |
-|------|--------|-------|-------|
-| Set up production environment variables | ⬜ | | GUIDE_JWT_SECRET, RESEND_API_KEY, etc. |
-| Configure Coolify deployment | ⬜ | | CRM + Web apps |
-| Set up production database (Supabase) | ⬜ | | Run db:push |
-| Configure production Clerk | ⬜ | | Organizations enabled |
-| Configure production Stripe | ⬜ | | Connect accounts |
-| Configure production Inngest | ⬜ | | Event-driven jobs |
-| DNS configuration | ⬜ | | app.domain.com, *.book.domain.com |
-| SSL certificates | ⬜ | | Via Traefik/Coolify |
+### Week 1: Foundation Components
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Combobox (searchable select with create) | ⬜ | Use shadcn/ui Command |
+| SlideOver (side panel) | ⬜ | Use shadcn/ui Sheet |
+| Modal (confirmations) | ⬜ | Use shadcn/ui Dialog |
+| Toast (feedback) | ⬜ | Use shadcn/ui Sonner |
+| EntityCard (consistent cards) | ⬜ | Custom component |
+| CommandPalette (Cmd+K) | ⬜ | Use cmdk library |
 
-### Priority 2: Essential Polish
-| Task | Status | Owner | Notes |
-|------|--------|-------|-------|
-| Loading states | ⬜ | | Skeleton loaders for lists |
-| Error boundaries | ⬜ | | Graceful error handling |
-| Empty states | ⬜ | | "No data" illustrations |
-| Form validation feedback | ⬜ | | Inline validation messages |
-| Toast notifications | ⬜ | | Success/error toasts |
-| Responsive design fixes | ⬜ | | Mobile-friendly tables |
+### Week 2: Entity Quick Views
+| Component | Status | Notes |
+|-----------|--------|-------|
+| BookingQuickView | ⬜ | Customer, schedule, status, actions |
+| CustomerQuickView | ⬜ | Contact, stats, recent bookings |
+| ScheduleQuickView | ⬜ | Tour, time, guide, bookings |
+| TourQuickView | ⬜ | Details, upcoming schedules |
+| GuideQuickView | ⬜ | Contact, availability |
 
-### Priority 3: Performance Quick Wins
-| Task | Status | Owner | Notes |
-|------|--------|-------|-------|
-| Add database indexes for slow queries | ⬜ | | Profile first |
-| Implement React.memo for heavy components | ⬜ | | Calendar, lists |
-| Add Suspense boundaries | ⬜ | | Route-level loading |
-| Image optimization | ⬜ | | next/image usage |
+### Week 3: Inline Creation & Booking Flow
+| Task | Status | Notes |
+|------|--------|-------|
+| CustomerQuickCreate modal | ⬜ | Name, email, phone minimal form |
+| Booking form - Customer Combobox | ⬜ | Replace `<select>` |
+| Booking form - Schedule Combobox | ⬜ | With date filtering |
+| Booking form - Promo code field | ⬜ | Connect to pricing service |
+| Booking form - Participant details | ⬜ | Inline name entry |
 
-### Priority 4: Documentation
-| Task | Status | Owner | Notes |
-|------|--------|-------|-------|
-| Environment variables documentation | ⬜ | | .env.example |
-| Deployment guide | ⬜ | | Step-by-step |
-| User guide (basic) | ⬜ | | Getting started |
+### Week 4: Page Updates & Connections
+| Task | Status | Notes |
+|------|--------|-------|
+| Dashboard - actionable alerts | ⬜ | Inline action buttons |
+| Dashboard - guide quick-assign | ⬜ | Modal, no navigation |
+| Customer detail - Quick Book button | ⬜ | In header |
+| Customer detail - Rebook actions | ⬜ | On booking history |
+| Schedule detail - Bookings panel | ⬜ | Currently missing |
+| Tour detail - Schedules panel | ⬜ | Currently missing |
+
+### Week 5: Global Integration & Polish
+| Task | Status | Notes |
+|------|--------|-------|
+| Global search tRPC router | ⬜ | Search all entities |
+| CommandPalette integration | ⬜ | In layout |
+| Keyboard shortcuts | ⬜ | Cmd+B, Cmd+K, etc. |
+| Replace all confirm() calls | ⬜ | Custom modals |
+| Replace all prompt() calls | ⬜ | Custom modals |
+| Loading skeletons | ⬜ | All list pages |
+| Empty states | ⬜ | Helpful messages |
+
+---
+
+### Success Metrics
+
+| Workflow | Before | Target |
+|----------|--------|--------|
+| Walk-in booking | 12+ clicks, 3-5 min | <8 clicks, 45 sec |
+| Repeat customer | 10+ clicks | 3-4 clicks |
+| Find any record | 5+ clicks | 1-2 clicks (Cmd+K) |
+| Customer service | 8+ clicks | 3-4 clicks |
 
 ---
 

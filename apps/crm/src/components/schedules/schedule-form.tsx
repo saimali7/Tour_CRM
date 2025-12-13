@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ScheduleFormProps {
   schedule?: {
@@ -61,7 +62,11 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
   const createMutation = trpc.schedule.create.useMutation({
     onSuccess: () => {
       utils.schedule.list.invalidate();
+      toast.success("Schedule created successfully");
       router.push(`/org/${slug}/schedules`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create schedule");
     },
   });
 
@@ -69,7 +74,11 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
     onSuccess: () => {
       utils.schedule.list.invalidate();
       utils.schedule.getById.invalidate({ id: schedule?.id });
+      toast.success("Schedule updated successfully");
       router.push(`/org/${slug}/schedules`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update schedule");
     },
   });
 

@@ -6,6 +6,10 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { NoToursEmpty } from "@/components/ui/empty-state";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { toast } from "sonner";
 
 type StatusFilter = "all" | "draft" | "active" | "paused" | "archived";
 
@@ -14,6 +18,7 @@ export default function ToursPage() {
   const slug = params.slug as string;
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const { confirm, ConfirmModal } = useConfirmModal();
 
   const { data, isLoading, error } = trpc.tour.list.useQuery({
     pagination: { page, limit: 10 },
@@ -25,29 +30,52 @@ export default function ToursPage() {
   const deleteMutation = trpc.tour.delete.useMutation({
     onSuccess: () => {
       utils.tour.list.invalidate();
+      toast.success("Tour deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete tour: ${error.message}`);
     },
   });
 
   const archiveMutation = trpc.tour.archive.useMutation({
     onSuccess: () => {
       utils.tour.list.invalidate();
+      toast.success("Tour archived successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to archive tour: ${error.message}`);
     },
   });
 
   const publishMutation = trpc.tour.publish.useMutation({
     onSuccess: () => {
       utils.tour.list.invalidate();
+      toast.success("Tour published successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to publish tour: ${error.message}`);
     },
   });
 
   const duplicateMutation = trpc.tour.duplicate.useMutation({
     onSuccess: () => {
       utils.tour.list.invalidate();
+      toast.success("Tour duplicated successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to duplicate tour: ${error.message}`);
     },
   });
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this tour?")) {
+  const handleDelete = async (id: string) => {
+    const confirmed = await confirm({
+      title: "Delete Tour",
+      description: "This will permanently delete this tour and all its schedules. This action cannot be undone.",
+      confirmLabel: "Delete Tour",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       deleteMutation.mutate({ id });
     }
   };
@@ -109,29 +137,10 @@ export default function ToursPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12">
-          <div className="flex justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
-        </div>
+        <TableSkeleton rows={10} columns={6} />
       ) : data?.data.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white">
-          <div className="p-12 text-center">
-            <Map className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">
-              No tours yet
-            </h3>
-            <p className="mt-2 text-gray-500">
-              Get started by creating your first tour product.
-            </p>
-            <Link
-              href={`/org/${slug}/tours/new` as Route}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Create Tour
-            </Link>
-          </div>
+          <NoToursEmpty orgSlug={slug} />
         </div>
       ) : (
         <>
@@ -200,6 +209,7 @@ export default function ToursPage() {
                           href={`/org/${slug}/tours/${tour.id}` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="View"
+                          aria-label="View tour details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
@@ -207,6 +217,7 @@ export default function ToursPage() {
                           href={`/org/${slug}/tours/${tour.id}/edit` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="Edit"
+                          aria-label="Edit tour"
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
@@ -214,6 +225,7 @@ export default function ToursPage() {
                           onClick={() => handleDuplicate(tour.id, tour.name)}
                           className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
                           title="Duplicate"
+                          aria-label="Duplicate tour"
                           disabled={duplicateMutation.isPending}
                         >
                           <Copy className="h-4 w-4" />
@@ -223,6 +235,7 @@ export default function ToursPage() {
                             onClick={() => handlePublish(tour.id)}
                             className="p-1.5 text-green-500 hover:text-green-700 hover:bg-green-50 rounded"
                             title="Publish"
+                            aria-label="Publish tour"
                           >
                             <Check className="h-4 w-4" />
                           </button>
@@ -232,6 +245,7 @@ export default function ToursPage() {
                             onClick={() => handleArchive(tour.id)}
                             className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                             title="Archive"
+                            aria-label="Archive tour"
                           >
                             <Archive className="h-4 w-4" />
                           </button>
@@ -240,6 +254,7 @@ export default function ToursPage() {
                           onClick={() => handleDelete(tour.id)}
                           className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                           title="Delete"
+                          aria-label="Delete tour"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -278,6 +293,8 @@ export default function ToursPage() {
           )}
         </>
       )}
+
+      {ConfirmModal}
     </div>
   );
 }

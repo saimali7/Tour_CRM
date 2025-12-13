@@ -7,6 +7,9 @@ import type { Route } from "next";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
 import { ScheduleCalendar, getCalendarDateRange } from "@/components/schedules/schedule-calendar";
+import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { NoSchedulesEmpty } from "@/components/ui/empty-state";
 
 type StatusFilter = "all" | "scheduled" | "in_progress" | "completed" | "cancelled";
 type ViewMode = "list" | "calendar";
@@ -17,6 +20,7 @@ export default function SchedulesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const slug = params.slug as string;
+  const confirmModal = useConfirmModal();
 
   // View state
   const initialView = (searchParams.get("view") as ViewMode) || "list";
@@ -85,14 +89,28 @@ export default function SchedulesPage() {
     },
   });
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this schedule?")) {
+  const handleDelete = async (id: string) => {
+    const confirmed = await confirmModal.confirm({
+      title: "Delete Schedule",
+      description: "This will permanently delete this schedule. This action cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       deleteMutation.mutate({ id });
     }
   };
 
-  const handleCancel = (id: string) => {
-    if (confirm("Are you sure you want to cancel this schedule?")) {
+  const handleCancel = async (id: string) => {
+    const confirmed = await confirmModal.confirm({
+      title: "Cancel Schedule",
+      description: "This will cancel this scheduled tour. Customers with bookings will be notified.",
+      confirmLabel: "Cancel Schedule",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
       cancelMutation.mutate({ id });
     }
   };
@@ -212,11 +230,15 @@ export default function SchedulesPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12">
-          <div className="flex justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        viewMode === "calendar" ? (
+          <div className="rounded-lg border border-gray-200 bg-white p-12">
+            <div className="flex justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
           </div>
-        </div>
+        ) : (
+          <TableSkeleton rows={10} columns={6} />
+        )
       ) : viewMode === "calendar" ? (
         /* Calendar View */
         <ScheduleCalendar
@@ -228,22 +250,7 @@ export default function SchedulesPage() {
         />
       ) : data?.data.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white">
-          <div className="p-12 text-center">
-            <Calendar className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">
-              No schedules yet
-            </h3>
-            <p className="mt-2 text-gray-500">
-              Create a tour first, then schedule specific times for it.
-            </p>
-            <Link
-              href={`/org/${slug}/schedules/new` as Route}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Schedule
-            </Link>
-          </div>
+          <NoSchedulesEmpty orgSlug={slug} />
         </div>
       ) : (
         /* List View */
@@ -311,21 +318,23 @@ export default function SchedulesPage() {
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="text-gray-600">{schedule.bookedCount ?? 0} / {schedule.maxParticipants}</span>
                           <span className={`font-medium ${
+                            schedule.maxParticipants === 0 ? 'text-gray-600' :
                             ((schedule.bookedCount ?? 0) / schedule.maxParticipants) >= 1 ? 'text-red-600' :
                             ((schedule.bookedCount ?? 0) / schedule.maxParticipants) >= 0.8 ? 'text-yellow-600' :
                             'text-green-600'
                           }`}>
-                            {Math.round(((schedule.bookedCount ?? 0) / schedule.maxParticipants) * 100)}%
+                            {schedule.maxParticipants === 0 ? 'N/A' : Math.round(((schedule.bookedCount ?? 0) / schedule.maxParticipants) * 100) + '%'}
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className={`h-2 rounded-full transition-all ${
+                              schedule.maxParticipants === 0 ? 'bg-gray-400' :
                               ((schedule.bookedCount ?? 0) / schedule.maxParticipants) >= 1 ? 'bg-red-500' :
                               ((schedule.bookedCount ?? 0) / schedule.maxParticipants) >= 0.8 ? 'bg-yellow-500' :
                               'bg-green-500'
                             }`}
-                            style={{ width: `${Math.min(100, ((schedule.bookedCount ?? 0) / schedule.maxParticipants) * 100)}%` }}
+                            style={{ width: `${schedule.maxParticipants === 0 ? 0 : Math.min(100, ((schedule.bookedCount ?? 0) / schedule.maxParticipants) * 100)}%` }}
                           />
                         </div>
                       </div>
@@ -339,6 +348,7 @@ export default function SchedulesPage() {
                           href={`/org/${slug}/schedules/${schedule.id}` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="View"
+                          aria-label="View schedule details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
@@ -346,6 +356,7 @@ export default function SchedulesPage() {
                           href={`/org/${slug}/schedules/${schedule.id}/edit` as Route}
                           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                           title="Edit"
+                          aria-label="Edit schedule"
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
@@ -354,6 +365,7 @@ export default function SchedulesPage() {
                             onClick={() => handleCancel(schedule.id)}
                             className="p-1.5 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded"
                             title="Cancel"
+                            aria-label="Cancel schedule"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -362,6 +374,7 @@ export default function SchedulesPage() {
                           onClick={() => handleDelete(schedule.id)}
                           className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                           title="Delete"
+                          aria-label="Delete schedule"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -400,6 +413,8 @@ export default function SchedulesPage() {
           )}
         </>
       )}
+
+      {confirmModal.ConfirmModal}
     </div>
   );
 }

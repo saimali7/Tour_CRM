@@ -4,11 +4,16 @@ import { BookingForm } from "@/components/bookings/booking-form";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 export default function NewBookingPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
+
+  // Get pre-selected values from URL query params
+  const preselectedCustomerId = searchParams.get("customerId") || undefined;
+  const preselectedScheduleId = searchParams.get("scheduleId") || undefined;
 
   return (
     <div className="space-y-6">
@@ -25,7 +30,10 @@ export default function NewBookingPage() {
         </div>
       </div>
 
-      <BookingForm />
+      <BookingForm
+        preselectedCustomerId={preselectedCustomerId}
+        preselectedScheduleId={preselectedScheduleId}
+      />
     </div>
   );
 }

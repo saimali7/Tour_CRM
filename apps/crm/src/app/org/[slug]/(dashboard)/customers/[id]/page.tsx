@@ -17,22 +17,28 @@ import {
   Pin,
   Trash2,
   Send,
-  Download,
   History,
   Check,
   X,
+  Plus,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { toast } from "sonner";
 
 export default function CustomerDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const customerId = params.id as string;
   const [activeTab, setActiveTab] = useState<"bookings" | "notes" | "communications">("bookings");
   const [newNote, setNewNote] = useState("");
+  const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -56,18 +62,28 @@ export default function CustomerDetailPage() {
     onSuccess: () => {
       utils.customerNote.list.invalidate({ customerId });
       setNewNote("");
+      toast.success("Note added");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to add note");
     },
   });
 
   const togglePinMutation = trpc.customerNote.togglePin.useMutation({
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       utils.customerNote.list.invalidate({ customerId });
+      toast.success("Note updated");
     },
   });
 
   const deleteNoteMutation = trpc.customerNote.delete.useMutation({
     onSuccess: () => {
       utils.customerNote.list.invalidate({ customerId });
+      setDeleteNoteId(null);
+      toast.success("Note deleted");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to delete note");
     },
   });
 
@@ -83,10 +99,21 @@ export default function CustomerDetailPage() {
     togglePinMutation.mutate({ id: noteId });
   };
 
-  const handleDeleteNote = (noteId: string) => {
-    if (confirm("Are you sure you want to delete this note?")) {
-      deleteNoteMutation.mutate({ id: noteId });
+  const handleDeleteNote = () => {
+    if (deleteNoteId) {
+      deleteNoteMutation.mutate({ id: deleteNoteId });
     }
+  };
+
+  const handleQuickBook = () => {
+    // Navigate to booking form with customer pre-selected
+    router.push(`/org/${slug}/bookings/new?customerId=${customerId}` as Route);
+  };
+
+  const handleRebook = (booking: { tourId?: string | null; scheduleId: string }) => {
+    // Navigate to booking form with customer pre-selected
+    // Note: A full rebook feature would clone participants, but this is a simpler version
+    router.push(`/org/${slug}/bookings/new?customerId=${customerId}` as Route);
   };
 
   if (isLoading) {
@@ -175,13 +202,19 @@ export default function CustomerDetailPage() {
           </div>
         </div>
 
-        <Link
-          href={`/org/${slug}/customers/${customer.id}/edit` as Route}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-        >
-          <Edit className="h-4 w-4" />
-          Edit Customer
-        </Link>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleQuickBook} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Quick Book
+          </Button>
+          <Link
+            href={`/org/${slug}/customers/${customer.id}/edit` as Route}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Edit className="h-4 w-4" />
+            Edit
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
@@ -432,12 +465,24 @@ export default function CustomerDetailPage() {
                             {booking.totalParticipants} guests
                           </p>
                         </div>
-                        <Link
-                          href={`/org/${slug}/bookings/${booking.id}` as Route}
-                          className="text-primary hover:underline text-sm"
-                        >
-                          View
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          {(booking.status === "completed" || booking.status === "cancelled") && (
+                            <button
+                              onClick={() => handleRebook(booking)}
+                              className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-primary px-2 py-1 rounded hover:bg-gray-100"
+                              title="Book again with same tour"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              Rebook
+                            </button>
+                          )}
+                          <Link
+                            href={`/org/${slug}/bookings/${booking.id}` as Route}
+                            className="text-primary hover:underline text-sm"
+                          >
+                            View
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -446,12 +491,10 @@ export default function CustomerDetailPage() {
                 <div className="text-center py-8">
                   <Ticket className="mx-auto h-12 w-12 text-gray-300" />
                   <p className="mt-4 text-gray-500">No bookings yet</p>
-                  <Link
-                    href={`/org/${slug}/bookings/new` as Route}
-                    className="mt-2 inline-block text-primary hover:underline"
-                  >
-                    Create a booking
-                  </Link>
+                  <Button onClick={handleQuickBook} variant="outline" className="mt-4 gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create First Booking
+                  </Button>
                 </div>
               )}
             </>
@@ -520,7 +563,7 @@ export default function CustomerDetailPage() {
                             <Pin className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteNote(note.id)}
+                            onClick={() => setDeleteNoteId(note.id)}
                             className="p-1.5 text-red-400 rounded hover:bg-red-50 hover:text-red-600"
                             title="Delete"
                           >
@@ -612,6 +655,18 @@ export default function CustomerDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Note Confirmation Modal */}
+      <ConfirmModal
+        open={!!deleteNoteId}
+        onOpenChange={(open) => !open && setDeleteNoteId(null)}
+        title="Delete Note"
+        description="Are you sure you want to delete this note? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDeleteNote}
+        isLoading={deleteNoteMutation.isPending}
+      />
     </div>
   );
 }
