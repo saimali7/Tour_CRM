@@ -202,6 +202,54 @@ export const bookingRouter = createRouter({
       return services.booking.complete(input.id);
     }),
 
+  reschedule: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      newScheduleId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+
+      // Get old booking details for activity log
+      const oldBooking = await services.booking.getById(input.id);
+      const oldScheduleDate = oldBooking.schedule
+        ? format(new Date(oldBooking.schedule.startsAt), "MMMM d, yyyy 'at' h:mm a")
+        : "unknown";
+
+      // Reschedule the booking
+      const booking = await services.booking.reschedule(input.id, input.newScheduleId);
+
+      const newScheduleDate = booking.schedule
+        ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy 'at' h:mm a")
+        : "unknown";
+
+      // Log the activity
+      const userId = ctx.user?.id || "system";
+      const userName = ctx.user
+        ? `${ctx.user.firstName || ""} ${ctx.user.lastName || ""}`.trim() || ctx.user.id
+        : "System";
+
+      await services.activityLog.logBookingAction(
+        "booking.rescheduled",
+        booking.id,
+        booking.referenceNumber,
+        `Booking rescheduled from ${oldScheduleDate} to ${newScheduleDate}`,
+        {
+          actorType: "user",
+          actorId: userId,
+          actorName: userName,
+          metadata: {
+            oldScheduleId: oldBooking.scheduleId,
+            newScheduleId: input.newScheduleId,
+            oldDate: oldScheduleDate,
+            newDate: newScheduleDate,
+          },
+        }
+      );
+
+      return booking;
+    }),
+
   updatePaymentStatus: protectedProcedure
     .input(
       z.object({

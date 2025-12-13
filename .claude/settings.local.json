@@ -34,7 +34,8 @@
       "Bash(pnpm dev:*)",
       "Bash(docker-compose:*)",
       "Bash(pnpm --filter @tour/web typecheck:*)",
-      "Bash(pnpm --filter @tour/web lint:*)"
+      "Bash(pnpm --filter @tour/web lint:*)",
+      "Bash(git add:*)"
     ]
   }
 }

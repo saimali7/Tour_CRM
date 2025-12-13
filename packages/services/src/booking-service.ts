@@ -620,6 +620,90 @@ export class BookingService extends BaseService {
     return this.getById(updated.id);
   }
 
+  async reschedule(id: string, newScheduleId: string): Promise<BookingWithRelations> {
+    const booking = await this.getById(id);
+
+    if (booking.status === "cancelled" || booking.status === "completed") {
+      throw new ValidationError(
+        `Cannot reschedule a ${booking.status} booking`
+      );
+    }
+
+    // Get new schedule
+    const newScheduleResult = await this.db
+      .select({
+        schedule: schedules,
+        tour: tours,
+      })
+      .from(schedules)
+      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .where(
+        and(
+          eq(schedules.id, newScheduleId),
+          eq(schedules.organizationId, this.organizationId)
+        )
+      )
+      .limit(1);
+
+    const newScheduleRow = newScheduleResult[0];
+    if (!newScheduleRow) {
+      throw new NotFoundError("Schedule", newScheduleId);
+    }
+
+    const newSchedule = newScheduleRow.schedule;
+
+    if (newSchedule.status === "cancelled") {
+      throw new ValidationError("Cannot reschedule to a cancelled schedule");
+    }
+
+    // Check availability on new schedule
+    const availableSpots = newSchedule.maxParticipants - (newSchedule.bookedCount || 0);
+    if (booking.totalParticipants > availableSpots) {
+      throw new ValidationError(
+        `Not enough availability on new schedule. Only ${availableSpots} spots remaining.`
+      );
+    }
+
+    // Decrement old schedule's booked count
+    await this.db
+      .update(schedules)
+      .set({
+        bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(schedules.id, booking.scheduleId));
+
+    // Increment new schedule's booked count
+    await this.db
+      .update(schedules)
+      .set({
+        bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${booking.totalParticipants}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(schedules.id, newScheduleId));
+
+    // Update the booking
+    const [updated] = await this.db
+      .update(bookings)
+      .set({
+        scheduleId: newScheduleId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(bookings.id, id),
+          eq(bookings.organizationId, this.organizationId)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      throw new NotFoundError("Booking", id);
+    }
+
+    return this.getById(updated.id);
+  }
+
   async updatePaymentStatus(
     id: string,
     paymentStatus: PaymentStatus,
