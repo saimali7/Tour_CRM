@@ -50,7 +50,7 @@
 | Workstream | Phase(s) | Status | Branch | Owner | Completion |
 |------------|----------|--------|--------|-------|------------|
 | **Foundation** | 0, 1 | ✅ COMPLETE | `main` | - | 97% |
-| **A: Web App** | 7, 8, 9 | 🔄 IN PROGRESS | `feature/web-app` | Active | 60% |
+| **A: Web App** | 7, 8, 9 | 🔄 IN PROGRESS | `feature/web-app` | Active | 70% |
 | **B: Customers & Comms** | 2 | 🟡 READY | `feature/phase-2-customers` | *Unassigned* | 0% |
 | **C: Guide Operations** | 3 | 🟡 READY | `feature/phase-3-guides` | *Unassigned* | 0% |
 | **D: Pricing & Promos** | 4 | 🟡 READY | `feature/phase-4-pricing` | *Unassigned* | 0% |
@@ -201,7 +201,7 @@ These can be completed by any workstream or deferred:
 - [x] Stripe payment integration
 - [x] Organization multi-tenancy
 
-### Phase 7: Web App Foundation (85%)
+### Phase 7: Web App Foundation (100%) ✅
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -214,16 +214,25 @@ These can be completed by any workstream or deferred:
 | Tour listing page | ✅ | With filtering, sorting, pagination |
 | Tour detail page | ✅ | Full info display with gallery |
 | Availability display | ✅ | Interactive calendar with color-coded status |
-| About page | ⬜ | |
-| Contact page | ⬜ | |
-| Terms & Privacy pages | ⬜ | |
+| About page | ✅ | Organization info and values |
+| Contact page | ✅ | Contact form with FAQ |
+| Terms & Privacy pages | ✅ | Legal pages |
+| Loading states | ✅ | Skeleton loading for all pages |
 
 **Files Created:**
 - `apps/web/src/middleware.ts` - Subdomain routing
 - `apps/web/src/lib/organization.ts` - Org context helpers
 - `apps/web/src/app/org/[slug]/layout.tsx` - Org-scoped layout
 - `apps/web/src/app/org/[slug]/page.tsx` - Tour listing
+- `apps/web/src/app/org/[slug]/loading.tsx` - Tour listing skeleton
 - `apps/web/src/app/org/[slug]/tours/[tourSlug]/page.tsx` - Tour detail
+- `apps/web/src/app/org/[slug]/tours/[tourSlug]/loading.tsx` - Tour detail skeleton
+- `apps/web/src/app/org/[slug]/about/page.tsx` - About page
+- `apps/web/src/app/org/[slug]/about/loading.tsx` - About skeleton
+- `apps/web/src/app/org/[slug]/contact/page.tsx` - Contact page
+- `apps/web/src/app/org/[slug]/contact/loading.tsx` - Contact skeleton
+- `apps/web/src/app/org/[slug]/terms/page.tsx` - Terms of Service
+- `apps/web/src/app/org/[slug]/privacy/page.tsx` - Privacy Policy
 - `apps/web/src/app/org/[slug]/sitemap.ts` - Dynamic sitemap
 - `apps/web/src/app/robots.ts` - Robots.txt
 - `apps/web/src/components/header.tsx` - Header
@@ -232,6 +241,7 @@ These can be completed by any workstream or deferred:
 - `apps/web/src/components/tour-filters.tsx` - Filters
 - `apps/web/src/components/availability-calendar.tsx` - Availability calendar
 - `apps/web/src/components/structured-data.tsx` - Schema.org
+- `apps/web/src/components/contact-form.tsx` - Contact form
 
 ### Phase 8: Booking Flow (0%)
 
