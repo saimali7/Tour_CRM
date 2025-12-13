@@ -50,7 +50,7 @@
 | Workstream | Phase(s) | Status | Branch | Owner | Completion |
 |------------|----------|--------|--------|-------|------------|
 | **Foundation** | 0, 1 | ✅ COMPLETE | `main` | - | 97% |
-| **A: Web App** | 7, 8, 9 | 🟡 READY | `feature/web-app` | *Unassigned* | 0% |
+| **A: Web App** | 7, 8, 9 | 🔄 IN PROGRESS | `feature/web-app` | Active | 60% |
 | **B: Customers & Comms** | 2 | ✅ COMPLETE | `quirky-newton` | Claude | 95% |
 | **C: Guide Operations** | 3 | 🟡 READY | `feature/phase-3-guides` | *Unassigned* | 0% |
 | **D: Pricing & Promos** | 4 | 🟡 READY | `feature/phase-4-pricing` | *Unassigned* | 0% |
@@ -191,8 +191,8 @@ These can be completed by any workstream or deferred:
 
 **Branch:** `feature/web-app`
 **App:** `apps/web`
-**Owner:** *Unassigned*
-**Status:** 🟡 READY TO START
+**Owner:** Active
+**Status:** 🔄 IN PROGRESS (60%)
 
 ### Prerequisites ✅
 - [x] Tours service available
@@ -201,19 +201,37 @@ These can be completed by any workstream or deferred:
 - [x] Stripe payment integration
 - [x] Organization multi-tenancy
 
-### Phase 7: Web App Foundation (0%)
+### Phase 7: Web App Foundation (85%)
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Subdomain routing middleware | ⬜ | `{slug}.book.platform.com` |
-| Organization context from subdomain | ⬜ | |
-| Basic layout (header, footer) | ⬜ | |
-| Organization branding (logo, colors) | ⬜ | |
-| SEO foundation (meta, sitemap, robots) | ⬜ | |
-| Structured data (Schema.org) | ⬜ | |
-| Tour listing page | ⬜ | |
-| Tour detail page | ⬜ | |
-| Availability display | ⬜ | |
+| Subdomain routing middleware | ✅ | `{slug}.localhost:3001` & `{slug}.book.platform.com` |
+| Organization context from subdomain | ✅ | `apps/web/src/lib/organization.ts` |
+| Basic layout (header, footer) | ✅ | `apps/web/src/components/header.tsx`, `footer.tsx` |
+| Organization branding (logo, colors) | ✅ | Primary color CSS custom properties |
+| SEO foundation (meta, sitemap, robots) | ✅ | `generateMetadata()`, dynamic sitemap |
+| Structured data (Schema.org) | ✅ | TouristAttraction + Product schemas |
+| Tour listing page | ✅ | With filtering, sorting, pagination |
+| Tour detail page | ✅ | Full info display with gallery |
+| Availability display | ✅ | Interactive calendar with color-coded status |
+| About page | ⬜ | |
+| Contact page | ⬜ | |
+| Terms & Privacy pages | ⬜ | |
+
+**Files Created:**
+- `apps/web/src/middleware.ts` - Subdomain routing
+- `apps/web/src/lib/organization.ts` - Org context helpers
+- `apps/web/src/app/org/[slug]/layout.tsx` - Org-scoped layout
+- `apps/web/src/app/org/[slug]/page.tsx` - Tour listing
+- `apps/web/src/app/org/[slug]/tours/[tourSlug]/page.tsx` - Tour detail
+- `apps/web/src/app/org/[slug]/sitemap.ts` - Dynamic sitemap
+- `apps/web/src/app/robots.ts` - Robots.txt
+- `apps/web/src/components/header.tsx` - Header
+- `apps/web/src/components/footer.tsx` - Footer
+- `apps/web/src/components/tour-card.tsx` - Tour card
+- `apps/web/src/components/tour-filters.tsx` - Filters
+- `apps/web/src/components/availability-calendar.tsx` - Availability calendar
+- `apps/web/src/components/structured-data.tsx` - Schema.org
 
 ### Phase 8: Booking Flow (0%)
 
