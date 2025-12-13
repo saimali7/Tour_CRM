@@ -2,6 +2,10 @@ import { eq, and, desc, asc, sql, count, ilike, or } from "drizzle-orm";
 import {
   customers,
   bookings,
+  customerNotes,
+  communicationLogs,
+  wishlists,
+  notificationPreferences,
   type Customer,
   type CustomerSource,
 } from "@tour/database";
@@ -49,6 +53,54 @@ export interface CreateCustomerInput {
 }
 
 export interface UpdateCustomerInput extends Partial<CreateCustomerInput> {}
+
+export interface GdprExportData {
+  customer: Customer;
+  bookings: Array<{
+    id: string;
+    referenceNumber: string;
+    status: string;
+    createdAt: Date;
+    adultCount: number;
+    childCount: number | null;
+    infantCount: number | null;
+    total: string;
+    currency: string;
+    specialRequests: string | null;
+    dietaryRequirements: string | null;
+    accessibilityNeeds: string | null;
+  }>;
+  communications: Array<{
+    id: string;
+    type: string;
+    subject: string | null;
+    sentAt: Date | null;
+    status: string;
+  }>;
+  notes: Array<{
+    id: string;
+    content: string;
+    createdAt: Date;
+    authorName: string;
+  }>;
+  wishlists: Array<{
+    id: string;
+    tourId: string;
+    createdAt: Date;
+  }>;
+  notificationPreferences: {
+    emailBookingConfirmation: boolean | null;
+    emailBookingReminder: boolean | null;
+    emailMarketing: boolean | null;
+    smsBookingConfirmation: boolean | null;
+    smsBookingReminder: boolean | null;
+    smsMarketing: boolean | null;
+    emailUnsubscribedAt: Date | null;
+    smsUnsubscribedAt: Date | null;
+  } | null;
+  exportedAt: Date;
+  organizationId: string;
+}
 
 export class CustomerService extends BaseService {
   async getAll(
@@ -390,5 +442,200 @@ export class CustomerService extends BaseService {
         )
       )
       .limit(limit);
+  }
+
+  /**
+   * GDPR Data Export - Exports all customer data for compliance
+   * Returns all personal data stored for the customer including:
+   * - Customer profile information
+   * - Booking history
+   * - Communication logs
+   * - Notes (content only, not internal staff notes about customer)
+   * - Wishlist items
+   * - Notification preferences
+   */
+  async exportGdprData(id: string): Promise<GdprExportData> {
+    const customer = await this.getById(id);
+
+    // Fetch all related data in parallel
+    const [
+      customerBookings,
+      customerCommunications,
+      customerNotesList,
+      customerWishlists,
+      customerPreferences,
+    ] = await Promise.all([
+      // Bookings
+      this.db
+        .select({
+          id: bookings.id,
+          referenceNumber: bookings.referenceNumber,
+          status: bookings.status,
+          createdAt: bookings.createdAt,
+          adultCount: bookings.adultCount,
+          childCount: bookings.childCount,
+          infantCount: bookings.infantCount,
+          total: bookings.total,
+          currency: bookings.currency,
+          specialRequests: bookings.specialRequests,
+          dietaryRequirements: bookings.dietaryRequirements,
+          accessibilityNeeds: bookings.accessibilityNeeds,
+        })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.customerId, id),
+            eq(bookings.organizationId, this.organizationId)
+          )
+        )
+        .orderBy(desc(bookings.createdAt)),
+
+      // Communications
+      this.db
+        .select({
+          id: communicationLogs.id,
+          type: communicationLogs.type,
+          subject: communicationLogs.subject,
+          sentAt: communicationLogs.sentAt,
+          status: communicationLogs.status,
+        })
+        .from(communicationLogs)
+        .where(
+          and(
+            eq(communicationLogs.customerId, id),
+            eq(communicationLogs.organizationId, this.organizationId)
+          )
+        )
+        .orderBy(desc(communicationLogs.sentAt)),
+
+      // Notes (only content that was shared with or about the customer)
+      this.db
+        .select({
+          id: customerNotes.id,
+          content: customerNotes.content,
+          createdAt: customerNotes.createdAt,
+          authorName: customerNotes.authorName,
+        })
+        .from(customerNotes)
+        .where(
+          and(
+            eq(customerNotes.customerId, id),
+            eq(customerNotes.organizationId, this.organizationId)
+          )
+        )
+        .orderBy(desc(customerNotes.createdAt)),
+
+      // Wishlists
+      this.db
+        .select({
+          id: wishlists.id,
+          tourId: wishlists.tourId,
+          createdAt: wishlists.createdAt,
+        })
+        .from(wishlists)
+        .where(
+          and(
+            eq(wishlists.customerId, id),
+            eq(wishlists.organizationId, this.organizationId)
+          )
+        )
+        .orderBy(desc(wishlists.createdAt)),
+
+      // Notification preferences
+      this.db.query.notificationPreferences.findFirst({
+        where: and(
+          eq(notificationPreferences.customerId, id),
+          eq(notificationPreferences.organizationId, this.organizationId)
+        ),
+      }),
+    ]);
+
+    return {
+      customer,
+      bookings: customerBookings,
+      communications: customerCommunications,
+      notes: customerNotesList,
+      wishlists: customerWishlists,
+      notificationPreferences: customerPreferences
+        ? {
+            emailBookingConfirmation: customerPreferences.emailBookingConfirmation,
+            emailBookingReminder: customerPreferences.emailBookingReminder,
+            emailMarketing: customerPreferences.emailMarketing,
+            smsBookingConfirmation: customerPreferences.smsBookingConfirmation,
+            smsBookingReminder: customerPreferences.smsBookingReminder,
+            smsMarketing: customerPreferences.smsMarketing,
+            emailUnsubscribedAt: customerPreferences.emailUnsubscribedAt,
+            smsUnsubscribedAt: customerPreferences.smsUnsubscribedAt,
+          }
+        : null,
+      exportedAt: new Date(),
+      organizationId: this.organizationId,
+    };
+  }
+
+  /**
+   * GDPR Right to Erasure - Anonymizes customer data
+   * Instead of hard delete, we anonymize to maintain booking records integrity
+   */
+  async anonymizeForGdpr(id: string): Promise<void> {
+    await this.getById(id);
+
+    // Anonymize customer data
+    await this.db
+      .update(customers)
+      .set({
+        email: `deleted-${id}@anonymized.local`,
+        firstName: "Deleted",
+        lastName: "Customer",
+        phone: null,
+        address: null,
+        city: null,
+        state: null,
+        country: null,
+        postalCode: null,
+        notes: null,
+        tags: [],
+        metadata: {},
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(customers.id, id),
+          eq(customers.organizationId, this.organizationId)
+        )
+      );
+
+    // Delete customer notes
+    await this.db
+      .delete(customerNotes)
+      .where(
+        and(
+          eq(customerNotes.customerId, id),
+          eq(customerNotes.organizationId, this.organizationId)
+        )
+      );
+
+    // Delete wishlists
+    await this.db
+      .delete(wishlists)
+      .where(
+        and(
+          eq(wishlists.customerId, id),
+          eq(wishlists.organizationId, this.organizationId)
+        )
+      );
+
+    // Delete notification preferences
+    await this.db
+      .delete(notificationPreferences)
+      .where(
+        and(
+          eq(notificationPreferences.customerId, id),
+          eq(notificationPreferences.organizationId, this.organizationId)
+        )
+      );
+
+    // Note: We keep communication logs for legal compliance but they reference
+    // the anonymized customer. Booking records are kept for financial records.
   }
 }

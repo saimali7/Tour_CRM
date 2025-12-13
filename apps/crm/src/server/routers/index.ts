@@ -9,6 +9,9 @@ import { onboardingRouter } from "./onboarding";
 import { teamRouter } from "./team";
 import { activityLogRouter } from "./activity-log";
 import { refundRouter } from "./refund";
+// Phase 2 routers
+import { customerNoteRouter } from "./customer-note";
+import { communicationRouter } from "./communication";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -21,6 +24,9 @@ export const appRouter = createRouter({
   team: teamRouter,
   activityLog: activityLogRouter,
   refund: refundRouter,
+  // Phase 2 routers
+  customerNote: customerNoteRouter,
+  communication: communicationRouter,
 });
 
 export type AppRouter = typeof appRouter;
