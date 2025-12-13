@@ -1,8 +1,8 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** December 12, 2025
-**Current Focus:** Phase 1 CRM Core Completion
-**Overall Status:** Phase 0 Complete, Phase 1 In Progress (~92%)
+**Last Updated:** December 13, 2025
+**Current Focus:** Phase 1 CRM Core Completion + Phase 7 Web App Foundation
+**Overall Status:** Phase 0 Complete, Phase 1 In Progress (~92%), Phase 7 In Progress (~60%)
 
 > This document is the single source of truth for implementation progress. Keep it updated as features are completed.
 
@@ -19,7 +19,8 @@
 | **4** | Pricing & Promotions | ⏳ NOT STARTED | 0% | Seasonal pricing, promo codes |
 | **5** | Reporting & Analytics | ⏳ NOT STARTED | 0% | Dashboards, reports |
 | **6** | Polish & Optimization | ⏳ NOT STARTED | 0% | Performance, UX, testing |
-| **7-11** | Web App & SaaS | ⏳ FUTURE | 0% | After CRM complete |
+| **7** | Web App Foundation | 🔄 IN PROGRESS | 60% | Subdomain routing, tour pages |
+| **8-11** | Web App Booking & SaaS | ⏳ FUTURE | 0% | After Phase 7 |
 
 ---
 
@@ -342,11 +343,85 @@
 
 ---
 
-## Phase 7-11 Preview (Web App & SaaS)
+## Phase 7: Web App Foundation 🔄 IN PROGRESS (60%)
+
+**Duration:** In Progress
+**Goal:** Public-facing booking website with tour browsing
+
+### 7.1 Infrastructure ✅ COMPLETE (100%)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| Subdomain routing middleware | ✅ | `apps/web/src/middleware.ts` |
+| Organization context from subdomain | ✅ | `apps/web/src/lib/organization.ts` |
+| `{slug}.localhost:3001` development | ✅ | Middleware handles *.localhost |
+| `{slug}.book.platform.com` production | ✅ | Middleware handles subdomains |
+
+### 7.2 Layout & Branding ✅ COMPLETE (100%)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| Organization-scoped layout | ✅ | `apps/web/src/app/org/[slug]/layout.tsx` |
+| Header with org branding | ✅ | `apps/web/src/components/header.tsx` |
+| Footer with contact info | ✅ | `apps/web/src/components/footer.tsx` |
+| Primary color theming | ✅ | CSS custom properties |
+| Mobile responsive nav | ✅ | Hamburger menu |
+
+### 7.3 SEO Foundation ✅ COMPLETE (100%)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| Meta tags per page | ✅ | `generateMetadata()` in pages |
+| Open Graph tags | ✅ | Title, description, images |
+| robots.txt | ✅ | `apps/web/src/app/robots.ts` |
+| sitemap.xml (dynamic) | ✅ | `apps/web/src/app/org/[slug]/sitemap.ts` |
+| Schema.org structured data | ✅ | `apps/web/src/components/structured-data.tsx` |
+| TouristAttraction schema | ✅ | Tour detail pages |
+| Product schema | ✅ | With pricing offers |
+
+### 7.4 Tour Display ✅ COMPLETE (100%)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| Tour listing page | ✅ | `apps/web/src/app/org/[slug]/page.tsx` |
+| Tour card component | ✅ | `apps/web/src/components/tour-card.tsx` |
+| Category filtering | ✅ | URL params + TourFilters component |
+| Sort options | ✅ | Newest, price low/high |
+| Pagination | ✅ | Page links in URL |
+| Tour detail page | ✅ | `apps/web/src/app/org/[slug]/tours/[tourSlug]/page.tsx` |
+| Image gallery | ✅ | Cover + thumbnail grid |
+| Pricing display | ✅ | Base price + tiers |
+| What's included/excluded | ✅ | Checklist display |
+| Meeting point | ✅ | With Google Maps link |
+| Cancellation policy | ✅ | Policy text + hours |
+
+### 7.5 Availability Display ✅ COMPLETE (100%)
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| Availability calendar | ✅ | `apps/web/src/components/availability-calendar.tsx` |
+| Month navigation | ✅ | Prev/next month |
+| Available/limited/sold-out indicators | ✅ | Color-coded dots |
+| Date selection | ✅ | Click to show time slots |
+| Time slot display | ✅ | With spots remaining |
+| Price per schedule | ✅ | If different from base |
+
+### 7.6 Remaining Tasks ⏳ NOT STARTED
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| About page | ⏳ | Static content from org |
+| Contact page | ⏳ | Contact form |
+| Terms & Privacy pages | ⏳ | Static content |
+| 404 page styling | ⏳ | Basic exists |
+| Loading states | ⏳ | Skeleton components |
+
+---
+
+## Phase 8-11 Preview (Web App Booking & SaaS)
 
 | Phase | Name | Prerequisite |
 |-------|------|--------------|
-| 7 | Web App Foundation | CRM Complete |
 | 8 | Web App Booking Flow | Phase 7 |
 | 9 | Web App Optimization | Phase 8 |
 | 10 | SaaS Platform | Web App Complete |
@@ -425,12 +500,27 @@
 - `packages/services/src/storage-service.ts` - Supabase Storage service (NEW)
 - `apps/crm/src/app/api/upload/route.ts` - File upload API (NEW)
 
-### UI Pages
+### UI Pages (CRM)
 - `apps/crm/src/app/org/[slug]/(dashboard)/tours/` - Tour pages
 - `apps/crm/src/app/org/[slug]/(dashboard)/schedules/` - Schedule pages (with calendar view)
 - `apps/crm/src/app/org/[slug]/(dashboard)/bookings/` - Booking pages
 - `apps/crm/src/app/org/[slug]/(dashboard)/customers/` - Customer pages
 - `apps/crm/src/app/org/[slug]/(dashboard)/settings/` - Settings pages
+
+### Web App (Public Booking) - NEW
+- `apps/web/src/middleware.ts` - Subdomain routing middleware
+- `apps/web/src/lib/organization.ts` - Organization context helpers
+- `apps/web/src/app/org/[slug]/layout.tsx` - Org-scoped layout with branding
+- `apps/web/src/app/org/[slug]/page.tsx` - Tour listing page
+- `apps/web/src/app/org/[slug]/tours/[tourSlug]/page.tsx` - Tour detail page
+- `apps/web/src/app/org/[slug]/sitemap.ts` - Dynamic sitemap generation
+- `apps/web/src/app/robots.ts` - Robots.txt
+- `apps/web/src/components/header.tsx` - Header with branding
+- `apps/web/src/components/footer.tsx` - Footer with contact info
+- `apps/web/src/components/tour-card.tsx` - Tour card component
+- `apps/web/src/components/tour-filters.tsx` - Category/sort filters
+- `apps/web/src/components/availability-calendar.tsx` - Availability calendar
+- `apps/web/src/components/structured-data.tsx` - Schema.org structured data
 
 ### Authentication
 - `apps/crm/src/middleware.ts` - Route protection
@@ -440,6 +530,52 @@
 ---
 
 ## Changelog
+
+### December 13, 2025 - Phase 7 Web App Foundation
+**Phase 7 progress: 0% → 60%**
+
+**Subdomain Routing & Organization Context:**
+- ✅ Created subdomain routing middleware for `{slug}.localhost:3001` and `{slug}.book.platform.com`
+- ✅ Organization resolver with database lookup by slug
+- ✅ Request header injection for org slug
+- ✅ Reserved subdomain filtering (www, api, admin, etc.)
+- ✅ No-org page for invalid/missing subdomains
+
+**Layout & Branding:**
+- ✅ Organization-scoped layout with header/footer
+- ✅ Header with logo, org name, primary color theming
+- ✅ Mobile-responsive navigation with hamburger menu
+- ✅ Footer with contact info, links, "Powered by" attribution
+
+**SEO Foundation:**
+- ✅ `generateMetadata()` for all pages (title, description, Open Graph)
+- ✅ Dynamic `robots.txt` generation
+- ✅ Dynamic per-org `sitemap.xml` with all public tours
+- ✅ Schema.org `TouristAttraction` structured data
+- ✅ Schema.org `Product` structured data with pricing
+
+**Tour Display:**
+- ✅ Tour listing page with grid layout
+- ✅ Tour card component with image, price, duration, capacity
+- ✅ Category filtering with URL params
+- ✅ Sort options (newest, price asc/desc)
+- ✅ Pagination
+- ✅ Tour detail page with full information display
+- ✅ Image gallery (cover + thumbnails)
+- ✅ Pricing tiers display
+- ✅ What's included/excluded lists
+- ✅ Meeting point with Google Maps link
+- ✅ Cancellation policy display
+
+**Availability Display:**
+- ✅ Interactive calendar component
+- ✅ Month navigation
+- ✅ Color-coded availability indicators (green/orange/red)
+- ✅ Date selection with time slot display
+- ✅ Spots remaining per schedule
+- ✅ Sold out states
+
+---
 
 ### December 12, 2025 (Session 3) - Phase 1 Near Completion
 **Phase 1 progress: 88% → 92%**
