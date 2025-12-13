@@ -41,7 +41,10 @@
       "Bash(pnpm exec tsc:*)",
       "Bash(pnpm --filter @tour/services build:*)",
       "Bash(test:*)",
-      "Bash(pnpm --filter crm typecheck:*)"
+      "Bash(pnpm --filter crm typecheck:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm next build:*)",
+      "Bash(head:*)"
     ]
   }
 }

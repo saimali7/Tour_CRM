@@ -2,7 +2,7 @@
 
 **Last Updated:** December 13, 2025
 **Status:** Sequential Phase Development
-**Current Phase:** Phase 5 - Reporting & Analytics (NEXT)
+**Current Phase:** Phase 6 - Polish & Optimization (NEXT)
 **Main Branch:** `main`
 
 > This document is the single source of truth for implementation progress. We follow a **sequential phase-by-phase** development strategy - completing each phase fully before moving to the next.
@@ -20,7 +20,7 @@
 │        ✅ DONE                   ✅ DONE                    ✅ DONE          │
 │                                                                              │
 │   ────► Phase 3: Guides ────► Phase 4: Pricing ────► Phase 5: Reporting     │
-│           ✅ DONE               ✅ DONE              🔄 NEXT                │
+│           ✅ DONE               ✅ DONE               ✅ DONE               │
 │                                                                              │
 │   ────► Phase 6: Polish ────► Phase 7-9: Web App ────► Phase 10-11: SaaS    │
 │           ⏳ PENDING            ⏳ PENDING               ⏳ PENDING          │
@@ -45,8 +45,8 @@
 | **2** | Customer & Communications | ✅ COMPLETE | 95% |
 | **3** | Guide Operations | ✅ COMPLETE | 95% |
 | **4** | Pricing & Promotions | ✅ COMPLETE | 95% |
-| **5** | Reporting & Analytics | 🔄 NEXT | 0% |
-| **6** | Polish & Optimization | ⏳ PENDING | 0% |
+| **5** | Reporting & Analytics | ✅ COMPLETE | 95% |
+| **6** | Polish & Optimization | 🔄 NEXT | 0% |
 | **7** | Web App Foundation | ⏳ PENDING | 0% |
 | **8** | Booking Flow | ⏳ PENDING | 0% |
 | **9** | Web Optimization | ⏳ PENDING | 0% |
@@ -356,26 +356,57 @@ pnpm test                 # Run tests
 
 ---
 
-## Phase 5: Reporting & Analytics ⏳ PENDING (0%)
+## Phase 5: Reporting & Analytics ✅ COMPLETE (95%)
+
+### Services Added
+| Service | File | Status |
+|---------|------|--------|
+| AnalyticsService | `analytics-service.ts` | ✅ Revenue, booking, capacity metrics |
+| DashboardService | `dashboard-service.ts` | ✅ Aggregated dashboard data |
+| CustomerIntelligenceService | `customer-intelligence-service.ts` | ✅ Scoring, segmentation, CLV |
 
 ### Dashboards
 | Task | Status | Notes |
 |------|--------|-------|
-| Operations dashboard | ⬜ | Today's tours, activity |
-| Business dashboard | ⬜ | Revenue, trends |
+| Operations dashboard | ✅ | Today's tours, participants, guides, activity feed |
+| Business dashboard | ✅ | Revenue cards, trends, capacity metrics |
+| Dashboard components | ✅ | StatCard, ActivityFeed, TodaySchedule, SimpleChart |
 
 ### Reports
 | Task | Status | Notes |
 |------|--------|-------|
-| Revenue report | ⬜ | By period, tour, source |
-| Booking report | ⬜ | Counts, patterns |
-| Capacity utilization | ⬜ | Fill rates |
-| Customer report | ⬜ | Acquisition, CLV |
-| Guide report | ⬜ | Performance metrics |
+| Reports hub page | ✅ | Navigation to all reports |
+| Revenue report | ✅ | By period, tour, payment method |
+| Booking report | ✅ | Counts, patterns, sources |
+| Capacity utilization | ✅ | Fill rates, underperforming schedules |
+| Customer report | ✅ | Segments, CLV, acquisition sources |
+| Guide report | ✅ | Performance metrics (basic) |
+| CSV export | ✅ | Export button on all reports |
+
+### Customer Intelligence
+| Task | Status | Notes |
+|------|--------|-------|
+| Customer scoring | ✅ | 0-100 weighted score calculation |
+| Customer segments | ✅ | VIP, Loyal, Promising, At Risk, Dormant |
+| CLV calculation | ✅ | Historical and predicted CLV |
+| Re-engagement triggers | ✅ | At-risk and dormant customer detection |
+
+### tRPC Routers Added
+| Router | Endpoints |
+|--------|-----------|
+| analytics | Revenue, booking, capacity stats |
+| dashboard | Operations and business dashboards |
+| customerIntelligence | Scoring, segments, CLV |
+| reports | Report generation and export |
+
+### Minor Gaps (Non-blocking)
+- [ ] Real-time dashboard updates (currently manual refresh)
+- [ ] Inngest jobs for nightly customer scoring
+- [ ] Revenue attribution by marketing channel
 
 ---
 
-## Phase 6: Polish & Optimization ⏳ PENDING (0%)
+## Phase 6: Polish & Optimization 🔄 NEXT (0%)
 
 ### Performance
 | Task | Status | Notes |
@@ -425,6 +456,17 @@ pnpm test                 # Run tests
 ---
 
 ## Changelog
+
+### December 13, 2025 - Phase 5 Complete
+- Phase 5 Reporting & Analytics: 0% → 95%
+- Created 3 new services (Analytics, Dashboard, CustomerIntelligence)
+- Built Operations Dashboard with today's tours, activity feed, alerts
+- Built Business Dashboard with revenue trends, booking metrics
+- Built Reports hub with 5 report types (Revenue, Booking, Capacity, Customer, Guide)
+- Created 4 new tRPC routers (analytics, dashboard, customerIntelligence, reports)
+- Added customer scoring (0-100) and segment assignment
+- Added CLV calculation (historical and predicted)
+- Added CSV export for all reports
 
 ### December 13, 2025 - Phase 4 Complete
 - Phase 4 Pricing & Promotions: 0% → 95%

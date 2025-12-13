@@ -272,19 +272,18 @@ Per-organization roles:
 | **2** | Customer & Communications | ✅ COMPLETE | 95% |
 | **3** | Guide Operations | ✅ COMPLETE | 95% |
 | **4** | Pricing & Promotions | ✅ COMPLETE | 95% |
-| **5** | Reporting & Analytics | 🔄 NEXT | 0% |
-| **6** | Polish & Optimization | ⏳ PENDING | 0% |
+| **5** | Reporting & Analytics | ✅ COMPLETE | 95% |
+| **6** | Polish & Optimization | 🔄 NEXT | 0% |
 | **7-11** | Web App & SaaS | ⏳ FUTURE | 0% |
 
-### Next Phase: Phase 5 - Reporting & Analytics
+### Next Phase: Phase 6 - Polish & Optimization
 
 **Key features:**
-- Operations dashboard (today's tours, activity)
-- Business dashboard (revenue, trends)
-- Revenue report (by period, tour, source)
-- Booking report (counts, patterns)
-- Capacity utilization report
-- Customer report (acquisition, CLV)
+- Query optimization (N+1 fixes, indexing)
+- Bundle optimization (code splitting, lazy loading)
+- Redis caching for hot data
+- Unit tests for critical paths
+- E2E tests with Playwright
 
 > See `PROGRESS.md` for detailed feature breakdowns and task lists.
 
@@ -321,9 +320,9 @@ When implementing features:
 
 | Directory | Count | Purpose |
 |-----------|-------|---------|
-| `packages/services/src/` | 25 services | Business logic layer |
+| `packages/services/src/` | 28 services | Business logic layer |
 | `packages/database/src/schema/` | 14 schema files | Drizzle ORM tables |
-| `apps/crm/src/server/routers/` | 22 routers | tRPC API endpoints |
+| `apps/crm/src/server/routers/` | 26 routers | tRPC API endpoints |
 
 ### Key Services by Phase
 
@@ -353,6 +352,11 @@ When implementing features:
 - `promo-code-service.ts` - Discount codes with limits
 - `group-discount-service.ts` - Threshold-based discounts
 - `pricing-calculation-service.ts` - Unified pricing logic
+
+**Phase 5 (Reporting & Analytics):**
+- `analytics-service.ts` - Revenue, booking, capacity metrics
+- `dashboard-service.ts` - Aggregated dashboard data
+- `customer-intelligence-service.ts` - Scoring, segmentation, CLV
 
 ### Database Schema Files
 

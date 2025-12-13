@@ -11,6 +11,7 @@ import {
   Settings,
   Mail,
   Tag,
+  BarChart3,
 } from "lucide-react";
 import { DashboardProviders } from "./providers";
 
@@ -27,6 +28,7 @@ const navigation = [
   { name: "Schedules", href: "/schedules", icon: Calendar },
   { name: "Guides", href: "/guides", icon: UserCircle },
   { name: "Promo Codes", href: "/promo-codes", icon: Tag },
+  { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Communications", href: "/communications", icon: Mail },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

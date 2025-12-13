@@ -22,6 +22,10 @@ import { SeasonalPricingService } from "./seasonal-pricing-service";
 import { PromoCodeService } from "./promo-code-service";
 import { GroupDiscountService } from "./group-discount-service";
 import { PricingCalculationService } from "./pricing-calculation-service";
+// Phase 5 services
+import { AnalyticsService } from "./analytics-service";
+import { DashboardService } from "./dashboard-service";
+import { CustomerIntelligenceService } from "./customer-intelligence-service";
 
 export interface Services {
   tour: TourService;
@@ -47,6 +51,10 @@ export interface Services {
   promoCode: PromoCodeService;
   groupDiscount: GroupDiscountService;
   pricingCalculation: PricingCalculationService;
+  // Phase 5 services
+  analytics: AnalyticsService;
+  dashboard: DashboardService;
+  customerIntelligence: CustomerIntelligenceService;
 }
 
 /**
@@ -84,6 +92,10 @@ export function createServices(ctx: ServiceContext): Services {
     promoCode: new PromoCodeService(ctx),
     groupDiscount: new GroupDiscountService(ctx),
     pricingCalculation: new PricingCalculationService(ctx),
+    // Phase 5 services
+    analytics: new AnalyticsService(ctx),
+    dashboard: new DashboardService(ctx),
+    customerIntelligence: new CustomerIntelligenceService(ctx),
   };
 }
 
@@ -111,6 +123,10 @@ export { SeasonalPricingService } from "./seasonal-pricing-service";
 export { PromoCodeService } from "./promo-code-service";
 export { GroupDiscountService } from "./group-discount-service";
 export { PricingCalculationService } from "./pricing-calculation-service";
+// Phase 5 services
+export { AnalyticsService } from "./analytics-service";
+export { DashboardService } from "./dashboard-service";
+export { CustomerIntelligenceService } from "./customer-intelligence-service";
 
 // Export types
 export * from "./types";
@@ -238,6 +254,33 @@ export type {
   AppliedPricing,
   PriceBreakdown,
 } from "./pricing-calculation-service";
+// Phase 5 types
+export type {
+  RevenueStats,
+  PeriodRevenueData,
+  BookingStats,
+  BookingTrendData,
+  CapacityUtilization,
+  TodaysOperations,
+  RecentActivityItem,
+} from "./analytics-service";
+export type {
+  OperationsDashboard,
+  Alert,
+  BusinessDashboard,
+  KeyMetrics,
+  TrendData,
+} from "./dashboard-service";
+export type {
+  CustomerSegment,
+  ReengagementTriggerType,
+  CustomerScore,
+  CustomerWithScore,
+  CustomerLifetimeValue,
+  ReengagementCandidate,
+  CustomerStatsReport,
+  SegmentDistribution,
+} from "./customer-intelligence-service";
 
 // Storage service (separate from org-scoped services, created with createStorageService)
 export { StorageService, createStorageService, type UploadResult } from "./storage-service";

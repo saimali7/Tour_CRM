@@ -22,6 +22,11 @@ import { seasonalPricingRouter } from "./seasonal-pricing";
 import { promoCodeRouter } from "./promo-code";
 import { groupDiscountRouter } from "./group-discount";
 import { pricingCalculationRouter } from "./pricing-calculation";
+// Phase 5 routers
+import { analyticsRouter } from "./analytics";
+import { dashboardRouter } from "./dashboard";
+import { customerIntelligenceRouter } from "./customer-intelligence";
+import { reportsRouter } from "./reports";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -48,6 +53,11 @@ export const appRouter = createRouter({
   promoCode: promoCodeRouter,
   groupDiscount: groupDiscountRouter,
   pricingCalculation: pricingCalculationRouter,
+  // Phase 5 routers
+  analytics: analyticsRouter,
+  dashboard: dashboardRouter,
+  customerIntelligence: customerIntelligenceRouter,
+  reports: reportsRouter,
 });
 
 export type AppRouter = typeof appRouter;
