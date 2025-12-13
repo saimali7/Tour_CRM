@@ -17,6 +17,11 @@ import { guideAvailabilityRouter } from "./guide-availability";
 import { tourGuideQualificationRouter } from "./tour-guide-qualification";
 import { guideAssignmentRouter } from "./guide-assignment";
 import { guidePortalRouter } from "./guide-portal";
+// Phase 4 routers
+import { seasonalPricingRouter } from "./seasonal-pricing";
+import { promoCodeRouter } from "./promo-code";
+import { groupDiscountRouter } from "./group-discount";
+import { pricingCalculationRouter } from "./pricing-calculation";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -38,6 +43,11 @@ export const appRouter = createRouter({
   guideAssignment: guideAssignmentRouter,
   // Guide Portal
   guidePortal: guidePortalRouter,
+  // Phase 4 routers
+  seasonalPricing: seasonalPricingRouter,
+  promoCode: promoCodeRouter,
+  groupDiscount: groupDiscountRouter,
+  pricingCalculation: pricingCalculationRouter,
 });
 
 export type AppRouter = typeof appRouter;

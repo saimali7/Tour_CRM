@@ -17,3 +17,6 @@ export * from "./communications";
 // Phase 3: Guide Operations
 export * from "./guide-operations";
 export * from "./guide-tokens";
+
+// Phase 4: Pricing & Promotions
+export * from "./pricing";

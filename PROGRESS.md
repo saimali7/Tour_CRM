@@ -2,7 +2,7 @@
 
 **Last Updated:** December 13, 2025
 **Status:** Sequential Phase Development
-**Current Phase:** Phase 4 - Pricing & Promotions (NEXT)
+**Current Phase:** Phase 5 - Reporting & Analytics (NEXT)
 **Main Branch:** `main`
 
 > This document is the single source of truth for implementation progress. We follow a **sequential phase-by-phase** development strategy - completing each phase fully before moving to the next.
@@ -20,7 +20,7 @@
 │        ✅ DONE                   ✅ DONE                    ✅ DONE          │
 │                                                                              │
 │   ────► Phase 3: Guides ────► Phase 4: Pricing ────► Phase 5: Reporting     │
-│           ✅ DONE               🔄 NEXT              ⏳ PENDING             │
+│           ✅ DONE               ✅ DONE              🔄 NEXT                │
 │                                                                              │
 │   ────► Phase 6: Polish ────► Phase 7-9: Web App ────► Phase 10-11: SaaS    │
 │           ⏳ PENDING            ⏳ PENDING               ⏳ PENDING          │
@@ -44,8 +44,8 @@
 | **1** | Core Booking Engine | ✅ COMPLETE | 97% |
 | **2** | Customer & Communications | ✅ COMPLETE | 95% |
 | **3** | Guide Operations | ✅ COMPLETE | 95% |
-| **4** | Pricing & Promotions | 🔄 NEXT | 0% |
-| **5** | Reporting & Analytics | ⏳ PENDING | 0% |
+| **4** | Pricing & Promotions | ✅ COMPLETE | 95% |
+| **5** | Reporting & Analytics | 🔄 NEXT | 0% |
 | **6** | Polish & Optimization | ⏳ PENDING | 0% |
 | **7** | Web App Foundation | ⏳ PENDING | 0% |
 | **8** | Booking Flow | ⏳ PENDING | 0% |
@@ -297,41 +297,62 @@ pnpm test                 # Run tests
 
 ---
 
-## Phase 4: Pricing & Promotions ⏳ NEXT (0%)
+## Phase 4: Pricing & Promotions ✅ COMPLETE (95%)
 
-### Database Tables Needed
+### Database Tables Added
 ```typescript
 // packages/database/src/schema/pricing.ts
-- seasonal_pricing (date ranges, adjustments)
-- promo_codes (codes, discounts, limits)
-- promo_code_usage (tracking)
-- group_discounts (thresholds)
+- seasonal_pricing ✅ (date ranges, percentage/fixed adjustments)
+- promo_codes ✅ (codes, discounts, usage limits)
+- promo_code_usage ✅ (usage tracking per booking/customer)
+- group_discounts ✅ (threshold-based discounts)
 ```
+
+### Services Added
+| Service | File | Status |
+|---------|------|--------|
+| SeasonalPricingService | `seasonal-pricing-service.ts` | ✅ |
+| PromoCodeService | `promo-code-service.ts` | ✅ |
+| GroupDiscountService | `group-discount-service.ts` | ✅ |
+| PricingCalculationService | `pricing-calculation-service.ts` | ✅ |
 
 ### Seasonal Pricing
 | Task | Status | Notes |
 |------|--------|-------|
-| Season definition UI | ⬜ | Date ranges |
-| Percentage/fixed adjustments | ⬜ | Price modifiers |
-| Tour-specific seasons | ⬜ | Per-tour pricing |
-| Price preview calendar | ⬜ | Visual pricing |
+| Season definition UI | ✅ | Date ranges in Settings |
+| Percentage/fixed adjustments | ✅ | Both supported |
+| Tour-specific seasons | ✅ | appliesTo: all/specific |
+| Price calculation | ✅ | Priority-based application |
 
 ### Group Discounts
 | Task | Status | Notes |
 |------|--------|-------|
-| Threshold configuration | ⬜ | 5+ = 10% off, etc. |
-| Auto-apply in booking | ⬜ | |
+| Threshold configuration | ✅ | Min/max participants |
+| Discount tiers UI | ✅ | In Settings |
+| Auto-apply in booking | ✅ | Via PricingCalculationService |
 
 ### Promo Codes
 | Task | Status | Notes |
 |------|--------|-------|
-| Promo code CRUD | ⬜ | |
-| Code generator | ⬜ | Random codes |
-| Usage limits | ⬜ | Total, per customer |
-| Date validity | ⬜ | Start/end dates |
-| Tour restrictions | ⬜ | Specific tours only |
-| Promo code reporting | ⬜ | Usage stats |
-| Apply in booking flow | ⬜ | |
+| Promo code CRUD | ✅ | Full management page |
+| Code generator | ✅ | Random unique codes |
+| Usage limits | ✅ | Total + per customer |
+| Date validity | ✅ | validFrom/validUntil |
+| Tour restrictions | ✅ | appliesTo: all/specific |
+| Promo code detail page | ✅ | Usage stats view |
+| Apply in booking flow | ✅ | PricingCalculationService |
+
+### Pricing Integration
+| Task | Status | Notes |
+|------|--------|-------|
+| PricingCalculationService | ✅ | Combines all pricing logic |
+| Discount stacking | ✅ | Seasonal → Group → Promo |
+| Price breakdown API | ✅ | Returns full breakdown |
+| Promo validation | ✅ | Real-time validation |
+
+### Minor Gaps (Non-blocking)
+- [ ] Price preview calendar (visual future pricing)
+- [ ] Early bird discounts (advance booking discount)
 
 ---
 
@@ -404,6 +425,16 @@ pnpm test                 # Run tests
 ---
 
 ## Changelog
+
+### December 13, 2025 - Phase 4 Complete
+- Phase 4 Pricing & Promotions: 0% → 95%
+- Added 4 new database tables (pricing.ts schema)
+- Created 4 new services (SeasonalPricing, PromoCode, GroupDiscount, PricingCalculation)
+- Built Pricing Settings page with Seasonal Pricing and Group Discounts tabs
+- Built Promo Codes management page with full CRUD
+- Built Promo Code detail page with usage stats
+- Implemented PricingCalculationService for unified pricing logic
+- Discount stacking: Seasonal → Group → Promo codes
 
 ### December 13, 2025 - Phase 3 Complete
 - Phase 3 Guide Operations: 0% → 95%

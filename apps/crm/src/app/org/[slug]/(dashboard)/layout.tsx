@@ -10,6 +10,7 @@ import {
   UserCircle,
   Settings,
   Mail,
+  Tag,
 } from "lucide-react";
 import { DashboardProviders } from "./providers";
 
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Tours", href: "/tours", icon: Map },
   { name: "Schedules", href: "/schedules", icon: Calendar },
   { name: "Guides", href: "/guides", icon: UserCircle },
+  { name: "Promo Codes", href: "/promo-codes", icon: Tag },
   { name: "Communications", href: "/communications", icon: Mail },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

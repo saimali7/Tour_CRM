@@ -271,23 +271,20 @@ Per-organization roles:
 | **1** | Core Booking Engine | ✅ COMPLETE | 97% |
 | **2** | Customer & Communications | ✅ COMPLETE | 95% |
 | **3** | Guide Operations | ✅ COMPLETE | 95% |
-| **4** | Pricing & Promotions | 🔄 NEXT | 0% |
-| **5-6** | Reporting & Polish | ⏳ PENDING | 0% |
+| **4** | Pricing & Promotions | ✅ COMPLETE | 95% |
+| **5** | Reporting & Analytics | 🔄 NEXT | 0% |
+| **6** | Polish & Optimization | ⏳ PENDING | 0% |
 | **7-11** | Web App & SaaS | ⏳ FUTURE | 0% |
 
-### Next Phase: Phase 4 - Pricing & Promotions
-
-**Database tables needed:**
-- `seasonal_pricing` - Date ranges with price adjustments
-- `promo_codes` - Discount codes with limits
-- `promo_code_usage` - Usage tracking
-- `group_discounts` - Threshold-based discounts
+### Next Phase: Phase 5 - Reporting & Analytics
 
 **Key features:**
-- Seasonal pricing UI (date ranges, percentage/fixed adjustments)
-- Promo code CRUD with usage limits and date validity
-- Group discount configuration
-- Apply discounts in booking flow
+- Operations dashboard (today's tours, activity)
+- Business dashboard (revenue, trends)
+- Revenue report (by period, tour, source)
+- Booking report (counts, patterns)
+- Capacity utilization report
+- Customer report (acquisition, CLV)
 
 > See `PROGRESS.md` for detailed feature breakdowns and task lists.
 
@@ -324,9 +321,9 @@ When implementing features:
 
 | Directory | Count | Purpose |
 |-----------|-------|---------|
-| `packages/services/src/` | 21 services | Business logic layer |
-| `packages/database/src/schema/` | 13 schema files | Drizzle ORM tables |
-| `apps/crm/src/server/routers/` | 18 routers | tRPC API endpoints |
+| `packages/services/src/` | 25 services | Business logic layer |
+| `packages/database/src/schema/` | 14 schema files | Drizzle ORM tables |
+| `apps/crm/src/server/routers/` | 22 routers | tRPC API endpoints |
 
 ### Key Services by Phase
 
@@ -351,6 +348,12 @@ When implementing features:
 - `guide-assignment-service.ts` - Schedule-guide assignments
 - `manifest-service.ts` - Participant lists for guides
 
+**Phase 4 (Pricing & Promotions):**
+- `seasonal-pricing-service.ts` - Date-based price adjustments
+- `promo-code-service.ts` - Discount codes with limits
+- `group-discount-service.ts` - Threshold-based discounts
+- `pricing-calculation-service.ts` - Unified pricing logic
+
 ### Database Schema Files
 
 ```
@@ -367,6 +370,7 @@ packages/database/src/schema/
 ├── communications.ts     # Email logs, templates, automations
 ├── activity-logs.ts      # Audit trail
 ├── refunds.ts            # Refund tracking
+├── pricing.ts            # Seasonal pricing, promo codes, group discounts
 └── index.ts              # Barrel export
 ```
 

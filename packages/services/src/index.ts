@@ -17,6 +17,11 @@ import { AvailabilityAlertService } from "./availability-alert-service";
 import { GuideAvailabilityService } from "./guide-availability-service";
 import { TourGuideQualificationService } from "./tour-guide-qualification-service";
 import { ManifestService } from "./manifest-service";
+// Phase 4 services
+import { SeasonalPricingService } from "./seasonal-pricing-service";
+import { PromoCodeService } from "./promo-code-service";
+import { GroupDiscountService } from "./group-discount-service";
+import { PricingCalculationService } from "./pricing-calculation-service";
 
 export interface Services {
   tour: TourService;
@@ -37,6 +42,11 @@ export interface Services {
   availabilityAlert: AvailabilityAlertService;
   guideAvailability: GuideAvailabilityService;
   tourGuideQualification: TourGuideQualificationService;
+  // Phase 4 services
+  seasonalPricing: SeasonalPricingService;
+  promoCode: PromoCodeService;
+  groupDiscount: GroupDiscountService;
+  pricingCalculation: PricingCalculationService;
 }
 
 /**
@@ -69,6 +79,11 @@ export function createServices(ctx: ServiceContext): Services {
     availabilityAlert: new AvailabilityAlertService(ctx),
     guideAvailability: new GuideAvailabilityService(ctx),
     tourGuideQualification: new TourGuideQualificationService(ctx),
+    // Phase 4 services
+    seasonalPricing: new SeasonalPricingService(ctx),
+    promoCode: new PromoCodeService(ctx),
+    groupDiscount: new GroupDiscountService(ctx),
+    pricingCalculation: new PricingCalculationService(ctx),
   };
 }
 
@@ -91,6 +106,11 @@ export { AvailabilityAlertService } from "./availability-alert-service";
 export { GuideAvailabilityService } from "./guide-availability-service";
 export { TourGuideQualificationService } from "./tour-guide-qualification-service";
 export { ManifestService } from "./manifest-service";
+// Phase 4 services
+export { SeasonalPricingService } from "./seasonal-pricing-service";
+export { PromoCodeService } from "./promo-code-service";
+export { GroupDiscountService } from "./group-discount-service";
+export { PricingCalculationService } from "./pricing-calculation-service";
 
 // Export types
 export * from "./types";
@@ -191,6 +211,33 @@ export type {
   GuideManifestSummary,
   DateManifestSummary,
 } from "./manifest-service";
+// Phase 4 types
+export type {
+  SeasonalPricingFilters,
+  SeasonalPricingSortField,
+  CreateSeasonalPricingInput,
+  UpdateSeasonalPricingInput,
+  PriceAdjustment,
+} from "./seasonal-pricing-service";
+export type {
+  PromoCodeFilters,
+  PromoCodeSortField,
+  CreatePromoCodeInput,
+  UpdatePromoCodeInput,
+  PromoCodeValidation,
+  PromoCodeUsageStats,
+} from "./promo-code-service";
+export type {
+  GroupDiscountFilters,
+  GroupDiscountSortField,
+  CreateGroupDiscountInput,
+  UpdateGroupDiscountInput,
+  GroupDiscountResult,
+} from "./group-discount-service";
+export type {
+  AppliedPricing,
+  PriceBreakdown,
+} from "./pricing-calculation-service";
 
 // Storage service (separate from org-scoped services, created with createStorageService)
 export { StorageService, createStorageService, type UploadResult } from "./storage-service";
