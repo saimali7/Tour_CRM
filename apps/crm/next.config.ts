@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Enable standalone output for Docker deployment
+  output: "standalone",
   transpilePackages: ["@tour/ui", "@tour/database", "@tour/validators", "@tour/config"],
   typedRoutes: true,
   // Ignore build errors for missing env vars during CI
@@ -11,6 +13,13 @@ const nextConfig: NextConfig = {
   typescript: {
     // We run typecheck separately
     ignoreBuildErrors: process.env.CI === "true",
+  },
+  // Optimize for production
+  poweredByHeader: false,
+  // Enable experimental features for better performance
+  experimental: {
+    // Optimize package imports
+    optimizePackageImports: ["lucide-react", "date-fns", "@tanstack/react-query"],
   },
 };
 

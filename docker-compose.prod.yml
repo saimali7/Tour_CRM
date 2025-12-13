@@ -1,0 +1,67 @@
+# =============================================================================
+# Tour CRM - Production Docker Compose
+# =============================================================================
+# This file is designed for deployment with Coolify
+#
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#
+# Note: Database (Supabase) is external - not included here
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # CRM Application
+  # ===========================================================================
+  crm:
+    build:
+      context: .
+      dockerfile: apps/crm/Dockerfile
+    container_name: tour_crm
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - .env.production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - tour_network
+    labels:
+      # Coolify labels for reverse proxy
+      - "coolify.managed=true"
+
+  # ===========================================================================
+  # Redis Cache (Optional - for session storage and caching)
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: tour_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-tourcrm2024}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-tourcrm2024}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tour_network
+
+networks:
+  tour_network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
