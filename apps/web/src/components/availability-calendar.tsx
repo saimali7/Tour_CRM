@@ -276,8 +276,10 @@ export function AvailabilityCalendar({
                         </span>
                       </div>
                       {!isFull && (
-                        <Button size="sm" disabled>
-                          Select
+                        <Button size="sm" asChild>
+                          <a href={`book?schedule=${schedule.id}`}>
+                            Book Now
+                          </a>
                         </Button>
                       )}
                     </div>

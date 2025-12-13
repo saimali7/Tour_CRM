@@ -59,6 +59,12 @@ export function Header({ orgName, logo, primaryColor }: HeaderProps) {
           >
             Contact
           </Link>
+          <Link
+            href="/booking"
+            className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+          >
+            Find Booking
+          </Link>
         </nav>
 
         {/* CTA Button */}
@@ -110,6 +116,13 @@ export function Header({ orgName, logo, primaryColor }: HeaderProps) {
               onClick={() => setMobileMenuOpen(false)}
             >
               Contact
+            </Link>
+            <Link
+              href="/booking"
+              className="text-sm font-medium hover:text-primary transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Find Booking
             </Link>
             <Button
               asChild

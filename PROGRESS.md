@@ -50,7 +50,7 @@
 | Workstream | Phase(s) | Status | Branch | Owner | Completion |
 |------------|----------|--------|--------|-------|------------|
 | **Foundation** | 0, 1 | ✅ COMPLETE | `main` | - | 97% |
-| **A: Web App** | 7, 8, 9 | 🔄 IN PROGRESS | `feature/web-app` | Active | 70% |
+| **A: Web App** | 7, 8, 9 | 🔄 IN PROGRESS | `feature/web-app` | Active | 85% |
 | **B: Customers & Comms** | 2 | 🟡 READY | `feature/phase-2-customers` | *Unassigned* | 0% |
 | **C: Guide Operations** | 3 | 🟡 READY | `feature/phase-3-guides` | *Unassigned* | 0% |
 | **D: Pricing & Promos** | 4 | 🟡 READY | `feature/phase-4-pricing` | *Unassigned* | 0% |
@@ -192,7 +192,7 @@ These can be completed by any workstream or deferred:
 **Branch:** `feature/web-app`
 **App:** `apps/web`
 **Owner:** Active
-**Status:** 🔄 IN PROGRESS (60%)
+**Status:** 🔄 IN PROGRESS (85%)
 
 ### Prerequisites ✅
 - [x] Tours service available
@@ -243,20 +243,36 @@ These can be completed by any workstream or deferred:
 - `apps/web/src/components/structured-data.tsx` - Schema.org
 - `apps/web/src/components/contact-form.tsx` - Contact form
 
-### Phase 8: Booking Flow (0%)
+### Phase 8: Booking Flow (70%) 🔄
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Booking form (multi-step) | ⬜ | |
-| Ticket selection | ⬜ | |
-| Customer details form | ⬜ | |
-| Stripe checkout integration | ⬜ | |
-| Booking confirmation page | ⬜ | |
-| Confirmation email trigger | ⬜ | |
-| Customer booking lookup | ⬜ | |
+| Booking form (multi-step) | ✅ | `apps/web/src/components/booking-flow.tsx` |
+| Ticket selection | ✅ | `apps/web/src/components/ticket-selection.tsx` |
+| Customer details form | ✅ | `apps/web/src/components/customer-details-form.tsx` |
+| Payment step UI | ✅ | `apps/web/src/components/payment-step.tsx` |
+| Booking confirmation page | ✅ | `apps/web/src/components/booking-confirmation.tsx` |
+| Booking API endpoint | ✅ | `apps/web/src/app/api/bookings/route.ts` |
+| Customer booking lookup | ✅ | `apps/web/src/app/org/[slug]/booking/page.tsx` |
+| Booking state management | ✅ | `apps/web/src/lib/booking-context.tsx` |
+| Stripe checkout integration | ⬜ | Payment flow ready, needs Stripe Connect setup |
+| Confirmation email trigger | ⬜ | Inngest event ready |
 | Self-service cancellation | ⬜ | |
 | Reviews display | ⬜ | |
 | Social proof elements | ⬜ | |
+
+**Phase 8 Files Created:**
+- `apps/web/src/lib/booking-context.tsx` - Booking state management
+- `apps/web/src/app/org/[slug]/tours/[tourSlug]/book/page.tsx` - Booking page
+- `apps/web/src/components/booking-flow.tsx` - Multi-step booking wrapper
+- `apps/web/src/components/ticket-selection.tsx` - Ticket/participant selection
+- `apps/web/src/components/customer-details-form.tsx` - Customer form
+- `apps/web/src/components/payment-step.tsx` - Payment step UI
+- `apps/web/src/components/booking-confirmation.tsx` - Confirmation display
+- `apps/web/src/app/api/bookings/route.ts` - Create booking API
+- `apps/web/src/app/api/bookings/lookup/route.ts` - Lookup booking API
+- `apps/web/src/app/org/[slug]/booking/page.tsx` - Booking lookup page
+- `apps/web/src/components/booking-lookup.tsx` - Booking lookup form
 
 ### Phase 9: Optimization (0%)
 
