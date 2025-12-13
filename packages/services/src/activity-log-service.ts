@@ -1,8 +1,7 @@
-import { eq, and, desc, gte, lte, inArray, count, or } from "drizzle-orm";
+import { eq, and, desc, gte, lte, inArray, count } from "drizzle-orm";
 import {
   activityLogs,
   type ActivityLog,
-  type NewActivityLog,
   type ActivityAction,
   type ActivityEntity,
 } from "@tour/database";

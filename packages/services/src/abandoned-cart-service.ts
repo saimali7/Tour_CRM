@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, count, sql, lt, gt, or, ilike } from "drizzle-orm";
+import { eq, and, desc, asc, count, sql, lt, or, ilike } from "drizzle-orm";
 import {
   abandonedCarts,
   tours,

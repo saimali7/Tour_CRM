@@ -1,5 +1,5 @@
-import { eq, and, desc, asc, like, sql, count, ilike, or } from "drizzle-orm";
-import { tours, tourPricingTiers, tourVariants, type Tour, type NewTour, type TourStatus, type TourPricingTier, type NewTourPricingTier, type TourVariant, type NewTourVariant, type PriceModifierType } from "@tour/database";
+import { eq, and, desc, asc, sql, count, ilike, or } from "drizzle-orm";
+import { tours, tourPricingTiers, tourVariants, type Tour, type TourStatus, type TourPricingTier, type TourVariant, type PriceModifierType } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
   type PaginationOptions,
