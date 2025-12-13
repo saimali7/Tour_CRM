@@ -12,6 +12,7 @@ export type ActivityAction =
   | "booking.confirmed"
   | "booking.completed"
   | "booking.refunded"
+  | "booking.rescheduled"
   | "booking.participant_added"
   | "booking.participant_removed"
   | "booking.email_sent"

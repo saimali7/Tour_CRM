@@ -15,7 +15,10 @@ import {
   CreditCard,
   AlertCircle,
   UserMinus,
+  CalendarClock,
+  RotateCcw,
 } from "lucide-react";
+import { useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams, useRouter } from "next/navigation";
@@ -26,6 +29,13 @@ export default function BookingDetailPage() {
   const router = useRouter();
   const slug = params.slug as string;
   const bookingId = params.id as string;
+
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState<"customer_request" | "booking_cancelled" | "other">("customer_request");
+  const [refundNotes, setRefundNotes] = useState("");
 
   const { data: booking, isLoading, error } = trpc.booking.getById.useQuery({ id: bookingId });
 
@@ -65,6 +75,46 @@ export default function BookingDetailPage() {
     },
   });
 
+  const rescheduleMutation = trpc.booking.reschedule.useMutation({
+    onSuccess: () => {
+      utils.booking.getById.invalidate({ id: bookingId });
+      utils.booking.list.invalidate();
+      setShowRescheduleModal(false);
+      setSelectedScheduleId(null);
+    },
+  });
+
+  const createRefundMutation = trpc.refund.create.useMutation({
+    onSuccess: () => {
+      utils.booking.getById.invalidate({ id: bookingId });
+      utils.refund.getForBooking.invalidate({ bookingId });
+      setShowRefundModal(false);
+      setRefundAmount("");
+      setRefundNotes("");
+    },
+  });
+
+  // Query for available schedules (same tour)
+  const { data: availableSchedules } = trpc.schedule.list.useQuery(
+    {
+      filters: {
+        tourId: booking?.tour?.id,
+        status: "scheduled",
+        dateRange: {
+          from: new Date(),
+        },
+      },
+      pagination: { limit: 50 },
+    },
+    { enabled: showRescheduleModal && !!booking?.tour?.id }
+  );
+
+  // Query for existing refunds
+  const { data: refunds } = trpc.refund.getForBooking.useQuery(
+    { bookingId },
+    { enabled: !!booking && booking.status === "cancelled" }
+  );
+
   const handleConfirm = () => {
     if (confirm("Confirm this booking?")) {
       confirmMutation.mutate({ id: bookingId });
@@ -96,6 +146,26 @@ export default function BookingDetailPage() {
         id: bookingId,
         paymentStatus: "paid",
         paidAmount: booking?.total,
+      });
+    }
+  };
+
+  const handleReschedule = () => {
+    if (selectedScheduleId) {
+      rescheduleMutation.mutate({
+        id: bookingId,
+        newScheduleId: selectedScheduleId,
+      });
+    }
+  };
+
+  const handleCreateRefund = () => {
+    if (refundAmount && parseFloat(refundAmount) > 0) {
+      createRefundMutation.mutate({
+        bookingId,
+        amount: refundAmount,
+        reason: refundReason,
+        reasonDetails: refundNotes || undefined,
       });
     }
   };
@@ -246,13 +316,34 @@ export default function BookingDetailPage() {
             </>
           )}
           {(booking.status === "pending" || booking.status === "confirmed") && (
+            <>
+              <button
+                onClick={() => setShowRescheduleModal(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
+              >
+                <CalendarClock className="h-4 w-4" />
+                Reschedule
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={cancelMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </button>
+            </>
+          )}
+          {booking.status === "cancelled" && booking.paymentStatus === "paid" && (
             <button
-              onClick={handleCancel}
-              disabled={cancelMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              onClick={() => {
+                setRefundAmount(booking.total);
+                setShowRefundModal(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
             >
-              <X className="h-4 w-4" />
-              Cancel
+              <RotateCcw className="h-4 w-4" />
+              Issue Refund
             </button>
           )}
           <Link
@@ -564,6 +655,257 @@ export default function BookingDetailPage() {
         title="Activity History"
         limit={15}
       />
+
+      {/* Refunds Section (for cancelled bookings) */}
+      {booking.status === "cancelled" && refunds && refunds.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Refunds</h2>
+          <div className="space-y-3">
+            {refunds.map((refund) => (
+              <div
+                key={refund.id}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+              >
+                <div>
+                  <p className="font-medium text-gray-900">
+                    ${parseFloat(refund.amount).toFixed(2)}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {refund.reason.replace("_", " ")} •{" "}
+                    {new Intl.DateTimeFormat("en-US", {
+                      dateStyle: "medium",
+                    }).format(new Date(refund.createdAt))}
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    refund.status === "succeeded"
+                      ? "bg-green-100 text-green-800"
+                      : refund.status === "pending"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : refund.status === "processing"
+                      ? "bg-blue-100 text-blue-800"
+                      : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  {refund.status.charAt(0).toUpperCase() + refund.status.slice(1)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule Modal */}
+      {showRescheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Reschedule Booking</h2>
+              <button
+                onClick={() => {
+                  setShowRescheduleModal(false);
+                  setSelectedScheduleId(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-500 mb-4">
+                Select a new date and time for this booking. The booking will be moved
+                to the selected schedule.
+              </p>
+
+              {availableSchedules?.data && availableSchedules.data.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {availableSchedules.data
+                    .filter((schedule) => schedule.id !== booking.scheduleId)
+                    .map((schedule) => {
+                      const available = schedule.maxParticipants - (schedule.bookedCount || 0);
+                      const hasCapacity = available >= booking.totalParticipants;
+                      return (
+                        <label
+                          key={schedule.id}
+                          className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
+                            selectedScheduleId === schedule.id
+                              ? "border-primary bg-primary/5"
+                              : hasCapacity
+                              ? "border-gray-200 hover:border-gray-300"
+                              : "border-gray-200 opacity-50 cursor-not-allowed"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="schedule"
+                              value={schedule.id}
+                              checked={selectedScheduleId === schedule.id}
+                              onChange={(e) => setSelectedScheduleId(e.target.value)}
+                              disabled={!hasCapacity}
+                              className="text-primary focus:ring-primary"
+                            />
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {new Intl.DateTimeFormat("en-US", {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                }).format(new Date(schedule.startsAt))}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {new Intl.DateTimeFormat("en-US", {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                }).format(new Date(schedule.startsAt))}
+                              </p>
+                            </div>
+                          </div>
+                          <span
+                            className={`text-sm ${
+                              hasCapacity ? "text-gray-500" : "text-red-500"
+                            }`}
+                          >
+                            {hasCapacity
+                              ? `${available} spots left`
+                              : "Not enough spots"}
+                          </span>
+                        </label>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="text-center text-gray-500 py-8">
+                  No other available schedules for this tour
+                </p>
+              )}
+
+              {rescheduleMutation.error && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{rescheduleMutation.error.message}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t">
+              <button
+                onClick={() => {
+                  setShowRescheduleModal(false);
+                  setSelectedScheduleId(null);
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReschedule}
+                disabled={!selectedScheduleId || rescheduleMutation.isPending}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              >
+                {rescheduleMutation.isPending ? "Rescheduling..." : "Confirm Reschedule"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Refund Modal */}
+      {showRefundModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Issue Refund</h2>
+              <button
+                onClick={() => setShowRefundModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Refund Amount
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                    $
+                  </span>
+                  <input
+                    type="text"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    placeholder="0.00"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Max refund: ${parseFloat(booking.total).toFixed(2)}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reason
+                </label>
+                <select
+                  value={refundReason}
+                  onChange={(e) =>
+                    setRefundReason(
+                      e.target.value as "customer_request" | "booking_cancelled" | "other"
+                    )
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="customer_request">Customer Request</option>
+                  <option value="booking_cancelled">Booking Cancelled</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes (optional)
+                </label>
+                <textarea
+                  value={refundNotes}
+                  onChange={(e) => setRefundNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  placeholder="Additional details about this refund..."
+                />
+              </div>
+
+              {createRefundMutation.error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{createRefundMutation.error.message}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t">
+              <button
+                onClick={() => setShowRefundModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateRefund}
+                disabled={
+                  !refundAmount ||
+                  parseFloat(refundAmount) <= 0 ||
+                  parseFloat(refundAmount) > parseFloat(booking.total) ||
+                  createRefundMutation.isPending
+                }
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              >
+                {createRefundMutation.isPending ? "Processing..." : "Issue Refund"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { trpc } from "@/lib/trpc";
-import { Map, Plus, Edit, Trash2, Eye, Archive, Check } from "lucide-react";
+import { Map, Plus, Edit, Trash2, Eye, Archive, Check, Copy } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
@@ -40,6 +40,12 @@ export default function ToursPage() {
     },
   });
 
+  const duplicateMutation = trpc.tour.duplicate.useMutation({
+    onSuccess: () => {
+      utils.tour.list.invalidate();
+    },
+  });
+
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to delete this tour?")) {
       deleteMutation.mutate({ id });
@@ -52,6 +58,10 @@ export default function ToursPage() {
 
   const handlePublish = (id: string) => {
     publishMutation.mutate({ id });
+  };
+
+  const handleDuplicate = (id: string, name: string) => {
+    duplicateMutation.mutate({ id, newName: `${name} (Copy)` });
   };
 
   if (error) {
@@ -200,6 +210,14 @@ export default function ToursPage() {
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
+                        <button
+                          onClick={() => handleDuplicate(tour.id, tour.name)}
+                          className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
+                          title="Duplicate"
+                          disabled={duplicateMutation.isPending}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
                         {tour.status === "draft" && (
                           <button
                             onClick={() => handlePublish(tour.id)}

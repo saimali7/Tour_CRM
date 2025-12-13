@@ -112,21 +112,21 @@
 
 ---
 
-## Phase 1: Core Booking Engine 🔄 IN PROGRESS (92%)
+## Phase 1: Core Booking Engine 🔄 IN PROGRESS (97%)
 
 **Duration:** In Progress
 **Goal:** End-to-end booking flow with CRM operations
 
-### 1.1 Tour Management ✅ MOSTLY COMPLETE (90%)
+### 1.1 Tour Management ✅ COMPLETE (98%)
 
 | Feature | Schema | Service | Router | UI | Overall |
 |---------|--------|---------|--------|-----|---------|
-| Tour CRUD | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 60% | 90% |
+| Tour CRUD | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
 | Tour status (draft/active/archived) | ✅ | ✅ | ✅ | ✅ | 100% |
-| Tour duplication | ✅ | ✅ | ✅ | ❌ | 50% |
+| Tour duplication | ✅ | ✅ | ✅ | ✅ | 100% |
 | Tour Variants | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 90% | 97% |
 | Pricing Tiers | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% | 100% |
-| Media Management | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 80% | 90% |
+| Media Management | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
 
 **Completed:**
 - [x] `tours` table with all required fields
@@ -143,11 +143,18 @@
 - [x] Upload API route with file validation
 - [x] Image uploader components (single & multi)
 
+**Completed (Session 4):**
+- [x] Tour form: category selector with presets + custom option
+- [x] Tour form: tags input with add/remove
+- [x] Tour form: cover image upload integration
+- [x] Tour form: gallery images upload integration
+- [x] Tour form: requirements field
+- [x] Tour form: SEO meta fields (title, description)
+- [x] Tour duplication button in list UI
+
 **Gaps (Lower Priority):**
-- [ ] Tour form missing: category selector, tags, meta fields, rich text editor
-- [ ] Cover image selection UI integration
-- [ ] Gallery management UI integration
 - [ ] Tour preview (customer view)
+- [ ] Rich text editor for descriptions
 - [ ] Full availability pattern for variants (recurring/specific dates)
 
 ### 1.2 Schedule Management ✅ MOSTLY COMPLETE (90%)
@@ -191,17 +198,17 @@
 
 > Deferred to Phase 7 (Web App). CRM handles admin bookings only.
 
-### 1.4 Admin Booking Management ✅ MOSTLY COMPLETE (90%)
+### 1.4 Admin Booking Management ✅ COMPLETE (98%)
 
 | Feature | Schema | Service | Router | UI | Overall |
 |---------|--------|---------|--------|-----|---------|
-| Booking List | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 90% | 95% |
-| Booking Detail View | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 85% | 90% |
-| Manual Booking Creation | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 85% | 90% |
-| Booking Modification | ✅ 100% | ✅ 85% | ✅ 85% | ⚠️ 75% | 85% |
-| Booking Cancellation | ✅ 100% | ✅ 90% | ✅ 90% | ⚠️ 85% | 90% |
-| Activity Log / Audit Trail | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-| Refund Processing | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 80% | 90% |
+| Booking List | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
+| Booking Detail View | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
+| Manual Booking Creation | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 90% | 95% |
+| Booking Modification | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
+| Booking Cancellation | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
+| Activity Log / Audit Trail | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 98% | 99% |
+| Refund Processing | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
 | Email Notifications | ✅ 100% | ✅ 100% | ✅ 100% | - | 95% |
 
 **Completed:**
@@ -228,9 +235,16 @@
 - [x] Event triggers in booking router (confirm/cancel emit events)
 - [x] Activity log component integrated in booking detail page
 
+**Completed (Session 4):**
+- [x] Booking reschedule functionality with availability check
+- [x] Reschedule service method with capacity management
+- [x] Reschedule router endpoint with activity logging
+- [x] Reschedule UI modal in booking detail page
+- [x] Refund UI modal in booking detail page
+- [x] Refunds list display for cancelled bookings
+
 **Gaps (Lower Priority):**
 - [ ] Payment handling options in create form
-- [ ] Date/time change with availability check (UI)
 
 ### 1.5 Customer Self-Service ⏳ DEFERRED (0%)
 

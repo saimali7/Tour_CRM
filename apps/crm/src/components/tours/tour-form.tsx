@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
-import { Loader2 } from "lucide-react";
+import { Loader2, X, Plus } from "lucide-react";
+import { SingleImageUploader, ImageUploader } from "@/components/uploads/image-uploader";
 
 interface TourFormData {
   name: string;
@@ -14,12 +15,19 @@ interface TourFormData {
   minParticipants: number;
   maxParticipants: number;
   basePrice: string;
+  category: string;
+  tags: string[];
+  coverImageUrl: string | null;
+  images: string[];
   includes: string[];
   excludes: string[];
+  requirements: string[];
   meetingPoint: string;
   meetingPointDetails: string;
   cancellationPolicy: string;
   cancellationHours: number;
+  metaTitle: string;
+  metaDescription: string;
 }
 
 interface TourFormProps {
@@ -33,14 +41,36 @@ interface TourFormProps {
     minParticipants: number | null;
     maxParticipants: number;
     basePrice: string;
+    category: string | null;
+    tags: string[] | null;
+    coverImageUrl: string | null;
+    images: string[] | null;
     includes: string[] | null;
     excludes: string[] | null;
+    requirements: string[] | null;
     meetingPoint: string | null;
     meetingPointDetails: string | null;
     cancellationPolicy: string | null;
     cancellationHours: number | null;
+    metaTitle: string | null;
+    metaDescription: string | null;
   };
 }
+
+const COMMON_CATEGORIES = [
+  "Walking Tours",
+  "Food & Wine",
+  "Adventure",
+  "Cultural",
+  "Historical",
+  "Nature",
+  "City Tours",
+  "Day Trips",
+  "Water Activities",
+  "Photography",
+  "Private Tours",
+  "Group Tours",
+];
 
 export function TourForm({ tour }: TourFormProps) {
   const router = useRouter();
@@ -57,16 +87,28 @@ export function TourForm({ tour }: TourFormProps) {
     minParticipants: tour?.minParticipants ?? 1,
     maxParticipants: tour?.maxParticipants ?? 10,
     basePrice: tour?.basePrice ?? "0.00",
+    category: tour?.category ?? "",
+    tags: tour?.tags ?? [],
+    coverImageUrl: tour?.coverImageUrl ?? null,
+    images: tour?.images ?? [],
     includes: tour?.includes ?? [],
     excludes: tour?.excludes ?? [],
+    requirements: tour?.requirements ?? [],
     meetingPoint: tour?.meetingPoint ?? "",
     meetingPointDetails: tour?.meetingPointDetails ?? "",
     cancellationPolicy: tour?.cancellationPolicy ?? "",
     cancellationHours: tour?.cancellationHours ?? 24,
+    metaTitle: tour?.metaTitle ?? "",
+    metaDescription: tour?.metaDescription ?? "",
   });
 
   const [includeInput, setIncludeInput] = useState("");
   const [excludeInput, setExcludeInput] = useState("");
+  const [requirementInput, setRequirementInput] = useState("");
+  const [tagInput, setTagInput] = useState("");
+  const [showCustomCategory, setShowCustomCategory] = useState(
+    !!(tour?.category && !COMMON_CATEGORIES.includes(tour.category))
+  );
 
   const utils = trpc.useUtils();
 
@@ -100,12 +142,19 @@ export function TourForm({ tour }: TourFormProps) {
       minParticipants: formData.minParticipants,
       maxParticipants: formData.maxParticipants,
       basePrice: formData.basePrice,
+      category: formData.category || undefined,
+      tags: formData.tags.length > 0 ? formData.tags : undefined,
+      coverImageUrl: formData.coverImageUrl || undefined,
+      images: formData.images.length > 0 ? formData.images : undefined,
       includes: formData.includes.length > 0 ? formData.includes : undefined,
       excludes: formData.excludes.length > 0 ? formData.excludes : undefined,
+      requirements: formData.requirements.length > 0 ? formData.requirements : undefined,
       meetingPoint: formData.meetingPoint || undefined,
       meetingPointDetails: formData.meetingPointDetails || undefined,
       cancellationPolicy: formData.cancellationPolicy || undefined,
       cancellationHours: formData.cancellationHours,
+      metaTitle: formData.metaTitle || undefined,
+      metaDescription: formData.metaDescription || undefined,
     };
 
     if (isEditing && tour) {
@@ -131,7 +180,7 @@ export function TourForm({ tour }: TourFormProps) {
   };
 
   const addToList = (
-    field: "includes" | "excludes",
+    field: "includes" | "excludes" | "requirements" | "tags",
     value: string,
     setValue: (v: string) => void
   ) => {
@@ -145,7 +194,7 @@ export function TourForm({ tour }: TourFormProps) {
   };
 
   const removeFromList = (
-    field: "includes" | "excludes",
+    field: "includes" | "excludes" | "requirements" | "tags",
     index: number
   ) => {
     setFormData((prev) => ({
@@ -212,6 +261,9 @@ export function TourForm({ tour }: TourFormProps) {
             placeholder="A brief description for listings (max 160 chars)"
             maxLength={160}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.shortDescription.length}/160 characters
+          </p>
         </div>
 
         <div>
@@ -227,6 +279,135 @@ export function TourForm({ tour }: TourFormProps) {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="Detailed description of the tour..."
           />
+        </div>
+
+        {/* Category */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Category
+          </label>
+          {showCustomCategory ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, category: e.target.value }))
+                }
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                placeholder="Enter custom category"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCustomCategory(false);
+                  setFormData((prev) => ({ ...prev, category: "" }));
+                }}
+                className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Use preset
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <select
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, category: e.target.value }))
+                }
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Select a category</option>
+                {COMMON_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowCustomCategory(true)}
+                className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg whitespace-nowrap"
+              >
+                Custom
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Tags */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tags
+          </label>
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addToList("tags", tagInput, setTagInput);
+                }
+              }}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              placeholder="Add tag (e.g., family-friendly, sunset, romantic)"
+            />
+            <button
+              type="button"
+              onClick={() => addToList("tags", tagInput, setTagInput)}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+          {formData.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {formData.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => removeFromList("tags", index)}
+                    className="hover:text-blue-900"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Images */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+        <h2 className="text-lg font-semibold text-gray-900">Images</h2>
+
+        <SingleImageUploader
+          value={formData.coverImageUrl}
+          onChange={(url) => setFormData((prev) => ({ ...prev, coverImageUrl: url }))}
+          label="Cover Image"
+          folder="tours/covers"
+        />
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Gallery Images
+          </label>
+          <ImageUploader
+            value={formData.images}
+            onChange={(urls) => setFormData((prev) => ({ ...prev, images: urls }))}
+            maxFiles={10}
+            folder="tours/gallery"
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            The first image will be used as the cover if no cover image is set
+          </p>
         </div>
       </div>
 
@@ -312,8 +493,8 @@ export function TourForm({ tour }: TourFormProps) {
         </div>
       </div>
 
-      {/* Inclusions & Exclusions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Inclusions, Exclusions & Requirements */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">What&apos;s Included</h2>
 
@@ -334,9 +515,9 @@ export function TourForm({ tour }: TourFormProps) {
             <button
               type="button"
               onClick={() => addToList("includes", includeInput, setIncludeInput)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
             >
-              Add
+              <Plus className="h-4 w-4" />
             </button>
           </div>
 
@@ -351,9 +532,9 @@ export function TourForm({ tour }: TourFormProps) {
                   <button
                     type="button"
                     onClick={() => removeFromList("includes", index)}
-                    className="text-red-500 hover:text-red-700 text-sm"
+                    className="text-red-500 hover:text-red-700"
                   >
-                    Remove
+                    <X className="h-4 w-4" />
                   </button>
                 </li>
               ))}
@@ -362,7 +543,7 @@ export function TourForm({ tour }: TourFormProps) {
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">What&apos;s Not Included</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Not Included</h2>
 
           <div className="flex gap-2">
             <input
@@ -381,9 +562,9 @@ export function TourForm({ tour }: TourFormProps) {
             <button
               type="button"
               onClick={() => addToList("excludes", excludeInput, setExcludeInput)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
             >
-              Add
+              <Plus className="h-4 w-4" />
             </button>
           </div>
 
@@ -398,9 +579,56 @@ export function TourForm({ tour }: TourFormProps) {
                   <button
                     type="button"
                     onClick={() => removeFromList("excludes", index)}
-                    className="text-red-500 hover:text-red-700 text-sm"
+                    className="text-red-500 hover:text-red-700"
                   >
-                    Remove
+                    <X className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">Requirements</h2>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={requirementInput}
+              onChange={(e) => setRequirementInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addToList("requirements", requirementInput, setRequirementInput);
+                }
+              }}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              placeholder="e.g., Comfortable walking shoes"
+            />
+            <button
+              type="button"
+              onClick={() => addToList("requirements", requirementInput, setRequirementInput)}
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          {formData.requirements.length > 0 && (
+            <ul className="space-y-2">
+              {formData.requirements.map((item, index) => (
+                <li
+                  key={index}
+                  className="flex items-center justify-between px-3 py-2 bg-yellow-50 rounded-lg"
+                >
+                  <span className="text-sm text-yellow-700">{item}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFromList("requirements", index)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <X className="h-4 w-4" />
                   </button>
                 </li>
               ))}
@@ -492,6 +720,49 @@ export function TourForm({ tour }: TourFormProps) {
               placeholder="Describe your cancellation policy..."
             />
           </div>
+        </div>
+      </div>
+
+      {/* SEO Settings */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+        <h2 className="text-lg font-semibold text-gray-900">SEO Settings</h2>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Meta Title
+          </label>
+          <input
+            type="text"
+            value={formData.metaTitle}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, metaTitle: e.target.value }))
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            placeholder="Leave blank to use tour name"
+            maxLength={60}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.metaTitle.length}/60 characters
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Meta Description
+          </label>
+          <textarea
+            value={formData.metaDescription}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, metaDescription: e.target.value }))
+            }
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            placeholder="Leave blank to use short description"
+            maxLength={160}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.metaDescription.length}/160 characters
+          </p>
         </div>
       </div>
 
