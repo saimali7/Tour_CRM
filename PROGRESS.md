@@ -1,391 +1,549 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** December 12, 2025
-**Current Focus:** Phase 1 CRM Core Completion
-**Overall Status:** Phase 0 Complete, Phase 1 In Progress (~92%)
+**Last Updated:** December 13, 2025
+**Status:** Parallel Development Mode
+**Main Branch:** `main`
 
-> This document is the single source of truth for implementation progress. Keep it updated as features are completed.
-
----
-
-## Quick Status Overview
-
-| Phase | Name | Status | Completion | Notes |
-|-------|------|--------|------------|-------|
-| **0** | Foundation | ✅ COMPLETE | 98% | Monorepo, DB, Auth, CI/CD, Sentry |
-| **1** | Core Booking Engine | 🔄 IN PROGRESS | 92% | Tours, Schedules, Bookings, Settings, Inngest |
-| **2** | Customer & Communications | ⏳ NOT STARTED | 0% | CRM features, email/SMS automation |
-| **3** | Guide Operations | ⏳ NOT STARTED | 0% | Guide management, manifests |
-| **4** | Pricing & Promotions | ⏳ NOT STARTED | 0% | Seasonal pricing, promo codes |
-| **5** | Reporting & Analytics | ⏳ NOT STARTED | 0% | Dashboards, reports |
-| **6** | Polish & Optimization | ⏳ NOT STARTED | 0% | Performance, UX, testing |
-| **7-11** | Web App & SaaS | ⏳ FUTURE | 0% | After CRM complete |
+> This document is the single source of truth for implementation progress. It supports **parallel development** across multiple workstreams using git worktrees.
 
 ---
 
-## Phase 0: Foundation ✅ COMPLETE (98%)
+## Parallel Development Overview
 
-**Duration:** Completed
-**Goal:** Deployable skeleton with multi-tenant infrastructure
-
-### 0.1 Monorepo Setup ✅ COMPLETE (100%)
-
-| Item | Status | Evidence |
-|------|--------|----------|
-| Turborepo + pnpm workspaces | ✅ | `turbo.json`, `pnpm-workspace.yaml` |
-| Next.js 15 apps (CRM + Web) | ✅ | `apps/crm`, `apps/web` |
-| @tour/database package | ✅ | Drizzle ORM, all schemas |
-| @tour/services package | ✅ | Business logic layer |
-| @tour/ui package | ✅ | Shared components |
-| @tour/validators package | ✅ | Zod schemas |
-| @tour/config package | ✅ | Tailwind config |
-| TypeScript strict mode | ✅ | `packages/typescript-config/base.json` |
-| Tailwind CSS + shadcn/ui | ✅ | Configured in all apps |
-| ESLint + Prettier | ✅ | Shared configs in `packages/eslint-config` |
-| tRPC setup | ✅ | 8 routers, multiple procedure types |
-
-### 0.2 Database Setup ✅ COMPLETE (100%)
-
-| Item | Status | Evidence |
-|------|--------|----------|
-| Drizzle ORM configuration | ✅ | `packages/database/drizzle.config.ts` |
-| Organizations table (tenant root) | ✅ | Full schema with all fields |
-| All tables have organization_id | ✅ | tours, bookings, customers, schedules, guides |
-| Unique constraints per org | ✅ | slug, email unique within org |
-| Seed data scripts | ✅ | `packages/database/src/seed/` |
-| RLS policies | ⚠️ | Optional - not implemented (defense-in-depth) |
-
-**Tables Implemented:**
-- `organizations` - Tenant root with settings, Stripe, plans
-- `users` - Platform users (Clerk sync)
-- `organization_members` - User-org relationships with roles
-- `tours` - Tour products
-- `tour_pricing_tiers` - Pricing tiers (Adult, Child, etc.)
-- `tour_variants` - Tour variants (Morning, Private, etc.)
-- `schedules` - Specific tour instances
-- `bookings` - Customer reservations
-- `booking_participants` - Individual participant details
-- `customers` - Customer records per org
-- `guides` - Tour guide profiles
-
-### 0.3 Authentication & Multi-Tenancy ✅ COMPLETE (100%)
-
-| Item | Status | Evidence |
-|------|--------|----------|
-| Clerk integration | ✅ | `@clerk/nextjs` v6.36.2 |
-| Organization context URL | ✅ | `/org/[slug]/...` pattern |
-| Sign in / Sign up flows | ✅ | Clerk-hosted pages |
-| Protected route middleware | ✅ | `apps/crm/src/middleware.ts` |
-| Role-based access (RBAC) | ✅ | Owner, Admin, Manager, Support, Guide |
-| Permission system | ✅ | `apps/crm/src/lib/auth.ts` with wildcards |
-| Clerk webhooks (user sync) | ✅ | `apps/crm/src/app/api/webhooks/clerk/` |
-| Organization onboarding flow | ✅ | First-time setup wizard |
-| Team management UI | ✅ | Invite, roles, remove members |
-
-**Roles Implemented:**
-- **Owner** - Full access including billing (`["*"]`)
-- **Admin** - Full operational access
-- **Manager** - Bookings, schedules, customers, guides
-- **Support** - View/modify bookings and customers
-- **Guide** - Own schedules and assigned bookings only
-
-### 0.4 CI/CD Pipeline ✅ COMPLETE (95%)
-
-| Item | Status | Evidence |
-|------|--------|----------|
-| GitHub Actions workflow | ✅ | `.github/workflows/ci.yml` |
-| Lint job | ✅ | ESLint runs on all packages |
-| Type check job | ✅ | TypeScript checking |
-| Test job | ✅ | Vitest configured |
-| Build job | ✅ | Full build with env vars |
-| Preview deployments | ⚠️ | Not configured (optional) |
-
-### 0.5 Monitoring & Error Tracking ✅ COMPLETE (95%)
-
-| Item | Status | Evidence |
-|------|--------|----------|
-| Sentry integration | ✅ | Server, client, edge configs |
-| Error tracking | ✅ | Auto-capture in instrumentation |
-| Performance monitoring | ✅ | Trace sampling configured |
-| Source maps | ✅ | Uploaded, deleted after |
-| Basic logging | ✅ | Console logging throughout |
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         PARALLEL WORKSTREAMS                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   FOUNDATION (Phase 0+1) ✅ COMPLETE - All workstreams can start            │
+│   ════════════════════════════════════════════════════════════              │
+│                                                                              │
+│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
+│   │ WORKSTREAM A │  │ WORKSTREAM B │  │ WORKSTREAM C │  │ WORKSTREAM D │   │
+│   │   Web App    │  │  Customers   │  │    Guides    │  │   Pricing    │   │
+│   │  (Phase 7-9) │  │  (Phase 2)   │  │  (Phase 3)   │  │  (Phase 4)   │   │
+│   │              │  │              │  │              │  │              │   │
+│   │ apps/web     │  │ CRM features │  │ CRM features │  │ CRM features │   │
+│   └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘   │
+│          │                 │                 │                 │            │
+│          └─────────────────┴─────────────────┴─────────────────┘            │
+│                                      │                                       │
+│                              ┌───────▼───────┐                              │
+│                              │ WORKSTREAM E  │                              │
+│                              │   Reporting   │                              │
+│                              │  (Phase 5)    │                              │
+│                              └───────┬───────┘                              │
+│                                      │                                       │
+│                              ┌───────▼───────┐                              │
+│                              │ WORKSTREAM F  │                              │
+│                              │    Polish     │                              │
+│                              │  (Phase 6)    │                              │
+│                              └───────────────┘                              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Phase 1: Core Booking Engine 🔄 IN PROGRESS (97%)
+## Quick Status Dashboard
 
-**Duration:** In Progress
-**Goal:** End-to-end booking flow with CRM operations
+| Workstream | Phase(s) | Status | Branch | Owner | Completion |
+|------------|----------|--------|--------|-------|------------|
+| **Foundation** | 0, 1 | ✅ COMPLETE | `main` | - | 97% |
+| **A: Web App** | 7, 8, 9 | 🟡 READY | `feature/web-app` | *Unassigned* | 0% |
+| **B: Customers & Comms** | 2 | 🟡 READY | `feature/phase-2-customers` | *Unassigned* | 0% |
+| **C: Guide Operations** | 3 | 🟡 READY | `feature/phase-3-guides` | *Unassigned* | 0% |
+| **D: Pricing & Promos** | 4 | 🟡 READY | `feature/phase-4-pricing` | *Unassigned* | 0% |
+| **E: Reporting** | 5 | 🟡 READY | `feature/phase-5-reporting` | *Unassigned* | 0% |
+| **F: Polish** | 6 | ⏳ BLOCKED | `feature/phase-6-polish` | *Unassigned* | 0% |
+| **G: SaaS Platform** | 10, 11 | 🟡 READY | `feature/saas-platform` | *Unassigned* | 0% |
 
-### 1.1 Tour Management ✅ COMPLETE (98%)
+**Legend:** ✅ Complete | 🔄 In Progress | 🟡 Ready to Start | ⏳ Blocked
 
-| Feature | Schema | Service | Router | UI | Overall |
-|---------|--------|---------|--------|-----|---------|
-| Tour CRUD | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-| Tour status (draft/active/archived) | ✅ | ✅ | ✅ | ✅ | 100% |
-| Tour duplication | ✅ | ✅ | ✅ | ✅ | 100% |
-| Tour Variants | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 90% | 97% |
-| Pricing Tiers | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% | 100% |
-| Media Management | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
+---
 
-**Completed:**
-- [x] `tours` table with all required fields
-- [x] Tour CRUD operations in service layer
-- [x] tRPC endpoints for all tour operations
-- [x] Tour list page with filters, search, pagination
-- [x] Tour create/edit forms (basic fields)
-- [x] Tour variants table, service, router, UI
-- [x] Pricing tiers table, service, router, UI
-- [x] Publish/unpublish/archive workflows
+## Git Worktree Strategy
 
-**Completed (Session 3):**
-- [x] Storage service for Supabase Storage uploads
-- [x] Upload API route with file validation
-- [x] Image uploader components (single & multi)
+### Setup Instructions
 
-**Completed (Session 4):**
-- [x] Tour form: category selector with presets + custom option
-- [x] Tour form: tags input with add/remove
-- [x] Tour form: cover image upload integration
-- [x] Tour form: gallery images upload integration
-- [x] Tour form: requirements field
-- [x] Tour form: SEO meta fields (title, description)
-- [x] Tour duplication button in list UI
+Each workstream operates in its own git worktree for true parallel development:
 
-**Gaps (Lower Priority):**
+```bash
+# From the main repository root, create worktrees for each workstream:
+
+# Workstream A: Web App
+git worktree add ../tour-web-app -b feature/web-app
+
+# Workstream B: Customers & Communications
+git worktree add ../tour-customers -b feature/phase-2-customers
+
+# Workstream C: Guide Operations
+git worktree add ../tour-guides -b feature/phase-3-guides
+
+# Workstream D: Pricing & Promotions
+git worktree add ../tour-pricing -b feature/phase-4-pricing
+
+# Workstream E: Reporting
+git worktree add ../tour-reporting -b feature/phase-5-reporting
+
+# Workstream G: SaaS Platform
+git worktree add ../tour-saas -b feature/saas-platform
+```
+
+### Worktree Rules
+
+1. **Each worktree = one workstream** - No cross-workstream changes
+2. **Sync with main regularly** - `git pull origin main` before starting work
+3. **Small, focused PRs** - Easier to review and merge
+4. **Database migrations** - Coordinate via Slack/Discord before creating migrations
+5. **Shared packages** - Changes to `@tour/*` packages need team review
+
+### Merge Strategy
+
+```
+feature/web-app ────────┐
+feature/phase-2 ────────┼──► main (via PR review)
+feature/phase-3 ────────┤
+feature/phase-4 ────────┘
+```
+
+- All PRs require review before merging to `main`
+- Run `pnpm typecheck && pnpm lint && pnpm build` before PR
+- Resolve conflicts with `main` before requesting review
+
+---
+
+## Workstream Dependencies
+
+```
+Phase 0 (Foundation) ✅
+    │
+    └──► Phase 1 (Core Booking) ✅
+            │
+            ├──► Workstream A: Web App (Phase 7-9) 🟡
+            │
+            ├──► Workstream B: Customers (Phase 2) 🟡
+            │
+            ├──► Workstream C: Guides (Phase 3) 🟡
+            │
+            ├──► Workstream D: Pricing (Phase 4) 🟡
+            │
+            └──► Workstream E: Reporting (Phase 5) 🟡
+                    │
+                    └──► Workstream F: Polish (Phase 6) ⏳
+                            │
+                            └──► Workstream G: SaaS (Phase 10-11) 🟡*
+
+* SaaS can start basic infrastructure now, but full features need CRM complete
+```
+
+---
+
+## Foundation (Phase 0 + 1) ✅ COMPLETE
+
+**This is the shared foundation all workstreams depend on.**
+
+### What's Available for All Workstreams
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| **Database Schema** | `packages/database/src/schema/` | ✅ |
+| Organizations | `organizations.ts` | ✅ |
+| Users | `users.ts` | ✅ |
+| Tours | `tours.ts` | ✅ |
+| Schedules | `schedules.ts` | ✅ |
+| Bookings | `bookings.ts` | ✅ |
+| Customers | `customers.ts` | ✅ |
+| Guides | `guides.ts` | ✅ |
+| Activity Logs | `activity-logs.ts` | ✅ |
+| Refunds | `refunds.ts` | ✅ |
+| **Services** | `packages/services/src/` | ✅ |
+| TourService | `tour-service.ts` | ✅ |
+| ScheduleService | `schedule-service.ts` | ✅ |
+| BookingService | `booking-service.ts` | ✅ |
+| CustomerService | `customer-service.ts` | ✅ |
+| GuideService | `guide-service.ts` | ✅ |
+| OrganizationService | `organization-service.ts` | ✅ |
+| ActivityLogService | `activity-log-service.ts` | ✅ |
+| RefundService | `refund-service.ts` | ✅ |
+| StorageService | `storage-service.ts` | ✅ |
+| **Infrastructure** | | ✅ |
+| Clerk Auth | Multi-tenant with orgs | ✅ |
+| tRPC | Type-safe API | ✅ |
+| Inngest | Background jobs | ✅ |
+| Resend | Email service | ✅ |
+| Stripe | Payments & Connect | ✅ |
+| Supabase Storage | File uploads | ✅ |
+
+### Phase 1 Minor Gaps (Non-Blocking)
+
+These can be completed by any workstream or deferred:
+
+- [ ] Rich text editor for tour descriptions
 - [ ] Tour preview (customer view)
-- [ ] Rich text editor for descriptions
-- [ ] Full availability pattern for variants (recurring/specific dates)
-
-### 1.2 Schedule Management ✅ MOSTLY COMPLETE (90%)
-
-| Feature | Schema | Service | Router | UI | Overall |
-|---------|--------|---------|--------|-----|---------|
-| Manual Schedule Creation | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 90% | 95% |
-| Automatic Generation | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 80% | 90% |
-| Calendar View | - | - | - | ✅ 90% | 90% |
-| Status Management | ✅ 100% | ✅ 90% | ✅ 90% | ✅ 85% | 90% |
-| Capacity Management | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-
-**Completed:**
-- [x] `schedules` table with all required fields
-- [x] Schedule CRUD operations
-- [x] Bulk create for multiple dates
-- [x] Schedule list view with filters
-- [x] Schedule form (create/edit)
-- [x] Capacity tracking (bookedCount, maxParticipants)
-- [x] `checkAvailability()` service method
-- [x] Cancel schedule functionality
-- [x] **Calendar view component** (month/week/day/agenda) with react-big-calendar
-- [x] **Auto-generate schedules** from recurring patterns (days of week, times, date range)
-- [x] **Preview auto-generate** before creating
-- [x] **Auto-close when full** (`checkAndUpdateCapacityStatus()` method)
-- [x] **Booking window validation** (minimum notice, maximum advance, same-day cutoff)
-- [x] Status-based color coding in calendar view
-- [x] View toggle (List/Calendar) with URL persistence
-
-**Completed (Session 3):**
-- [x] Visual capacity progress bars in schedule list view
-- [x] Visual capacity progress bars in calendar view
-- [x] Color-coded capacity status (green/yellow/red)
-
-**Gaps (Lower Priority):**
-- [ ] Auto-reopen when cancellation frees space (service method exists)
+- [ ] Drag-and-drop calendar editing
 - [ ] Guide conflict warnings
-- [ ] Drag-and-drop schedule editing in calendar
-
-### 1.3 Public Booking Flow ⏳ DEFERRED (0%)
-
-> Deferred to Phase 7 (Web App). CRM handles admin bookings only.
-
-### 1.4 Admin Booking Management ✅ COMPLETE (98%)
-
-| Feature | Schema | Service | Router | UI | Overall |
-|---------|--------|---------|--------|-----|---------|
-| Booking List | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-| Booking Detail View | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-| Manual Booking Creation | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 90% | 95% |
-| Booking Modification | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-| Booking Cancellation | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-| Activity Log / Audit Trail | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 98% | 99% |
-| Refund Processing | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-| Email Notifications | ✅ 100% | ✅ 100% | ✅ 100% | - | 95% |
-
-**Completed:**
-- [x] `bookings` table with full schema
-- [x] `booking_participants` table
-- [x] Booking list with search, filters, pagination
-- [x] Booking detail view with all info
-- [x] Manual booking creation form
-- [x] Status management (confirm, cancel, complete, no_show)
-- [x] Capacity updates on booking changes
-- [x] Source tracking (manual, website, api)
-- [x] **Activity Log / Audit Trail** - `activity_logs` table, service, router, UI component
-- [x] **Stripe Refund Processing** - `refunds` table, service, router with Stripe API integration
-- [x] **Email Templates** - @tour/emails package with React Email templates
-- [x] **Email Service** - Resend integration for transactional emails
-- [x] Booking confirmation email template
-- [x] Booking cancellation email template
-- [x] Booking reminder email template
-
-**Completed (Session 3):**
-- [x] Inngest client and event system setup
-- [x] Inngest background job functions for email notifications
-- [x] Inngest API route handler
-- [x] Event triggers in booking router (confirm/cancel emit events)
-- [x] Activity log component integrated in booking detail page
-
-**Completed (Session 4):**
-- [x] Booking reschedule functionality with availability check
-- [x] Reschedule service method with capacity management
-- [x] Reschedule router endpoint with activity logging
-- [x] Reschedule UI modal in booking detail page
-- [x] Refund UI modal in booking detail page
-- [x] Refunds list display for cancelled bookings
-
-**Gaps (Lower Priority):**
-- [ ] Payment handling options in create form
-
-### 1.5 Customer Self-Service ⏳ DEFERRED (0%)
-
-> Deferred to Phase 7 (Web App). Customers use CRM admin interface.
-
-### 1.6 Settings ✅ MOSTLY COMPLETE (95%)
-
-| Feature | Schema | Service | Router | UI | Overall |
-|---------|--------|---------|--------|-----|---------|
-| Business Settings | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% | 100% |
-| Booking Settings | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 98% |
-| Payment Settings | ✅ 100% | ✅ 100% | ✅ 100% | ⚠️ 85% | 90% |
-| Tax Configuration | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 100% | 100% |
-| Team Management | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 95% |
-| Notification Settings | ⚠️ 70% | ⚠️ 70% | ⚠️ 70% | ⚠️ 60% | 65% |
-| Branding Settings | ✅ 100% | ✅ 100% | ✅ 100% | ✅ 95% | 95% |
-
-**Completed:**
-- [x] Business profile (name, contact, address, timezone)
-- [x] Stripe Connect onboarding flow
-- [x] Stripe Connect status display
-- [x] Stripe Dashboard link
-- [x] Disconnect Stripe option
-- [x] Tax configuration with preview
-- [x] Team invite, roles, remove
-- [x] Branding (logo URL, primary color)
-- [x] Basic notification toggles
-- [x] **Booking Window Settings** - Schema with `BookingWindowSettings` interface
-- [x] **Minimum notice hours** - Service method validates booking times
-- [x] **Maximum advance days** - Configurable per organization
-- [x] **Same-day booking** - Toggle with cutoff time support
-
-**Completed (Session 3):**
-- [x] Booking window settings UI form (min notice hours, max advance days, same-day toggle, cutoff time)
-
-**Gaps (Lower Priority):**
-- [ ] Terms URL field
-- [ ] Apple Pay / Google Pay toggles
-- [ ] Email/SMS template management UI
+- [ ] Auto-reopen schedule when cancellation frees space
 
 ---
 
-## Phase 1 Critical Path to Completion
+## Workstream A: Web App (Phase 7-9)
 
-### P0 - Critical ✅ ALL COMPLETE
+**Branch:** `feature/web-app`
+**App:** `apps/web`
+**Owner:** *Unassigned*
+**Status:** 🟡 READY TO START
 
-| Task | Current | Target | Status |
-|------|---------|--------|--------|
-| Schedule Calendar View | 90% | 80% | ✅ COMPLETE |
-| Activity Log / Audit Trail | 95% | 80% | ✅ COMPLETE |
-| Stripe Refund Processing | 90% | 80% | ✅ COMPLETE |
-| Email Notifications (confirm/cancel) | 85% | 80% | ✅ COMPLETE |
+### Prerequisites ✅
+- [x] Tours service available
+- [x] Schedules service available
+- [x] Bookings service available
+- [x] Stripe payment integration
+- [x] Organization multi-tenancy
 
-### P1 - High ✅ ALL COMPLETE
+### Phase 7: Web App Foundation (0%)
 
-| Task | Current | Target | Status |
-|------|---------|--------|--------|
-| Auto-Schedule Generation | 90% | 80% | ✅ COMPLETE |
-| Tour Media Upload | 90% | 80% | ✅ COMPLETE |
-| Booking Date/Time Modification | 85% | 90% | ⚠️ IN PROGRESS |
-| Status Auto-Close When Full | 90% | 100% | ✅ COMPLETE |
-| Inngest Email Integration | 95% | 80% | ✅ COMPLETE |
+| Task | Status | Notes |
+|------|--------|-------|
+| Subdomain routing middleware | ⬜ | `{slug}.book.platform.com` |
+| Organization context from subdomain | ⬜ | |
+| Basic layout (header, footer) | ⬜ | |
+| Organization branding (logo, colors) | ⬜ | |
+| SEO foundation (meta, sitemap, robots) | ⬜ | |
+| Structured data (Schema.org) | ⬜ | |
+| Tour listing page | ⬜ | |
+| Tour detail page | ⬜ | |
+| Availability display | ⬜ | |
 
-### P2 - Medium ✅ MOSTLY COMPLETE
+### Phase 8: Booking Flow (0%)
 
-| Task | Current | Target | Status |
-|------|---------|--------|--------|
-| Tour Form Completeness | 60% | 90% | ⏳ PENDING |
-| Booking Settings UI (window, notice) | 95% | 90% | ✅ COMPLETE |
-| Visual Capacity Indicators | 95% | 90% | ✅ COMPLETE |
-| Activity Log in Booking Page | 95% | 90% | ✅ COMPLETE |
+| Task | Status | Notes |
+|------|--------|-------|
+| Booking form (multi-step) | ⬜ | |
+| Ticket selection | ⬜ | |
+| Customer details form | ⬜ | |
+| Stripe checkout integration | ⬜ | |
+| Booking confirmation page | ⬜ | |
+| Confirmation email trigger | ⬜ | |
+| Customer booking lookup | ⬜ | |
+| Self-service cancellation | ⬜ | |
+| Reviews display | ⬜ | |
+| Social proof elements | ⬜ | |
 
----
+### Phase 9: Optimization (0%)
 
-## Phase 2-6 Preview (CRM Features)
-
-### Phase 2: Customer & Communications
-- Customer profiles and history
-- Email templates and automation
-- SMS integration (Twilio)
-- Abandoned cart recovery
-- Communication history
-
-### Phase 3: Guide Operations
-- Guide profiles and qualifications
-- Guide availability management
-- Schedule assignments
-- Guide portal / manifests
-
-### Phase 4: Pricing & Promotions
-- Seasonal pricing rules
-- Group discounts
-- Early bird pricing
-- Promotional codes
-
-### Phase 5: Reporting & Analytics
-- Operations dashboard
-- Business dashboard
-- Revenue reports
-- Booking reports
-- Customer insights
-
-### Phase 6: Polish & Optimization
-- Performance optimization
-- Query optimization
-- UX improvements
-- Accessibility audit
-- E2E testing
+| Task | Status | Notes |
+|------|--------|-------|
+| Core Web Vitals optimization | ⬜ | |
+| Image optimization | ⬜ | |
+| Edge caching | ⬜ | |
+| A/B testing framework | ⬜ | |
+| Conversion funnel tracking | ⬜ | |
 
 ---
 
-## Phase 7-11 Preview (Web App & SaaS)
+## Workstream B: Customers & Communications (Phase 2)
 
-| Phase | Name | Prerequisite |
-|-------|------|--------------|
-| 7 | Web App Foundation | CRM Complete |
-| 8 | Web App Booking Flow | Phase 7 |
-| 9 | Web App Optimization | Phase 8 |
-| 10 | SaaS Platform | Web App Complete |
-| 11 | Public API | Phase 10 |
+**Branch:** `feature/phase-2-customers`
+**App:** `apps/crm`
+**Owner:** *Unassigned*
+**Status:** 🟡 READY TO START
+
+### Prerequisites ✅
+- [x] Customers table exists
+- [x] CustomerService exists
+- [x] Email templates package exists (`@tour/emails`)
+- [x] Inngest configured
+
+### New Database Tables Needed
+
+```typescript
+// packages/database/src/schema/communications.ts
+- communication_logs (email/SMS history)
+- email_templates (custom templates)
+- abandoned_carts (cart recovery)
+- wishlists (save for later)
+- notification_preferences
+```
+
+### Phase 2 Tasks (0%)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| **Customer Management** | | |
+| Customer list UI (search, filter, sort) | ⬜ | |
+| Customer profile page | ⬜ | |
+| Customer edit form | ⬜ | |
+| Customer notes system | ⬜ | |
+| Customer tags | ⬜ | |
+| Customer data export (GDPR) | ⬜ | |
+| **Email Communications** | | |
+| Email template management UI | ⬜ | |
+| Template variable system | ⬜ | |
+| Manual email composer | ⬜ | |
+| Email automation settings | ⬜ | |
+| Communication history view | ⬜ | |
+| **SMS Communications** | | |
+| Twilio integration | ⬜ | |
+| SMS templates | ⬜ | |
+| SMS automation | ⬜ | |
+| **Conversion Recovery** | | |
+| Abandoned cart tracking | ⬜ | |
+| Cart recovery emails (Inngest) | ⬜ | |
+| Wishlist functionality | ⬜ | |
+| Price drop alerts | ⬜ | |
+| Availability alerts | ⬜ | |
 
 ---
 
-## Technical Debt & Known Issues
+## Workstream C: Guide Operations (Phase 3)
 
-### High Priority
-- [x] ~~No image upload (using URL strings)~~ ✅ RESOLVED - Supabase Storage service + upload API
-- [x] ~~No email service integration (Resend)~~ ✅ RESOLVED - @tour/emails package with Resend
-- [x] ~~No background job processing (Inngest)~~ ✅ RESOLVED - Inngest client + booking email functions
-- [x] ~~No refund processing~~ ✅ RESOLVED - Stripe refund integration complete
+**Branch:** `feature/phase-3-guides`
+**App:** `apps/crm`
+**Owner:** *Unassigned*
+**Status:** 🟡 READY TO START
 
-### Medium Priority
-- [ ] No RLS policies (relying on service-layer isolation)
-- [ ] Limited test coverage
-- [ ] No error boundaries in React
-- [ ] Console-only logging
+### Prerequisites ✅
+- [x] Guides table exists
+- [x] GuideService exists
+- [x] Schedules service available
 
-### Low Priority
-- [ ] No OpenAPI documentation
-- [ ] No environment variable validation
-- [ ] No rate limiting
+### New Database Tables Needed
+
+```typescript
+// packages/database/src/schema/guide-operations.ts
+- guide_availability (weekly patterns, overrides)
+- guide_qualifications (tour-guide assignments)
+- guide_assignments (schedule-guide with status)
+```
+
+### Phase 3 Tasks (0%)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| **Guide Management** | | |
+| Guide profile CRUD | ⬜ | |
+| Guide photo upload | ⬜ | |
+| Languages & certifications | ⬜ | |
+| Guide-tour qualifications | ⬜ | |
+| **Availability** | | |
+| Weekly availability pattern UI | ⬜ | |
+| Date-specific overrides | ⬜ | |
+| Vacation/leave blocking | ⬜ | |
+| Availability calendar view | ⬜ | |
+| **Assignments** | | |
+| Assign guide to schedule | ⬜ | |
+| Conflict detection | ⬜ | |
+| Assignment notifications | ⬜ | |
+| Guide calendar (admin view) | ⬜ | |
+| **Guide Portal** | | |
+| Magic link login | ⬜ | |
+| Guide dashboard | ⬜ | |
+| Tour manifest view | ⬜ | |
+| Confirm/decline assignments | ⬜ | |
+| Mark tour complete | ⬜ | |
+| **Manifests** | | |
+| Daily manifest generation | ⬜ | |
+| PDF export | ⬜ | |
+| Email manifests to guides | ⬜ | |
+
+---
+
+## Workstream D: Pricing & Promotions (Phase 4)
+
+**Branch:** `feature/phase-4-pricing`
+**App:** `apps/crm`
+**Owner:** *Unassigned*
+**Status:** 🟡 READY TO START
+
+### Prerequisites ✅
+- [x] Tour pricing tiers exist
+- [x] Booking pricing calculation exists
+
+### New Database Tables Needed
+
+```typescript
+// packages/database/src/schema/pricing.ts
+- seasonal_pricing (date ranges, adjustments)
+- promo_codes (codes, discounts, limits)
+- promo_code_usage (tracking)
+- group_discounts (thresholds)
+```
+
+### Phase 4 Tasks (0%)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| **Seasonal Pricing** | | |
+| Season definition UI | ⬜ | |
+| Percentage/fixed adjustments | ⬜ | |
+| Tour-specific seasons | ⬜ | |
+| Price preview calendar | ⬜ | |
+| **Group Discounts** | | |
+| Threshold configuration | ⬜ | |
+| Auto-apply in booking | ⬜ | |
+| **Early Bird Pricing** | | |
+| Advance booking discounts | ⬜ | |
+| **Promo Codes** | | |
+| Promo code CRUD | ⬜ | |
+| Code generator | ⬜ | |
+| Usage limits (total, per customer) | ⬜ | |
+| Date validity | ⬜ | |
+| Tour restrictions | ⬜ | |
+| Promo code reporting | ⬜ | |
+| Apply code in booking flow | ⬜ | |
+
+---
+
+## Workstream E: Reporting & Analytics (Phase 5)
+
+**Branch:** `feature/phase-5-reporting`
+**App:** `apps/crm`
+**Owner:** *Unassigned*
+**Status:** 🟡 READY TO START
+
+### Prerequisites ✅
+- [x] Bookings data available
+- [x] Tours data available
+- [x] Customers data available
+
+### Phase 5 Tasks (0%)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| **Dashboards** | | |
+| Operations dashboard | ⬜ | Today's tours, activity |
+| Business dashboard | ⬜ | Revenue, trends |
+| **Reports** | | |
+| Revenue report | ⬜ | By period, tour, source |
+| Booking report | ⬜ | Counts, patterns |
+| Capacity utilization report | ⬜ | |
+| Customer report | ⬜ | Acquisition, CLV |
+| Guide report | ⬜ | Performance |
+| **Analytics** | | |
+| Booking trends visualization | ⬜ | |
+| Source attribution | ⬜ | UTM tracking |
+| **CRM Intelligence** | | |
+| Customer scoring | ⬜ | |
+| Customer segmentation | ⬜ | |
+| CLV prediction | ⬜ | |
+| No-show risk detection | ⬜ | |
+| Re-engagement campaigns | ⬜ | |
+| Revenue attribution dashboard | ⬜ | |
+
+---
+
+## Workstream F: Polish & Optimization (Phase 6)
+
+**Branch:** `feature/phase-6-polish`
+**App:** `apps/crm`
+**Owner:** *Unassigned*
+**Status:** ⏳ BLOCKED (Wait for Workstreams B-E)
+
+### Phase 6 Tasks (0%)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| **Performance** | | |
+| Query optimization | ⬜ | |
+| Frontend bundle optimization | ⬜ | |
+| Redis caching | ⬜ | |
+| **UX** | | |
+| Loading states (skeletons) | ⬜ | |
+| Error boundaries | ⬜ | |
+| Mobile optimization | ⬜ | |
+| Accessibility audit (WCAG 2.1) | ⬜ | |
+| **Testing** | | |
+| Unit tests (critical paths) | ⬜ | |
+| Integration tests | ⬜ | |
+| E2E tests (Playwright) | ⬜ | |
+| Load testing | ⬜ | |
+| **Features** | | |
+| Global search (Cmd+K) | ⬜ | |
+| Notification center | ⬜ | |
+
+---
+
+## Workstream G: SaaS Platform (Phase 10-11)
+
+**Branch:** `feature/saas-platform`
+**App:** `apps/crm` (platform admin routes)
+**Owner:** *Unassigned*
+**Status:** 🟡 READY TO START (basic infrastructure)
+
+### Prerequisites ✅
+- [x] Organizations table exists
+- [x] Multi-tenant architecture in place
+
+### Phase 10: Platform Infrastructure (0%)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Self-service org signup | ⬜ | |
+| Organization onboarding wizard | ⬜ | |
+| Stripe subscription billing | ⬜ | |
+| Plan limits & feature flags | ⬜ | |
+| Platform admin dashboard | ⬜ | `/platform/` routes |
+| Organization impersonation | ⬜ | |
+| Usage tracking | ⬜ | |
+
+### Phase 11: Public API (0%)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| REST API routes | ⬜ | |
+| API key management | ⬜ | |
+| Rate limiting | ⬜ | |
+| OpenAPI documentation | ⬜ | |
+| Webhook system | ⬜ | |
+| OTA integrations | ⬜ | Viator, GetYourGuide |
+
+---
+
+## Coordination Guidelines
+
+### Database Migrations
+
+```bash
+# Before creating a migration, check for conflicts:
+git pull origin main
+pnpm db:generate  # See what would be generated
+
+# Announce in team chat before running:
+pnpm db:push
+
+# Migration naming convention:
+# YYYYMMDD_HHMM_workstream_description.sql
+# Example: 20251213_1430_phase2_add_communication_logs.sql
+```
+
+### Shared Package Changes
+
+Changes to these packages affect all workstreams - coordinate before modifying:
+
+| Package | Impact | Coordination |
+|---------|--------|--------------|
+| `@tour/database` | All apps | Announce migrations |
+| `@tour/services` | All apps | PR review required |
+| `@tour/ui` | All apps | PR review required |
+| `@tour/validators` | All apps | PR review required |
+| `@tour/emails` | CRM, background jobs | Low impact |
+
+### Daily Sync Checklist
+
+```bash
+# Start of day:
+git checkout main
+git pull origin main
+git checkout your-feature-branch
+git merge main  # or rebase
+
+# Before PR:
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm build
+```
 
 ---
 
@@ -398,176 +556,55 @@
 
 ### Database
 - `packages/database/src/schema/` - All table definitions
-- `packages/database/src/schema/activity-logs.ts` - Activity log schema (NEW)
-- `packages/database/src/schema/refunds.ts` - Refunds schema (NEW)
 - `packages/database/drizzle.config.ts` - Drizzle config
 - `packages/database/src/seed/` - Seed scripts
 
 ### Services
-- `packages/services/src/tour-service.ts` - Tour business logic
-- `packages/services/src/schedule-service.ts` - Schedule business logic (enhanced with auto-generate)
-- `packages/services/src/booking-service.ts` - Booking business logic
-- `packages/services/src/customer-service.ts` - Customer business logic
-- `packages/services/src/organization-service.ts` - Org settings
-- `packages/services/src/activity-log-service.ts` - Activity logging (NEW)
-- `packages/services/src/refund-service.ts` - Refund processing (NEW)
+- `packages/services/src/` - All business logic services
 
-### Emails Package (NEW)
-- `packages/emails/src/email-service.ts` - Resend email service
-- `packages/emails/src/templates/booking-confirmation.tsx` - Confirmation email
-- `packages/emails/src/templates/booking-cancellation.tsx` - Cancellation email
-- `packages/emails/src/templates/booking-reminder.tsx` - Reminder email
+### CRM App
+- `apps/crm/src/app/org/[slug]/` - Organization-scoped routes
+- `apps/crm/src/server/routers/` - tRPC routers
+- `apps/crm/src/components/` - React components
+- `apps/crm/src/inngest/` - Background job functions
 
-### API Routers
-- `apps/crm/src/server/routers/` - All tRPC routers
-- `apps/crm/src/server/routers/activity-log.ts` - Activity log router (NEW)
-- `apps/crm/src/server/routers/refund.ts` - Refund router with Stripe (NEW)
-- `apps/crm/src/server/trpc.ts` - tRPC initialization
+### Web App
+- `apps/web/` - Public booking website (to be built)
 
-### UI Components
-- `apps/crm/src/components/schedules/schedule-calendar.tsx` - Calendar view with capacity bars
-- `apps/crm/src/components/activity-log/activity-log-list.tsx` - Activity log UI
-- `apps/crm/src/components/uploads/image-uploader.tsx` - Image upload components (NEW)
-
-### Inngest (Background Jobs)
-- `apps/crm/src/inngest/client.ts` - Inngest client with event types (NEW)
-- `apps/crm/src/inngest/functions/booking-emails.ts` - Email notification functions (NEW)
-- `apps/crm/src/inngest/index.ts` - Function exports (NEW)
-- `apps/crm/src/app/api/inngest/route.ts` - Inngest API handler (NEW)
-
-### Storage Service
-- `packages/services/src/storage-service.ts` - Supabase Storage service (NEW)
-- `apps/crm/src/app/api/upload/route.ts` - File upload API (NEW)
-
-### UI Pages
-- `apps/crm/src/app/org/[slug]/(dashboard)/tours/` - Tour pages
-- `apps/crm/src/app/org/[slug]/(dashboard)/schedules/` - Schedule pages (with calendar view)
-- `apps/crm/src/app/org/[slug]/(dashboard)/bookings/` - Booking pages
-- `apps/crm/src/app/org/[slug]/(dashboard)/customers/` - Customer pages
-- `apps/crm/src/app/org/[slug]/(dashboard)/settings/` - Settings pages
-
-### Authentication
-- `apps/crm/src/middleware.ts` - Route protection
-- `apps/crm/src/lib/auth.ts` - Auth utilities & permissions
-- `apps/crm/src/app/api/webhooks/clerk/` - Clerk webhooks
+### Emails
+- `packages/emails/src/templates/` - Email templates
+- `packages/emails/src/email-service.ts` - Resend integration
 
 ---
 
 ## Changelog
 
-### December 12, 2025 (Session 3) - Phase 1 Near Completion
-**Phase 1 progress: 88% → 92%**
+### December 13, 2025 - Parallel Development Setup
+- Restructured PROGRESS.md for parallel workstreams
+- Added git worktree strategy
+- Defined 7 independent workstreams (A-G)
+- All workstreams except Phase 6 are ready to start
+- Phase 0+1 foundation marked complete (97%)
 
-**Inngest Integration (Background Jobs):**
-- ✅ Added `inngest` package to CRM app
-- ✅ Created Inngest client with typed booking events
-- ✅ Implemented email notification functions (confirmation, cancellation, reminder)
-- ✅ Created API route handler (`/api/inngest`)
-- ✅ Added event triggers to booking router mutations (confirm/cancel)
-- ✅ Added `booking.email_sent` to ActivityAction type
+### December 12, 2025 (Session 4)
+- Phase 1: 92% → 97%
+- Added tour form enhancements (category, tags, images, SEO)
+- Added booking reschedule functionality
+- Added refund UI modal
+- Merged to main
 
-**Tour Media Upload (Supabase Storage):**
-- ✅ Created `StorageService` in @tour/services
-- ✅ Organization-scoped file paths for tenant isolation
-- ✅ Upload API route with validation (size, type)
-- ✅ `ImageUploader` component (multi-file with drag-drop)
-- ✅ `SingleImageUploader` component (for cover images)
-- ✅ Added @tour/emails dependency to CRM
+### December 12, 2025 (Session 3)
+- Phase 1: 88% → 92%
+- Added Inngest integration for background jobs
+- Added Supabase Storage for image uploads
+- Added booking window settings UI
 
-**Booking Settings UI:**
-- ✅ Added booking window settings form to Settings page
-- ✅ Minimum notice hours input
-- ✅ Maximum advance days input
-- ✅ Same-day booking toggle
-- ✅ Cutoff time selector
-
-**Activity Log Integration:**
-- ✅ Added ActivityLogCard to booking detail page
-
-**Visual Capacity Indicators:**
-- ✅ Progress bars in schedule list view
-- ✅ Progress bars in calendar events
-- ✅ Color-coded status (green/yellow/red)
-
-**Technical Improvements:**
-- Fixed TypeScript errors in storage service
-- All typechecks passing
-
-### December 12, 2025 (Session 2) - Major Phase 1 Completion
-**Phase 1 progress: 70% → 88%**
-
-**Schedule Management (1.2) - NEW FEATURES:**
-- ✅ Implemented Schedule Calendar View with react-big-calendar
-  - Month/week/day/agenda views
-  - Status-based color coding (scheduled=blue, in_progress=yellow, completed=green, cancelled=red)
-  - Click-to-navigate to schedule details
-  - View toggle (List/Calendar) with URL persistence
-- ✅ Implemented Auto-Schedule Generation
-  - Recurring pattern support (days of week, times, date range)
-  - Preview before creation
-  - Skip existing schedules option
-  - `autoGenerate()` and `previewAutoGenerate()` service methods
-- ✅ Implemented Capacity Auto-Close
-  - `checkAndUpdateCapacityStatus()` method
-- ✅ Booking Window Validation
-  - `BookingWindowSettings` interface (minimumNoticeHours, maximumAdvanceDays, allowSameDayBooking, sameDayCutoffTime)
-  - `checkAvailabilityWithSettings()` method validates booking times
-
-**Admin Booking Management (1.4) - NEW FEATURES:**
-- ✅ Activity Log / Audit Trail
-  - `activity_logs` table with comprehensive schema
-  - `ActivityLogService` with convenience methods for booking/schedule/tour/customer actions
-  - `activity-log` tRPC router with list, getById, getByEntity, getStats
-  - `ActivityLogList` UI component with filters
-- ✅ Stripe Refund Processing
-  - `refunds` table with status tracking
-  - `RefundService` with full workflow (create, markProcessing, markSucceeded, markFailed)
-  - `refund` tRPC router with Stripe API integration
-  - Automatic booking paymentStatus updates
-- ✅ Email Notifications
-  - New `@tour/emails` package
-  - `EmailService` with Resend integration
-  - React Email templates: booking-confirmation, booking-cancellation, booking-reminder
-  - Organization branding support in templates
-
-**Settings (1.6) - NEW FEATURES:**
-- ✅ Booking Window Settings schema added to OrganizationSettings
-
-**Technical Improvements:**
-- Fixed multiple TypeScript errors
-- Database schema pushed to Supabase
-- All typechecks passing
-
-### December 12, 2025 (Session 1)
-- Created PROGRESS.md as project management tool
-- Completed comprehensive audit of Phase 0 and Phase 1
-- Phase 0 marked as complete (98%)
-- Phase 1.1 Tour Management at 90%
-- Phase 1.6 Settings at 85%
-- Identified critical gaps: Calendar view, Activity log, Refunds
-
-### Previous Sessions
-- Completed Stripe Connect payment settings
-- Completed Tax configuration
-- Completed Tour pricing tiers
-- Completed Tour variants
-- Fixed drizzle-orm type issues
-
----
-
-## Next Steps for Phase 1 Completion (to 95%+)
-
-**Remaining P2 Tasks:**
-1. **Tour Form Completeness** - Add category selector, tags, meta fields
-2. **Image Uploader Integration** - Connect uploader components to tour edit form
-3. **Booking Date/Time Modification UI** - Add reschedule option with availability check
-
-**Optional Improvements:**
-- Email/SMS template management UI
-- Guide conflict warnings in schedule creation
-- Drag-and-drop schedule editing in calendar
-
-**Phase 1 is at ~92% completion and ready for Phase 2 features.**
+### December 12, 2025 (Session 2)
+- Phase 1: 70% → 88%
+- Added calendar view with react-big-calendar
+- Added auto-schedule generation
+- Added activity log system
+- Added refund processing with Stripe
 
 ---
 

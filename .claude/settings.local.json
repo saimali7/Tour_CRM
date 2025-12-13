@@ -32,7 +32,8 @@
       "Bash(pnpm build:*)",
       "Bash(git -C /Users/saim/.claude-worktrees/Tour_CRM/quirky-newton log --oneline -20)",
       "Bash(pnpm dev:*)",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "Bash(git add:*)"
     ]
   }
 }
