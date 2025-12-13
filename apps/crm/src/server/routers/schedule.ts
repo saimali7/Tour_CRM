@@ -86,21 +86,21 @@ export const scheduleRouter = createRouter({
       return services.schedule.getById(input.id);
     }),
 
-  create: protectedProcedure
+  create: adminProcedure
     .input(createScheduleSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.schedule.create(input);
     }),
 
-  bulkCreate: protectedProcedure
+  bulkCreate: adminProcedure
     .input(bulkCreateSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.schedule.bulkCreate(input);
     }),
 
-  update: protectedProcedure
+  update: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -112,7 +112,7 @@ export const scheduleRouter = createRouter({
       return services.schedule.update(input.id, input.data);
     }),
 
-  delete: protectedProcedure
+  delete: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -120,7 +120,7 @@ export const scheduleRouter = createRouter({
       return { success: true };
     }),
 
-  cancel: protectedProcedure
+  cancel: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -170,7 +170,7 @@ export const scheduleRouter = createRouter({
       return services.schedule.getStats(input.dateRange);
     }),
 
-  autoGenerate: protectedProcedure
+  autoGenerate: adminProcedure
     .input(autoGenerateSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });

@@ -175,7 +175,10 @@ export const organizationRouter = createRouter({
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       const org = await services.organization.get();
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!baseUrl) {
+        throw new Error("NEXT_PUBLIC_APP_URL environment variable must be set");
+      }
       let accountId = org.stripeConnectAccountId;
 
       // Create a new Stripe Connect account if one doesn't exist
@@ -229,7 +232,10 @@ export const organizationRouter = createRouter({
       }
 
       // Create new onboarding link
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!baseUrl) {
+        throw new Error("NEXT_PUBLIC_APP_URL environment variable must be set");
+      }
       const accountLink = await createAccountLink(
         org.stripeConnectAccountId,
         `${baseUrl}/api/stripe/connect/refresh?org=${input.orgSlug}`,

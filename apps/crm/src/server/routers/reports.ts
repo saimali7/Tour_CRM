@@ -96,9 +96,54 @@ export const reportsRouter = createRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      // TODO: Implement proper guide report with guide performance metrics
-      // For now, return empty array to match expected type
-      return [];
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+
+      // Get all guides with their assignments and performance metrics
+      const guidesData = await services.guide.getAll();
+
+      const guideReports = await Promise.all(
+        guidesData.data.map(async (guide) => {
+          // Get assignments for this guide in the date range
+          const assignments = await services.guideAssignment.getAssignmentsForGuide(
+            guide.id,
+            { dateRange: input.dateRange }
+          );
+
+          // Calculate metrics
+          const totalAssignments = assignments.length;
+          const confirmedAssignments = assignments.filter((a) => a.status === 'confirmed').length;
+          const pendingAssignments = assignments.filter((a) => a.status === 'pending').length;
+          const declinedAssignments = assignments.filter((a) => a.status === 'declined').length;
+
+          // Get participant count from confirmed assignments
+          let totalParticipants = 0;
+          for (const assignment of assignments.filter((a) => a.status === 'confirmed')) {
+            if (assignment.schedule) {
+              totalParticipants += assignment.schedule.bookedCount || 0;
+            }
+          }
+
+          return {
+            guideId: guide.id,
+            guideName: `${guide.firstName} ${guide.lastName}`,
+            email: guide.email,
+            phone: guide.phone,
+            totalAssignments,
+            confirmedAssignments,
+            pendingAssignments,
+            declinedAssignments,
+            totalParticipants,
+            confirmationRate: totalAssignments > 0
+              ? Math.round((confirmedAssignments / totalAssignments) * 100)
+              : 0,
+            averageParticipantsPerTour: confirmedAssignments > 0
+              ? Math.round(totalParticipants / confirmedAssignments)
+              : 0,
+          };
+        })
+      );
+
+      return guideReports;
     }),
 
   // Export Report
@@ -130,8 +175,43 @@ export const reportsRouter = createRouter({
           reportData = await services.customerIntelligence.getCustomerStats(input.dateRange);
           break;
         case "guide":
-          // TODO: Implement proper guide report
-          reportData = [];
+          // Get guide report data using the same logic as getGuideReport
+          const guidesData = await services.guide.getAll();
+          reportData = await Promise.all(
+            guidesData.data.map(async (guide) => {
+              const assignments = await services.guideAssignment.getAssignmentsForGuide(
+                guide.id,
+                { dateRange: input.dateRange }
+              );
+              const totalAssignments = assignments.length;
+              const confirmedAssignments = assignments.filter((a) => a.status === 'confirmed').length;
+              const pendingAssignments = assignments.filter((a) => a.status === 'pending').length;
+              const declinedAssignments = assignments.filter((a) => a.status === 'declined').length;
+              let totalParticipants = 0;
+              for (const assignment of assignments.filter((a) => a.status === 'confirmed')) {
+                if (assignment.schedule) {
+                  totalParticipants += assignment.schedule.bookedCount || 0;
+                }
+              }
+              return {
+                guideId: guide.id,
+                guideName: `${guide.firstName} ${guide.lastName}`,
+                email: guide.email,
+                phone: guide.phone,
+                totalAssignments,
+                confirmedAssignments,
+                pendingAssignments,
+                declinedAssignments,
+                totalParticipants,
+                confirmationRate: totalAssignments > 0
+                  ? Math.round((confirmedAssignments / totalAssignments) * 100)
+                  : 0,
+                averageParticipantsPerTour: confirmedAssignments > 0
+                  ? Math.round(totalParticipants / confirmedAssignments)
+                  : 0,
+              };
+            })
+          );
           break;
       }
 

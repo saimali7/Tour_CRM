@@ -77,11 +77,17 @@ export const bookings = pgTable("bookings", {
   scheduleIdx: index("bookings_schedule_idx").on(table.scheduleId),
   statusIdx: index("bookings_status_idx").on(table.status),
   createdAtIdx: index("bookings_created_at_idx").on(table.createdAt),
+  orgStatusCreatedIdx: index("bookings_org_status_created_idx").on(table.organizationId, table.status, table.createdAt),
 }));
 
 // Booking participants - Individual people on a booking
 export const bookingParticipants = pgTable("booking_participants", {
   id: text("id").primaryKey().$defaultFn(createId),
+
+  // Organization (tenant isolation)
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
 
   // Booking this participant belongs to
   bookingId: text("booking_id")
@@ -105,6 +111,7 @@ export const bookingParticipants = pgTable("booking_participants", {
   // Timestamps
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
+  orgIdx: index("participants_org_idx").on(table.organizationId),
   bookingIdx: index("participants_booking_idx").on(table.bookingId),
 }));
 
@@ -126,6 +133,10 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
 }));
 
 export const bookingParticipantsRelations = relations(bookingParticipants, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [bookingParticipants.organizationId],
+    references: [organizations.id],
+  }),
   booking: one(bookings, {
     fields: [bookingParticipants.bookingId],
     references: [bookings.id],

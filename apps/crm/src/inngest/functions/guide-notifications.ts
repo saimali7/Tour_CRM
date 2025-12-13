@@ -46,10 +46,10 @@ export const sendGuideAssignmentEmail = inngest.createFunction(
       minute: "2-digit",
     })}`;
 
-    // TODO: Generate actual URLs when guide portal is implemented
-    const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL}/org/${org.slug}/guide/assignments/${data.assignmentId}/confirm`;
-    const declineUrl = `${process.env.NEXT_PUBLIC_APP_URL}/org/${org.slug}/guide/assignments/${data.assignmentId}/decline`;
-    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/org/${org.slug}/schedules/${data.scheduleId}/manifest`;
+    // Guide portal URLs - guides access via magic link authentication
+    const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/confirm`;
+    const declineUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/decline`;
+    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${data.scheduleId}/manifest`;
 
     // Send the email
     const result = await step.run("send-email", async () => {
@@ -160,9 +160,9 @@ export const sendPendingAssignmentReminder = inngest.createFunction(
       minute: "2-digit",
     })}`;
 
-    const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL}/org/${org.slug}/guide/assignments/${data.assignmentId}/confirm`;
-    const declineUrl = `${process.env.NEXT_PUBLIC_APP_URL}/org/${org.slug}/guide/assignments/${data.assignmentId}/decline`;
-    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/org/${org.slug}/schedules/${data.scheduleId}/manifest`;
+    const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/confirm`;
+    const declineUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/decline`;
+    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${data.scheduleId}/manifest`;
 
     // Send reminder email
     const result = await step.run("send-email", async () => {
@@ -244,7 +244,7 @@ export const sendGuideScheduleReminder = inngest.createFunction(
       minute: "2-digit",
     })}`;
 
-    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/org/${org.slug}/schedules/${data.scheduleId}/manifest`;
+    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${data.scheduleId}/manifest`;
 
     // Send reminder email
     const result = await step.run("send-email", async () => {
@@ -406,7 +406,7 @@ export const sendGuideDailyManifest = inngest.createFunction(
                   time: tourTime,
                   participantCount,
                   meetingPoint: gs.meetingPoint || undefined,
-                  manifestUrl: `${process.env.NEXT_PUBLIC_APP_URL}/org/${organizationId}/schedules/${gs.id}/manifest`,
+                  manifestUrl: `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${gs.id}/manifest`,
                 };
               })
             );

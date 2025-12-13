@@ -101,6 +101,7 @@ export const promoCodes = pgTable("promo_codes", {
   codeIdx: index("promo_codes_code_idx").on(table.code),
   activeIdx: index("promo_codes_active_idx").on(table.isActive),
   validityIdx: index("promo_codes_validity_idx").on(table.validFrom, table.validUntil),
+  orgValidityIdx: index("promo_codes_org_validity_idx").on(table.organizationId, table.isActive, table.validFrom, table.validUntil),
   // Unique code per organization (case-insensitive)
   orgCodeUnique: unique().on(table.organizationId, table.code),
 }));

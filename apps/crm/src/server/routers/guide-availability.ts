@@ -25,7 +25,7 @@ export const guideAvailabilityRouter = createRouter({
       return services.guideAvailability.getWeeklyAvailability(input.guideId);
     }),
 
-  setWeeklyAvailability: protectedProcedure
+  setWeeklyAvailability: adminProcedure
     .input(
       z.object({
         guideId: z.string(),
@@ -40,7 +40,7 @@ export const guideAvailabilityRouter = createRouter({
       );
     }),
 
-  addWeeklySlot: protectedProcedure
+  addWeeklySlot: adminProcedure
     .input(
       z.object({
         guideId: z.string(),
@@ -52,7 +52,7 @@ export const guideAvailabilityRouter = createRouter({
       return services.guideAvailability.addWeeklySlot(input.guideId, input.slot);
     }),
 
-  updateWeeklySlot: protectedProcedure
+  updateWeeklySlot: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -64,7 +64,7 @@ export const guideAvailabilityRouter = createRouter({
       return services.guideAvailability.updateWeeklySlot(input.id, input.data);
     }),
 
-  deleteWeeklySlot: protectedProcedure
+  deleteWeeklySlot: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -88,7 +88,7 @@ export const guideAvailabilityRouter = createRouter({
       });
     }),
 
-  createOverride: protectedProcedure
+  createOverride: adminProcedure
     .input(
       z.object({
         guideId: z.string(),
@@ -103,7 +103,7 @@ export const guideAvailabilityRouter = createRouter({
       );
     }),
 
-  updateOverride: protectedProcedure
+  updateOverride: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -115,7 +115,7 @@ export const guideAvailabilityRouter = createRouter({
       return services.guideAvailability.updateOverride(input.id, input.data);
     }),
 
-  deleteOverride: protectedProcedure
+  deleteOverride: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });

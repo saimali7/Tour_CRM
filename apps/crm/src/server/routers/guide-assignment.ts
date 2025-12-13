@@ -60,7 +60,7 @@ export const guideAssignmentRouter = createRouter({
       );
     }),
 
-  createAssignment: protectedProcedure
+  createAssignment: adminProcedure
     .input(createGuideAssignmentInputSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -103,7 +103,7 @@ export const guideAssignmentRouter = createRouter({
       );
     }),
 
-  assignGuideToSchedule: protectedProcedure
+  assignGuideToSchedule: adminProcedure
     .input(
       z.object({
         scheduleId: z.string(),

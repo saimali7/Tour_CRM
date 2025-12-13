@@ -77,6 +77,7 @@ export const communicationLogs = pgTable("communication_logs", {
   typeIdx: index("communication_logs_type_idx").on(table.type),
   statusIdx: index("communication_logs_status_idx").on(table.status),
   createdAtIdx: index("communication_logs_created_at_idx").on(table.createdAt),
+  orgTypeCreatedIdx: index("communication_logs_org_type_created_idx").on(table.organizationId, table.type, table.createdAt),
 }));
 
 // ============================================
@@ -303,7 +304,7 @@ export const wishlists = pgTable("wishlists", {
   emailIdx: index("wishlists_email_idx").on(table.email),
   sessionIdx: index("wishlists_session_idx").on(table.sessionId),
   // Unique wishlist per customer+tour or session+tour
-  customerTourUnique: unique().on(table.customerId, table.tourId),
+  customerTourUnique: unique().on(table.organizationId, table.customerId, table.tourId),
 }));
 
 // ============================================
@@ -436,7 +437,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   orgIdx: index("notification_preferences_org_idx").on(table.organizationId),
-  customerUnique: unique().on(table.customerId), // One preferences record per customer
+  orgCustomerUnique: unique().on(table.organizationId, table.customerId), // One preferences record per customer per org
 }));
 
 // ============================================

@@ -270,10 +270,22 @@ export class WishlistService extends BaseService {
             sessionId: null,
             updatedAt: new Date(),
           })
-          .where(eq(wishlists.id, item.id));
+          .where(
+            and(
+              eq(wishlists.id, item.id),
+              eq(wishlists.organizationId, this.organizationId)
+            )
+          );
       } else {
         // Delete duplicate
-        await this.db.delete(wishlists).where(eq(wishlists.id, item.id));
+        await this.db
+          .delete(wishlists)
+          .where(
+            and(
+              eq(wishlists.id, item.id),
+              eq(wishlists.organizationId, this.organizationId)
+            )
+          );
       }
     }
   }

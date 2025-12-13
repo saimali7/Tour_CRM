@@ -33,7 +33,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Create a new account link
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!baseUrl) {
+      return NextResponse.redirect(
+        new URL(`/org/${orgSlug}/settings?tab=payments&error=configuration_error`, request.url)
+      );
+    }
     const accountLink = await createAccountLink(
       org.stripeConnectAccountId,
       `${baseUrl}/api/stripe/connect/refresh?org=${orgSlug}`,

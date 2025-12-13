@@ -428,6 +428,18 @@ export class GuideAssignmentService extends BaseService {
     endsAt: Date,
     excludeScheduleId?: string
   ): Promise<boolean> {
+    // Verify guide belongs to this organization
+    const guide = await this.db.query.guides.findFirst({
+      where: and(
+        eq(guides.id, guideId),
+        eq(guides.organizationId, this.organizationId)
+      ),
+    });
+
+    if (!guide) {
+      throw new NotFoundError("Guide", guideId);
+    }
+
     const conditions = [
       eq(schedules.organizationId, this.organizationId),
       eq(schedules.guideId, guideId),

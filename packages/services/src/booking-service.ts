@@ -242,7 +242,10 @@ export class BookingService extends BaseService {
     }
 
     const participants = await this.db.query.bookingParticipants.findMany({
-      where: eq(bookingParticipants.bookingId, id),
+      where: and(
+        eq(bookingParticipants.bookingId, id),
+        eq(bookingParticipants.organizationId, this.organizationId)
+      ),
     });
 
     return {
@@ -399,6 +402,7 @@ export class BookingService extends BaseService {
     if (input.participants && input.participants.length > 0) {
       await this.db.insert(bookingParticipants).values(
         input.participants.map((p) => ({
+          organizationId: this.organizationId,
           bookingId: booking.id,
           firstName: p.firstName,
           lastName: p.lastName,
@@ -418,7 +422,12 @@ export class BookingService extends BaseService {
         bookedCount: sql`${schedules.bookedCount} + ${totalParticipants}`,
         updatedAt: new Date(),
       })
-      .where(eq(schedules.id, input.scheduleId));
+      .where(
+        and(
+          eq(schedules.id, input.scheduleId),
+          eq(schedules.organizationId, this.organizationId)
+        )
+      );
 
     return this.getById(booking.id);
   }
@@ -463,7 +472,12 @@ export class BookingService extends BaseService {
             bookedCount: sql`${schedules.bookedCount} + ${diff}`,
             updatedAt: new Date(),
           })
-          .where(eq(schedules.id, booking.scheduleId));
+          .where(
+            and(
+              eq(schedules.id, booking.scheduleId),
+              eq(schedules.organizationId, this.organizationId)
+            )
+          );
       }
 
       updateData.totalParticipants = newTotal;
@@ -535,7 +549,12 @@ export class BookingService extends BaseService {
         bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
         updatedAt: new Date(),
       })
-      .where(eq(schedules.id, booking.scheduleId));
+      .where(
+        and(
+          eq(schedules.id, booking.scheduleId),
+          eq(schedules.organizationId, this.organizationId)
+        )
+      );
 
     const [updated] = await this.db
       .update(bookings)
@@ -671,7 +690,12 @@ export class BookingService extends BaseService {
         bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
         updatedAt: new Date(),
       })
-      .where(eq(schedules.id, booking.scheduleId));
+      .where(
+        and(
+          eq(schedules.id, booking.scheduleId),
+          eq(schedules.organizationId, this.organizationId)
+        )
+      );
 
     // Increment new schedule's booked count
     await this.db
@@ -680,7 +704,12 @@ export class BookingService extends BaseService {
         bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${booking.totalParticipants}`,
         updatedAt: new Date(),
       })
-      .where(eq(schedules.id, newScheduleId));
+      .where(
+        and(
+          eq(schedules.id, newScheduleId),
+          eq(schedules.organizationId, this.organizationId)
+        )
+      );
 
     // Update the booking
     const [updated] = await this.db
@@ -753,6 +782,7 @@ export class BookingService extends BaseService {
     const [created] = await this.db
       .insert(bookingParticipants)
       .values({
+        organizationId: this.organizationId,
         bookingId,
         firstName: participant.firstName,
         lastName: participant.lastName,
@@ -783,7 +813,8 @@ export class BookingService extends BaseService {
       .where(
         and(
           eq(bookingParticipants.id, participantId),
-          eq(bookingParticipants.bookingId, bookingId)
+          eq(bookingParticipants.bookingId, bookingId),
+          eq(bookingParticipants.organizationId, this.organizationId)
         )
       );
   }

@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
-    console.error("Missing CLERK_WEBHOOK_SECRET environment variable");
+    console.error("[Clerk Webhook] Missing CLERK_WEBHOOK_SECRET environment variable");
     return new Response("Webhook secret not configured", { status: 500 });
   }
 
@@ -41,14 +41,14 @@ export async function POST(req: Request) {
       "svix-signature": svix_signature,
     }) as WebhookEvent;
   } catch (err) {
-    console.error("Error verifying webhook:", err);
+    console.error("[Clerk Webhook] Error verifying webhook:", err);
     return new Response("Error verifying webhook", { status: 400 });
   }
 
   // Handle the webhook
   const eventType = evt.type;
 
-  console.log(`Clerk webhook received: ${eventType}`);
+  console.log(`[Clerk Webhook] Event received: ${eventType}`);
 
   try {
     switch (eventType) {
@@ -65,12 +65,12 @@ export async function POST(req: Request) {
         break;
 
       default:
-        console.log(`Unhandled webhook event type: ${eventType}`);
+        console.log(`[Clerk Webhook] Unhandled event type: ${eventType}`);
     }
 
     return new Response("Webhook processed successfully", { status: 200 });
   } catch (error) {
-    console.error(`Error processing webhook ${eventType}:`, error);
+    console.error(`[Clerk Webhook] Error processing ${eventType}:`, error);
     return new Response("Error processing webhook", { status: 500 });
   }
 }
@@ -94,7 +94,7 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
   const primaryEmail = email_addresses?.[0]?.email_address;
 
   if (!primaryEmail) {
-    console.error("User created without email address:", id);
+    console.error("[Clerk Webhook] User created without email address:", id);
     return;
   }
 
@@ -104,7 +104,7 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
   });
 
   if (existingUser) {
-    console.log(`User ${id} already exists in database`);
+    console.log(`[Clerk Webhook] User ${id} already exists in database`);
     return;
   }
 
@@ -123,7 +123,7 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
 
   const newUser = result[0];
   if (newUser) {
-    console.log(`Created user ${newUser.id} from Clerk user ${id}`);
+    console.log(`[Clerk Webhook] Created user ${newUser.id} from Clerk user ${id}`);
   }
 }
 
@@ -174,7 +174,7 @@ async function handleUserUpdated(data: WebhookEvent["data"]) {
 
   const updatedUser = updateResult[0];
   if (updatedUser) {
-    console.log(`Updated user ${updatedUser.id} from Clerk user ${id}`);
+    console.log(`[Clerk Webhook] Updated user ${updatedUser.id} from Clerk user ${id}`);
   }
 }
 
@@ -193,12 +193,12 @@ async function handleUserDeleted(data: WebhookEvent["data"]) {
   });
 
   if (!existingUser) {
-    console.log(`User ${id} not found in database (already deleted?)`);
+    console.log(`[Clerk Webhook] User ${id} not found in database (already deleted?)`);
     return;
   }
 
   // Delete the user (cascade will handle organization memberships)
   await db.delete(users).where(eq(users.clerkId, id));
 
-  console.log(`Deleted user with Clerk ID ${id}`);
+  console.log(`[Clerk Webhook] Deleted user with Clerk ID ${id}`);
 }

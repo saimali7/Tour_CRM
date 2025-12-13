@@ -66,11 +66,11 @@ export class SeasonalPricingService extends BaseService {
     }
 
     if (filters.dateRange?.from) {
-      conditions.push(gte(seasonalPricing.endDate, filters.dateRange.from.toISOString().split('T')[0] || ''));
+      conditions.push(gte(seasonalPricing.endDate, filters.dateRange.from.toISOString().split('T')[0]!));
     }
 
     if (filters.dateRange?.to) {
-      conditions.push(lte(seasonalPricing.startDate, filters.dateRange.to.toISOString().split('T')[0] || ''));
+      conditions.push(lte(seasonalPricing.startDate, filters.dateRange.to.toISOString().split('T')[0]!));
     }
 
     const orderBy =
@@ -111,11 +111,11 @@ export class SeasonalPricingService extends BaseService {
     }
 
     if (filters.dateRange?.from) {
-      conditions.push(gte(seasonalPricing.endDate, filters.dateRange.from.toISOString().split('T')[0] || ''));
+      conditions.push(gte(seasonalPricing.endDate, filters.dateRange.from.toISOString().split('T')[0]!));
     }
 
     if (filters.dateRange?.to) {
-      conditions.push(lte(seasonalPricing.startDate, filters.dateRange.to.toISOString().split('T')[0] || ''));
+      conditions.push(lte(seasonalPricing.startDate, filters.dateRange.to.toISOString().split('T')[0]!));
     }
 
     return this.db
@@ -159,8 +159,8 @@ export class SeasonalPricingService extends BaseService {
         organizationId: this.organizationId,
         name: input.name,
         description: input.description,
-        startDate: input.startDate.toISOString().split('T')[0] || '',
-        endDate: input.endDate.toISOString().split('T')[0] || '',
+        startDate: input.startDate.toISOString().split('T')[0]!,
+        endDate: input.endDate.toISOString().split('T')[0]!,
         adjustmentType: input.adjustmentType,
         adjustmentValue: input.adjustmentValue.toString(),
         appliesTo: input.appliesTo ?? "all",
@@ -254,7 +254,7 @@ export class SeasonalPricingService extends BaseService {
     date: Date,
     basePrice: number
   ): Promise<PriceAdjustment> {
-    const dateStr = date.toISOString().split('T')[0] || '';
+    const dateStr = date.toISOString().split('T')[0]!;
 
     // Get all active seasons that apply to this tour and date
     const applicableSeasons = await this.db
@@ -320,8 +320,8 @@ export class SeasonalPricingService extends BaseService {
     endDate: Date,
     excludeId?: string
   ): Promise<SeasonalPricing[]> {
-    const startDateStr = startDate.toISOString().split('T')[0] || '';
-    const endDateStr = endDate.toISOString().split('T')[0] || '';
+    const startDateStr = startDate.toISOString().split('T')[0]!;
+    const endDateStr = endDate.toISOString().split('T')[0]!;
 
     const conditions = [
       eq(seasonalPricing.organizationId, this.organizationId),
@@ -358,7 +358,7 @@ export class SeasonalPricingService extends BaseService {
     current: number;
     past: number;
   }> {
-    const now = new Date().toISOString().split('T')[0] || '';
+    const now = new Date().toISOString().split('T')[0]!;
 
     const statsResult = await this.db
       .select({

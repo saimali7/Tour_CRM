@@ -53,11 +53,16 @@ export const processAbandonedCarts = inngest.createFunction(
             : null;
 
           // Substitute variables
+          const webUrl = process.env.NEXT_PUBLIC_WEB_URL;
+          if (!webUrl) {
+            throw new Error("NEXT_PUBLIC_WEB_URL environment variable must be set");
+          }
+
           const content = services.communication.substituteVariables(template.contentHtml, {
             customer_name: `${cart.firstName || ""} ${cart.lastName || ""}`.trim() || "Valued Customer",
             customer_first_name: cart.firstName || "there",
             tour_name: tour?.name || "your selected tour",
-            recovery_link: `${process.env.NEXT_PUBLIC_WEB_URL || ""}/recover/${cart.recoveryToken}`,
+            recovery_link: `${webUrl}/recover/${cart.recoveryToken}`,
             cart_total: cart.total ? `$${cart.total}` : "",
           });
 
@@ -102,11 +107,16 @@ export const processAbandonedCarts = inngest.createFunction(
             ? await services.tour.getById(cart.tourId)
             : null;
 
+          const webUrl = process.env.NEXT_PUBLIC_WEB_URL;
+          if (!webUrl) {
+            throw new Error("NEXT_PUBLIC_WEB_URL environment variable must be set");
+          }
+
           const content = services.communication.substituteVariables(template.contentHtml, {
             customer_name: `${cart.firstName || ""} ${cart.lastName || ""}`.trim() || "Valued Customer",
             customer_first_name: cart.firstName || "there",
             tour_name: tour?.name || "your selected tour",
-            recovery_link: `${process.env.NEXT_PUBLIC_WEB_URL || ""}/recover/${cart.recoveryToken}`,
+            recovery_link: `${webUrl}/recover/${cart.recoveryToken}`,
             cart_total: cart.total ? `$${cart.total}` : "",
             discount_code: automation2.discountCode || "",
             discount_percentage: automation2.discountPercentage?.toString() || "",
@@ -151,11 +161,16 @@ export const processAbandonedCarts = inngest.createFunction(
             ? await services.tour.getById(cart.tourId)
             : null;
 
+          const webUrl = process.env.NEXT_PUBLIC_WEB_URL;
+          if (!webUrl) {
+            throw new Error("NEXT_PUBLIC_WEB_URL environment variable must be set");
+          }
+
           const content = services.communication.substituteVariables(template.contentHtml, {
             customer_name: `${cart.firstName || ""} ${cart.lastName || ""}`.trim() || "Valued Customer",
             customer_first_name: cart.firstName || "there",
             tour_name: tour?.name || "your selected tour",
-            recovery_link: `${process.env.NEXT_PUBLIC_WEB_URL || ""}/recover/${cart.recoveryToken}`,
+            recovery_link: `${webUrl}/recover/${cart.recoveryToken}`,
             cart_total: cart.total ? `$${cart.total}` : "",
             discount_code: automation3.discountCode || "",
             discount_percentage: automation3.discountPercentage?.toString() || "",
@@ -240,12 +255,17 @@ export const handleCartAbandoned = inngest.createFunction(
 
     // Send the first recovery email
     await step.run("send-recovery-email", async () => {
+      const webUrl = process.env.NEXT_PUBLIC_WEB_URL;
+      if (!webUrl) {
+        throw new Error("NEXT_PUBLIC_WEB_URL environment variable must be set");
+      }
+
       const content = services.communication.substituteVariables(template.contentHtml, {
         customer_name: data.customerName || "Valued Customer",
         customer_first_name: data.customerName?.split(" ")[0] || "there",
         tour_name: data.tourName,
         tour_date: data.tourDate || "",
-        recovery_link: `${process.env.NEXT_PUBLIC_WEB_URL || ""}/recover/${data.recoveryToken}`,
+        recovery_link: `${webUrl}/recover/${data.recoveryToken}`,
         cart_total: data.cartTotal || "",
       });
 

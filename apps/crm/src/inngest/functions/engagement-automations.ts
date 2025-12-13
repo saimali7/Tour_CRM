@@ -36,14 +36,43 @@ export const sendReviewRequests = inngest.createFunction(
     }
 
     // Get completed bookings from the last 24-48 hours that haven't received a review request
-    // This is a placeholder - the booking service would need a method to query for this
     const completedBookings = await step.run("get-completed-bookings", async () => {
-      // TODO: Implement this method in booking service
-      // Should query for bookings where:
-      // - status = 'completed'
-      // - schedule.endsAt was 24 hours ago (configurable)
-      // - no review request has been sent yet (check communication logs)
-      return [] as { id: string }[];
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const twoDaysAgo = new Date(now);
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+      // Get bookings where schedule ended between 24-48 hours ago
+      const { db, schedules, bookings: bookingsTable, communicationLogs } = await import("@tour/database");
+      const { eq, and, lte, gte, isNull } = await import("drizzle-orm");
+
+      const completedBookingsQuery = await db
+        .select({
+          id: bookingsTable.id,
+          customerId: bookingsTable.customerId,
+          scheduleId: bookingsTable.scheduleId,
+        })
+        .from(bookingsTable)
+        .innerJoin(schedules, eq(bookingsTable.scheduleId, schedules.id))
+        .leftJoin(
+          communicationLogs,
+          and(
+            eq(communicationLogs.bookingId, bookingsTable.id),
+            eq(communicationLogs.templateName, 'review_request')
+          )
+        )
+        .where(
+          and(
+            eq(bookingsTable.organizationId, organizationId),
+            eq(bookingsTable.status, 'confirmed'),
+            lte(schedules.endsAt, yesterday),
+            gte(schedules.endsAt, twoDaysAgo),
+            isNull(communicationLogs.id) // No review request sent yet
+          )
+        );
+
+      return completedBookingsQuery;
     });
 
     let emailsSent = 0;

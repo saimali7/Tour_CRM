@@ -253,7 +253,12 @@ export class PromoCodeService extends BaseService {
     const usageCount = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(promoCodeUsage)
-      .where(eq(promoCodeUsage.promoCodeId, id));
+      .where(
+        and(
+          eq(promoCodeUsage.promoCodeId, id),
+          eq(promoCodeUsage.organizationId, this.organizationId)
+        )
+      );
 
     const count = usageCount[0]?.count ?? 0;
     if (count > 0) {
@@ -421,7 +426,12 @@ export class PromoCodeService extends BaseService {
         currentUses: sql`${promoCodes.currentUses} + 1`,
         updatedAt: new Date(),
       })
-      .where(eq(promoCodes.id, promoCode.id));
+      .where(
+        and(
+          eq(promoCodes.id, promoCode.id),
+          eq(promoCodes.organizationId, this.organizationId)
+        )
+      );
 
     return usage;
   }

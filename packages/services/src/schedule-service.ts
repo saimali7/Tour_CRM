@@ -550,7 +550,7 @@ export class ScheduleService extends BaseService {
   }
 
   async incrementBookedCount(id: string, count: number): Promise<void> {
-    await this.db
+    const result = await this.db
       .update(schedules)
       .set({
         bookedCount: sql`${schedules.bookedCount} + ${count}`,
@@ -558,11 +558,16 @@ export class ScheduleService extends BaseService {
       })
       .where(
         and(eq(schedules.id, id), eq(schedules.organizationId, this.organizationId))
-      );
+      )
+      .returning({ id: schedules.id });
+
+    if (result.length === 0) {
+      throw new NotFoundError("Schedule", id);
+    }
   }
 
   async decrementBookedCount(id: string, count: number): Promise<void> {
-    await this.db
+    const result = await this.db
       .update(schedules)
       .set({
         bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${count})`,
@@ -570,7 +575,12 @@ export class ScheduleService extends BaseService {
       })
       .where(
         and(eq(schedules.id, id), eq(schedules.organizationId, this.organizationId))
-      );
+      )
+      .returning({ id: schedules.id });
+
+    if (result.length === 0) {
+      throw new NotFoundError("Schedule", id);
+    }
   }
 
   async getStats(dateRange?: DateRangeFilter): Promise<{

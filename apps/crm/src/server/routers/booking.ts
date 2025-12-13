@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { format } from "date-fns";
-import { createRouter, protectedProcedure } from "../trpc";
+import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 import { inngest } from "@/inngest";
 
@@ -104,14 +104,14 @@ export const bookingRouter = createRouter({
       return services.booking.getByReference(input.referenceNumber);
     }),
 
-  create: protectedProcedure
+  create: adminProcedure
     .input(createBookingSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.booking.create(input);
     }),
 
-  update: protectedProcedure
+  update: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -153,7 +153,7 @@ export const bookingRouter = createRouter({
       return booking;
     }),
 
-  cancel: protectedProcedure
+  cancel: adminProcedure
     .input(z.object({
       id: z.string(),
       reason: z.string().optional(),
@@ -202,7 +202,7 @@ export const bookingRouter = createRouter({
       return services.booking.complete(input.id);
     }),
 
-  reschedule: protectedProcedure
+  reschedule: adminProcedure
     .input(z.object({
       id: z.string(),
       newScheduleId: z.string(),
@@ -250,7 +250,7 @@ export const bookingRouter = createRouter({
       return booking;
     }),
 
-  updatePaymentStatus: protectedProcedure
+  updatePaymentStatus: adminProcedure
     .input(
       z.object({
         id: z.string(),

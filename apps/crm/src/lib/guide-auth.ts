@@ -4,10 +4,19 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { randomBytes, createHash } from "crypto";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.GUIDE_JWT_SECRET || "your-secret-key-change-this-in-production"
-);
 const COOKIE_NAME = "guide-portal-token";
+
+/**
+ * Get the JWT secret - lazy initialization to avoid build-time errors
+ * Throws at runtime if GUIDE_JWT_SECRET is not set
+ */
+function getJwtSecret(): Uint8Array {
+  const jwtSecret = process.env.GUIDE_JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error("GUIDE_JWT_SECRET environment variable must be set");
+  }
+  return new TextEncoder().encode(jwtSecret);
+}
 const TOKEN_EXPIRY_DAYS = 7;
 
 export interface GuideContext {
@@ -89,7 +98,7 @@ export async function validateMagicLinkToken(
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime(`${TOKEN_EXPIRY_DAYS}d`)
     .setIssuedAt()
-    .sign(JWT_SECRET);
+    .sign(getJwtSecret());
 
   // Set the session cookie
   const cookieStore = await cookies();
@@ -122,7 +131,7 @@ export async function getGuideContext(): Promise<GuideContext | null> {
     }
 
     // Verify JWT
-    const verified = await jwtVerify(token, JWT_SECRET);
+    const verified = await jwtVerify(token, getJwtSecret());
     const payload = verified.payload as {
       guideId: string;
       organizationId: string;

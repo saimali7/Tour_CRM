@@ -337,7 +337,10 @@ export class RefundService extends BaseService {
    */
   private async updateBookingPaymentStatus(bookingId: string): Promise<void> {
     const booking = await this.db.query.bookings.findFirst({
-      where: eq(bookings.id, bookingId),
+      where: and(
+        eq(bookings.id, bookingId),
+        eq(bookings.organizationId, this.organizationId)
+      ),
     });
 
     if (!booking) return;
@@ -368,7 +371,12 @@ export class RefundService extends BaseService {
         paymentStatus: newPaymentStatus,
         updatedAt: new Date(),
       })
-      .where(eq(bookings.id, bookingId));
+      .where(
+        and(
+          eq(bookings.id, bookingId),
+          eq(bookings.organizationId, this.organizationId)
+        )
+      );
   }
 
   /**

@@ -56,6 +56,7 @@ export const schedules = pgTable("schedules", {
   guideIdx: index("schedules_guide_idx").on(table.guideId),
   startsAtIdx: index("schedules_starts_at_idx").on(table.startsAt),
   statusIdx: index("schedules_status_idx").on(table.status),
+  orgStartsAtIdx: index("schedules_org_starts_at_idx").on(table.organizationId, table.startsAt),
 }));
 
 // Relations

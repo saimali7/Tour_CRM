@@ -561,7 +561,12 @@ export class CommunicationService extends BaseService {
           ...input,
           updatedAt: new Date(),
         })
-        .where(eq(communicationAutomations.id, existing.id))
+        .where(
+          and(
+            eq(communicationAutomations.id, existing.id),
+            eq(communicationAutomations.organizationId, this.organizationId)
+          )
+        )
         .returning();
 
       return automation!;
@@ -592,7 +597,12 @@ export class CommunicationService extends BaseService {
     const [updated] = await this.db
       .update(communicationAutomations)
       .set({ isActive, updatedAt: new Date() })
-      .where(eq(communicationAutomations.id, automation.id))
+      .where(
+        and(
+          eq(communicationAutomations.id, automation.id),
+          eq(communicationAutomations.organizationId, this.organizationId)
+        )
+      )
       .returning();
 
     return updated!;
@@ -626,7 +636,12 @@ export class CommunicationService extends BaseService {
           ...preferences,
           updatedAt: new Date(),
         })
-        .where(eq(notificationPreferences.id, existing.id))
+        .where(
+          and(
+            eq(notificationPreferences.id, existing.id),
+            eq(notificationPreferences.organizationId, this.organizationId)
+          )
+        )
         .returning();
 
       return updated!;
