@@ -12,16 +12,19 @@ A **multi-tenant tour operations platform** designed to:
 
 ## Architecture Documents
 
+All planning and design documents are in the `docs/` folder:
+
 | Document | Purpose |
 |----------|---------|
-| `SYSTEM_DESIGN.md` | Multi-tenant architecture, organization model, three-layer platform design, monorepo structure |
-| `ARCHITECTURE.md` | Domain model, database schema, API design, tech stack decisions with rationale |
-| `FEATURES.md` | Feature specifications by phase, app ownership (CRM vs Web), acceptance criteria |
-| **`PROGRESS.md`** | **Implementation status tracker - single source of truth for what's done vs pending** |
+| `docs/SYSTEM_DESIGN.md` | Multi-tenant architecture, organization model, three-layer platform design, monorepo structure |
+| `docs/ARCHITECTURE.md` | Domain model, database schema, API design, tech stack decisions with rationale |
+| `docs/FEATURES.md` | Feature specifications by phase, app ownership (CRM vs Web), acceptance criteria |
+| **`docs/PROGRESS.md`** | **Implementation status tracker - single source of truth for what's done vs pending** |
+| `docs/SPRINT.md` | Current sprint goals, tasks, and priorities |
 
 **Always consult these documents before making architectural decisions.**
 
-> **Important:** `PROGRESS.md` is the project management tool. Update it after completing any feature. Check it before starting new work.
+> **Important:** `docs/PROGRESS.md` is the project management tool. Update it after completing any feature. Check it before starting new work.
 
 ## Three-Layer Platform Model
 
@@ -261,7 +264,7 @@ Per-organization roles:
 
 ## Implementation Status
 
-> **Detailed tracking in [`PROGRESS.md`](./PROGRESS.md)** - Single source of truth for all implementation status.
+> **Detailed tracking in [`docs/PROGRESS.md`](./docs/PROGRESS.md)** - Single source of truth for all implementation status.
 
 ### Quick Status (December 2025)
 
@@ -285,7 +288,7 @@ Per-organization roles:
 - Unit tests for critical paths
 - E2E tests with Playwright
 
-> See `PROGRESS.md` for detailed feature breakdowns and task lists.
+> See `docs/PROGRESS.md` for detailed feature breakdowns and task lists.
 
 ## Commands
 
@@ -306,7 +309,7 @@ pnpm test                 # Run tests
 ## Decision-Making Guidelines
 
 When implementing features:
-1. **Check which app owns the feature** - See FEATURES.md Application Ownership section
+1. **Check which app owns the feature** - See docs/FEATURES.md Application Ownership section
 2. **Always scope to organization** - Every query, every mutation, every event
 3. **Use shared services** - Business logic in `@tour/services`, not in app code
 4. **Emit events for side effects** - Don't call email service directly; emit event, let Inngest handle
@@ -399,4 +402,4 @@ Located at `apps/crm/src/inngest/`:
 1. All work on `main` branch (no feature branches)
 2. Use parallel subagents within phases for efficiency
 3. Run `pnpm typecheck && pnpm build` before moving phases
-4. Update `PROGRESS.md` after each feature
+4. Update `docs/PROGRESS.md` after each feature
