@@ -5,11 +5,17 @@ import { ArrowLeft, Edit, Clock, Users, DollarSign, MapPin, Calendar, User } fro
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { ScheduleGuideAssignment } from "@/components/schedules/schedule-guide-assignment";
+import { ScheduleManifest } from "@/components/schedules/schedule-manifest";
+
+type Tab = "details" | "manifest";
 
 export default function ScheduleDetailPage() {
   const params = useParams();
   const slug = params.slug as string;
   const scheduleId = params.id as string;
+  const [activeTab, setActiveTab] = useState<Tab>("details");
 
   const { data: schedule, isLoading, error } = trpc.schedule.getById.useQuery({ id: scheduleId });
 
@@ -95,8 +101,37 @@ export default function ScheduleDetailPage() {
         </Link>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab("details")}
+            className={`${
+              activeTab === "details"
+                ? "border-primary text-primary"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+          >
+            Details
+          </button>
+          <button
+            onClick={() => setActiveTab("manifest")}
+            className={`${
+              activeTab === "manifest"
+                ? "border-primary text-primary"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+          >
+            Manifest
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === "details" && (
+        <div className="space-y-6">
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -156,6 +191,16 @@ export default function ScheduleDetailPage() {
         </div>
       </div>
 
+      {/* Guide Assignment */}
+      {schedule.tour && (
+        <ScheduleGuideAssignment
+          scheduleId={schedule.id}
+          tourId={schedule.tour.id}
+          startsAt={schedule.startsAt}
+          endsAt={schedule.endsAt}
+        />
+      )}
+
       {/* Tour Info */}
       {schedule.tour && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -214,6 +259,10 @@ export default function ScheduleDetailPage() {
           )}
         </div>
       )}
+        </div>
+      )}
+
+      {activeTab === "manifest" && <ScheduleManifest scheduleId={scheduleId} />}
     </div>
   );
 }

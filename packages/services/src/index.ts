@@ -4,6 +4,7 @@ import { ScheduleService } from "./schedule-service";
 import { BookingService } from "./booking-service";
 import { CustomerService } from "./customer-service";
 import { GuideService } from "./guide-service";
+import { GuideAssignmentService } from "./guide-assignment-service";
 import { OrganizationService } from "./organization-service";
 import { ActivityLogService } from "./activity-log-service";
 import { RefundService } from "./refund-service";
@@ -13,6 +14,9 @@ import { CommunicationService } from "./communication-service";
 import { WishlistService } from "./wishlist-service";
 import { AbandonedCartService } from "./abandoned-cart-service";
 import { AvailabilityAlertService } from "./availability-alert-service";
+import { GuideAvailabilityService } from "./guide-availability-service";
+import { TourGuideQualificationService } from "./tour-guide-qualification-service";
+import { ManifestService } from "./manifest-service";
 
 export interface Services {
   tour: TourService;
@@ -20,15 +24,19 @@ export interface Services {
   booking: BookingService;
   customer: CustomerService;
   guide: GuideService;
+  guideAssignment: GuideAssignmentService;
   organization: OrganizationService;
   activityLog: ActivityLogService;
   refund: RefundService;
+  manifest: ManifestService;
   // Phase 2 services
   customerNote: CustomerNoteService;
   communication: CommunicationService;
   wishlist: WishlistService;
   abandonedCart: AbandonedCartService;
   availabilityAlert: AvailabilityAlertService;
+  guideAvailability: GuideAvailabilityService;
+  tourGuideQualification: TourGuideQualificationService;
 }
 
 /**
@@ -48,15 +56,19 @@ export function createServices(ctx: ServiceContext): Services {
     booking: new BookingService(ctx),
     customer: new CustomerService(ctx),
     guide: new GuideService(ctx),
+    guideAssignment: new GuideAssignmentService(ctx),
     organization: new OrganizationService(ctx),
     activityLog: new ActivityLogService(ctx),
     refund: new RefundService(ctx),
+    manifest: new ManifestService(ctx),
     // Phase 2 services
     customerNote: new CustomerNoteService(ctx),
     communication: new CommunicationService(ctx),
     wishlist: new WishlistService(ctx),
     abandonedCart: new AbandonedCartService(ctx),
     availabilityAlert: new AvailabilityAlertService(ctx),
+    guideAvailability: new GuideAvailabilityService(ctx),
+    tourGuideQualification: new TourGuideQualificationService(ctx),
   };
 }
 
@@ -66,6 +78,7 @@ export { ScheduleService } from "./schedule-service";
 export { BookingService } from "./booking-service";
 export { CustomerService } from "./customer-service";
 export { GuideService } from "./guide-service";
+export { GuideAssignmentService } from "./guide-assignment-service";
 export { OrganizationService } from "./organization-service";
 export { ActivityLogService } from "./activity-log-service";
 export { RefundService } from "./refund-service";
@@ -75,6 +88,9 @@ export { CommunicationService } from "./communication-service";
 export { WishlistService } from "./wishlist-service";
 export { AbandonedCartService } from "./abandoned-cart-service";
 export { AvailabilityAlertService } from "./availability-alert-service";
+export { GuideAvailabilityService } from "./guide-availability-service";
+export { TourGuideQualificationService } from "./tour-guide-qualification-service";
+export { ManifestService } from "./manifest-service";
 
 // Export types
 export * from "./types";
@@ -106,6 +122,11 @@ export type {
   CreateGuideInput,
   UpdateGuideInput,
 } from "./guide-service";
+export type {
+  GuideAssignmentFilters,
+  GuideAssignmentWithRelations,
+  CreateGuideAssignmentInput,
+} from "./guide-assignment-service";
 export type {
   UpdateOrganizationInput,
   UpdateOrganizationSettingsInput,
@@ -151,6 +172,25 @@ export type {
   AvailabilityAlertWithRelations,
   CreateAvailabilityAlertInput,
 } from "./availability-alert-service";
+export type {
+  WeeklyAvailabilitySlot,
+  AvailabilityOverrideInput,
+  DateAvailability,
+} from "./guide-availability-service";
+export type {
+  QualificationWithGuide,
+  QualificationWithTour,
+  CreateQualificationInput,
+  UpdateQualificationInput,
+  QualifiedGuideWithAvailability,
+} from "./tour-guide-qualification-service";
+export type {
+  ManifestParticipant,
+  ManifestBooking,
+  ScheduleManifest,
+  GuideManifestSummary,
+  DateManifestSummary,
+} from "./manifest-service";
 
 // Storage service (separate from org-scoped services, created with createStorageService)
 export { StorageService, createStorageService, type UploadResult } from "./storage-service";

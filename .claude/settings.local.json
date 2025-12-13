@@ -33,7 +33,15 @@
       "Bash(git -C /Users/saim/.claude-worktrees/Tour_CRM/quirky-newton log --oneline -20)",
       "Bash(pnpm dev:*)",
       "Bash(docker-compose:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm --filter @tour/services typecheck:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(pnpm --filter @tour/services build:*)",
+      "Bash(test:*)",
+      "Bash(pnpm --filter crm typecheck:*)"
     ]
   }
 }

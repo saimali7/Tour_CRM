@@ -97,6 +97,57 @@ type BookingEvents = {
       newPrice: string;
     };
   };
+  // Guide notification events
+  "guide/assignment.created": {
+    data: {
+      organizationId: string;
+      assignmentId: string;
+      scheduleId: string;
+      guideId: string;
+      guideName: string;
+      guideEmail: string;
+      tourName: string;
+      startsAt: string;
+      endsAt: string;
+      meetingPoint?: string;
+      meetingPointDetails?: string;
+    };
+  };
+  "guide/assignment.pending-reminder": {
+    data: {
+      organizationId: string;
+      assignmentId: string;
+      scheduleId: string;
+      guideId: string;
+      guideName: string;
+      guideEmail: string;
+      tourName: string;
+      startsAt: string;
+      endsAt: string;
+      meetingPoint?: string;
+      meetingPointDetails?: string;
+    };
+  };
+  "guide/schedule.reminder": {
+    data: {
+      organizationId: string;
+      scheduleId: string;
+      guideId: string;
+      guideName: string;
+      guideEmail: string;
+      tourName: string;
+      startsAt: string;
+      endsAt: string;
+      participantCount: number;
+      meetingPoint?: string;
+      meetingPointDetails?: string;
+    };
+  };
+  "guide/daily-manifest": {
+    data: {
+      organizationId: string;
+    };
+  };
 };
 
 // Create the Inngest client

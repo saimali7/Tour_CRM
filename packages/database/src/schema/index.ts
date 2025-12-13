@@ -13,3 +13,7 @@ export * from "./refunds";
 
 // Phase 2: Communications & Customer engagement
 export * from "./communications";
+
+// Phase 3: Guide Operations
+export * from "./guide-operations";
+export * from "./guide-tokens";
