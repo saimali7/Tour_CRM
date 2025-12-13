@@ -2,6 +2,9 @@ import { Resend } from "resend";
 import { BookingConfirmationEmail } from "./templates/booking-confirmation";
 import { BookingCancellationEmail } from "./templates/booking-cancellation";
 import { BookingReminderEmail } from "./templates/booking-reminder";
+import { GuideAssignmentEmail } from "./templates/guide-assignment";
+import { GuideReminderEmail } from "./templates/guide-reminder";
+import { GuideDailyManifestEmail } from "./templates/guide-daily-manifest";
 import * as React from "react";
 
 // Lazy initialize Resend client
@@ -74,6 +77,44 @@ export interface ReminderEmailData {
   specialInstructions?: string;
   viewBookingUrl?: string;
   hoursUntilTour: number;
+}
+
+export interface GuideAssignmentEmailData {
+  guideName: string;
+  guideEmail: string;
+  tourName: string;
+  tourDate: string;
+  tourTime: string;
+  meetingPoint?: string;
+  meetingPointDetails?: string;
+  confirmUrl?: string;
+  declineUrl?: string;
+  manifestUrl?: string;
+}
+
+export interface GuideReminderEmailData {
+  guideName: string;
+  guideEmail: string;
+  tourName: string;
+  tourDate: string;
+  tourTime: string;
+  participantCount: number;
+  meetingPoint?: string;
+  meetingPointDetails?: string;
+  manifestUrl?: string;
+}
+
+export interface GuideDailyManifestEmailData {
+  guideName: string;
+  guideEmail: string;
+  date: string;
+  tours: Array<{
+    tourName: string;
+    time: string;
+    participantCount: number;
+    meetingPoint?: string;
+    manifestUrl?: string;
+  }>;
 }
 
 export class EmailService {
@@ -200,6 +241,119 @@ export class EmailService {
           viewBookingUrl: data.viewBookingUrl,
           logoUrl: this.org.logoUrl,
           hoursUntilTour: data.hoursUntilTour,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send guide assignment email
+   */
+  async sendGuideAssignment(data: GuideAssignmentEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.guideEmail,
+        replyTo: this.replyTo,
+        subject: `New Tour Assignment - ${data.tourName}`,
+        react: React.createElement(GuideAssignmentEmail, {
+          guideName: data.guideName,
+          tourName: data.tourName,
+          tourDate: data.tourDate,
+          tourTime: data.tourTime,
+          meetingPoint: data.meetingPoint,
+          meetingPointDetails: data.meetingPointDetails,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          confirmUrl: data.confirmUrl,
+          declineUrl: data.declineUrl,
+          manifestUrl: data.manifestUrl,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send guide reminder email
+   */
+  async sendGuideReminder(data: GuideReminderEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.guideEmail,
+        replyTo: this.replyTo,
+        subject: `Tour Reminder - ${data.tourName}`,
+        react: React.createElement(GuideReminderEmail, {
+          guideName: data.guideName,
+          tourName: data.tourName,
+          tourDate: data.tourDate,
+          tourTime: data.tourTime,
+          participantCount: data.participantCount,
+          meetingPoint: data.meetingPoint,
+          meetingPointDetails: data.meetingPointDetails,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          manifestUrl: data.manifestUrl,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send guide daily manifest email
+   */
+  async sendGuideDailyManifest(data: GuideDailyManifestEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.guideEmail,
+        replyTo: this.replyTo,
+        subject: `Your Daily Schedule - ${data.date}`,
+        react: React.createElement(GuideDailyManifestEmail, {
+          guideName: data.guideName,
+          date: data.date,
+          tours: data.tours,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          logoUrl: this.org.logoUrl,
         }),
       });
 

@@ -4,6 +4,8 @@ import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { tours } from "./tours";
 import { guides } from "./guides";
+import { bookings } from "./bookings";
+import { guideAssignments } from "./guide-operations";
 
 // Schedules - Specific tour instances (org-scoped)
 export const schedules = pgTable("schedules", {
@@ -57,7 +59,7 @@ export const schedules = pgTable("schedules", {
 }));
 
 // Relations
-export const schedulesRelations = relations(schedules, ({ one }) => ({
+export const schedulesRelations = relations(schedules, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [schedules.organizationId],
     references: [organizations.id],
@@ -70,6 +72,8 @@ export const schedulesRelations = relations(schedules, ({ one }) => ({
     fields: [schedules.guideId],
     references: [guides.id],
   }),
+  bookings: many(bookings),
+  assignments: many(guideAssignments),
 }));
 
 // Types

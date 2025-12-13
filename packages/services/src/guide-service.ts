@@ -242,7 +242,7 @@ export class GuideService extends BaseService {
   async getSchedules(
     id: string,
     dateRange?: DateRangeFilter
-  ): Promise<typeof schedules.$inferSelect[]> {
+  ) {
     await this.getById(id);
 
     const conditions = [
@@ -260,6 +260,9 @@ export class GuideService extends BaseService {
     return this.db.query.schedules.findMany({
       where: and(...conditions),
       orderBy: [asc(schedules.startsAt)],
+      with: {
+        tour: true,
+      },
     });
   }
 

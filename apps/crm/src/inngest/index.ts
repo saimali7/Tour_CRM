@@ -20,6 +20,13 @@ export {
   checkPriceDrops,
 } from "./functions/engagement-automations";
 
+export {
+  sendGuideAssignmentEmail,
+  sendPendingAssignmentReminder,
+  sendGuideScheduleReminder,
+  sendGuideDailyManifest,
+} from "./functions/guide-notifications";
+
 // Aggregate all functions for the serve handler
 import {
   sendBookingConfirmationEmail,
@@ -38,6 +45,13 @@ import {
   checkPriceDrops,
 } from "./functions/engagement-automations";
 
+import {
+  sendGuideAssignmentEmail,
+  sendPendingAssignmentReminder,
+  sendGuideScheduleReminder,
+  sendGuideDailyManifest,
+} from "./functions/guide-notifications";
+
 export const inngestFunctions = [
   // Booking emails
   sendBookingConfirmationEmail,
@@ -50,4 +64,9 @@ export const inngestFunctions = [
   sendReviewRequests,
   checkAvailabilityAlerts,
   checkPriceDrops,
+  // Guide notifications
+  sendGuideAssignmentEmail,
+  sendPendingAssignmentReminder,
+  sendGuideScheduleReminder,
+  sendGuideDailyManifest,
 ];

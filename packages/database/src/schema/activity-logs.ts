@@ -23,6 +23,7 @@ export type ActivityAction =
   | "schedule.completed"
   | "schedule.guide_assigned"
   | "schedule.guide_removed"
+  | "schedule.guide_reminder_sent"
   // Tour actions
   | "tour.created"
   | "tour.updated"
@@ -39,6 +40,10 @@ export type ActivityAction =
   | "guide.updated"
   | "guide.activated"
   | "guide.deactivated"
+  | "guide.daily_manifest_sent"
+  // Assignment actions
+  | "assignment.email_sent"
+  | "assignment.reminder_sent"
   // Organization actions
   | "organization.settings_updated"
   | "organization.stripe_connected"
@@ -55,6 +60,7 @@ export type ActivityEntity =
   | "tour"
   | "customer"
   | "guide"
+  | "guide_assignment"
   | "organization"
   | "payment";
 

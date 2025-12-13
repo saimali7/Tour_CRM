@@ -252,19 +252,10 @@ Per-organization roles:
 
 ## Build Phases
 
-**Sequential Phase Development** - We complete each phase fully before moving to the next.
-
-| Phase | Name | Focus |
-|-------|------|-------|
-| **0** | Foundation | Monorepo, multi-tenant DB, Clerk orgs |
-| **1** | Core Booking | Tours, schedules, bookings, payments |
-| **2** | Customer & Comms | CRM features, email automation |
-| **3** | Guide Operations | Guides, assignments, manifests |
-| **4** | Pricing & Promos | Seasonal pricing, promo codes |
-| **5** | Reporting | Dashboards, analytics |
-| **6** | Polish | Performance, testing, UX |
-| **7-9** | Web App | Public booking site |
-| **10-11** | SaaS Platform | Multi-tenant onboarding, API |
+1. **Foundation** - Monorepo, multi-tenant DB, Clerk orgs, basic CRM
+2. **Operations** - Guides, calendar, modifications, communications
+3. **Web App** - Subdomain routing, theming, booking checkout
+4. **Platform Scale** - Onboarding, subscription billing, feature flags
 
 ---
 
@@ -279,15 +270,24 @@ Per-organization roles:
 | **0** | Foundation | ✅ COMPLETE | 100% |
 | **1** | Core Booking Engine | ✅ COMPLETE | 97% |
 | **2** | Customer & Communications | ✅ COMPLETE | 95% |
-| **3** | Guide Operations | 🔄 NEXT | 0% |
-| **4-11** | Remaining Phases | ⏳ PENDING | 0% |
+| **3** | Guide Operations | ✅ COMPLETE | 95% |
+| **4** | Pricing & Promotions | 🔄 NEXT | 0% |
+| **5-6** | Reporting & Polish | ⏳ PENDING | 0% |
+| **7-11** | Web App & SaaS | ⏳ FUTURE | 0% |
 
-### Development Strategy
+### Next Phase: Phase 4 - Pricing & Promotions
 
-- **One phase at a time** - Complete current phase before starting next
-- **All work on `main`** - No feature branches needed
-- **Subagents for efficiency** - Use parallel subagents within a phase
-- **Commit frequently** - Small, focused commits after each feature
+**Database tables needed:**
+- `seasonal_pricing` - Date ranges with price adjustments
+- `promo_codes` - Discount codes with limits
+- `promo_code_usage` - Usage tracking
+- `group_discounts` - Threshold-based discounts
+
+**Key features:**
+- Seasonal pricing UI (date ranges, percentage/fixed adjustments)
+- Promo code CRUD with usage limits and date validity
+- Group discount configuration
+- Apply discounts in booking flow
 
 > See `PROGRESS.md` for detailed feature breakdowns and task lists.
 
@@ -315,3 +315,80 @@ When implementing features:
 3. **Use shared services** - Business logic in `@tour/services`, not in app code
 4. **Emit events for side effects** - Don't call email service directly; emit event, let Inngest handle
 5. **Validate at boundaries** - Use `@tour/validators` schemas for all inputs
+
+---
+
+## Codebase Structure Reference
+
+### Current File Counts (December 13, 2025)
+
+| Directory | Count | Purpose |
+|-----------|-------|---------|
+| `packages/services/src/` | 21 services | Business logic layer |
+| `packages/database/src/schema/` | 13 schema files | Drizzle ORM tables |
+| `apps/crm/src/server/routers/` | 18 routers | tRPC API endpoints |
+
+### Key Services by Phase
+
+**Phase 1 (Core Booking):**
+- `tour-service.ts` - Tour CRUD
+- `schedule-service.ts` - Schedule management
+- `booking-service.ts` - Booking operations
+- `activity-log-service.ts` - Audit trail
+
+**Phase 2 (Customer & Communications):**
+- `customer-service.ts` - Customer CRUD
+- `communication-service.ts` - Email/SMS
+- `customer-note-service.ts` - Customer notes
+- `wishlist-service.ts` - Wishlists
+- `abandoned-cart-service.ts` - Cart recovery
+- `availability-alert-service.ts` - Alerts
+
+**Phase 3 (Guide Operations):**
+- `guide-service.ts` - Guide CRUD
+- `guide-availability-service.ts` - Weekly patterns + overrides
+- `tour-guide-qualification-service.ts` - Which guides lead which tours
+- `guide-assignment-service.ts` - Schedule-guide assignments
+- `manifest-service.ts` - Participant lists for guides
+
+### Database Schema Files
+
+```
+packages/database/src/schema/
+├── organizations.ts      # Tenant root
+├── users.ts              # Clerk user sync
+├── customers.ts          # Booking customers
+├── tours.ts              # Tour products
+├── schedules.ts          # Tour instances
+├── bookings.ts           # Reservations
+├── guides.ts             # Tour guides
+├── guide-operations.ts   # Availability, qualifications, assignments
+├── guide-tokens.ts       # Magic link auth for guide portal
+├── communications.ts     # Email logs, templates, automations
+├── activity-logs.ts      # Audit trail
+├── refunds.ts            # Refund tracking
+└── index.ts              # Barrel export
+```
+
+### Guide Portal (Magic Link Auth)
+
+Located at `apps/crm/src/app/(guide-portal)/`:
+- Uses JWT tokens stored in `guide_tokens` table
+- Guides receive email with magic link to `/guide/login?token=xxx`
+- Token validated, sets HTTP-only cookie
+- Portal shows upcoming assignments, confirm/decline, view manifests
+
+### Inngest Background Jobs
+
+Located at `apps/crm/src/inngest/`:
+- `booking/` - Confirmation emails, reminders
+- `customer/` - Abandoned cart recovery, price drop alerts
+- `guide/` - Assignment notifications, daily manifests
+
+### Development Strategy
+
+**Sequential phase development** - Complete each phase before moving to the next:
+1. All work on `main` branch (no feature branches)
+2. Use parallel subagents within phases for efficiency
+3. Run `pnpm typecheck && pnpm build` before moving phases
+4. Update `PROGRESS.md` after each feature

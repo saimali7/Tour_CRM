@@ -6,6 +6,7 @@ import { ArrowLeft, Edit, Clock, Users, DollarSign, MapPin, Calendar, Check, X, 
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
+import { TourGuideQualifications } from "@/components/tours/tour-guide-qualifications";
 
 interface PricingTierFormData {
   name: string;
@@ -621,6 +622,9 @@ export default function TourDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Qualified Guides */}
+      <TourGuideQualifications tourId={tourId} />
 
       {/* Cancellation Policy */}
       {tour.cancellationPolicy && (
