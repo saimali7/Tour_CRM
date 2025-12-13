@@ -148,4 +148,20 @@ export const customerRouter = createRouter({
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.customer.search(input.query, input.limit);
     }),
+
+  // GDPR Compliance endpoints
+  exportGdprData: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.customer.exportGdprData(input.id);
+    }),
+
+  anonymizeForGdpr: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      await services.customer.anonymizeForGdpr(input.id);
+      return { success: true };
+    }),
 });

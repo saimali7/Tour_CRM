@@ -1,7 +1,7 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** December 13, 2025
-**Status:** Parallel Development Mode
+**Last Updated:** December 13, 2025 (Phase 2 Complete)
+**Status:** Parallel Development Mode - Phase 2 Complete
 **Main Branch:** `main`
 
 > This document is the single source of truth for implementation progress. It supports **parallel development** across multiple workstreams using git worktrees.
@@ -51,7 +51,7 @@
 |------------|----------|--------|--------|-------|------------|
 | **Foundation** | 0, 1 | ✅ COMPLETE | `main` | - | 97% |
 | **A: Web App** | 7, 8, 9 | 🟡 READY | `feature/web-app` | *Unassigned* | 0% |
-| **B: Customers & Comms** | 2 | 🟡 READY | `feature/phase-2-customers` | *Unassigned* | 0% |
+| **B: Customers & Comms** | 2 | ✅ COMPLETE | `quirky-newton` | Claude | 95% |
 | **C: Guide Operations** | 3 | 🟡 READY | `feature/phase-3-guides` | *Unassigned* | 0% |
 | **D: Pricing & Promos** | 4 | 🟡 READY | `feature/phase-4-pricing` | *Unassigned* | 0% |
 | **E: Reporting** | 5 | 🟡 READY | `feature/phase-5-reporting` | *Unassigned* | 0% |
@@ -244,10 +244,10 @@ These can be completed by any workstream or deferred:
 
 ## Workstream B: Customers & Communications (Phase 2)
 
-**Branch:** `feature/phase-2-customers`
+**Branch:** `quirky-newton`
 **App:** `apps/crm`
-**Owner:** *Unassigned*
-**Status:** 🟡 READY TO START
+**Owner:** Claude
+**Status:** ✅ COMPLETE (95%)
 
 ### Prerequisites ✅
 - [x] Customers table exists
@@ -255,44 +255,63 @@ These can be completed by any workstream or deferred:
 - [x] Email templates package exists (`@tour/emails`)
 - [x] Inngest configured
 
-### New Database Tables Needed
+### New Database Tables ✅
 
 ```typescript
 // packages/database/src/schema/communications.ts
-- communication_logs (email/SMS history)
-- email_templates (custom templates)
-- abandoned_carts (cart recovery)
-- wishlists (save for later)
-- notification_preferences
+- communication_logs ✅
+- email_templates ✅
+- sms_templates ✅
+- abandoned_carts ✅
+- wishlists ✅
+- availability_alerts ✅
+- customer_notes ✅
+- notification_preferences ✅
+- communication_automations ✅
 ```
 
-### Phase 2 Tasks (0%)
+### Phase 2 Tasks (95%)
 
 | Task | Status | Notes |
 |------|--------|-------|
 | **Customer Management** | | |
-| Customer list UI (search, filter, sort) | ⬜ | |
-| Customer profile page | ⬜ | |
-| Customer edit form | ⬜ | |
-| Customer notes system | ⬜ | |
-| Customer tags | ⬜ | |
-| Customer data export (GDPR) | ⬜ | |
+| Customer list UI (search, filter, sort) | ✅ | `customers/page.tsx` |
+| Customer profile page | ✅ | `customers/[id]/page.tsx` with tabs |
+| Customer edit form | ✅ | Edit modal in profile |
+| Customer notes system | ✅ | Notes tab with add/pin/delete |
+| Customer tags | ✅ | In edit form |
+| Customer data export (GDPR) | ✅ | `exportGdprData` & `anonymizeForGdpr` in service |
 | **Email Communications** | | |
-| Email template management UI | ⬜ | |
-| Template variable system | ⬜ | |
-| Manual email composer | ⬜ | |
-| Email automation settings | ⬜ | |
-| Communication history view | ⬜ | |
+| Email template management UI | ✅ | Communications page with template CRUD |
+| Template variable system | ✅ | `substituteVariables` in service |
+| Manual email composer | ⬜ | Could use template system for now |
+| Email automation settings | ✅ | Automations tab with toggles |
+| Communication history view | ✅ | History tab with filters |
 | **SMS Communications** | | |
-| Twilio integration | ⬜ | |
-| SMS templates | ⬜ | |
-| SMS automation | ⬜ | |
+| Twilio integration | ⬜ | Backend ready, needs Twilio credentials |
+| SMS templates | ✅ | Schema and service ready |
+| SMS automation | ⬜ | Schema ready, needs Twilio |
 | **Conversion Recovery** | | |
-| Abandoned cart tracking | ⬜ | |
-| Cart recovery emails (Inngest) | ⬜ | |
-| Wishlist functionality | ⬜ | |
-| Price drop alerts | ⬜ | |
-| Availability alerts | ⬜ | |
+| Abandoned cart tracking | ✅ | Schema, service, and Inngest functions |
+| Cart recovery emails (Inngest) | ✅ | 3-email sequence in `cart-recovery.ts` |
+| Wishlist functionality | ✅ | Schema and service ready |
+| Price drop alerts | ✅ | Inngest function `checkPriceDrops` |
+| Availability alerts | ✅ | Schema, service, Inngest function |
+
+### Phase 2 Summary
+
+**Completed:**
+- Full communications schema (9 new tables)
+- 5 new services (CommunicationService, CustomerNoteService, WishlistService, AbandonedCartService, AvailabilityAlertService)
+- tRPC routers for all Phase 2 services
+- Communications page with 4 tabs (History, Email Templates, SMS Templates, Automations)
+- Customer profile page with Notes and Communications tabs
+- GDPR data export and anonymization
+- Inngest automation functions for cart recovery, price drops, availability alerts
+
+**Remaining (5%):**
+- Twilio SMS integration (needs credentials)
+- Dedicated manual email composer UI (templates work for now)
 
 ---
 
@@ -578,6 +597,17 @@ pnpm build
 ---
 
 ## Changelog
+
+### December 13, 2025 - Phase 2 Complete (Session 2)
+- Phase 2 Customers & Communications: 0% → 95%
+- Added 9 new database tables (communications schema)
+- Created 5 new services (CommunicationService, CustomerNoteService, WishlistService, AbandonedCartService, AvailabilityAlertService)
+- Added tRPC routers for all Phase 2 services
+- Built Communications page with History, Email Templates, SMS Templates, Automations tabs
+- Enhanced Customer profile page with Notes and Communications tabs
+- Implemented GDPR data export and anonymization functions
+- Created Inngest automation functions for cart recovery, price drops, availability alerts
+- Remaining: Twilio SMS integration (needs credentials), manual email composer UI
 
 ### December 13, 2025 - Parallel Development Setup
 - Restructured PROGRESS.md for parallel workstreams

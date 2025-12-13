@@ -10,3 +10,6 @@ export * from "./schedules";
 export * from "./bookings";
 export * from "./activity-logs";
 export * from "./refunds";
+
+// Phase 2: Communications & Customer engagement
+export * from "./communications";
