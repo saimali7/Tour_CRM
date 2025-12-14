@@ -64,6 +64,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 # Skip env validation during build (will validate at runtime)
 ENV SKIP_ENV_VALIDATION=true
+# Dummy DATABASE_URL for build - actual URL provided at runtime
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
 
 # Build the CRM app
 RUN pnpm --filter @tour/crm build

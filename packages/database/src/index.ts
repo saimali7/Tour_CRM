@@ -2,26 +2,49 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-// Lazy initialization to avoid crashes when DATABASE_URL is not set
+// Lazy initialization to avoid crashes when DATABASE_URL is not set at build time
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let _initError: Error | null = null;
 
 export function getDb() {
+  if (_initError) {
+    throw _initError;
+  }
   if (!_db) {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
-      throw new Error("DATABASE_URL environment variable is not set");
+      // During build, return a mock that will fail at runtime
+      if (process.env.NODE_ENV === "production" && typeof window === "undefined") {
+        console.warn("DATABASE_URL not set - database calls will fail at runtime");
+      }
+      _initError = new Error("DATABASE_URL environment variable is not set");
+      throw _initError;
     }
-    const queryClient = postgres(databaseUrl);
-    _db = drizzle(queryClient, { schema });
+    try {
+      const queryClient = postgres(databaseUrl);
+      _db = drizzle(queryClient, { schema });
+    } catch (err) {
+      _initError = err as Error;
+      throw _initError;
+    }
   }
   return _db;
 }
 
-// For backwards compatibility - will throw if DATABASE_URL is not set
+// For backwards compatibility - uses Proxy for lazy access
+// The proxy only triggers getDb() when a property is actually accessed
 export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
-  get(_, prop) {
+  get(target, prop, receiver) {
+    // Skip certain properties that might be checked during build/bundling
+    if (prop === "then" || prop === Symbol.toStringTag || prop === Symbol.iterator) {
+      return undefined;
+    }
     const database = getDb();
-    return (database as unknown as Record<string | symbol, unknown>)[prop];
+    const value = (database as unknown as Record<string | symbol, unknown>)[prop];
+    if (typeof value === "function") {
+      return value.bind(database);
+    }
+    return value;
   },
 });
 
