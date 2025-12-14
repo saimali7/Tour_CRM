@@ -5,6 +5,9 @@ import type { Route } from "next";
 import { Building2, Plus } from "lucide-react";
 import { db } from "@tour/database";
 
+// Force dynamic rendering - this page needs database access
+export const dynamic = "force-dynamic";
+
 // Check if Clerk is enabled
 const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
 
