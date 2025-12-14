@@ -1,10 +1,36 @@
-import { UserButton } from "@clerk/nextjs";
 import { getOrgContext } from "@/lib/auth";
 import { DashboardProviders } from "./providers";
 import { CommandPalette } from "@/components/command-palette";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { NavigationProgress } from "@/components/navigation-progress";
 import { Suspense } from "react";
+import { User } from "lucide-react";
+
+// Check if Clerk is enabled
+const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
+
+// Conditionally import UserButton
+async function UserAccountButton() {
+  if (ENABLE_CLERK) {
+    const { UserButton } = await import("@clerk/nextjs");
+    return (
+      <UserButton
+        appearance={{
+          elements: {
+            avatarBox: "h-8 w-8",
+          },
+        }}
+      />
+    );
+  }
+
+  // Fallback avatar when Clerk is disabled
+  return (
+    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200">
+      <User className="h-4 w-4 text-gray-600" />
+    </div>
+  );
+}
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -51,13 +77,7 @@ export default async function DashboardLayout({
         {/* User section */}
         <div className="border-t border-gray-200 p-4">
           <div className="flex items-center gap-3">
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox: "h-8 w-8",
-                },
-              }}
-            />
+            <UserAccountButton />
             <div className="flex-1 truncate">
               <p className="text-sm font-medium text-gray-900 truncate">
                 Account
@@ -77,7 +97,7 @@ export default async function DashboardLayout({
           <p className="flex-1 text-sm font-semibold text-gray-900 truncate">
             {organization.name}
           </p>
-          <UserButton />
+          <UserAccountButton />
         </header>
 
         {/* Page content */}

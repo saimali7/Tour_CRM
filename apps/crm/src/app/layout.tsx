@@ -14,18 +14,26 @@ export const metadata: Metadata = {
   description: "Tour operations management platform",
 };
 
+// Check if Clerk is enabled
+const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={`${inter.variable} font-sans antialiased`}>
-          <TRPCProvider>{children}</TRPCProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+  const content = (
+    <html lang="en">
+      <body className={`${inter.variable} font-sans antialiased`}>
+        <TRPCProvider>{children}</TRPCProvider>
+      </body>
+    </html>
   );
+
+  // Only wrap with ClerkProvider if Clerk is enabled
+  if (ENABLE_CLERK) {
+    return <ClerkProvider>{content}</ClerkProvider>;
+  }
+
+  return content;
 }

@@ -1,8 +1,10 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, eq, and } from "@tour/database";
 import { users, organizationMembers, organizations } from "@tour/database/schema";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
+
+// Check if Clerk is enabled
+const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
 
 export interface OrgContext {
   organizationId: string;
@@ -19,6 +21,14 @@ export interface OrgContext {
  * Wrapped with React cache() for request-level deduplication
  */
 export const getCurrentUser = cache(async () => {
+  // If Clerk is disabled, return the first user (dev mode)
+  if (!ENABLE_CLERK) {
+    const devUser = await db.query.users.findFirst();
+    return devUser || null;
+  }
+
+  // Dynamic import Clerk only when enabled
+  const { auth, currentUser } = await import("@clerk/nextjs/server");
   const { userId } = await auth();
 
   if (!userId) {
@@ -114,6 +124,28 @@ export const getOrgContext = cache(async (orgSlug: string): Promise<OrgContext> 
 
   if (!org) {
     throw new Error("Organization not found");
+  }
+
+  // If Clerk is disabled, skip membership check (dev mode)
+  if (!ENABLE_CLERK) {
+    // Create a mock membership for dev mode
+    const mockMembership = {
+      id: "dev-membership",
+      organizationId: org.id,
+      userId: user.id,
+      role: "admin" as const,
+      status: "active" as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    return {
+      organizationId: org.id,
+      organization: org,
+      membership: mockMembership as typeof organizationMembers.$inferSelect,
+      user,
+      role: "admin",
+    };
   }
 
   // Verify user has access to this organization - cached

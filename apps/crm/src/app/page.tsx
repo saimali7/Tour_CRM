@@ -1,12 +1,25 @@
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import { getUserOrganizations } from "@/lib/auth";
 import Link from "next/link";
 import type { Route } from "next";
 import { Building2, Plus } from "lucide-react";
+import { db } from "@tour/database";
+
+// Check if Clerk is enabled
+const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
 
 export default async function HomePage() {
-  const { userId } = await auth();
+  let userId: string | null = null;
+
+  // Only check Clerk auth if enabled
+  if (ENABLE_CLERK) {
+    const { auth } = await import("@clerk/nextjs/server");
+    const authResult = await auth();
+    userId = authResult.userId;
+  } else {
+    // In dev mode, assume authenticated
+    userId = "dev-user";
+  }
 
   // If not signed in, show landing page
   if (!userId) {
@@ -42,8 +55,16 @@ export default async function HomePage() {
     );
   }
 
-  // Get user's organizations
-  const orgs = await getUserOrganizations();
+  // Get user's organizations (or first org in dev mode)
+  let orgs = await getUserOrganizations();
+
+  // In dev mode, if no orgs from getUserOrganizations, get first org directly
+  if (!ENABLE_CLERK && orgs.length === 0) {
+    const firstOrg = await db.query.organizations.findFirst();
+    if (firstOrg) {
+      orgs = [firstOrg];
+    }
+  }
 
   // If user has exactly one org, redirect to it
   if (orgs.length === 1 && orgs[0]) {

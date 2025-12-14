@@ -1,21 +1,42 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-// Routes that don't require authentication at middleware level
-// Note: tRPC handles its own auth via protectedProcedure
-const isPublicRoute = createRouteMatcher([
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/webhooks(.*)",
-  "/api/trpc(.*)",
-  // Note: /onboarding requires auth (will redirect to sign-in if not logged in)
-]);
+// =============================================================================
+// AUTH DISABLED FOR TESTING
+// =============================================================================
+// Set ENABLE_CLERK=true in environment to re-enable Clerk authentication
+// =============================================================================
 
-export default clerkMiddleware(async (auth, req) => {
-  // Protect all routes except public ones
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
+
+// Clerk middleware (only used when ENABLE_CLERK=true)
+async function clerkAuth(req: NextRequest) {
+  const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
+
+  const isPublicRoute = createRouteMatcher([
+    "/sign-in(.*)",
+    "/sign-up(.*)",
+    "/api/webhooks(.*)",
+    "/api/trpc(.*)",
+    "/api/health(.*)",
+  ]);
+
+  return clerkMiddleware(async (auth, request) => {
+    if (!isPublicRoute(request)) {
+      await auth.protect();
+    }
+  })(req, {} as any);
+}
+
+export default async function middleware(req: NextRequest) {
+  // If Clerk is disabled, allow all requests
+  if (!ENABLE_CLERK) {
+    return NextResponse.next();
   }
-});
+
+  // Otherwise use Clerk authentication
+  return clerkAuth(req);
+}
 
 export const config = {
   matcher: [
