@@ -79,6 +79,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install pnpm for running db commands
+RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
+
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -93,6 +96,12 @@ RUN chown nextjs:nodejs .next
 # Copy standalone build output
 COPY --from=builder --chown=nextjs:nodejs /app/apps/crm/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/crm/.next/static ./apps/crm/.next/static
+
+# Copy database package for migrations (drizzle-kit)
+COPY --from=builder --chown=nextjs:nodejs /app/packages/database ./packages/database
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 USER nextjs
 
