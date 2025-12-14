@@ -62,6 +62,7 @@ export function NewBookingFlow({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(preselectedCustomerId || "");
   const [newCustomer, setNewCustomer] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [customerSearch, setCustomerSearch] = useState("");
+  const [pickupLocation, setPickupLocation] = useState("");
   const [notes, setNotes] = useState("");
 
   // Queries
@@ -241,6 +242,12 @@ export function NewBookingFlow({
         customerId = customer.id;
       }
 
+      // Combine pickup and notes into special requests
+      const specialRequests = [
+        pickupLocation && `Pickup: ${pickupLocation}`,
+        notes,
+      ].filter(Boolean).join("\n\n") || undefined;
+
       // Create booking
       await createBookingMutation.mutateAsync({
         customerId,
@@ -250,7 +257,7 @@ export function NewBookingFlow({
         infantCount: guestCounts.infants || undefined,
         subtotal: pricing.subtotal.toFixed(2),
         total: pricing.total.toFixed(2),
-        specialRequests: notes || undefined,
+        specialRequests,
         source: "manual",
       });
     } catch {
@@ -813,6 +820,21 @@ export function NewBookingFlow({
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Pickup Location */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Location / Hotel</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={pickupLocation}
+                    onChange={(e) => setPickupLocation(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                    placeholder="Hotel name, address, or meeting point"
+                  />
+                </div>
               </div>
 
               {/* Special Requests */}
