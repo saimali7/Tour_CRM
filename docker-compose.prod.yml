@@ -5,18 +5,39 @@
 #
 # Usage:
 #   docker-compose -f docker-compose.prod.yml up -d
-#
-# Note: Database (Supabase) is external - not included here
 # =============================================================================
 
 services:
+  # ===========================================================================
+  # PostgreSQL Database
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: tour_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tourcrm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tourcrm2024}
+      POSTGRES_DB: ${POSTGRES_DB:-tour_platform}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tourcrm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tour_network
+
   # ===========================================================================
   # CRM Application
   # ===========================================================================
   crm:
     build:
       context: .
-      dockerfile: apps/crm/Dockerfile
+      dockerfile: Dockerfile
     container_name: tour_crm
     restart: unless-stopped
     ports:
@@ -24,8 +45,12 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-    env_file:
-      - .env.production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-tourcrm}:${POSTGRES_PASSWORD:-tourcrm2024}@postgres:5432/${POSTGRES_DB:-tour_platform}
+      - DIRECT_URL=postgresql://${POSTGRES_USER:-tourcrm}:${POSTGRES_PASSWORD:-tourcrm2024}@postgres:5432/${POSTGRES_DB:-tour_platform}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -35,11 +60,10 @@ services:
     networks:
       - tour_network
     labels:
-      # Coolify labels for reverse proxy
       - "coolify.managed=true"
 
   # ===========================================================================
-  # Redis Cache (Optional - for session storage and caching)
+  # Redis Cache (Optional)
   # ===========================================================================
   redis:
     image: redis:7-alpine
@@ -63,5 +87,7 @@ networks:
     driver: bridge
 
 volumes:
+  postgres_data:
+    driver: local
   redis_data:
     driver: local
