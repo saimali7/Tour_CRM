@@ -1,6 +1,6 @@
 "use client";
 
-import { BookingForm } from "@/components/bookings/booking-form";
+import { NewBookingFlow } from "@/components/bookings/new-booking-flow";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -12,8 +12,9 @@ export default function NewBookingPage() {
   const slug = params.slug as string;
 
   // Get pre-selected values from URL query params
-  const preselectedCustomerId = searchParams.get("customerId") || undefined;
+  const preselectedTourId = searchParams.get("tourId") || undefined;
   const preselectedScheduleId = searchParams.get("scheduleId") || undefined;
+  const preselectedCustomerId = searchParams.get("customerId") || undefined;
 
   return (
     <div className="space-y-6">
@@ -30,9 +31,10 @@ export default function NewBookingPage() {
         </div>
       </div>
 
-      <BookingForm
-        preselectedCustomerId={preselectedCustomerId}
+      <NewBookingFlow
+        preselectedTourId={preselectedTourId}
         preselectedScheduleId={preselectedScheduleId}
+        preselectedCustomerId={preselectedCustomerId}
       />
     </div>
   );
