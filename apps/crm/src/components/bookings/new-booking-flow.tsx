@@ -199,7 +199,7 @@ export function NewBookingFlow({
         return !!selectedScheduleId && totalGuests > 0 && totalGuests <= availableSpots;
       case "book":
         if (customerMode === "existing") return !!selectedCustomerId;
-        return newCustomer.firstName.trim() && newCustomer.lastName.trim() && hasValidContact;
+        return newCustomer.firstName.trim() && hasValidContact; // lastName optional
       default:
         return false;
     }
@@ -234,7 +234,7 @@ export function NewBookingFlow({
       if (customerMode === "new") {
         const customer = await createCustomerMutation.mutateAsync({
           firstName: newCustomer.firstName.trim(),
-          lastName: newCustomer.lastName.trim(),
+          lastName: newCustomer.lastName.trim() || "-", // Default for optional lastName
           email: newCustomer.email.trim() || `${Date.now()}@placeholder.local`, // Fallback for phone-only
           phone: newCustomer.phone.trim() || undefined,
         });
@@ -402,6 +402,8 @@ export function NewBookingFlow({
                       setSelectedTourId(tour.id);
                       setSelectedScheduleId("");
                       setSelectedDate(null);
+                      // Auto-advance to next step
+                      setTimeout(() => setCurrentStep("schedule"), 150);
                     }}
                     className={cn(
                       "w-full text-left p-4 rounded-xl border-2 transition-all",
@@ -544,7 +546,11 @@ export function NewBookingFlow({
                             return (
                               <button
                                 key={schedule.id}
-                                onClick={() => setSelectedScheduleId(schedule.id)}
+                                onClick={() => {
+                                  setSelectedScheduleId(schedule.id);
+                                  // Auto-advance to book step (guests default to 1 adult = valid)
+                                  setTimeout(() => setCurrentStep("book"), 200);
+                                }}
                                 className={cn(
                                   "w-full text-left px-4 py-3 rounded-lg border transition-all",
                                   isSelected
@@ -727,13 +733,13 @@ export function NewBookingFlow({
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                         <input
                           type="text"
                           value={newCustomer.lastName}
                           onChange={(e) => setNewCustomer(prev => ({ ...prev, lastName: e.target.value }))}
                           className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                          placeholder="Smith"
+                          placeholder="Smith (optional)"
                         />
                       </div>
                     </div>
