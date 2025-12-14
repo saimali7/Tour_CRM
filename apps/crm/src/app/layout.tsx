@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
 import { TRPCProvider } from "@/providers/trpc-provider";
 import "@tour/ui/globals.css";
 
@@ -17,7 +16,7 @@ export const metadata: Metadata = {
 // Check if Clerk is enabled
 const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -32,6 +31,7 @@ export default function RootLayout({
 
   // Only wrap with ClerkProvider if Clerk is enabled
   if (ENABLE_CLERK) {
+    const { ClerkProvider } = await import("@clerk/nextjs");
     return <ClerkProvider>{content}</ClerkProvider>;
   }
 
