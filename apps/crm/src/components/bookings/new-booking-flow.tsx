@@ -546,11 +546,7 @@ export function NewBookingFlow({
                             return (
                               <button
                                 key={schedule.id}
-                                onClick={() => {
-                                  setSelectedScheduleId(schedule.id);
-                                  // Auto-advance to book step (guests default to 1 adult = valid)
-                                  setTimeout(() => setCurrentStep("book"), 200);
-                                }}
+                                onClick={() => setSelectedScheduleId(schedule.id)}
                                 className={cn(
                                   "w-full text-left px-4 py-3 rounded-lg border transition-all",
                                   isSelected
