@@ -7,10 +7,6 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    },
-    "./tailwind": {
-      "types": "./tailwind.config.ts",
-      "default": "./tailwind.config.ts"
     }
   },
   "scripts": {
@@ -21,10 +17,6 @@
     "@tour/eslint-config": "workspace:*",
     "@tour/typescript-config": "workspace:*",
     "eslint": "^8.57.0",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.2"
-  },
-  "dependencies": {
-    "tailwindcss-animate": "^1.0.7"
+    "typescript": "^5.9.3"
   }
 }

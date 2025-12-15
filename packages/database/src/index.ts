@@ -13,8 +13,8 @@ export function getDb() {
   if (!_db) {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
-      // During build, return a mock that will fail at runtime
-      if (process.env.NODE_ENV === "production" && typeof window === "undefined") {
+      // During build, database URL may not be available - warn but don't crash
+      if (process.env.NODE_ENV === "production") {
         console.warn("DATABASE_URL not set - database calls will fail at runtime");
       }
       _initError = new Error("DATABASE_URL environment variable is not set");

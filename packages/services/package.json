@@ -18,13 +18,13 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.87.1",
     "@tour/database": "workspace:*",
-    "drizzle-orm": "^0.38.2"
+    "drizzle-orm": "^0.45.1"
   },
   "devDependencies": {
     "@tour/eslint-config": "workspace:*",
     "@tour/typescript-config": "workspace:*",
-    "@types/node": "^22.10.2",
+    "@types/node": "^22.19.2",
     "eslint": "^8.57.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.9.3"
   }
 }
