@@ -110,6 +110,9 @@ export default function TourDetailPage() {
     { enabled: !!tourId }
   );
 
+  // Fetch tour ratings from reviews
+  const { data: tourRatings } = trpc.review.tourRatings.useQuery();
+
   const createTierMutation = trpc.tour.createPricingTier.useMutation({
     onSuccess: () => {
       utils.tour.listPricingTiers.invalidate({ tourId });
@@ -290,19 +293,22 @@ export default function TourDetailPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-red-600">Error loading tour: {error.message}</p>
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+        <p className="text-destructive">Error loading tour: {error.message}</p>
       </div>
     );
   }
 
   if (!tour) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <p className="text-gray-500">Tour not found</p>
+      <div className="rounded-lg border border-border bg-card p-6">
+        <p className="text-muted-foreground">Tour not found</p>
       </div>
     );
   }
+
+  // Get this tour's rating from the ratings data
+  const thisTourRating = tourRatings?.find((r) => r.tourId === tourId);
 
   return (
     <div className="space-y-6">
@@ -310,33 +316,33 @@ export default function TourDetailPage() {
         <div className="flex items-center gap-4">
           <Link
             href={`/org/${slug}/tours` as Route}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-accent rounded-lg transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-500" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">{tour.name}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{tour.name}</h1>
               <span
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                   tour.status === "active"
-                    ? "bg-green-100 text-green-800"
+                    ? "bg-success/10 text-success"
                     : tour.status === "draft"
-                    ? "bg-yellow-100 text-yellow-800"
+                    ? "bg-warning/10 text-warning"
                     : tour.status === "paused"
-                    ? "bg-orange-100 text-orange-800"
-                    : "bg-gray-100 text-gray-800"
+                    ? "bg-warning/10 text-warning"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
                 {tour.status}
               </span>
             </div>
-            <p className="text-gray-500 mt-1">{tour.slug}</p>
+            <p className="text-muted-foreground mt-1">{tour.slug}</p>
           </div>
         </div>
         <Link
           href={`/org/${slug}/tours/${tour.id}/edit` as Route}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Edit className="h-4 w-4" />
           Edit Tour
@@ -344,83 +350,106 @@ export default function TourDetailPage() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Clock className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-warning/10 rounded-lg">
+              <Star className="h-5 w-5 text-warning" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Duration</p>
-              <p className="font-semibold text-gray-900">{tour.durationMinutes} min</p>
+              <p className="text-sm text-muted-foreground">Rating</p>
+              {thisTourRating ? (
+                <div className="flex items-center gap-1">
+                  <p className="font-semibold text-foreground">
+                    {thisTourRating.averageRating.toFixed(1)}
+                  </p>
+                  <span className="text-sm text-muted-foreground">
+                    ({thisTourRating.totalReviews})
+                  </span>
+                </div>
+              ) : (
+                <p className="font-semibold text-muted-foreground">-</p>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="h-5 w-5 text-green-600" />
+            <div className="p-2 bg-info/10 rounded-lg">
+              <Clock className="h-5 w-5 text-info" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Capacity</p>
-              <p className="font-semibold text-gray-900">
+              <p className="text-sm text-muted-foreground">Duration</p>
+              <p className="font-semibold text-foreground">{tour.durationMinutes} min</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-success/10 rounded-lg">
+              <Users className="h-5 w-5 text-success" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Capacity</p>
+              <p className="font-semibold text-foreground">
                 {tour.minParticipants ?? 1} - {tour.maxParticipants}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <DollarSign className="h-5 w-5 text-purple-600" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <DollarSign className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Base Price</p>
-              <p className="font-semibold text-gray-900">
+              <p className="text-sm text-muted-foreground">Base Price</p>
+              <p className="font-semibold text-foreground">
                 ${parseFloat(tour.basePrice).toFixed(2)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Calendar className="h-5 w-5 text-orange-600" />
+            <div className="p-2 bg-muted rounded-lg">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Cutoff</p>
-              <p className="font-semibold text-gray-900">{tour.cancellationHours ?? 24}h before</p>
+              <p className="text-sm text-muted-foreground">Cutoff</p>
+              <p className="font-semibold text-foreground">{tour.cancellationHours ?? 24}h before</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Description */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Description</h2>
+      <div className="bg-card rounded-lg border border-border p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">Description</h2>
         {tour.shortDescription && (
-          <p className="text-gray-600 mb-4 font-medium">{tour.shortDescription}</p>
+          <p className="text-muted-foreground mb-4 font-medium">{tour.shortDescription}</p>
         )}
         {tour.description ? (
-          <p className="text-gray-600 whitespace-pre-wrap">{tour.description}</p>
+          <p className="text-muted-foreground whitespace-pre-wrap">{tour.description}</p>
         ) : (
-          <p className="text-gray-400 italic">No description provided</p>
+          <p className="text-muted-foreground italic">No description provided</p>
         )}
       </div>
 
       {/* Inclusions & Exclusions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {tour.includes && tour.includes.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">What&apos;s Included</h2>
+          <div className="bg-card rounded-lg border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">What&apos;s Included</h2>
             <ul className="space-y-2">
               {tour.includes.map((item: string, index: number) => (
                 <li key={index} className="flex items-start gap-2">
-                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">{item}</span>
+                  <Check className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">{item}</span>
                 </li>
               ))}
             </ul>
@@ -428,13 +457,13 @@ export default function TourDetailPage() {
         )}
 
         {tour.excludes && tour.excludes.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Not Included</h2>
+          <div className="bg-card rounded-lg border border-border p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Not Included</h2>
             <ul className="space-y-2">
               {tour.excludes.map((item: string, index: number) => (
                 <li key={index} className="flex items-start gap-2">
-                  <X className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">{item}</span>
+                  <X className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">{item}</span>
                 </li>
               ))}
             </ul>
@@ -444,16 +473,16 @@ export default function TourDetailPage() {
 
       {/* Meeting Point */}
       {(tour.meetingPoint || tour.meetingPointDetails) && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Meeting Point</h2>
+        <div className="bg-card rounded-lg border border-border p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Meeting Point</h2>
           <div className="flex items-start gap-3">
-            <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+            <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
             <div>
               {tour.meetingPoint && (
-                <p className="font-medium text-gray-900">{tour.meetingPoint}</p>
+                <p className="font-medium text-foreground">{tour.meetingPoint}</p>
               )}
               {tour.meetingPointDetails && (
-                <p className="text-gray-600 mt-1">{tour.meetingPointDetails}</p>
+                <p className="text-muted-foreground mt-1">{tour.meetingPointDetails}</p>
               )}
             </div>
           </div>
@@ -461,12 +490,12 @@ export default function TourDetailPage() {
       )}
 
       {/* Pricing Tiers */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Pricing Tiers</h2>
+          <h2 className="text-lg font-semibold text-foreground">Pricing Tiers</h2>
           <button
             onClick={() => handleOpenTierModal()}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Tier
@@ -478,10 +507,10 @@ export default function TourDetailPage() {
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : pricingTiers.length === 0 ? (
-          <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-            <DollarSign className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 mb-2">No pricing tiers configured</p>
-            <p className="text-sm text-gray-400 mb-4">
+          <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
+            <DollarSign className="h-10 w-10 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-muted-foreground mb-2">No pricing tiers configured</p>
+            <p className="text-sm text-muted-foreground/80 mb-4">
               Add pricing tiers like Adult, Child, Senior to offer different prices
             </p>
             <button
@@ -497,28 +526,28 @@ export default function TourDetailPage() {
               <div
                 key={tier.id}
                 className={`flex items-center justify-between p-4 rounded-lg border ${
-                  tier.isActive ? "border-gray-200 bg-gray-50" : "border-gray-100 bg-gray-50/50 opacity-60"
+                  tier.isActive ? "border-border bg-muted" : "border-border/50 bg-muted/50 opacity-60"
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <GripVertical className="h-5 w-5 text-gray-300" />
+                  <GripVertical className="h-5 w-5 text-muted-foreground/40" />
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{tier.label}</span>
+                      <span className="font-medium text-foreground">{tier.label}</span>
                       {tier.isDefault && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning">
                           <Star className="h-3 w-3" />
                           Default
                         </span>
                       )}
                       {!tier.isActive && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                           Inactive
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                      <span className="font-medium text-gray-700">
+                    <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">
                         ${parseFloat(tier.price).toFixed(2)}
                       </span>
                       {(tier.minAge !== null || tier.maxAge !== null) && (
@@ -527,7 +556,7 @@ export default function TourDetailPage() {
                         </span>
                       )}
                       {!tier.countTowardsCapacity && (
-                        <span className="text-orange-600">Doesn&apos;t count to capacity</span>
+                        <span className="text-warning">Doesn&apos;t count to capacity</span>
                       )}
                     </div>
                   </div>
@@ -535,13 +564,13 @@ export default function TourDetailPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleOpenTierModal(tier)}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
                   >
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setDeletingTierId(tier.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                     disabled={deleteTierMutation.isPending}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -554,12 +583,12 @@ export default function TourDetailPage() {
       </div>
 
       {/* Tour Variants */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Tour Variants</h2>
+          <h2 className="text-lg font-semibold text-foreground">Tour Variants</h2>
           <button
             onClick={() => handleOpenVariantModal()}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add Variant
@@ -571,10 +600,10 @@ export default function TourDetailPage() {
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : variants.length === 0 ? (
-          <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-            <Layers className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 mb-2">No variants configured</p>
-            <p className="text-sm text-gray-400 mb-4">
+          <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
+            <Layers className="h-10 w-10 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-muted-foreground mb-2">No variants configured</p>
+            <p className="text-sm text-muted-foreground/80 mb-4">
               Add variants like Morning/Evening tours, Private/Group options, or language versions
             </p>
             <button
@@ -590,29 +619,29 @@ export default function TourDetailPage() {
               <div
                 key={variant.id}
                 className={`flex items-center justify-between p-4 rounded-lg border ${
-                  variant.isActive ? "border-gray-200 bg-gray-50" : "border-gray-100 bg-gray-50/50 opacity-60"
+                  variant.isActive ? "border-border bg-muted" : "border-border/50 bg-muted/50 opacity-60"
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <GripVertical className="h-5 w-5 text-gray-300" />
+                  <GripVertical className="h-5 w-5 text-muted-foreground/40" />
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{variant.label}</span>
+                      <span className="font-medium text-foreground">{variant.label}</span>
                       {variant.isDefault && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning">
                           <Star className="h-3 w-3" />
                           Default
                         </span>
                       )}
                       {!variant.isActive && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                           Inactive
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                    <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                       {variant.priceModifier && (
-                        <span className="font-medium text-gray-700">
+                        <span className="font-medium text-foreground">
                           {variant.priceModifierType === "absolute"
                             ? `$${parseFloat(variant.priceModifier).toFixed(2)}`
                             : variant.priceModifierType === "percentage"
@@ -637,13 +666,13 @@ export default function TourDetailPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleOpenVariantModal(variant)}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
                   >
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setDeletingVariantId(variant.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                     disabled={deleteVariantMutation.isPending}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -659,11 +688,11 @@ export default function TourDetailPage() {
       <TourGuideQualifications tourId={tourId} />
 
       {/* Upcoming Schedules */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+      <div className="bg-card rounded-lg border border-border">
+        <div className="p-4 border-b border-border flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Upcoming Schedules</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-lg font-semibold text-foreground">Upcoming Schedules</h2>
+            <p className="text-sm text-muted-foreground">
               {schedulesData?.data?.length || 0} schedules
             </p>
           </div>
@@ -674,7 +703,7 @@ export default function TourDetailPage() {
         </div>
 
         {schedulesData?.data && schedulesData.data.length > 0 ? (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-border">
             {schedulesData.data.slice(0, 5).map((schedule) => {
               const date = new Date(schedule.startsAt);
               const dateStr = new Intl.DateTimeFormat("en-US", {
@@ -689,24 +718,24 @@ export default function TourDetailPage() {
               return (
                 <div
                   key={schedule.id}
-                  className="p-4 flex items-center justify-between hover:bg-gray-50"
+                  className="p-4 flex items-center justify-between hover:bg-accent"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{dateStr}</span>
+                      <span className="font-medium text-foreground">{dateStr}</span>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           schedule.status === "scheduled"
-                            ? "bg-blue-100 text-blue-800"
+                            ? "bg-info/10 text-info"
                             : schedule.status === "completed"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
+                            ? "bg-success/10 text-success"
+                            : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {schedule.status}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {schedule.bookedCount || 0}/{schedule.maxParticipants} booked • {available} spots available
                       {schedule.guide && ` • ${schedule.guide.firstName} ${schedule.guide.lastName}`}
                     </p>
@@ -724,8 +753,8 @@ export default function TourDetailPage() {
           </div>
         ) : (
           <div className="p-8 text-center">
-            <Ticket className="mx-auto h-12 w-12 text-gray-300" />
-            <p className="mt-4 text-gray-500">No schedules yet</p>
+            <Ticket className="mx-auto h-12 w-12 text-muted-foreground/40" />
+            <p className="mt-4 text-muted-foreground">No schedules yet</p>
             <Button onClick={handleCreateSchedule} variant="outline" className="mt-4 gap-2">
               <Plus className="h-4 w-4" />
               Create First Schedule
@@ -734,7 +763,7 @@ export default function TourDetailPage() {
         )}
 
         {schedulesData?.data && schedulesData.data.length > 5 && (
-          <div className="p-4 border-t border-gray-200 text-center">
+          <div className="p-4 border-t border-border text-center">
             <Link
               href={`/org/${slug}/schedules?tourId=${tourId}` as Route}
               className="text-sm text-primary hover:underline"
@@ -747,9 +776,9 @@ export default function TourDetailPage() {
 
       {/* Cancellation Policy */}
       {tour.cancellationPolicy && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Cancellation Policy</h2>
-          <p className="text-gray-600 whitespace-pre-wrap">{tour.cancellationPolicy}</p>
+        <div className="bg-card rounded-lg border border-border p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Cancellation Policy</h2>
+          <p className="text-muted-foreground whitespace-pre-wrap">{tour.cancellationPolicy}</p>
         </div>
       )}
 
@@ -760,16 +789,16 @@ export default function TourDetailPage() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowTierModal(false)}
           />
-          <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-card rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4">
                 {editingTierId ? "Edit Pricing Tier" : "Add Pricing Tier"}
               </h3>
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Name (internal) *
                     </label>
                     <input
@@ -777,11 +806,11 @@ export default function TourDetailPage() {
                       value={tierForm.name}
                       onChange={(e) => setTierForm({ ...tierForm, name: e.target.value })}
                       placeholder="e.g., adult, child"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Label (display) *
                     </label>
                     <input
@@ -789,17 +818,17 @@ export default function TourDetailPage() {
                       value={tierForm.label}
                       onChange={(e) => setTierForm({ ...tierForm, label: e.target.value })}
                       placeholder="e.g., Adult (13+)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Price *
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
+                    <span className="absolute left-3 top-2 text-muted-foreground">$</span>
                     <input
                       type="number"
                       step="0.01"
@@ -807,13 +836,13 @@ export default function TourDetailPage() {
                       value={tierForm.price}
                       onChange={(e) => setTierForm({ ...tierForm, price: e.target.value })}
                       placeholder="0.00"
-                      className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full pl-7 pr-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Description
                   </label>
                   <input
@@ -821,13 +850,13 @@ export default function TourDetailPage() {
                     value={tierForm.description}
                     onChange={(e) => setTierForm({ ...tierForm, description: e.target.value })}
                     placeholder="Optional description"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Min Age
                     </label>
                     <input
@@ -836,11 +865,11 @@ export default function TourDetailPage() {
                       value={tierForm.minAge}
                       onChange={(e) => setTierForm({ ...tierForm, minAge: e.target.value })}
                       placeholder="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Max Age
                     </label>
                     <input
@@ -849,14 +878,14 @@ export default function TourDetailPage() {
                       value={tierForm.maxAge}
                       onChange={(e) => setTierForm({ ...tierForm, maxAge: e.target.value })}
                       placeholder="No limit"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Min Quantity
                     </label>
                     <input
@@ -865,11 +894,11 @@ export default function TourDetailPage() {
                       value={tierForm.minQuantity}
                       onChange={(e) => setTierForm({ ...tierForm, minQuantity: e.target.value })}
                       placeholder="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Max Quantity
                     </label>
                     <input
@@ -878,7 +907,7 @@ export default function TourDetailPage() {
                       value={tierForm.maxQuantity}
                       onChange={(e) => setTierForm({ ...tierForm, maxQuantity: e.target.value })}
                       placeholder="No limit"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                 </div>
@@ -889,9 +918,9 @@ export default function TourDetailPage() {
                       type="checkbox"
                       checked={tierForm.isDefault}
                       onChange={(e) => setTierForm({ ...tierForm, isDefault: e.target.checked })}
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      className="w-4 h-4 text-primary border-input rounded focus:ring-ring"
                     />
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-foreground">
                       Set as default tier (shown as primary price)
                     </span>
                   </label>
@@ -902,23 +931,23 @@ export default function TourDetailPage() {
                       onChange={(e) =>
                         setTierForm({ ...tierForm, countTowardsCapacity: e.target.checked })
                       }
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      className="w-4 h-4 text-primary border-input rounded focus:ring-ring"
                     />
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-foreground">
                       Counts towards tour capacity (uncheck for infants/free additions)
                     </span>
                   </label>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
                 <button
                   onClick={() => {
                     setShowTierModal(false);
                     setEditingTierId(null);
                     setTierForm(defaultTierForm);
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-foreground hover:bg-accent rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -931,7 +960,7 @@ export default function TourDetailPage() {
                     createTierMutation.isPending ||
                     updateTierMutation.isPending
                   }
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {createTierMutation.isPending || updateTierMutation.isPending
                     ? "Saving..."
@@ -952,16 +981,16 @@ export default function TourDetailPage() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowVariantModal(false)}
           />
-          <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-card rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4">
                 {editingVariantId ? "Edit Variant" : "Add Variant"}
               </h3>
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Name (internal) *
                     </label>
                     <input
@@ -969,11 +998,11 @@ export default function TourDetailPage() {
                       value={variantForm.name}
                       onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
                       placeholder="e.g., morning, private"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Label (display) *
                     </label>
                     <input
@@ -981,13 +1010,13 @@ export default function TourDetailPage() {
                       value={variantForm.label}
                       onChange={(e) => setVariantForm({ ...variantForm, label: e.target.value })}
                       placeholder="e.g., Morning Tour"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Description
                   </label>
                   <input
@@ -995,13 +1024,13 @@ export default function TourDetailPage() {
                     value={variantForm.description}
                     onChange={(e) => setVariantForm({ ...variantForm, description: e.target.value })}
                     placeholder="Optional description"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Price Type
                     </label>
                     <select
@@ -1012,7 +1041,7 @@ export default function TourDetailPage() {
                           priceModifierType: e.target.value as "absolute" | "percentage" | "fixed_add",
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     >
                       <option value="absolute">Absolute Price</option>
                       <option value="percentage">Percentage of Base</option>
@@ -1020,11 +1049,11 @@ export default function TourDetailPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Price Value
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-gray-500">
+                      <span className="absolute left-3 top-2 text-muted-foreground">
                         {variantForm.priceModifierType === "percentage" ? "%" : "$"}
                       </span>
                       <input
@@ -1035,7 +1064,7 @@ export default function TourDetailPage() {
                           setVariantForm({ ...variantForm, priceModifier: e.target.value })
                         }
                         placeholder={variantForm.priceModifierType === "percentage" ? "0" : "0.00"}
-                        className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                        className="w-full pl-7 pr-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                       />
                     </div>
                   </div>
@@ -1043,7 +1072,7 @@ export default function TourDetailPage() {
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Duration (min)
                     </label>
                     <input
@@ -1054,11 +1083,11 @@ export default function TourDetailPage() {
                         setVariantForm({ ...variantForm, durationMinutes: e.target.value })
                       }
                       placeholder="Use default"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Min Participants
                     </label>
                     <input
@@ -1069,11 +1098,11 @@ export default function TourDetailPage() {
                         setVariantForm({ ...variantForm, minParticipants: e.target.value })
                       }
                       placeholder="Use default"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Max Participants
                     </label>
                     <input
@@ -1084,13 +1113,13 @@ export default function TourDetailPage() {
                         setVariantForm({ ...variantForm, maxParticipants: e.target.value })
                       }
                       placeholder="Use default"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Default Start Time
                   </label>
                   <input
@@ -1099,12 +1128,12 @@ export default function TourDetailPage() {
                     onChange={(e) =>
                       setVariantForm({ ...variantForm, defaultStartTime: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-ring bg-background text-foreground"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Available Days
                   </label>
                   <div className="flex gap-2">
@@ -1115,8 +1144,8 @@ export default function TourDetailPage() {
                         onClick={() => toggleVariantDay(index)}
                         className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                           variantForm.availableDays.includes(index)
-                            ? "bg-primary text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-accent"
                         }`}
                       >
                         {day}
@@ -1133,9 +1162,9 @@ export default function TourDetailPage() {
                       onChange={(e) =>
                         setVariantForm({ ...variantForm, isDefault: e.target.checked })
                       }
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      className="w-4 h-4 text-primary border-input rounded focus:ring-ring"
                     />
-                    <span className="text-sm text-gray-700">Set as default variant</span>
+                    <span className="text-sm text-foreground">Set as default variant</span>
                   </label>
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
@@ -1144,21 +1173,21 @@ export default function TourDetailPage() {
                       onChange={(e) =>
                         setVariantForm({ ...variantForm, isActive: e.target.checked })
                       }
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      className="w-4 h-4 text-primary border-input rounded focus:ring-ring"
                     />
-                    <span className="text-sm text-gray-700">Active (visible for booking)</span>
+                    <span className="text-sm text-foreground">Active (visible for booking)</span>
                   </label>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
                 <button
                   onClick={() => {
                     setShowVariantModal(false);
                     setEditingVariantId(null);
                     setVariantForm(defaultVariantForm);
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-foreground hover:bg-accent rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -1170,7 +1199,7 @@ export default function TourDetailPage() {
                     createVariantMutation.isPending ||
                     updateVariantMutation.isPending
                   }
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
                 >
                   {createVariantMutation.isPending || updateVariantMutation.isPending
                     ? "Saving..."

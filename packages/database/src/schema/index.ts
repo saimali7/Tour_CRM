@@ -20,3 +20,6 @@ export * from "./guide-tokens";
 
 // Phase 4: Pricing & Promotions
 export * from "./pricing";
+
+// High-Impact Features: Reviews & Feedback
+export * from "./reviews";

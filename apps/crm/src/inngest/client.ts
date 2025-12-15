@@ -53,6 +53,21 @@ type BookingEvents = {
       hoursUntilTour: number;
     };
   };
+  "booking/completed": {
+    data: {
+      organizationId: string;
+      bookingId: string;
+      customerId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      tourName: string;
+      tourDate: string;
+      tourTime: string;
+      guideId?: string;
+      guideName?: string;
+    };
+  };
   "schedule/reminder-check": {
     data: {
       organizationId: string;

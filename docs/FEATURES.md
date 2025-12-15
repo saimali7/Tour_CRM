@@ -2793,11 +2793,431 @@ These features differentiate from basic CRMs and enable data-driven operations.
 
 ---
 
+## CRM High-Impact Features (Pre-Web App)
+
+**Duration:** 4-6 weeks
+**Goal:** Features that tour operators can't run their business without
+**Priority:** Complete before starting Web App
+
+> These features were identified through industry analysis. They address critical gaps that competitors (FareHarbor, Peek, Bokun) solve and that real tour operators require for daily operations.
+
+---
+
+### HI-1 Digital Waivers & Liability Forms
+
+**Priority:** P0 - CRITICAL
+**Complexity:** Medium
+
+**Why Critical:**
+- **Legally required** for liability protection
+- Insurance companies mandate signed waivers for adventure activities
+- Tour operators cannot operate without waivers for activities like kayaking, hiking, ATV tours
+- Waivers must be signed BEFORE tour day (verification at check-in)
+
+**User Story:**
+> As an Operations Manager, I want customers to sign liability waivers digitally so I'm legally protected and can verify signatures at check-in.
+
+**Database Schema:**
+```typescript
+// waiver_templates table
+- id, organizationId
+- name: string ("Standard Liability Waiver")
+- content: text (rich text with legal language)
+- isDefault: boolean
+- tourIds: string[] (null = all tours)
+- createdAt, updatedAt
+
+// waiver_signatures table
+- id, organizationId
+- waiverTemplateId: string
+- bookingId: string
+- participantId: string
+- signedAt: timestamp
+- signatureImageUrl: string (Supabase Storage)
+- ipAddress: string
+- userAgent: string
+- signerName: string
+- signerEmail: string
+```
+
+**Acceptance Criteria:**
+- [ ] Rich text waiver editor with legal template library
+- [ ] Link waiver templates to specific tours or all tours
+- [ ] Auto-send waiver email after booking confirmation
+- [ ] Customer portal to sign waivers online (draw signature or type name)
+- [ ] Track signature with timestamp, IP, and browser info
+- [ ] Dashboard alert: "X bookings with unsigned waivers"
+- [ ] Guide portal: show waiver status per participant
+- [ ] Block check-in if waiver not signed (configurable per tour)
+- [ ] Kiosk mode for on-site tablet signing
+
+---
+
+### HI-2 Deposit & Payment Plans
+
+**Priority:** P0 - CRITICAL
+**Complexity:** Medium
+
+**Why Critical:**
+- Tour operators RARELY receive full payment upfront for tours over $500
+- Industry standard: 20-50% deposit at booking, balance due 7-30 days before
+- Without this, operators lose high-value bookings customers can't pay in full today
+- Cash flow management: predictable deposit schedules
+
+**User Story:**
+> As an Operations Manager, I want to require deposits for expensive tours and automatically collect the balance before the tour date.
+
+**Database Schema:**
+```typescript
+// Add to tours table
+- depositType: 'none' | 'percentage' | 'fixed'
+- depositAmount: number (percentage or fixed amount)
+- balanceDueDays: number (days before tour start)
+- allowInstallments: boolean
+
+// payment_schedules table
+- id, organizationId, bookingId
+- dueDate: timestamp
+- amount: number
+- status: 'pending' | 'paid' | 'overdue' | 'failed'
+- stripePaymentIntentId: string
+- paidAt: timestamp
+- remindersSent: number
+
+// payment_transactions table (history)
+- id, organizationId, bookingId
+- type: 'deposit' | 'balance' | 'installment' | 'refund'
+- amount: number
+- stripePaymentId: string
+- status: string
+- createdAt: timestamp
+```
+
+**Acceptance Criteria:**
+- [ ] Configure deposit requirements per tour (none, percentage, fixed)
+- [ ] Set balance due days (e.g., "Balance due 7 days before tour")
+- [ ] Booking flow collects deposit only, creates payment schedule
+- [ ] Automated balance reminder emails (7 days, 3 days, 1 day before due)
+- [ ] Customer portal to pay outstanding balance
+- [ ] Dashboard alert: "X bookings with overdue balances"
+- [ ] Auto-cancel option if balance not paid by due date
+- [ ] Installment plans for high-value tours (optional)
+- [ ] Payment history timeline in booking detail
+
+**Inngest Jobs:**
+- `payment/balance-reminder` - Send reminders for upcoming due dates
+- `payment/overdue-check` - Daily check for overdue payments
+- `payment/auto-cancel` - Cancel bookings with overdue balances (if configured)
+
+---
+
+### HI-3 Resource & Equipment Management
+
+**Priority:** P0 - CRITICAL
+**Complexity:** Medium
+
+**Why Critical:**
+- Tours require physical resources: boats, bikes, helmets, wetsuits, vehicles
+- Resource availability limits capacity (even if guide is available)
+- "I have 2 boats, 12 person capacity each" - this is REAL inventory
+- Overbooking equipment = operational nightmare
+
+**User Story:**
+> As an Operations Manager, I want to track equipment and vehicles so I don't overbook tours that require specific resources.
+
+**Database Schema:**
+```typescript
+// resources table
+- id, organizationId
+- name: string ("Boat #1", "Mountain Bike - Medium")
+- type: 'vehicle' | 'equipment' | 'facility'
+- category: string ("boat", "bike", "helmet", "van")
+- quantity: number (for non-unique items like helmets)
+- isUnique: boolean (true for specific vehicles/boats)
+- status: 'available' | 'maintenance' | 'retired'
+- notes: text
+
+// tour_resource_requirements table
+- tourId: string
+- resourceCategory: string ("boat", "van")
+- quantityRequired: number (per schedule)
+- isRequired: boolean (true = can't run without)
+
+// resource_assignments table
+- id, organizationId
+- resourceId: string
+- scheduleId: string
+- quantity: number (for non-unique items)
+- assignedAt: timestamp
+- assignedBy: string
+
+// resource_maintenance table
+- id, resourceId
+- scheduledDate: date
+- type: 'routine' | 'repair'
+- notes: text
+- status: 'scheduled' | 'in_progress' | 'completed'
+```
+
+**Acceptance Criteria:**
+- [ ] Resource CRUD (create vehicles, equipment, facilities)
+- [ ] Define resource requirements per tour
+- [ ] Resource calendar view (see what's assigned when)
+- [ ] Auto-check resource availability when scheduling
+- [ ] Conflict detection: "Can't schedule - Boat #1 already assigned"
+- [ ] Assign resources to schedules manually or auto-assign
+- [ ] Maintenance scheduling and tracking
+- [ ] Dashboard alert: "Resource due for maintenance"
+- [ ] Resource utilization report
+
+---
+
+### HI-4 Booking Add-Ons & Upsells
+
+**Priority:** P1 - HIGH
+**Complexity:** Medium
+
+**Why Important:**
+- Direct revenue increase (15-30% boost is common)
+- Photo packages, meal upgrades, equipment rental, transport
+- Customers expect to customize their experience
+- Easy win: infrastructure exists, just needs add-on layer
+
+**User Story:**
+> As an Operations Manager, I want to offer add-ons like lunch upgrades and photo packages to increase booking value.
+
+**Database Schema:**
+```typescript
+// tour_add_ons table
+- id, organizationId
+- tourId: string (null = available for all tours)
+- name: string ("Lunch Upgrade", "GoPro Rental")
+- description: text
+- price: number
+- pricingType: 'per_person' | 'per_booking' | 'per_day'
+- maxQuantity: number (null = unlimited)
+- requiresInventory: boolean
+- inventoryResourceId: string (link to resources if tracked)
+- status: 'active' | 'inactive'
+- sortOrder: number
+
+// booking_add_ons table
+- id, organizationId, bookingId
+- addOnId: string
+- quantity: number
+- unitPrice: number (at time of booking)
+- totalPrice: number
+```
+
+**Acceptance Criteria:**
+- [ ] Add-on CRUD per tour or global
+- [ ] Pricing types: per person, per booking, per day (multi-day tours)
+- [ ] Display add-ons in booking flow (CRM manual booking)
+- [ ] Staff can add/remove add-ons from existing bookings
+- [ ] Price recalculation includes add-ons
+- [ ] Add-ons shown in booking confirmation and manifest
+- [ ] Inventory tracking for limited items (link to resources)
+- [ ] Add-on revenue report
+
+---
+
+### HI-5 Check-In & Attendance Tracking
+
+**Priority:** P1 - HIGH
+**Complexity:** Low
+
+**Why Important:**
+- Guides need to verify who showed up vs. who's a no-show
+- Waiver verification at check-in
+- No-show rate tracking for capacity planning
+- Required for any operational tour business
+
+**User Story:**
+> As a Guide, I want to check in participants so I know who's present and can verify their waiver status.
+
+**Database Schema:**
+```typescript
+// Add to booking_participants table
+- checkedInAt: timestamp
+- checkedInBy: string (guide/staff ID)
+- noShowRecorded: boolean
+- noShowRecordedAt: timestamp
+- checkInNotes: text
+```
+
+**Acceptance Criteria:**
+- [ ] Guide portal: participant list with check-in buttons
+- [ ] Visual indicator: waiver signed ✓ / waiver missing ✗
+- [ ] Bulk check-in option ("Check in all present")
+- [ ] Mark no-show with timestamp
+- [ ] No-show tracking in customer profile
+- [ ] Dashboard: no-show rate by tour, customer
+- [ ] Automated no-show policy (configurable): notify customer, apply fee
+
+---
+
+### HI-6 Gift Vouchers & Prepaid Credits
+
+**Priority:** P1 - HIGH
+**Complexity:** Low
+
+**Why Important:**
+- B2B revenue: hotels, concierges buy voucher packs at discount
+- Gift market: holiday/birthday gifts
+- Pre-paid = cash in hand before service delivered
+- Different from promo codes (these have monetary value)
+
+**User Story:**
+> As a Business Owner, I want to sell gift vouchers that customers or partners can redeem for tours.
+
+**Database Schema:**
+```typescript
+// vouchers table
+- id, organizationId
+- code: string (unique, redeemable code)
+- type: 'gift' | 'prepaid' | 'corporate'
+- purchasedAmount: number
+- remainingBalance: number
+- currency: string
+- purchasedBy: string (customer name or B2B partner)
+- purchasedAt: timestamp
+- expiresAt: timestamp
+- recipientEmail: string (for gift vouchers)
+- recipientName: string
+- personalMessage: text (gift message)
+- status: 'active' | 'redeemed' | 'expired' | 'cancelled'
+- stripePaymentId: string
+
+// voucher_redemptions table
+- id, voucherId, bookingId
+- amountRedeemed: number
+- redeemedAt: timestamp
+```
+
+**Acceptance Criteria:**
+- [ ] Create voucher with amount (fixed or custom)
+- [ ] Generate unique redemption code
+- [ ] Email voucher to recipient with gift message
+- [ ] Voucher lookup page (enter code to check balance)
+- [ ] Apply voucher in booking flow (like promo code but deducts balance)
+- [ ] Partial redemption (use $50 of $100 voucher)
+- [ ] B2B bulk voucher creation (10 x $100 vouchers for hotel partner)
+- [ ] Voucher balance tracking and history
+- [ ] Expiration handling and reminders
+
+---
+
+### HI-7 Affiliate & Reseller Network
+
+**Priority:** P1 - HIGH
+**Complexity:** Medium
+
+**Why Important:**
+- Hotels, travel agents, influencers drive 30-50% of bookings
+- Commission tracking (typically 10-20% per booking)
+- Unique booking links per affiliate for attribution
+- Essential for B2B distribution channel
+
+**User Story:**
+> As a Business Owner, I want to track bookings from hotel partners and pay them commission.
+
+**Database Schema:**
+```typescript
+// affiliates table
+- id, organizationId
+- name: string ("Grand Hotel Concierge")
+- type: 'hotel' | 'agent' | 'influencer' | 'ota'
+- contactEmail: string
+- commissionType: 'percentage' | 'fixed'
+- commissionRate: number
+- uniqueCode: string (for tracking: ?ref=GRANDHOTEL)
+- status: 'active' | 'inactive'
+- payoutMethod: string (bank transfer, PayPal)
+- payoutDetails: jsonb
+- createdAt: timestamp
+
+// Add to bookings table
+- affiliateId: string
+- affiliateCommission: number (calculated at booking time)
+
+// affiliate_payouts table
+- id, organizationId, affiliateId
+- periodStart: date
+- periodEnd: date
+- totalBookings: number
+- totalRevenue: number
+- commissionAmount: number
+- status: 'pending' | 'paid'
+- paidAt: timestamp
+- paymentReference: string
+```
+
+**Acceptance Criteria:**
+- [ ] Affiliate CRUD with commission rates
+- [ ] Generate unique tracking codes/links per affiliate
+- [ ] Track affiliate attribution on bookings (via URL param or manual)
+- [ ] Commission calculation at booking time
+- [ ] Affiliate dashboard: view their bookings and commissions (readonly)
+- [ ] Monthly commission report per affiliate
+- [ ] Mark commissions as paid with reference
+- [ ] Affiliate performance report (top performers, conversion rates)
+
+---
+
+### HI-8 Review & Feedback System
+
+**Priority:** P2 - MEDIUM
+**Complexity:** Low
+
+**Why Important:**
+- Post-tour reviews drive TripAdvisor/Google reviews
+- Internal guide ratings for performance management
+- Testimonials for marketing
+- Identify service quality issues
+
+**User Story:**
+> As a Business Owner, I want to collect reviews after tours to improve service and gather testimonials.
+
+**Database Schema:**
+```typescript
+// reviews table
+- id, organizationId, bookingId, customerId
+- tourId: string
+- guideId: string
+- overallRating: integer (1-5)
+- tourRating: integer (1-5)
+- guideRating: integer (1-5)
+- valueRating: integer (1-5)
+- comment: text
+- isPublic: boolean (can be used as testimonial)
+- platform: 'internal' | 'tripadvisor' | 'google' | 'facebook'
+- externalReviewUrl: string
+- respondedAt: timestamp
+- responseText: text
+- createdAt: timestamp
+```
+
+**Acceptance Criteria:**
+- [ ] Auto-send review request email 24h after tour completion
+- [ ] Simple review form: overall rating + optional comment
+- [ ] Optional guide-specific rating
+- [ ] Mark reviews as testimonials (public display)
+- [ ] Response to reviews (shown alongside)
+- [ ] Prompt to leave TripAdvisor/Google review after internal review
+- [ ] Guide performance: average rating display
+- [ ] Review report: trends, flagged issues
+
+**Inngest Jobs:**
+- `review/request-send` - Send review request 24h after tour
+- `review/reminder` - Reminder if no review after 72h
+
+---
+
 ## Phase 7: Web App Foundation
 
 **Duration:** 2 weeks
 **Goal:** Public booking website scaffolding with SEO foundation
-**Prerequisite:** CRM Phases 0-6 complete
+**Prerequisite:** CRM Phases 0-6 + High-Impact Features complete
 
 > **Note:** Your tour business is fully operational on CRM before this phase begins. The Web App adds a customer acquisition channel.
 

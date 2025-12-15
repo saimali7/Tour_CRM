@@ -1,8 +1,8 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** December 13, 2025
+**Last Updated:** December 15, 2025
 **Status:** Sequential Phase Development
-**Current Phase:** Phase 7 - Web App Foundation (NEXT)
+**Current Phase:** CRM Completion (remaining features)
 **Main Branch:** `main`
 
 > This document is the single source of truth for implementation progress. We follow a **sequential phase-by-phase** development strategy - completing each phase fully before moving to the next.
@@ -13,23 +13,25 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    SEQUENTIAL PHASE DEVELOPMENT                              │
+│                         DEVELOPMENT ROADMAP                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│   Phase 0: Foundation ────► Phase 1: Core Booking ────► Phase 2: Customers  │
-│        ✅ DONE                   ✅ DONE                    ✅ DONE          │
+│   ═══════════════════════ CRM APPLICATION ═══════════════════════           │
 │                                                                              │
-│   ────► Phase 3: Guides ────► Phase 4: Pricing ────► Phase 5: Reporting     │
-│           ✅ DONE               ✅ DONE               ✅ DONE               │
+│   Phase 0-6: Core CRM ──────────────────────────────► ✅ COMPLETE           │
+│   (Foundation, Booking, Customers, Guides, Pricing, Reports, UX)            │
 │                                                                              │
-│   ────► Phase 6: Polish ────► Phase 7-9: Web App ────► Phase 10-11: SaaS    │
-│           ✅ DONE              🔄 NEXT                  ⏳ PENDING          │
+│   High-Impact Features ─────────────────────────────► 🔄 CURRENT            │
+│   (Waivers, Deposits, Resources, Add-Ons, Check-In, Vouchers, Affiliates)   │
 │                                                                              │
-│   Benefits:                                                                  │
-│   • Clean structure - no merge conflicts                                    │
-│   • No branching complexity                                                 │
-│   • Each phase builds on the last                                           │
-│   • Subagents can be used within phases for efficiency                      │
+│   ═══════════════════ WEB APPLICATION ═══════════════════════               │
+│                                                                              │
+│   Phase 7: Web App & Booking ───────────────────────► ⏳ PENDING            │
+│   Phase 8: Web Optimization ────────────────────────► ⏳ PENDING            │
+│                                                                              │
+│   ═══════════════════ PLATFORM (FUTURE) ═══════════════════════             │
+│                                                                              │
+│   Phase 9+: SaaS & Public API ──────────────────────► ⏳ FUTURE             │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -38,22 +40,33 @@
 
 ## Quick Status Dashboard
 
+### CRM Application (Staff Portal)
+
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
 | **0** | Foundation | ✅ COMPLETE | 100% |
-| **1** | Core Booking Engine | ✅ COMPLETE | 97% |
-| **2** | Customer & Communications | ✅ COMPLETE | 95% |
-| **3** | Guide Operations | ✅ COMPLETE | 95% |
-| **4** | Pricing & Promotions | ✅ COMPLETE | 95% |
-| **5** | Reporting & Analytics | ✅ COMPLETE | 95% |
+| **1** | Core Booking Engine | ✅ COMPLETE | 100% |
+| **2** | Customer & Communications | ✅ COMPLETE | 100% |
+| **3** | Guide Operations | ✅ COMPLETE | 100% |
+| **4** | Pricing & Promotions | ✅ COMPLETE | 100% |
+| **5** | Reporting & Analytics | ✅ COMPLETE | 100% |
 | **6** | UX Overhaul | ✅ COMPLETE | 100% |
-| **7** | Web App Foundation | 🔄 NEXT | 0% |
-| **8** | Booking Flow | ⏳ PENDING | 0% |
-| **9** | Web Optimization | ⏳ PENDING | 0% |
-| **10** | SaaS Platform | ⏳ PENDING | 0% |
-| **11** | Public API | ⏳ PENDING | 0% |
+| **—** | **High-Impact Features** | 🔄 CURRENT | 12.5% |
 
-**Legend:** ✅ Complete | 🔄 In Progress/Next | ⏳ Pending
+### Web Application (Customer Portal)
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| **7** | Web App & Booking Flow | ⏳ PENDING | 0% |
+| **8** | Web Optimization | ⏳ PENDING | 0% |
+
+### Platform (SaaS & API)
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| **9+** | SaaS Platform & Public API | ⏳ FUTURE | 0% |
+
+**Legend:** ✅ Complete | 🔄 In Progress | ⏳ Pending
 
 ---
 
@@ -510,35 +523,123 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 
 ---
 
-## Phase 7-9: Web App ⏳ PENDING (0%)
+## CRM High-Impact Features 🔄 IN PROGRESS
 
-### Phase 7: Foundation
-- Subdomain routing
-- Tour listing/detail pages
-- Availability calendar
+> **Goal:** Build features that real tour operators can't run their business without.
 
-### Phase 8: Booking Flow
-- Multi-step booking form
-- Stripe checkout
-- Confirmation emails
+### CRITICAL - Operations Blockers
 
-### Phase 9: Optimization
-- Core Web Vitals
-- Image optimization
+| Feature | Why Critical | Status | Complexity |
+|---------|--------------|--------|------------|
+| **Digital Waivers** | Legally required for liability protection. Insurance mandates signed waivers. | ⬜ TODO | Medium |
+| **Deposit & Payment Plans** | Can't sell $500+ tours without deposits. Industry standard 20-50% upfront. | ⬜ TODO | Medium |
+| **Resource Management** | Tours need boats, bikes, vehicles - not just guides. Real inventory constraints. | ⬜ TODO | Medium |
+
+### HIGH - Revenue & Operations Impact
+
+| Feature | Why Important | Status | Complexity |
+|---------|---------------|--------|------------|
+| **Booking Add-Ons & Upsells** | Direct revenue increase (photo packages, meal upgrades, equipment rental). | ⬜ TODO | Medium |
+| **Check-In & Attendance** | Guides verify who showed up. No-show tracking. Waiver verification. | ⬜ TODO | Low |
+| **Gift Vouchers** | B2B revenue (hotels buy packs). Pre-paid = cash before service. | ⬜ TODO | Low |
+| **Affiliate/Reseller Network** | Hotels, agents drive 30-50% of bookings. Commission tracking. | ⬜ TODO | Medium |
+
+### MEDIUM - Competitive Parity
+
+| Feature | Why Useful | Status | Complexity |
+|---------|------------|--------|------------|
+| **Review & Feedback System** | Post-tour reviews, guide ratings, testimonials for marketing. | ✅ DONE | Low |
+| **Multi-Day Tours** | Support itineraries spanning multiple days with accommodations. | ⬜ TODO | High |
+| **Dynamic Pricing** | Auto-adjust prices based on demand, last-minute premiums. | ⬜ TODO | Medium |
+
+#### Review System Implementation (Completed)
+- **Database:** `reviews` table with ratings (overall, tour, guide, value), comments, testimonial support
+- **Service:** Full CRUD, stats aggregation, guide/tour ratings, public testimonials
+- **API:** tRPC router with list, create, respond, approve/reject, flag, stats endpoints
+- **Automation:** Inngest jobs - review request 24h after tour, reminder at 72h
+- **UI:** Reviews management page with stats, rating distribution, guide performance
+- **Profiles:** Guide and Tour detail pages now show average ratings
+
+### Deferred (Nice-to-Have)
+
+| Feature | Notes |
+|---------|-------|
+| Rich text editor | Can use markdown for now |
+| Drag-drop calendar | Functional without it |
+| PDF manifest export | Browser print works |
+| Real-time dashboard | Manual refresh acceptable |
+
+### What Operators Say
+
+> *"I can't sell my boat tours without tracking which boat is available"* → **Resource Management**
+
+> *"My insurance requires signed waivers or I'm not covered"* → **Digital Waivers**
+
+> *"Customers won't book my $3K safari paying in full today"* → **Payment Plans**
+
+> *"I'm losing 20% revenue because I don't capture upsells"* → **Add-Ons**
 
 ---
 
-## Phase 10-11: SaaS Platform ⏳ PENDING (0%)
+# WEB APPLICATION
 
-### Phase 10: Platform
-- Self-service signup
-- Subscription billing
-- Feature flags
+> **Status:** Not started. Complete CRM Remaining Work first.
 
-### Phase 11: Public API
-- REST API
-- API keys
-- OTA integrations
+---
+
+## Phase 7: Web App & Booking Flow ⏳ PENDING (0%)
+
+> **Goal:** Customer-facing booking website with complete checkout flow
+
+### Foundation
+- Subdomain routing (`{slug}.book.platform.com`)
+- Tour listing page with filters
+- Tour detail page with gallery, map, reviews
+- Availability calendar display
+
+### Booking Flow
+- Multi-step booking form (tickets → details → payment)
+- Guest checkout (no account required)
+- Stripe checkout integration
+- Promo code application
+- Confirmation page & emails
+
+### Customer Features
+- Booking management (view, cancel, reschedule)
+- Magic link authentication for customers
+- Booking history
+
+---
+
+## Phase 8: Web Optimization ⏳ PENDING (0%)
+
+> **Goal:** Performance and conversion optimization
+
+- Core Web Vitals optimization
+- Image optimization (WebP, lazy loading, CDN)
+- SEO (structured data, meta tags, sitemaps)
+- Conversion tracking (analytics events)
+- A/B testing infrastructure
+
+---
+
+## Phase 9+: SaaS Platform & Public API ⏳ FUTURE (0%)
+
+> **Goal:** Enable selling platform to other tour operators
+
+### SaaS Platform
+- Self-service organization signup
+- Subscription billing (Stripe)
+- Feature flags per plan
+- White-label/theming per organization
+- Platform admin dashboard
+
+### Public API
+- REST API for partners
+- API key management
+- Rate limiting
+- OTA integrations (Viator, GetYourGuide)
+- Webhook system for external systems
 
 ---
 

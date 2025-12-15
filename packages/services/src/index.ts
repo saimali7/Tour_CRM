@@ -26,6 +26,8 @@ import { PricingCalculationService } from "./pricing-calculation-service";
 import { AnalyticsService } from "./analytics-service";
 import { DashboardService } from "./dashboard-service";
 import { CustomerIntelligenceService } from "./customer-intelligence-service";
+// High-Impact Features
+import { ReviewService } from "./review-service";
 
 export interface Services {
   tour: TourService;
@@ -55,6 +57,8 @@ export interface Services {
   analytics: AnalyticsService;
   dashboard: DashboardService;
   customerIntelligence: CustomerIntelligenceService;
+  // High-Impact Features
+  review: ReviewService;
 }
 
 /**
@@ -96,6 +100,8 @@ export function createServices(ctx: ServiceContext): Services {
     analytics: new AnalyticsService(ctx),
     dashboard: new DashboardService(ctx),
     customerIntelligence: new CustomerIntelligenceService(ctx),
+    // High-Impact Features
+    review: new ReviewService(ctx),
   };
 }
 
@@ -127,6 +133,8 @@ export { PricingCalculationService } from "./pricing-calculation-service";
 export { AnalyticsService } from "./analytics-service";
 export { DashboardService } from "./dashboard-service";
 export { CustomerIntelligenceService } from "./customer-intelligence-service";
+// High-Impact Features
+export { ReviewService } from "./review-service";
 
 // Export types
 export * from "./types";
@@ -281,6 +289,16 @@ export type {
   CustomerStatsReport,
   SegmentDistribution,
 } from "./customer-intelligence-service";
+// High-Impact Features types
+export type {
+  ReviewSortField,
+  CreateReviewInput,
+  UpdateReviewInput,
+  ReviewFilters,
+  ReviewWithRelations,
+  ReviewStats,
+  GuideRatingStats,
+} from "./review-service";
 
 // Storage service (separate from org-scoped services, created with createStorageService)
 export { StorageService, createStorageService, type UploadResult } from "./storage-service";

@@ -27,6 +27,12 @@ export {
   sendGuideDailyManifest,
 } from "./functions/guide-notifications";
 
+export {
+  sendReviewRequestEmail,
+  sendReviewReminderEmail,
+  dailyReviewRequestCheck,
+} from "./functions/review-requests";
+
 // Aggregate all functions for the serve handler
 import {
   sendBookingConfirmationEmail,
@@ -52,6 +58,12 @@ import {
   sendGuideDailyManifest,
 } from "./functions/guide-notifications";
 
+import {
+  sendReviewRequestEmail,
+  sendReviewReminderEmail,
+  dailyReviewRequestCheck,
+} from "./functions/review-requests";
+
 export const inngestFunctions = [
   // Booking emails
   sendBookingConfirmationEmail,
@@ -69,4 +81,8 @@ export const inngestFunctions = [
   sendPendingAssignmentReminder,
   sendGuideScheduleReminder,
   sendGuideDailyManifest,
+  // Review requests
+  sendReviewRequestEmail,
+  sendReviewReminderEmail,
+  dailyReviewRequestCheck,
 ];

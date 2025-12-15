@@ -117,6 +117,15 @@ export interface GuideDailyManifestEmailData {
   }>;
 }
 
+export interface ReviewRequestEmailData {
+  customerName: string;
+  customerEmail: string;
+  tourName: string;
+  tourDate: string;
+  reviewUrl: string;
+  isReminder?: boolean;
+}
+
 export class EmailService {
   private org: OrganizationEmailConfig;
   private fromEmail: string;
@@ -355,6 +364,40 @@ export class EmailService {
           organizationPhone: this.org.phone,
           logoUrl: this.org.logoUrl,
         }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send review request email
+   */
+  async sendReviewRequest(data: ReviewRequestEmailData): Promise<EmailResult> {
+    try {
+      const subject = data.isReminder
+        ? `Quick reminder: Share your ${data.tourName} experience`
+        : `How was your ${data.tourName} experience?`;
+
+      const bodyText = data.isReminder
+        ? `Hi ${data.customerName},\n\nA few days ago, you experienced ${data.tourName} with us. We noticed you haven't had a chance to leave a review yet.\n\nYour feedback is incredibly valuable - it helps other travelers make informed decisions and helps us continuously improve our tours.\n\nIt only takes a minute!\n\nLeave a Review: ${data.reviewUrl}\n\nThank you for considering leaving a review!\n\n${this.org.name}`
+        : `Hi ${data.customerName},\n\nThank you for joining us on ${data.tourName} on ${data.tourDate}!\n\nWe hope you had an amazing experience. Your feedback helps us improve and helps other travelers discover great tours.\n\nWould you mind taking a moment to share your thoughts?\n\nLeave a Review: ${data.reviewUrl}\n\nThank you for your time and for choosing us!\n\n${this.org.name}`;
+
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject,
+        text: bodyText,
       });
 
       if (error) {
