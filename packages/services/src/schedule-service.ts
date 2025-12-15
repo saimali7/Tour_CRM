@@ -80,6 +80,41 @@ export interface AutoGenerateScheduleInput {
   skipExisting?: boolean; // Don't create duplicates
 }
 
+// Heatmap types
+export interface HeatmapCell {
+  totalCapacity: number;
+  bookedCount: number;
+  scheduleCount: number;
+  utilization: number; // 0-100
+}
+
+export interface HeatmapData {
+  tours: Array<{ id: string; name: string }>;
+  dates: string[];
+  cells: Record<string, HeatmapCell>; // key: `${tourId}-${date}`
+}
+
+// Availability search types
+export interface AvailabilitySearchInput {
+  date: Date;
+  participants: number;
+  tourId?: string;
+  flexDays?: number;
+}
+
+export interface AvailableScheduleResult {
+  scheduleId: string;
+  tourId: string;
+  tourName: string;
+  startsAt: Date;
+  endsAt: Date;
+  availableSpots: number;
+  totalCapacity: number;
+  bookedCount: number;
+  price: string | null;
+  guideName: string | null;
+}
+
 export class ScheduleService extends BaseService {
   async getAll(
     filters: ScheduleFilters = {},
@@ -820,5 +855,173 @@ export class ScheduleService extends BaseService {
       dates,
       existingCount,
     };
+  }
+
+  /**
+   * Get capacity heatmap data for all tours across a date range
+   * Used for the availability planning dashboard
+   */
+  async getCapacityHeatmap(
+    dateRange: DateRangeFilter,
+    tourIds?: string[]
+  ): Promise<HeatmapData> {
+    // Validate date range (max 90 days)
+    const from = dateRange.from;
+    const to = dateRange.to;
+    if (!from || !to) {
+      throw new ValidationError("Date range is required for heatmap");
+    }
+
+    const daysDiff = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 90) {
+      throw new ValidationError("Heatmap date range cannot exceed 90 days");
+    }
+
+    // Get active tours
+    const tourConditions = [
+      eq(tours.organizationId, this.organizationId),
+      eq(tours.status, "active"),
+    ];
+    if (tourIds && tourIds.length > 0) {
+      tourConditions.push(sql`${tours.id} = ANY(${tourIds})`);
+    }
+
+    const tourList = await this.db
+      .select({ id: tours.id, name: tours.name })
+      .from(tours)
+      .where(and(...tourConditions))
+      .orderBy(asc(tours.name));
+
+    if (tourList.length === 0) {
+      return { tours: [], dates: [], cells: {} };
+    }
+
+    // Get schedule data grouped by tour and date
+    const scheduleData = await this.db
+      .select({
+        tourId: schedules.tourId,
+        date: sql<string>`DATE(${schedules.startsAt})`.as("date"),
+        totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)::int`.as("total_capacity"),
+        bookedCount: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)::int`.as("booked_count"),
+        scheduleCount: sql<number>`COUNT(*)::int`.as("schedule_count"),
+      })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.organizationId, this.organizationId),
+          gte(schedules.startsAt, from),
+          lte(schedules.startsAt, to),
+          sql`${schedules.status} != 'cancelled'`
+        )
+      )
+      .groupBy(schedules.tourId, sql`DATE(${schedules.startsAt})`)
+      .orderBy(schedules.tourId, sql`DATE(${schedules.startsAt})`);
+
+    // Generate all dates in range
+    const dates: string[] = [];
+    const currentDate = new Date(from);
+    while (currentDate <= to) {
+      dates.push(currentDate.toISOString().split("T")[0]!);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Build cells map
+    const cells: Record<string, HeatmapCell> = {};
+    for (const row of scheduleData) {
+      const key = `${row.tourId}-${row.date}`;
+      const totalCapacity = Number(row.totalCapacity) || 0;
+      const bookedCount = Number(row.bookedCount) || 0;
+      const utilization = totalCapacity > 0
+        ? Math.round((bookedCount / totalCapacity) * 100)
+        : 0;
+
+      cells[key] = {
+        totalCapacity,
+        bookedCount,
+        scheduleCount: Number(row.scheduleCount) || 0,
+        utilization,
+      };
+    }
+
+    return {
+      tours: tourList,
+      dates,
+      cells,
+    };
+  }
+
+  /**
+   * Search for available schedules by date and party size
+   * Used for the booking planner in availability dashboard
+   */
+  async searchAvailability(
+    input: AvailabilitySearchInput
+  ): Promise<AvailableScheduleResult[]> {
+    const { date, participants, tourId, flexDays = 0 } = input;
+
+    if (participants < 1) {
+      throw new ValidationError("Participants must be at least 1");
+    }
+
+    // Calculate date range based on flex days
+    const fromDate = new Date(date);
+    fromDate.setDate(fromDate.getDate() - flexDays);
+    fromDate.setHours(0, 0, 0, 0);
+
+    const toDate = new Date(date);
+    toDate.setDate(toDate.getDate() + flexDays);
+    toDate.setHours(23, 59, 59, 999);
+
+    // Build query conditions
+    const conditions = [
+      eq(schedules.organizationId, this.organizationId),
+      eq(schedules.status, "scheduled"),
+      gte(schedules.startsAt, fromDate),
+      lte(schedules.startsAt, toDate),
+      sql`(${schedules.maxParticipants} - ${schedules.bookedCount}) >= ${participants}`,
+    ];
+
+    if (tourId) {
+      conditions.push(eq(schedules.tourId, tourId));
+    }
+
+    const results = await this.db
+      .select({
+        scheduleId: schedules.id,
+        tourId: schedules.tourId,
+        tourName: tours.name,
+        startsAt: schedules.startsAt,
+        endsAt: schedules.endsAt,
+        maxParticipants: schedules.maxParticipants,
+        bookedCount: schedules.bookedCount,
+        price: schedules.price,
+        guideFirstName: guides.firstName,
+        guideLastName: guides.lastName,
+      })
+      .from(schedules)
+      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .leftJoin(guides, eq(schedules.guideId, guides.id))
+      .where(and(...conditions))
+      .orderBy(
+        // Order by exact date match first, then by time
+        sql`ABS(DATE(${schedules.startsAt}) - DATE(${date}))`,
+        asc(schedules.startsAt)
+      )
+      .limit(50);
+
+    return results.map((row) => ({
+      scheduleId: row.scheduleId,
+      tourId: row.tourId,
+      tourName: row.tourName || "Unknown Tour",
+      startsAt: row.startsAt,
+      endsAt: row.endsAt,
+      availableSpots: row.maxParticipants - (row.bookedCount ?? 0),
+      totalCapacity: row.maxParticipants,
+      bookedCount: row.bookedCount ?? 0,
+      price: row.price,
+      guideName: row.guideFirstName
+        ? `${row.guideFirstName} ${row.guideLastName || ""}`.trim()
+        : null,
+    }));
   }
 }

@@ -4,9 +4,13 @@ export type { BookingEvents } from "./client";
 
 // Export all functions
 export {
+  sendBookingCreatedEmail,
   sendBookingConfirmationEmail,
   sendBookingCancellationEmail,
+  sendBookingRescheduleEmail,
   sendBookingReminderEmail,
+  sendRefundProcessedEmail,
+  dailyBookingReminderCheck,
 } from "./functions/booking-emails";
 
 export {
@@ -35,9 +39,13 @@ export {
 
 // Aggregate all functions for the serve handler
 import {
+  sendBookingCreatedEmail,
   sendBookingConfirmationEmail,
   sendBookingCancellationEmail,
+  sendBookingRescheduleEmail,
   sendBookingReminderEmail,
+  sendRefundProcessedEmail,
+  dailyBookingReminderCheck,
 } from "./functions/booking-emails";
 
 import {
@@ -66,9 +74,13 @@ import {
 
 export const inngestFunctions = [
   // Booking emails
+  sendBookingCreatedEmail,
   sendBookingConfirmationEmail,
   sendBookingCancellationEmail,
+  sendBookingRescheduleEmail,
   sendBookingReminderEmail,
+  sendRefundProcessedEmail,
+  dailyBookingReminderCheck,
   // Cart recovery (Phase 2)
   processAbandonedCarts,
   handleCartAbandoned,

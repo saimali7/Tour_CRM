@@ -73,7 +73,7 @@ export default function CustomerReportPage() {
     ? Object.entries(data.segmentDistribution).map(([segment, count]) => ({
         label: segment.toUpperCase(),
         value: count,
-        color: segmentColors[segment as CustomerSegment] || "#gray-500",
+        color: segmentColors[segment as CustomerSegment] || "#9ca3af",
       }))
     : [];
 
@@ -98,7 +98,7 @@ export default function CustomerReportPage() {
       header: "Source",
       sortable: true,
       render: (row) => (
-        <span className="font-medium text-gray-900 capitalize">{row.source}</span>
+        <span className="font-medium text-foreground capitalize">{row.source}</span>
       ),
     },
     {
@@ -107,7 +107,7 @@ export default function CustomerReportPage() {
       sortable: true,
       align: "center",
       render: (row) => (
-        <span className="font-semibold text-gray-900">{row.count}</span>
+        <span className="font-semibold text-foreground">{row.count}</span>
       ),
     },
   ];
@@ -173,52 +173,52 @@ export default function CustomerReportPage() {
         </ReportChart>
 
         {/* Segment definitions */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Segment Definitions
           </h2>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <div className="h-4 w-4 rounded bg-purple-500 mt-0.5 flex-shrink-0" />
+              <div className="h-4 w-4 rounded bg-primary/10 border border-primary mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium text-gray-900 text-sm">VIP</p>
-                <p className="text-xs text-gray-600">
+                <p className="font-medium text-foreground text-sm">VIP</p>
+                <p className="text-xs text-muted-foreground">
                   5+ bookings or $1000+ lifetime value
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="h-4 w-4 rounded bg-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="h-4 w-4 rounded bg-primary/10 border border-primary mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium text-gray-900 text-sm">Loyal</p>
-                <p className="text-xs text-gray-600">
+                <p className="font-medium text-foreground text-sm">Loyal</p>
+                <p className="text-xs text-muted-foreground">
                   3-4 bookings or $500-$999 lifetime value
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="h-4 w-4 rounded bg-green-500 mt-0.5 flex-shrink-0" />
+              <div className="h-4 w-4 rounded bg-success mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium text-gray-900 text-sm">Promising</p>
-                <p className="text-xs text-gray-600">
+                <p className="font-medium text-foreground text-sm">Promising</p>
+                <p className="text-xs text-muted-foreground">
                   2 bookings, potential for growth
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="h-4 w-4 rounded bg-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="h-4 w-4 rounded bg-warning mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium text-gray-900 text-sm">At Risk</p>
-                <p className="text-xs text-gray-600">
+                <p className="font-medium text-foreground text-sm">At Risk</p>
+                <p className="text-xs text-muted-foreground">
                   No booking in 90+ days
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <div className="h-4 w-4 rounded bg-red-500 mt-0.5 flex-shrink-0" />
+              <div className="h-4 w-4 rounded bg-destructive mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium text-gray-900 text-sm">Dormant</p>
-                <p className="text-xs text-gray-600">
+                <p className="font-medium text-foreground text-sm">Dormant</p>
+                <p className="text-xs text-muted-foreground">
                   No booking in 180+ days
                 </p>
               </div>
@@ -237,8 +237,8 @@ export default function CustomerReportPage() {
       </ReportChart>
 
       {/* Customers by acquisition source table */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">
           Customers by Acquisition Source
         </h2>
         <ReportTable

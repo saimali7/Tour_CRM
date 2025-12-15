@@ -63,18 +63,18 @@ function getActionIcon(action: string) {
 
 function getActionColor(action: string): string {
   if (action.includes("created") || action.includes("confirmed") || action.includes("activated")) {
-    return "text-green-600 bg-green-50";
+    return "text-success bg-success/10";
   }
   if (action.includes("cancelled") || action.includes("deleted") || action.includes("deactivated")) {
-    return "text-red-600 bg-red-50";
+    return "text-destructive bg-destructive/10";
   }
   if (action.includes("updated") || action.includes("assigned")) {
-    return "text-blue-600 bg-blue-50";
+    return "text-primary bg-primary/10";
   }
   if (action.includes("refunded")) {
-    return "text-yellow-600 bg-yellow-50";
+    return "text-warning bg-warning/10";
   }
-  return "text-gray-600 bg-gray-50";
+  return "text-muted-foreground bg-muted";
 }
 
 export function ActivityLogList({
@@ -101,7 +101,7 @@ export function ActivityLogList({
 
   if (query.error) {
     return (
-      <div className="text-center py-8 text-red-500">
+      <div className="text-center py-8 text-destructive">
         Error loading activity log
       </div>
     );
@@ -111,7 +111,7 @@ export function ActivityLogList({
 
   if (!logs || logs.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-muted-foreground">
         No activity recorded yet
       </div>
     );
@@ -130,27 +130,27 @@ export function ActivityLogList({
               <div className="relative pb-8">
                 {!isLast && (
                   <span
-                    className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"
+                    className="absolute left-4 top-4 -ml-px h-full w-0.5 bg-border"
                     aria-hidden="true"
                   />
                 )}
                 <div className="relative flex items-start space-x-3">
                   <div
-                    className={`relative flex h-8 w-8 items-center justify-center rounded-full ring-8 ring-white ${getActionColor(log.action)}`}
+                    className={`relative flex h-8 w-8 items-center justify-center rounded-full ring-8 ring-card ${getActionColor(log.action)}`}
                   >
                     <ActionIcon className="h-4 w-4" aria-hidden="true" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm text-gray-900">
+                      <p className="text-sm text-foreground">
                         {log.description}
                       </p>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
                         <EntityIcon className="h-3 w-3 mr-1" />
                         {log.entityType}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                       <span>
                         {log.actorName || (log.actorType === "system" ? "System" : "Unknown")}
                       </span>
@@ -185,8 +185,8 @@ export function ActivityLogCard({
   limit?: number;
 }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+    <div className="bg-card rounded-lg border border-border p-6">
+      <h3 className="text-lg font-semibold text-foreground mb-4">{title}</h3>
       <ActivityLogList entityType={entityType} entityId={entityId} limit={limit} />
     </div>
   );

@@ -183,4 +183,37 @@ export const scheduleRouter = createRouter({
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.schedule.previewAutoGenerate(input);
     }),
+
+  // ============================================
+  // Availability Dashboard Endpoints
+  // ============================================
+
+  getCapacityHeatmap: protectedProcedure
+    .input(
+      z.object({
+        dateRange: z.object({
+          from: z.coerce.date(),
+          to: z.coerce.date(),
+        }),
+        tourIds: z.array(z.string()).optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.schedule.getCapacityHeatmap(input.dateRange, input.tourIds);
+    }),
+
+  searchAvailability: protectedProcedure
+    .input(
+      z.object({
+        date: z.coerce.date(),
+        participants: z.number().min(1),
+        tourId: z.string().optional(),
+        flexDays: z.number().min(0).max(7).default(0),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.schedule.searchAvailability(input);
+    }),
 });

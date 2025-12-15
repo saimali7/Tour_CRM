@@ -86,7 +86,7 @@ export default function BookingReportPage() {
       return {
         label: point.source,
         value: point.count,
-        color: colors[index % colors.length] || "#gray-500",
+        color: colors[index % colors.length] || "#9ca3af",
       };
     }) ?? [];
 
@@ -97,7 +97,7 @@ export default function BookingReportPage() {
       header: "Tour",
       sortable: true,
       render: (row) => (
-        <span className="font-medium text-gray-900">{row.tourName}</span>
+        <span className="font-medium text-foreground">{row.tourName}</span>
       ),
     },
     {
@@ -106,7 +106,7 @@ export default function BookingReportPage() {
       sortable: true,
       align: "center",
       render: (row) => (
-        <span className="font-semibold text-gray-900">{row.bookingCount}</span>
+        <span className="font-semibold text-foreground">{row.bookingCount}</span>
       ),
     },
     {
@@ -114,7 +114,7 @@ export default function BookingReportPage() {
       header: "Participants",
       sortable: true,
       align: "center",
-      render: (row) => <span className="text-gray-700">{row.participantCount}</span>,
+      render: (row) => <span className="text-foreground">{row.participantCount}</span>,
     },
     {
       key: "participantCount",
@@ -122,7 +122,7 @@ export default function BookingReportPage() {
       sortable: false,
       align: "right",
       render: (row) => (
-        <span className="text-gray-700">
+        <span className="text-foreground">
           {row.bookingCount > 0 ? (row.participantCount / row.bookingCount).toFixed(1) : "0"}
         </span>
       ),
@@ -185,12 +185,12 @@ export default function BookingReportPage() {
         {additionalMetrics.map((metric) => (
           <div
             key={metric.name}
-            className="rounded-lg border border-gray-200 bg-white p-6"
+            className="rounded-lg border border-border bg-card p-6"
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-500">{metric.name}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-sm font-medium text-muted-foreground">{metric.name}</p>
+                <p className="text-2xl font-bold text-foreground mt-2">
                   {metric.value}
                 </p>
               </div>
@@ -212,8 +212,8 @@ export default function BookingReportPage() {
       </ReportChart>
 
       {/* Bookings by tour table */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">
           Bookings by Tour
         </h2>
         <ReportTable

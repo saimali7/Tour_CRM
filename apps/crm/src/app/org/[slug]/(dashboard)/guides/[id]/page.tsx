@@ -470,7 +470,7 @@ export default function GuideDetailPage() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <Link
-                                    href={`/org/${slug}/schedules/${schedule.id}` as Route}
+                                    href={`/org/${slug}/availability/${schedule.id}` as Route}
                                     className="font-medium text-foreground hover:text-primary"
                                   >
                                     {schedule.tour?.name || "Unknown Tour"}
@@ -497,7 +497,7 @@ export default function GuideDetailPage() {
                                 </p>
                               </div>
                               <Link
-                                href={`/org/${slug}/schedules/${schedule.id}` as Route}
+                                href={`/org/${slug}/availability/${schedule.id}` as Route}
                                 className="text-primary hover:underline text-sm"
                               >
                                 View
@@ -525,7 +525,7 @@ export default function GuideDetailPage() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <Link
-                                    href={`/org/${slug}/schedules/${schedule.id}` as Route}
+                                    href={`/org/${slug}/availability/${schedule.id}` as Route}
                                     className="font-medium text-foreground hover:text-primary"
                                   >
                                     {schedule.tour?.name || "Unknown Tour"}
@@ -552,7 +552,7 @@ export default function GuideDetailPage() {
                                 </p>
                               </div>
                               <Link
-                                href={`/org/${slug}/schedules/${schedule.id}` as Route}
+                                href={`/org/${slug}/availability/${schedule.id}` as Route}
                                 className="text-primary hover:underline text-sm"
                               >
                                 View
@@ -569,7 +569,7 @@ export default function GuideDetailPage() {
                   <Calendar className="mx-auto h-12 w-12 text-muted-foreground/40" />
                   <p className="mt-4 text-muted-foreground">No schedules yet</p>
                   <Link
-                    href={`/org/${slug}/schedules/new` as Route}
+                    href={`/org/${slug}/availability/new` as Route}
                     className="mt-2 inline-block text-primary hover:underline"
                   >
                     Create a schedule

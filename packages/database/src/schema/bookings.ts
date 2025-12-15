@@ -130,6 +130,7 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     references: [schedules.id],
   }),
   participants: many(bookingParticipants),
+  // Note: payments relation added in payments.ts to avoid circular dependencies
 }));
 
 export const bookingParticipantsRelations = relations(bookingParticipants, ({ one }) => ({

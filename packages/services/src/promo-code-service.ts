@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, lte, gte, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, lte, gte, lt, or } from "drizzle-orm";
 import { promoCodes, promoCodeUsage, type PromoCode, type PromoCodeUsage } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
@@ -513,16 +513,24 @@ export class PromoCodeService extends BaseService {
   }> {
     const now = new Date();
 
-    const statsResult = await this.db
+    // Get all promo codes for this org and calculate stats in JS
+    // This avoids PostgreSQL date serialization issues with raw SQL
+    const allCodes = await this.db
       .select({
-        total: sql<number>`COUNT(*)::int`,
-        active: sql<number>`COUNT(*) FILTER (WHERE ${promoCodes.isActive} = true)::int`,
-        inactive: sql<number>`COUNT(*) FILTER (WHERE ${promoCodes.isActive} = false OR ${promoCodes.isActive} IS NULL)::int`,
-        expired: sql<number>`COUNT(*) FILTER (WHERE ${promoCodes.validUntil} < ${now})::int`,
-        totalUses: sql<number>`COALESCE(SUM(${promoCodes.currentUses}), 0)::int`,
+        isActive: promoCodes.isActive,
+        validUntil: promoCodes.validUntil,
+        currentUses: promoCodes.currentUses,
       })
       .from(promoCodes)
       .where(eq(promoCodes.organizationId, this.organizationId));
+
+    const stats = {
+      total: allCodes.length,
+      active: allCodes.filter(c => c.isActive === true).length,
+      inactive: allCodes.filter(c => c.isActive === false || c.isActive === null).length,
+      expired: allCodes.filter(c => c.validUntil && new Date(c.validUntil) < now).length,
+      totalUses: allCodes.reduce((sum, c) => sum + (c.currentUses || 0), 0),
+    };
 
     // Get total discount from usage table
     const discountResult = await this.db
@@ -532,15 +540,14 @@ export class PromoCodeService extends BaseService {
       .from(promoCodeUsage)
       .where(eq(promoCodeUsage.organizationId, this.organizationId));
 
-    const stats = statsResult[0];
     const totalDiscount = discountResult[0]?.totalDiscount ? parseFloat(discountResult[0].totalDiscount.toString()) : 0;
 
     return {
-      total: stats?.total ?? 0,
-      active: stats?.active ?? 0,
-      inactive: stats?.inactive ?? 0,
-      expired: stats?.expired ?? 0,
-      totalUses: stats?.totalUses ?? 0,
+      total: stats.total,
+      active: stats.active,
+      inactive: stats.inactive,
+      expired: stats.expired,
+      totalUses: stats.totalUses,
       totalDiscount,
     };
   }
@@ -575,7 +582,7 @@ export class PromoCodeService extends BaseService {
         and(
           eq(promoCodes.organizationId, this.organizationId),
           eq(promoCodes.isActive, true),
-          sql`${promoCodes.validUntil} < ${now}`
+          lt(promoCodes.validUntil, now)
         )
       )
       .returning();

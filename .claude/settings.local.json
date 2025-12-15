@@ -58,7 +58,31 @@
       "Bash(git -C /Users/saim/Desktop/Tour_CRM commit -m \"$(cat <<''EOF''\nAdd Production Readiness section to PROGRESS.md\n\nDocuments comprehensive audit results and all fixes applied:\n- Security audit (JWT, magic links, env validation)\n- Multi-tenant isolation (20+ org filter fixes)\n- Database schema (booking_participants, indexes)\n- Authorization (15+ mutations to adminProcedure)\n- Bug fixes (currency logic, dates, URLs)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git -C /Users/saim/Desktop/Tour_CRM add:*)",
       "Bash(git -C /Users/saim/Desktop/Tour_CRM commit -m \"$(cat <<''EOF''\nReorganize docs and create sprint planning\n\n- Move planning files to docs/ folder:\n  - ARCHITECTURE.md\n  - FEATURES.md\n  - SYSTEM_DESIGN.md\n  - PROGRESS.md\n  - GUIDE_PORTAL_IMPLEMENTATION.md\n\n- Update CLAUDE.md with new file paths\n\n- Create docs/SPRINT.md for sprint planning:\n  - Sprint 7: Production Deployment & Polish\n  - Backlog for Sprints 8-11\n  - Environment variables checklist\n  - Definition of done\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(pnpm --filter @tour/crm build:*)"
+      "Bash(pnpm --filter @tour/crm build:*)",
+      "Bash(pnpm --filter crm build:*)",
+      "Bash(pnpm outdated:*)",
+      "Bash(pnpm --filter web build:*)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM push origin dev)",
+      "Bash(npm view:*)",
+      "Bash(pnpm audit:*)",
+      "Bash(pnpm -r exec:*)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM commit -m \"$(cat <<''EOF''\nUpdate @react-email/components and resend to fix vulnerabilities\n\nSecurity Fixes:\n- @react-email/components: 0.0.31 → 1.0.1 (fixes prismjs vulnerability)\n- resend: 4.8.0 → 6.6.0\n\nReact Status:\n- React 19.2.3 already at latest (includes December 2025 security fix)\n- All email templates verified compatible with new versions\n\nRemaining advisory (dev dependency only):\n- esbuild in drizzle-kit (development tool, not production)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "WebFetch(domain:square-ui-dashboard-2.vercel.app)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.figma.com)",
+      "Bash(npx playwright:*)",
+      "Bash(pnpm --filter crm add:*)",
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(wc:*)",
+      "Bash(pnpm --filter @tour/crm exec tsc:*)",
+      "Bash(npx tsx:*)",
+      "Bash(yes:*)",
+      "Bash(npx drizzle-kit push:*)",
+      "Bash(printf:*)",
+      "Bash(CI=true npx drizzle-kit push:*)",
+      "Bash(expect:*)",
+      "Bash(pnpm --filter @tour/crm typecheck:*)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM diff --stat HEAD)"
     ]
   }
 }

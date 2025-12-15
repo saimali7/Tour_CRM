@@ -1,34 +1,99 @@
 "use client";
 
 import { trpc } from "@/lib/trpc";
-import { Map, Plus, Edit, Trash2, Eye, Archive, Check, Copy } from "lucide-react";
+import { Edit, Trash2, Eye, Archive, Check, Copy, ChevronRight, ChevronDown, ChevronLeft, Calendar, List, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+// Design system components
+import { PageHeader, PageHeaderAction } from "@/components/ui/page-header";
+import { FilterChipGroup } from "@/components/ui/filter-bar";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+  TableActions,
+  ActionButton,
+} from "@/components/ui/data-table";
+import { TourStatusBadge } from "@/components/ui/status-badge";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { NoToursEmpty } from "@/components/ui/empty-state";
-import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
-import { toast } from "sonner";
+import { useConfirmModal } from "@/components/ui/confirm-modal";
 
+// Tour-specific components
+import { TourScheduleStats } from "@/components/tours/tour-schedule-stats";
+import { TourSchedulePreview } from "@/components/tours/tour-schedule-preview";
+import { ToursDayView } from "@/components/tours/tours-day-view";
+import { ToursWeekView } from "@/components/tours/tours-week-view";
+
+type ViewMode = "day" | "week" | "list";
 type StatusFilter = "all" | "draft" | "active" | "paused" | "archived";
+
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "draft", label: "Draft" },
+  { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
+  { value: "archived", label: "Archived" },
+];
+
+function formatDateLabel(date: Date): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+
+  if (target.getTime() === today.getTime()) return "Today";
+  if (target.getTime() === tomorrow.getTime()) return "Tomorrow";
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
 
 export default function ToursPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const slug = params.slug as string;
+
+  // View mode
+  const initialView = (searchParams.get("view") as ViewMode) || "day";
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // List view state
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [expandedTourIds, setExpandedTourIds] = useState<Set<string>>(new Set());
   const { confirm, ConfirmModal } = useConfirmModal();
 
-  const { data, isLoading, error } = trpc.tour.list.useQuery({
-    pagination: { page, limit: 10 },
-    filters: statusFilter === "all" ? undefined : { status: statusFilter },
-  });
+  // Use the new endpoint with schedule stats (only for list view)
+  const { data, isLoading, error } = trpc.tour.listWithScheduleStats.useQuery(
+    {
+      pagination: { page, limit: 10 },
+      filters: statusFilter === "all" ? undefined : { status: statusFilter },
+    },
+    { enabled: viewMode === "list" }
+  );
 
   const utils = trpc.useUtils();
 
   const deleteMutation = trpc.tour.delete.useMutation({
     onSuccess: () => {
+      utils.tour.listWithScheduleStats.invalidate();
       utils.tour.list.invalidate();
       toast.success("Tour deleted successfully");
     },
@@ -39,6 +104,7 @@ export default function ToursPage() {
 
   const archiveMutation = trpc.tour.archive.useMutation({
     onSuccess: () => {
+      utils.tour.listWithScheduleStats.invalidate();
       utils.tour.list.invalidate();
       toast.success("Tour archived successfully");
     },
@@ -49,6 +115,7 @@ export default function ToursPage() {
 
   const publishMutation = trpc.tour.publish.useMutation({
     onSuccess: () => {
+      utils.tour.listWithScheduleStats.invalidate();
       utils.tour.list.invalidate();
       toast.success("Tour published successfully");
     },
@@ -59,6 +126,7 @@ export default function ToursPage() {
 
   const duplicateMutation = trpc.tour.duplicate.useMutation({
     onSuccess: () => {
+      utils.tour.listWithScheduleStats.invalidate();
       utils.tour.list.invalidate();
       toast.success("Tour duplicated successfully");
     },
@@ -66,6 +134,18 @@ export default function ToursPage() {
       toast.error(`Failed to duplicate tour: ${error.message}`);
     },
   });
+
+  const toggleExpand = useCallback((tourId: string) => {
+    setExpandedTourIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tourId)) {
+        next.delete(tourId);
+      } else {
+        next.add(tourId);
+      }
+      return next;
+    });
+  }, []);
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
@@ -92,204 +172,337 @@ export default function ToursPage() {
     duplicateMutation.mutate({ id, newName: `${name} (Copy)` });
   };
 
-  if (error) {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-red-600">Error loading tours: {error.message}</p>
-      </div>
-    );
-  }
+  // View mode change
+  const handleViewChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", mode);
+    router.replace(`${url.pathname}${url.search}` as Route);
+  };
+
+  // Date navigation
+  const navigateDate = (direction: "prev" | "next") => {
+    const newDate = new Date(selectedDate);
+    if (viewMode === "day") {
+      newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1));
+    } else if (viewMode === "week") {
+      newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7));
+    }
+    setSelectedDate(newDate);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  // List view handlers
+  const handleFilterChange = (value: StatusFilter) => {
+    setStatusFilter(value);
+    setPage(1);
+    setExpandedTourIds(new Set());
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    setExpandedTourIds(new Set());
+  };
+
+  // Day click from week view
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(date);
+    handleViewChange("day");
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tours</h1>
-          <p className="text-gray-500 mt-1">Manage your tour offerings</p>
-        </div>
-        <Link
-          href={`/org/${slug}/tours/new` as Route}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
+      {/* Page Header */}
+      <PageHeader
+        title="Tours"
+        description={viewMode === "list" ? "Manage your tour offerings" : `Operations for ${formatDateLabel(selectedDate)}`}
+      >
+        <PageHeaderAction href={`/org/${slug}/tours/new`}>
           Create Tour
-        </Link>
-      </div>
+        </PageHeaderAction>
+      </PageHeader>
 
-      {/* Filters */}
-      <div className="flex gap-2">
-        {(["all", "draft", "active", "paused", "archived"] as const).map((status) => (
-          <button
-            key={status}
-            onClick={() => {
-              setStatusFilter(status);
-              setPage(1);
-            }}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-              statusFilter === status
-                ? "bg-primary text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <TableSkeleton rows={10} columns={6} />
-      ) : data?.data.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white">
-          <NoToursEmpty orgSlug={slug} />
-        </div>
-      ) : (
-        <>
-          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tour
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Duration
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Capacity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {data?.data.map((tour) => (
-                  <tr key={tour.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {tour.name}
-                        </div>
-                        <div className="text-sm text-gray-500">{tour.slug}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          tour.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : tour.status === "draft"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : tour.status === "paused"
-                            ? "bg-orange-100 text-orange-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {tour.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {tour.durationMinutes} min
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {tour.minParticipants ?? 1} - {tour.maxParticipants}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${parseFloat(tour.basePrice).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          href={`/org/${slug}/tours/${tour.id}` as Route}
-                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                          title="View"
-                          aria-label="View tour details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          href={`/org/${slug}/tours/${tour.id}/edit` as Route}
-                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                          title="Edit"
-                          aria-label="Edit tour"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                        <button
-                          onClick={() => handleDuplicate(tour.id, tour.name)}
-                          className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
-                          title="Duplicate"
-                          aria-label="Duplicate tour"
-                          disabled={duplicateMutation.isPending}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-                        {tour.status === "draft" && (
-                          <button
-                            onClick={() => handlePublish(tour.id)}
-                            className="p-1.5 text-green-500 hover:text-green-700 hover:bg-green-50 rounded"
-                            title="Publish"
-                            aria-label="Publish tour"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                        )}
-                        {tour.status === "active" && (
-                          <button
-                            onClick={() => handleArchive(tour.id)}
-                            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                            title="Archive"
-                            aria-label="Archive tour"
-                          >
-                            <Archive className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(tour.id)}
-                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
-                          title="Delete"
-                          aria-label="Delete tour"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* View Mode Toggle & Navigation */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Date Navigation (for day/week views) */}
+        {(viewMode === "day" || viewMode === "week") && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigateDate("prev")}
+              className="p-2 rounded-lg border border-input hover:bg-accent transition-colors"
+              aria-label="Previous"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={goToToday}
+              className="px-3 py-2 text-sm font-medium rounded-lg border border-input hover:bg-accent transition-colors"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => navigateDate("next")}
+              className="p-2 rounded-lg border border-input hover:bg-accent transition-colors"
+              aria-label="Next"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <span className="ml-2 text-sm font-medium text-foreground">
+              {formatDateLabel(selectedDate)}
+            </span>
           </div>
+        )}
 
-          {/* Pagination */}
-          {data && data.totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
-                Showing {(page - 1) * 10 + 1} to{" "}
-                {Math.min(page * 10, data.total)} of {data.total} tours
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                  disabled={page >= data.totalPages}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  Next
-                </button>
-              </div>
+        {/* Status Filter (for list view) */}
+        {viewMode === "list" && (
+          <FilterChipGroup
+            value={statusFilter}
+            onChange={handleFilterChange}
+            options={STATUS_OPTIONS}
+          />
+        )}
+
+        {/* View Toggle */}
+        <div className="flex rounded-lg border border-input bg-background p-1">
+          <button
+            onClick={() => handleViewChange("day")}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors",
+              viewMode === "day"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent"
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Day
+          </button>
+          <button
+            onClick={() => handleViewChange("week")}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors",
+              viewMode === "week"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent"
+            )}
+          >
+            <Calendar className="h-4 w-4" />
+            Week
+          </button>
+          <button
+            onClick={() => handleViewChange("list")}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors",
+              viewMode === "list"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent"
+            )}
+          >
+            <List className="h-4 w-4" />
+            Products
+          </button>
+        </div>
+      </div>
+
+      {/* Day View */}
+      {viewMode === "day" && (
+        <ToursDayView orgSlug={slug} selectedDate={selectedDate} />
+      )}
+
+      {/* Week View */}
+      {viewMode === "week" && (
+        <ToursWeekView orgSlug={slug} weekStart={selectedDate} onDayClick={handleDayClick} />
+      )}
+
+      {/* List View (Product Catalog) */}
+      {viewMode === "list" && (
+        <>
+          {error ? (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+              <p className="text-destructive">Error loading tours: {error.message}</p>
             </div>
+          ) : isLoading ? (
+            <TableSkeleton rows={10} columns={7} />
+          ) : data?.data.length === 0 ? (
+            <div className="rounded-lg border border-border bg-card">
+              <NoToursEmpty orgSlug={slug} />
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Tour</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Capacity</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Schedule Stats</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data?.data.map((tour) => {
+                    const isExpanded = expandedTourIds.has(tour.id);
+                    const stats = tour.scheduleStats;
+
+                    return (
+                      <>
+                        {/* Main Row */}
+                        <TableRow
+                          key={tour.id}
+                          className={cn(
+                            "cursor-pointer transition-colors",
+                            isExpanded && "bg-muted/50"
+                          )}
+                          onClick={() => toggleExpand(tour.id)}
+                        >
+                          {/* Expand Toggle */}
+                          <TableCell className="w-10 pr-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(tour.id);
+                              }}
+                              className="p-1 rounded hover:bg-accent transition-colors"
+                              aria-label={isExpanded ? "Collapse" : "Expand"}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                          </TableCell>
+
+                          {/* Tour Name */}
+                          <TableCell>
+                            <div>
+                              <div className="text-sm font-medium text-foreground">
+                                {tour.name}
+                              </div>
+                              <div className="text-sm text-muted-foreground">{tour.slug}</div>
+                            </div>
+                          </TableCell>
+
+                          {/* Status */}
+                          <TableCell>
+                            <TourStatusBadge status={tour.status as "draft" | "active" | "archived"} />
+                          </TableCell>
+
+                          {/* Duration */}
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {tour.durationMinutes} min
+                            </span>
+                          </TableCell>
+
+                          {/* Capacity */}
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {tour.minParticipants ?? 1} - {tour.maxParticipants}
+                            </span>
+                          </TableCell>
+
+                          {/* Price */}
+                          <TableCell>
+                            <span className="text-sm font-medium text-foreground">
+                              ${parseFloat(tour.basePrice).toFixed(2)}
+                            </span>
+                          </TableCell>
+
+                          {/* Schedule Stats */}
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <TourScheduleStats
+                              upcomingCount={stats.upcomingCount}
+                              totalCapacity={stats.totalCapacity}
+                              totalBooked={stats.totalBooked}
+                              utilizationPercent={stats.utilizationPercent}
+                              nextScheduleDate={stats.nextScheduleDate}
+                            />
+                          </TableCell>
+
+                          {/* Actions */}
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <TableActions>
+                              <Link href={`/org/${slug}/tours/${tour.id}` as Route}>
+                                <ActionButton tooltip="View tour">
+                                  <Eye className="h-4 w-4" />
+                                </ActionButton>
+                              </Link>
+                              <Link href={`/org/${slug}/tours/${tour.id}/edit` as Route}>
+                                <ActionButton tooltip="Edit tour">
+                                  <Edit className="h-4 w-4" />
+                                </ActionButton>
+                              </Link>
+                              <ActionButton
+                                tooltip="Duplicate tour"
+                                onClick={() => handleDuplicate(tour.id, tour.name)}
+                                disabled={duplicateMutation.isPending}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </ActionButton>
+                              {tour.status === "draft" && (
+                                <ActionButton
+                                  variant="success"
+                                  tooltip="Publish tour"
+                                  onClick={() => handlePublish(tour.id)}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </ActionButton>
+                              )}
+                              {tour.status === "active" && (
+                                <ActionButton
+                                  tooltip="Archive tour"
+                                  onClick={() => handleArchive(tour.id)}
+                                >
+                                  <Archive className="h-4 w-4" />
+                                </ActionButton>
+                              )}
+                              <ActionButton
+                                variant="danger"
+                                tooltip="Delete tour"
+                                onClick={() => handleDelete(tour.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </ActionButton>
+                            </TableActions>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Expanded Row */}
+                        {isExpanded && (
+                          <TableRow key={`${tour.id}-expanded`}>
+                            <TableCell colSpan={8} className="p-0">
+                              <TourSchedulePreview
+                                tourId={tour.id}
+                                orgSlug={slug}
+                                isExpanded={isExpanded}
+                                maxDisplay={5}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {data && data.totalPages > 1 && (
+                <TablePagination
+                  page={page}
+                  totalPages={data.totalPages}
+                  total={data.total}
+                  pageSize={10}
+                  onPageChange={handlePageChange}
+                />
+              )}
+            </>
           )}
         </>
       )}

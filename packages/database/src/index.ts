@@ -21,7 +21,11 @@ export function getDb() {
       throw _initError;
     }
     try {
-      const queryClient = postgres(databaseUrl);
+      const queryClient = postgres(databaseUrl, {
+        max: 20, // Maximum connections in pool
+        idle_timeout: 20, // Seconds before idle connection is closed
+        connect_timeout: 10, // Seconds to wait for connection
+      });
       _db = drizzle(queryClient, { schema });
     } catch (err) {
       _initError = err as Error;

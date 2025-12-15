@@ -5,9 +5,13 @@ import { emailSchema } from "./common";
 export const customerSourceSchema = z.enum(["manual", "website", "api", "import", "referral"]);
 export type CustomerSource = z.infer<typeof customerSourceSchema>;
 
-// Create customer validation
-export const createCustomerSchema = z.object({
-  email: emailSchema,
+// Contact preference enum
+export const contactPreferenceSchema = z.enum(["email", "phone", "both"]);
+export type ContactPreference = z.infer<typeof contactPreferenceSchema>;
+
+// Base customer schema
+const baseCustomerSchema = z.object({
+  email: emailSchema.optional(),
   firstName: z
     .string()
     .min(1, "First name is required")
@@ -17,6 +21,7 @@ export const createCustomerSchema = z.object({
     .min(1, "Last name is required")
     .max(50, "Last name must be less than 50 characters"),
   phone: z.string().max(20).optional(),
+  contactPreference: contactPreferenceSchema.default("email"),
   address: z.string().max(200).optional(),
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
@@ -30,8 +35,22 @@ export const createCustomerSchema = z.object({
   sourceDetails: z.string().max(200).optional(),
 });
 
-// Update customer validation
-export const updateCustomerSchema = createCustomerSchema.partial();
+// Create customer validation with email OR phone requirement
+export const createCustomerSchema = baseCustomerSchema.refine(
+  (data) => data.email || data.phone,
+  {
+    message: "Customer must have either email or phone number",
+    path: ["email"],
+  }
+);
+
+// Update customer validation (partial with same refinement)
+export const updateCustomerSchema = baseCustomerSchema
+  .partial()
+  .refine((data) => !("email" in data && "phone" in data) || data.email || data.phone, {
+    message: "Customer must have either email or phone number",
+    path: ["email"],
+  });
 
 // Customer search/filter validation
 export const customerFilterSchema = z.object({

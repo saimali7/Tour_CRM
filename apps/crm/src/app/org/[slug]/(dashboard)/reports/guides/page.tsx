@@ -50,14 +50,14 @@ export default function GuideReportPage() {
       key: "scheduleId",
       header: "Schedule",
       render: (row: any) => (
-        <span className="font-medium text-gray-900">{row.scheduleId?.slice(0, 8)}...</span>
+        <span className="font-medium text-foreground">{row.scheduleId?.slice(0, 8)}...</span>
       ),
     },
     {
       key: "guideId",
       header: "Guide",
       render: (row: any) => (
-        <span className="text-gray-700">{row.guideId?.slice(0, 8)}...</span>
+        <span className="text-foreground">{row.guideId?.slice(0, 8)}...</span>
       ),
     },
     {
@@ -69,10 +69,10 @@ export default function GuideReportPage() {
         <span
           className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
             row.status === "confirmed"
-              ? "bg-green-100 text-green-700"
+              ? "bg-success/10 text-success"
               : row.status === "pending"
-              ? "bg-yellow-100 text-yellow-700"
-              : "bg-gray-100 text-gray-700"
+              ? "bg-warning/10 text-warning"
+              : "bg-muted text-muted-foreground"
           }`}
         >
           {row.status || "N/A"}
@@ -83,7 +83,7 @@ export default function GuideReportPage() {
       key: "createdAt",
       header: "Assigned",
       render: (row: any) => (
-        <span className="text-gray-700">
+        <span className="text-foreground">
           {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "N/A"}
         </span>
       ),
@@ -142,8 +142,8 @@ export default function GuideReportPage() {
       <SummaryCards cards={summaryCards} />
 
       {/* Guide assignments table */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">
           Guide Assignments
         </h2>
         <ReportTable

@@ -1,5 +1,5 @@
-import { eq, and, desc, asc, sql, count, ilike, or } from "drizzle-orm";
-import { tours, tourPricingTiers, tourVariants, type Tour, type TourStatus, type TourPricingTier, type TourVariant, type PriceModifierType } from "@tour/database";
+import { eq, and, desc, asc, sql, count, ilike, or, gte } from "drizzle-orm";
+import { tours, tourPricingTiers, tourVariants, schedules, type Tour, type TourStatus, type TourPricingTier, type TourVariant, type PriceModifierType } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
   type PaginationOptions,
@@ -17,6 +17,18 @@ export interface TourFilters {
 }
 
 export type TourSortField = "name" | "createdAt" | "updatedAt" | "basePrice";
+
+export interface TourScheduleStats {
+  upcomingCount: number;
+  totalCapacity: number;
+  totalBooked: number;
+  utilizationPercent: number;
+  nextScheduleDate: Date | null;
+}
+
+export interface TourWithScheduleStats extends Tour {
+  scheduleStats: TourScheduleStats;
+}
 
 export interface CreateTourInput {
   name: string;
@@ -103,6 +115,120 @@ export class TourService extends BaseService {
 
     return {
       data,
+      ...this.paginationMeta(total, page, limit),
+    };
+  }
+
+  /**
+   * Get all tours with schedule stats (upcoming count, capacity, utilization)
+   * Uses a single query with aggregation for efficiency
+   */
+  async getAllWithScheduleStats(
+    filters: TourFilters = {},
+    pagination: PaginationOptions = {},
+    sort: SortOptions<TourSortField> = { field: "createdAt", direction: "desc" }
+  ): Promise<PaginatedResult<TourWithScheduleStats>> {
+    const { page = 1, limit = 20 } = pagination;
+    const offset = (page - 1) * limit;
+    const now = new Date();
+
+    const conditions = [eq(tours.organizationId, this.organizationId)];
+
+    if (filters.status) {
+      conditions.push(eq(tours.status, filters.status));
+    }
+    if (filters.isPublic !== undefined) {
+      conditions.push(eq(tours.isPublic, filters.isPublic));
+    }
+    if (filters.category) {
+      conditions.push(eq(tours.category, filters.category));
+    }
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(tours.name, `%${filters.search}%`),
+          ilike(tours.description, `%${filters.search}%`)
+        )!
+      );
+    }
+
+    const orderBy =
+      sort.direction === "asc" ? asc(tours[sort.field]) : desc(tours[sort.field]);
+
+    // Query tours with schedule stats using subquery
+    const [data, countResult] = await Promise.all([
+      this.db
+        .select({
+          tour: tours,
+          upcomingCount: sql<number>`(
+            SELECT COUNT(*)::int
+            FROM ${schedules}
+            WHERE ${schedules.tourId} = ${tours.id}
+              AND ${schedules.organizationId} = ${this.organizationId}
+              AND ${schedules.startsAt} > ${now}
+              AND ${schedules.status} != 'cancelled'
+          )`.as('upcoming_count'),
+          totalCapacity: sql<number>`(
+            SELECT COALESCE(SUM(${schedules.maxParticipants}), 0)::int
+            FROM ${schedules}
+            WHERE ${schedules.tourId} = ${tours.id}
+              AND ${schedules.organizationId} = ${this.organizationId}
+              AND ${schedules.startsAt} > ${now}
+              AND ${schedules.status} != 'cancelled'
+          )`.as('total_capacity'),
+          totalBooked: sql<number>`(
+            SELECT COALESCE(SUM(${schedules.bookedCount}), 0)::int
+            FROM ${schedules}
+            WHERE ${schedules.tourId} = ${tours.id}
+              AND ${schedules.organizationId} = ${this.organizationId}
+              AND ${schedules.startsAt} > ${now}
+              AND ${schedules.status} != 'cancelled'
+          )`.as('total_booked'),
+          nextScheduleDate: sql<Date | null>`(
+            SELECT MIN(${schedules.startsAt})
+            FROM ${schedules}
+            WHERE ${schedules.tourId} = ${tours.id}
+              AND ${schedules.organizationId} = ${this.organizationId}
+              AND ${schedules.startsAt} > ${now}
+              AND ${schedules.status} != 'cancelled'
+          )`.as('next_schedule_date'),
+        })
+        .from(tours)
+        .where(and(...conditions))
+        .orderBy(orderBy)
+        .limit(limit)
+        .offset(offset),
+      this.db
+        .select({ total: count() })
+        .from(tours)
+        .where(and(...conditions)),
+    ]);
+
+    const total = countResult[0]?.total ?? 0;
+
+    // Transform data to include scheduleStats
+    const toursWithStats: TourWithScheduleStats[] = data.map((row) => {
+      const upcomingCount = Number(row.upcomingCount) || 0;
+      const totalCapacity = Number(row.totalCapacity) || 0;
+      const totalBooked = Number(row.totalBooked) || 0;
+      const utilizationPercent = totalCapacity > 0
+        ? Math.round((totalBooked / totalCapacity) * 100)
+        : 0;
+
+      return {
+        ...row.tour,
+        scheduleStats: {
+          upcomingCount,
+          totalCapacity,
+          totalBooked,
+          utilizationPercent,
+          nextScheduleDate: row.nextScheduleDate,
+        },
+      };
+    });
+
+    return {
+      data: toursWithStats,
       ...this.paginationMeta(total, page, limit),
     };
   }

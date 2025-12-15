@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Edit, Clock, Users, DollarSign, MapPin, Calendar, Check, X, Plus, Trash2, GripVertical, Star, Layers, ExternalLink, Ticket } from "lucide-react";
+import { ArrowLeft, Edit, Clock, Users, DollarSign, MapPin, Calendar, Check, X, Plus, Trash2, GripVertical, Star, Layers } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { TourGuideQualifications } from "@/components/tours/tour-guide-qualifications";
+import { TourScheduleManager } from "@/components/tours/tour-schedule-manager";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { toast } from "sonner";
@@ -71,7 +72,6 @@ const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function TourDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const slug = params.slug as string;
   const tourId = params.id as string;
 
@@ -97,16 +97,6 @@ export default function TourDetailPage() {
   );
   const { data: variants = [], isLoading: variantsLoading } = trpc.tour.listVariants.useQuery(
     { tourId },
-    { enabled: !!tourId }
-  );
-
-  // Get upcoming schedules for this tour
-  const { data: schedulesData } = trpc.schedule.list.useQuery(
-    {
-      filters: { tourId },
-      pagination: { limit: 10 },
-      sort: { field: "startsAt", direction: "asc" },
-    },
     { enabled: !!tourId }
   );
 
@@ -270,10 +260,6 @@ export default function TourDetailPage() {
     if (deletingVariantId) {
       deleteVariantMutation.mutate({ variantId: deletingVariantId });
     }
-  };
-
-  const handleCreateSchedule = () => {
-    router.push(`/org/${slug}/schedules/new?tourId=${tourId}` as Route);
   };
 
   const toggleVariantDay = (day: number) => {
@@ -687,92 +673,17 @@ export default function TourDetailPage() {
       {/* Qualified Guides */}
       <TourGuideQualifications tourId={tourId} />
 
-      {/* Upcoming Schedules */}
-      <div className="bg-card rounded-lg border border-border">
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Upcoming Schedules</h2>
-            <p className="text-sm text-muted-foreground">
-              {schedulesData?.data?.length || 0} schedules
-            </p>
-          </div>
-          <Button onClick={handleCreateSchedule} size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create Schedule
-          </Button>
-        </div>
-
-        {schedulesData?.data && schedulesData.data.length > 0 ? (
-          <div className="divide-y divide-border">
-            {schedulesData.data.slice(0, 5).map((schedule) => {
-              const date = new Date(schedule.startsAt);
-              const dateStr = new Intl.DateTimeFormat("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              }).format(date);
-              const available = (schedule.maxParticipants || 0) - (schedule.bookedCount || 0);
-
-              return (
-                <div
-                  key={schedule.id}
-                  className="p-4 flex items-center justify-between hover:bg-accent"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground">{dateStr}</span>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          schedule.status === "scheduled"
-                            ? "bg-info/10 text-info"
-                            : schedule.status === "completed"
-                            ? "bg-success/10 text-success"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {schedule.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {schedule.bookedCount || 0}/{schedule.maxParticipants} booked • {available} spots available
-                      {schedule.guide && ` • ${schedule.guide.firstName} ${schedule.guide.lastName}`}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/org/${slug}/schedules/${schedule.id}` as Route}
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    View
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="p-8 text-center">
-            <Ticket className="mx-auto h-12 w-12 text-muted-foreground/40" />
-            <p className="mt-4 text-muted-foreground">No schedules yet</p>
-            <Button onClick={handleCreateSchedule} variant="outline" className="mt-4 gap-2">
-              <Plus className="h-4 w-4" />
-              Create First Schedule
-            </Button>
-          </div>
-        )}
-
-        {schedulesData?.data && schedulesData.data.length > 5 && (
-          <div className="p-4 border-t border-border text-center">
-            <Link
-              href={`/org/${slug}/schedules?tourId=${tourId}` as Route}
-              className="text-sm text-primary hover:underline"
-            >
-              View all {schedulesData.data.length} schedules
-            </Link>
-          </div>
-        )}
-      </div>
+      {/* Schedule Management */}
+      <TourScheduleManager
+        tourId={tourId}
+        orgSlug={slug}
+        tourDefaults={{
+          durationMinutes: tour.durationMinutes,
+          maxParticipants: tour.maxParticipants,
+          meetingPoint: tour.meetingPoint,
+          meetingPointDetails: tour.meetingPointDetails,
+        }}
+      />
 
       {/* Cancellation Policy */}
       {tour.cancellationPolicy && (

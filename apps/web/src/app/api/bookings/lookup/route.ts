@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Verify email matches
-    if (booking.customer?.email.toLowerCase() !== email.toLowerCase()) {
+    // Verify email matches (customer must have email for web lookup)
+    if (!booking.customer?.email || booking.customer.email.toLowerCase() !== email.toLowerCase()) {
       return NextResponse.json(
         { message: "Booking not found. Please check your email address." },
         { status: 404 }

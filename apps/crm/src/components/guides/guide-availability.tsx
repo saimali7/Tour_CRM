@@ -200,15 +200,15 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Weekly Availability</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="text-lg font-semibold text-foreground">Weekly Availability</h3>
+            <p className="text-sm text-muted-foreground mt-1">
               Set recurring weekly availability for this guide
             </p>
           </div>
           {!isAddingSlot && (
             <button
               onClick={() => setIsAddingSlot(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Add Time Slot
@@ -227,11 +227,11 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                 key={day.value}
                 className={`rounded-lg border p-3 ${
                   hasAvailableSlots
-                    ? "bg-green-50 border-green-200"
-                    : "bg-gray-50 border-gray-200"
+                    ? "status-confirmed"
+                    : "bg-muted border-border"
                 }`}
               >
-                <h4 className="font-medium text-sm text-gray-900 mb-2">
+                <h4 className="font-medium text-sm text-foreground mb-2">
                   {day.label}
                 </h4>
                 <div className="space-y-2">
@@ -241,8 +241,8 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                         key={slot.id}
                         className={`relative group text-xs rounded px-2 py-1.5 ${
                           slot.isAvailable
-                            ? "bg-green-100 text-green-800 border border-green-300"
-                            : "bg-gray-200 text-gray-600 border border-gray-300"
+                            ? "status-confirmed border"
+                            : "bg-muted text-muted-foreground border border-border"
                         }`}
                       >
                         <div className="flex items-center gap-1">
@@ -253,7 +253,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                         </div>
                         <button
                           onClick={() => handleDeleteSlot(slot.id)}
-                          className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"
+                          className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive text-destructive-foreground rounded-full p-0.5 hover:bg-destructive/90"
                           title="Delete slot"
                         >
                           <X className="h-3 w-3" />
@@ -261,7 +261,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs text-gray-400">Unavailable</p>
+                    <p className="text-xs text-muted-foreground">Unavailable</p>
                   )}
                 </div>
               </div>
@@ -271,11 +271,11 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
 
         {/* Add Slot Form */}
         {isAddingSlot && (
-          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3">Add New Time Slot</h4>
+          <div className="mt-4 bg-accent border border-border rounded-lg p-4">
+            <h4 className="font-medium text-foreground mb-3">Add New Time Slot</h4>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Day
                 </label>
                 <select
@@ -283,7 +283,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                   onChange={(e) =>
                     setNewSlot({ ...newSlot, dayOfWeek: Number(e.target.value) })
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {DAYS_OF_WEEK.map((day) => (
                     <option key={day.value} value={day.value}>
@@ -294,7 +294,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Start Time
                 </label>
                 <input
@@ -303,12 +303,12 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                   onChange={(e) =>
                     setNewSlot({ ...newSlot, startTime: e.target.value })
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   End Time
                 </label>
                 <input
@@ -317,12 +317,12 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                   onChange={(e) =>
                     setNewSlot({ ...newSlot, endTime: e.target.value })
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Status
                 </label>
                 <select
@@ -333,7 +333,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                       isAvailable: e.target.value === "available",
                     })
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="available">Available</option>
                   <option value="unavailable">Unavailable</option>
@@ -345,7 +345,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
               <button
                 onClick={handleAddSlot}
                 disabled={addSlotMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 {addSlotMutation.isPending ? (
                   <>
@@ -362,16 +362,16 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
               <button
                 onClick={() => setIsAddingSlot(false)}
                 disabled={addSlotMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
             </div>
 
             {addSlotMutation.error && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-red-600">{addSlotMutation.error.message}</p>
+              <div className="mt-3 p-3 status-cancelled rounded-lg flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <p className="text-sm">{addSlotMutation.error.message}</p>
               </div>
             )}
           </div>
@@ -382,15 +382,15 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Date Overrides</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="text-lg font-semibold text-foreground">Date Overrides</h3>
+            <p className="text-sm text-muted-foreground mt-1">
               Override availability for specific dates (e.g., vacation, sick days)
             </p>
           </div>
           {!isAddingOverride && (
             <button
               onClick={() => setIsAddingOverride(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Add Override
@@ -400,11 +400,11 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
 
         {/* Add Override Form */}
         {isAddingOverride && (
-          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3">Add Date Override</h4>
+          <div className="mb-4 bg-accent border border-border rounded-lg p-4">
+            <h4 className="font-medium text-foreground mb-3">Add Date Override</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Date
                 </label>
                 <input
@@ -413,12 +413,12 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                   onChange={(e) =>
                     setNewOverride({ ...newOverride, date: e.target.value })
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Status
                 </label>
                 <select
@@ -429,7 +429,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                       isAvailable: e.target.value === "available",
                     })
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="unavailable">Unavailable</option>
                   <option value="available">Available</option>
@@ -437,7 +437,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Reason (Optional)
                 </label>
                 <input
@@ -447,7 +447,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                     setNewOverride({ ...newOverride, reason: e.target.value })
                   }
                   placeholder="e.g., Vacation"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-lg border border-input px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
@@ -456,7 +456,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
               <button
                 onClick={handleAddOverride}
                 disabled={createOverrideMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 {createOverrideMutation.isPending ? (
                   <>
@@ -473,16 +473,16 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
               <button
                 onClick={() => setIsAddingOverride(false)}
                 disabled={createOverrideMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
             </div>
 
             {createOverrideMutation.error && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-red-600">
+              <div className="mt-3 p-3 status-cancelled rounded-lg flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <p className="text-sm">
                   {createOverrideMutation.error.message}
                 </p>
               </div>
@@ -491,52 +491,52 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
         )}
 
         {/* Overrides List */}
-        <div className="bg-white rounded-lg border border-gray-200">
+        <div className="bg-card rounded-lg border border-border">
           {overrides && overrides.length > 0 ? (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-border">
               {overrides.map((override) => (
                 <div
                   key={override.id}
-                  className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                  className="p-4 flex items-center justify-between hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <div
                       className={`p-2 rounded-lg ${
                         override.isAvailable
-                          ? "bg-green-100"
-                          : "bg-red-100"
+                          ? "bg-success/10"
+                          : "bg-destructive/10"
                       }`}
                     >
                       <Calendar
                         className={`h-5 w-5 ${
                           override.isAvailable
-                            ? "text-green-600"
-                            : "text-red-600"
+                            ? "text-success"
+                            : "text-destructive"
                         }`}
                       />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-foreground">
                           {formatDate(override.date)}
                         </p>
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             override.isAvailable
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
+                              ? "status-confirmed"
+                              : "status-cancelled"
                           }`}
                         >
                           {override.isAvailable ? "Available" : "Unavailable"}
                         </span>
                       </div>
                       {override.reason && (
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           {override.reason}
                         </p>
                       )}
                       {override.startTime && override.endTime && (
-                        <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                        <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {override.startTime} - {override.endTime}
                         </p>
@@ -546,7 +546,7 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
                   <button
                     onClick={() => handleDeleteOverride(override.id)}
                     disabled={deleteOverrideMutation.isPending}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
                     title="Delete override"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -556,8 +556,8 @@ export function GuideAvailability({ guideId }: GuideAvailabilityProps) {
             </div>
           ) : (
             <div className="p-8 text-center">
-              <AlertCircle className="mx-auto h-12 w-12 text-gray-300" />
-              <p className="mt-4 text-gray-500">No upcoming overrides</p>
+              <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <p className="mt-4 text-muted-foreground">No upcoming overrides</p>
             </div>
           )}
         </div>

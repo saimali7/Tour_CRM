@@ -44,17 +44,17 @@ export default function CapacityReportPage() {
 
   // Get utilization color
   const getUtilizationColor = (rate: number) => {
-    if (rate >= 80) return "text-green-600";
-    if (rate >= 60) return "text-yellow-600";
-    if (rate >= 40) return "text-orange-600";
-    return "text-red-600";
+    if (rate >= 80) return "text-success";
+    if (rate >= 60) return "text-warning";
+    if (rate >= 40) return "text-warning";
+    return "text-destructive";
   };
 
   const getUtilizationBgColor = (rate: number) => {
-    if (rate >= 80) return "bg-green-500";
-    if (rate >= 60) return "bg-yellow-500";
-    if (rate >= 40) return "bg-orange-500";
-    return "bg-red-500";
+    if (rate >= 80) return "bg-success";
+    if (rate >= 60) return "bg-warning";
+    if (rate >= 40) return "bg-warning";
+    return "bg-destructive";
   };
 
   // Prepare chart data - Utilization by tour
@@ -78,7 +78,7 @@ export default function CapacityReportPage() {
       header: "Tour",
       sortable: true,
       render: (row) => (
-        <span className="font-medium text-gray-900">{row.tourName}</span>
+        <span className="font-medium text-foreground">{row.tourName}</span>
       ),
     },
     {
@@ -86,7 +86,7 @@ export default function CapacityReportPage() {
       header: "Total Capacity",
       sortable: true,
       align: "center",
-      render: (row) => <span className="text-gray-700">{row.totalCapacity}</span>,
+      render: (row) => <span className="text-foreground">{row.totalCapacity}</span>,
     },
     {
       key: "bookedCount",
@@ -94,7 +94,7 @@ export default function CapacityReportPage() {
       sortable: true,
       align: "center",
       render: (row) => (
-        <span className="font-semibold text-gray-900">{row.bookedCount}</span>
+        <span className="font-semibold text-foreground">{row.bookedCount}</span>
       ),
     },
     {
@@ -119,7 +119,7 @@ export default function CapacityReportPage() {
       header: "Tour",
       sortable: true,
       render: (row) => (
-        <span className="font-medium text-gray-900">{row.tourName}</span>
+        <span className="font-medium text-foreground">{row.tourName}</span>
       ),
     },
     {
@@ -127,7 +127,7 @@ export default function CapacityReportPage() {
       header: "Date & Time",
       sortable: true,
       render: (row) => (
-        <span className="text-gray-700">
+        <span className="text-foreground">
           {new Date(row.startsAt).toLocaleDateString()} at {new Date(row.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       ),
@@ -137,7 +137,7 @@ export default function CapacityReportPage() {
       header: "Booked / Capacity",
       align: "center",
       render: (row) => (
-        <span className="text-gray-700">
+        <span className="text-foreground">
           {row.bookedCount} / {row.maxParticipants}
         </span>
       ),
@@ -206,9 +206,9 @@ export default function CapacityReportPage() {
       />
 
       {/* Overall utilization gauge */}
-      <div className="rounded-lg border border-gray-200 bg-white p-8">
+      <div className="rounded-lg border border-border bg-card p-8">
         <div className="text-center">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Overall Utilization
           </h2>
           <div className="flex items-center justify-center">
@@ -251,22 +251,22 @@ export default function CapacityReportPage() {
                 >
                   {utilizationPercentage.toFixed(1)}%
                 </span>
-                <span className="text-sm text-gray-500 mt-1">Utilization</span>
+                <span className="text-sm text-muted-foreground mt-1">Utilization</span>
               </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 mt-8 max-w-md mx-auto">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-2xl font-bold text-foreground">
                 {data?.utilizationByTour.reduce((sum, t) => sum + t.totalCapacity, 0) ?? 0}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Total Capacity</p>
+              <p className="text-sm text-muted-foreground mt-1">Total Capacity</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-2xl font-bold text-foreground">
                 {data?.utilizationByTour.reduce((sum, t) => sum + t.bookedCount, 0) ?? 0}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Booked Spots</p>
+              <p className="text-sm text-muted-foreground mt-1">Booked Spots</p>
             </div>
           </div>
         </div>
@@ -299,8 +299,8 @@ export default function CapacityReportPage() {
       </ReportChart>
 
       {/* Utilization by tour table */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">
           Tour Utilization Details
         </h2>
         <ReportTable
@@ -314,10 +314,10 @@ export default function CapacityReportPage() {
       {/* Underperforming schedules */}
       {data?.underperformingSchedules &&
         data.underperformingSchedules.length > 0 && (
-          <div className="rounded-lg border border-gray-200 bg-white p-6">
+          <div className="rounded-lg border border-border bg-card p-6">
             <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
-              <h2 className="text-lg font-semibold text-gray-900">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              <h2 className="text-lg font-semibold text-foreground">
                 Underperforming Schedules (Below 50% Utilization)
               </h2>
             </div>

@@ -1,31 +1,25 @@
 "use client";
 
-import { ScheduleForm } from "@/components/schedules/schedule-form";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import type { Route } from "next";
-import { useParams } from "next/navigation";
 
-export default function NewSchedulePage() {
+// Redirect from old /schedules/new to new /availability/new
+export default function NewScheduleRedirect() {
+  const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link
-          href={`/org/${slug}/schedules` as Route}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-500" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Add Schedule</h1>
-          <p className="text-gray-500 mt-1">Schedule a new tour time</p>
-        </div>
-      </div>
+  useEffect(() => {
+    const queryString = searchParams.toString();
+    const newUrl = `/org/${slug}/availability/new${queryString ? `?${queryString}` : ""}` as Route;
+    router.replace(newUrl);
+  }, [router, slug, searchParams]);
 
-      <ScheduleForm />
+  return (
+    <div className="flex justify-center items-center h-64">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
     </div>
   );
 }

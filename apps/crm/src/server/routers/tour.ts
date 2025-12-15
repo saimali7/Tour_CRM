@@ -67,6 +67,23 @@ export const tourRouter = createRouter({
       );
     }),
 
+  listWithScheduleStats: protectedProcedure
+    .input(
+      z.object({
+        filters: tourFilterSchema.optional(),
+        pagination: paginationSchema.optional(),
+        sort: sortSchema.optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.tour.getAllWithScheduleStats(
+        input.filters,
+        input.pagination,
+        input.sort
+      );
+    }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {

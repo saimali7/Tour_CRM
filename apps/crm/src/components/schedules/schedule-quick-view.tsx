@@ -36,16 +36,16 @@ export function ScheduleQuickView({
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-6 w-32 bg-gray-200 rounded" />
-        <div className="h-4 w-48 bg-gray-200 rounded" />
-        <div className="h-20 bg-gray-200 rounded" />
+        <div className="h-6 w-32 bg-muted rounded" />
+        <div className="h-4 w-48 bg-muted rounded" />
+        <div className="h-20 bg-muted rounded" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-8 text-red-500">
+      <div className="text-center py-8 text-destructive">
         Error loading schedule: {error.message}
       </div>
     );
@@ -60,10 +60,10 @@ export function ScheduleQuickView({
   }
 
   const statusColors: Record<string, string> = {
-    scheduled: "bg-blue-100 text-blue-800",
-    in_progress: "bg-yellow-100 text-yellow-800",
-    completed: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
+    scheduled: "bg-primary/10 text-primary",
+    in_progress: "status-pending",
+    completed: "status-completed",
+    cancelled: "status-cancelled",
   };
 
   const bookedCount = schedule.bookedCount || 0;
@@ -85,7 +85,7 @@ export function ScheduleQuickView({
         </div>
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            statusColors[schedule.status] || "bg-gray-100 text-gray-800"
+            statusColors[schedule.status] || "bg-secondary text-secondary-foreground"
           }`}
         >
           {schedule.status.replace("_", " ")}
@@ -141,14 +141,14 @@ export function ScheduleQuickView({
             <span>{bookedCount} booked</span>
             <span>{maxParticipants} max</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div className="w-full bg-muted rounded-full h-2.5">
             <div
               className={`h-2.5 rounded-full ${
                 capacityPercentage >= 100
-                  ? "bg-red-500"
+                  ? "bg-destructive"
                   : capacityPercentage >= 80
-                  ? "bg-yellow-500"
-                  : "bg-green-500"
+                  ? "bg-warning"
+                  : "bg-success"
               }`}
               style={{ width: `${capacityPercentage}%` }}
             />
@@ -220,7 +220,7 @@ export function ScheduleQuickView({
             )}
           </div>
         ) : (
-          <p className="text-sm text-yellow-600 font-medium">
+          <p className="text-sm text-warning font-medium">
             No guide assigned
           </p>
         )}
@@ -264,7 +264,7 @@ export function ScheduleQuickView({
 
       {/* Actions */}
       <div className="flex gap-2 pt-2">
-        <Link href={`/org/${orgSlug}/schedules/${schedule.id}`} className="flex-1">
+        <Link href={`/org/${orgSlug}/availability/${schedule.id}`} className="flex-1">
           <Button variant="outline" className="w-full">
             <ExternalLink className="mr-2 h-4 w-4" />
             Full Details

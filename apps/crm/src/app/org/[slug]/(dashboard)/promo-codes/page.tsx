@@ -216,15 +216,15 @@ export default function PromoCodesPage() {
   };
 
   const getStatusColor = (promo: any) => {
-    if (!promo.isActive) return "bg-gray-100 text-gray-800";
+    if (!promo.isActive) return "bg-secondary text-secondary-foreground";
     const now = new Date();
     if (promo.validUntil) {
       const validUntil = new Date(promo.validUntil);
-      if (validUntil < now) return "bg-red-100 text-red-800";
+      if (validUntil < now) return "status-cancelled";
     }
     if (promo.maxUses && promo.currentUses && promo.currentUses >= promo.maxUses)
-      return "bg-orange-100 text-orange-800";
-    return "bg-green-100 text-green-800";
+      return "bg-warning/20 text-warning";
+    return "status-confirmed";
   };
 
   const getStatusLabel = (promo: any) => {
@@ -240,8 +240,8 @@ export default function PromoCodesPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-red-600">Error loading promo codes: {error.message}</p>
+      <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-6">
+        <p className="text-destructive">Error loading promo codes: {error.message}</p>
       </div>
     );
   }
@@ -250,12 +250,12 @@ export default function PromoCodesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Promo Codes</h1>
-          <p className="text-gray-500 mt-1">Create and manage discount codes</p>
+          <h1 className="text-2xl font-bold text-foreground">Promo Codes</h1>
+          <p className="text-muted-foreground mt-1">Create and manage discount codes</p>
         </div>
         <div className="flex items-center gap-3">
           {saveSuccess && (
-            <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
+            <div className="flex items-center gap-2 text-success bg-success/10 px-4 py-2 rounded-lg">
               <CheckCircle className="h-4 w-4" />
               <span className="text-sm">Success</span>
             </div>
@@ -266,7 +266,7 @@ export default function PromoCodesPage() {
               setEditingId(null);
               setShowModal(true);
             }}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Create Code
@@ -277,50 +277,50 @@ export default function PromoCodesPage() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Tag className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Tag className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Total Codes</p>
-                <p className="text-xl font-semibold text-gray-900">{stats.total}</p>
+                <p className="text-sm text-muted-foreground">Total Codes</p>
+                <p className="text-xl font-semibold text-foreground">{stats.total}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/10 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Active</p>
-                <p className="text-xl font-semibold text-gray-900">{stats.active}</p>
+                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-xl font-semibold text-foreground">{stats.active}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Users className="h-5 w-5 text-purple-600" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Users className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Total Uses</p>
-                <p className="text-xl font-semibold text-gray-900">{stats.totalUses}</p>
+                <p className="text-sm text-muted-foreground">Total Uses</p>
+                <p className="text-xl font-semibold text-foreground">{stats.totalUses}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <DollarSign className="h-5 w-5 text-orange-600" />
+              <div className="p-2 bg-warning/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-warning" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Total Discount</p>
-                <p className="text-xl font-semibold text-gray-900">
+                <p className="text-sm text-muted-foreground">Total Discount</p>
+                <p className="text-xl font-semibold text-foreground">
                   ${stats.totalDiscount.toFixed(2)}
                 </p>
               </div>
@@ -332,7 +332,7 @@ export default function PromoCodesPage() {
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
             value={search}
@@ -341,7 +341,7 @@ export default function PromoCodesPage() {
               setPage(1);
             }}
             placeholder="Search by code or description..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full pl-10 pr-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
 
@@ -355,8 +355,8 @@ export default function PromoCodesPage() {
               }}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                 statusFilter === status
-                  ? "bg-primary text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground hover:bg-accent"
               }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -366,17 +366,17 @@ export default function PromoCodesPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12">
+        <div className="rounded-lg border border-border bg-card p-12">
           <div className="flex justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
         </div>
       ) : data?.data.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white">
+        <div className="rounded-lg border border-border bg-card">
           <div className="p-12 text-center">
-            <Tag className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No promo codes yet</h3>
-            <p className="mt-2 text-gray-500">
+            <Tag className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h3 className="mt-4 text-lg font-medium text-foreground">No promo codes yet</h3>
+            <p className="mt-2 text-muted-foreground">
               Create promo codes to offer discounts to your customers.
             </p>
             <button
@@ -385,7 +385,7 @@ export default function PromoCodesPage() {
                 setEditingId(null);
                 setShowModal(true);
               }}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Create Code
@@ -394,46 +394,46 @@ export default function PromoCodesPage() {
         </div>
       ) : (
         <>
-          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Code
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Discount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Valid Dates
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Usage
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-border">
                 {data?.data.map((promo) => (
-                  <tr key={promo.id} className="hover:bg-gray-50">
+                  <tr key={promo.id} className="hover:bg-muted">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div>
-                          <div className="text-sm font-mono font-semibold text-gray-900">
+                          <div className="text-sm font-mono font-semibold text-foreground">
                             {promo.code}
                           </div>
                           {promo.description && (
-                            <div className="text-xs text-gray-500">{promo.description}</div>
+                            <div className="text-xs text-muted-foreground">{promo.description}</div>
                           )}
                         </div>
                         <button
                           onClick={() => copyToClipboard(promo.code)}
-                          className="p-1 text-gray-400 hover:text-gray-600"
+                          className="p-1 text-muted-foreground hover:text-foreground"
                           title="Copy code"
                         >
                           <Copy className="h-3.5 w-3.5" />
@@ -441,23 +441,23 @@ export default function PromoCodesPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-confirmed">
                         {promo.discountValue}
                         {promo.discountType === "percentage" ? "%" : " USD"} off
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       <div className="flex flex-col">
                         {promo.validFrom && <span>{formatDate(promo.validFrom)}</span>}
                         {promo.validUntil && (
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-muted-foreground">
                             to {formatDate(promo.validUntil)}
                           </span>
                         )}
                         {!promo.validFrom && !promo.validUntil && <span>No expiry</span>}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       {promo.currentUses || 0}
                       {promo.maxUses ? ` / ${promo.maxUses}` : " uses"}
                     </td>
@@ -474,21 +474,21 @@ export default function PromoCodesPage() {
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           href={`/org/${slug}/promo-codes/${promo.id}` as Route}
-                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded"
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
                         <button
                           onClick={() => handleEdit(promo)}
-                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded"
                           title="Edit"
                         >
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(promo.id)}
-                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                          className="p-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 rounded"
                           title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -504,7 +504,7 @@ export default function PromoCodesPage() {
           {/* Pagination */}
           {data && data.totalPages > 1 && (
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Showing {(page - 1) * 20 + 1} to {Math.min(page * 20, data.total)} of{" "}
                 {data.total} promo codes
               </p>
@@ -512,14 +512,14 @@ export default function PromoCodesPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-3 py-1.5 text-sm rounded-lg border border-input disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                   disabled={page >= data.totalPages}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-3 py-1.5 text-sm rounded-lg border border-input disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
                 >
                   Next
                 </button>
@@ -532,9 +532,9 @@ export default function PromoCodesPage() {
       {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">
                 {editingId ? "Edit Promo Code" : "Create Promo Code"}
               </h3>
               <button
@@ -543,7 +543,7 @@ export default function PromoCodesPage() {
                   setEditingId(null);
                   resetForm();
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -551,7 +551,7 @@ export default function PromoCodesPage() {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Code *
                 </label>
                 <div className="flex gap-2">
@@ -563,12 +563,12 @@ export default function PromoCodesPage() {
                     }
                     required
                     placeholder="e.g., SUMMER2025"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono"
+                    className="flex-1 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono"
                   />
                   <button
                     type="button"
                     onClick={generateCode}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
                   >
                     <Sparkles className="h-4 w-4" />
                     Generate
@@ -577,7 +577,7 @@ export default function PromoCodesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Description
                 </label>
                 <input
@@ -587,13 +587,13 @@ export default function PromoCodesPage() {
                     setForm((prev) => ({ ...prev, description: e.target.value }))
                   }
                   placeholder="Brief description of this promo"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Discount Type *
                   </label>
                   <select
@@ -604,14 +604,14 @@ export default function PromoCodesPage() {
                         discountType: e.target.value as DiscountType,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   >
                     <option value="percentage">Percentage</option>
                     <option value="fixed">Fixed Amount</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Discount Value *
                   </label>
                   <div className="relative">
@@ -627,9 +627,9 @@ export default function PromoCodesPage() {
                         }))
                       }
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                       {form.discountType === "percentage" ? "%" : "$"}
                     </span>
                   </div>
@@ -638,7 +638,7 @@ export default function PromoCodesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Valid From *
                   </label>
                   <input
@@ -648,11 +648,11 @@ export default function PromoCodesPage() {
                       setForm((prev) => ({ ...prev, validFrom: e.target.value }))
                     }
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Valid Until *
                   </label>
                   <input
@@ -662,14 +662,14 @@ export default function PromoCodesPage() {
                       setForm((prev) => ({ ...prev, validUntil: e.target.value }))
                     }
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Max Uses
                   </label>
                   <input
@@ -683,11 +683,11 @@ export default function PromoCodesPage() {
                       }))
                     }
                     placeholder="Unlimited"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Max Uses Per Customer
                   </label>
                   <input
@@ -701,17 +701,17 @@ export default function PromoCodesPage() {
                       }))
                     }
                     placeholder="Unlimited"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Min Booking Amount
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                     $
                   </span>
                   <input
@@ -728,13 +728,13 @@ export default function PromoCodesPage() {
                       }))
                     }
                     placeholder="No minimum"
-                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full pl-8 pr-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Applies To *
                 </label>
                 <select
@@ -745,7 +745,7 @@ export default function PromoCodesPage() {
                       appliesTo: e.target.value as AppliesTo,
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="all">All Tours</option>
                   <option value="specific">Specific Tours</option>
@@ -754,10 +754,10 @@ export default function PromoCodesPage() {
 
               {form.appliesTo === "specific" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Select Tours *
                   </label>
-                  <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                  <div className="border border-input rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
                     {tours?.data.map((tour) => (
                       <label key={tour.id} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -771,9 +771,9 @@ export default function PromoCodesPage() {
                                 : prev.tourIds.filter((id) => id !== tour.id),
                             }));
                           }}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                         />
-                        <span className="text-sm text-gray-700">{tour.name}</span>
+                        <span className="text-sm text-foreground">{tour.name}</span>
                       </label>
                     ))}
                   </div>
@@ -781,20 +781,20 @@ export default function PromoCodesPage() {
               )}
 
               <div>
-                <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+                <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.isActive}
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, isActive: e.target.checked }))
                     }
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                   />
-                  <span className="text-sm text-gray-700">Active</span>
+                  <span className="text-sm text-foreground">Active</span>
                 </label>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
                   onClick={() => {
@@ -802,14 +802,14 @@ export default function PromoCodesPage() {
                     setEditingId(null);
                     resetForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createMutation.isPending || updateMutation.isPending}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                 >
                   {createMutation.isPending || updateMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

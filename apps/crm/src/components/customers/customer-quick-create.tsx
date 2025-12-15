@@ -16,7 +16,7 @@ import { toast } from "sonner";
 interface CustomerQuickCreateProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: (customer: { id: string; firstName: string; lastName: string; email: string }) => void;
+  onSuccess: (customer: { id: string; firstName: string; lastName: string; email: string | null }) => void;
   defaultEmail?: string;
 }
 
@@ -124,11 +124,11 @@ export function CustomerQuickCreate({
                     setFormData((prev) => ({ ...prev, firstName: e.target.value }))
                   }
                   className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                    errors.firstName ? "border-red-500" : "border-input"
+                    errors.firstName ? "border-destructive" : "border-input"
                   }`}
                 />
                 {errors.firstName && (
-                  <p className="text-xs text-red-500">{errors.firstName}</p>
+                  <p className="text-xs text-destructive">{errors.firstName}</p>
                 )}
               </div>
               <div className="space-y-2">
@@ -144,11 +144,11 @@ export function CustomerQuickCreate({
                     setFormData((prev) => ({ ...prev, lastName: e.target.value }))
                   }
                   className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                    errors.lastName ? "border-red-500" : "border-input"
+                    errors.lastName ? "border-destructive" : "border-input"
                   }`}
                 />
                 {errors.lastName && (
-                  <p className="text-xs text-red-500">{errors.lastName}</p>
+                  <p className="text-xs text-destructive">{errors.lastName}</p>
                 )}
               </div>
             </div>
@@ -165,11 +165,11 @@ export function CustomerQuickCreate({
                   setFormData((prev) => ({ ...prev, email: e.target.value }))
                 }
                 className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                  errors.email ? "border-red-500" : "border-input"
+                  errors.email ? "border-destructive" : "border-input"
                 }`}
               />
               {errors.email && (
-                <p className="text-xs text-red-500">{errors.email}</p>
+                <p className="text-xs text-destructive">{errors.email}</p>
               )}
             </div>
             <div className="space-y-2">

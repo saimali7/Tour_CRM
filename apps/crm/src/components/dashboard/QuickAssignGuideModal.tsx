@@ -79,22 +79,22 @@ export function QuickAssignGuideModal({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden">
+      <div className="relative bg-card rounded-xl shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-border">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Assign Guide</h2>
-              <p className="text-sm text-gray-500 mt-1">{tourName}</p>
+              <h2 className="text-lg font-semibold text-foreground">Assign Guide</h2>
+              <p className="text-sm text-muted-foreground mt-1">{tourName}</p>
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="flex items-center gap-2 mt-3 text-sm text-gray-600">
+          <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
             <span>
               {formatDate(startsAt)} • {formatTime(startsAt)} - {formatTime(endsAt)}
@@ -106,14 +106,14 @@ export function QuickAssignGuideModal({
         <div className="px-6 py-4 overflow-y-auto max-h-[400px]">
           {loadingGuides || loadingAllGuides ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : allGuides?.data && allGuides.data.length > 0 ? (
             <div className="space-y-2">
               {/* Available guides first */}
               {availableGuides && availableGuides.length > 0 && (
                 <>
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                     Available ({availableGuides.length})
                   </div>
                   {availableGuides.map((guide) => (
@@ -126,17 +126,17 @@ export function QuickAssignGuideModal({
                         "hover:border-primary hover:bg-primary/5",
                         selectedGuideId === guide.id
                           ? "border-primary bg-primary/5"
-                          : "border-gray-200 bg-white"
+                          : "border-border bg-card"
                       )}
                     >
-                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                        <UserCheck className="h-5 w-5 text-green-600" />
+                      <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+                        <UserCheck className="h-5 w-5 text-success" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">
+                        <p className="font-medium text-foreground truncate">
                           {guide.firstName} {guide.lastName}
                         </p>
-                        <p className="text-sm text-green-600">Available</p>
+                        <p className="text-sm text-success">Available</p>
                       </div>
                       {assignMutation.isPending && selectedGuideId === guide.id && (
                         <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -149,7 +149,7 @@ export function QuickAssignGuideModal({
               {/* Unavailable guides */}
               {allGuides.data.filter((g) => !availableGuideIds.has(g.id)).length > 0 && (
                 <>
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 mt-4">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 mt-4">
                     Busy / Unavailable
                   </div>
                   {allGuides.data
@@ -157,16 +157,16 @@ export function QuickAssignGuideModal({
                     .map((guide) => (
                       <div
                         key={guide.id}
-                        className="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-100 bg-gray-50 opacity-60"
+                        className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-muted opacity-60"
                       >
-                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                          <AlertCircle className="h-5 w-5 text-gray-400" />
+                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                          <AlertCircle className="h-5 w-5 text-muted-foreground" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-600 truncate">
+                          <p className="font-medium text-muted-foreground truncate">
                             {guide.firstName} {guide.lastName}
                           </p>
-                          <p className="text-sm text-gray-400">Not available</p>
+                          <p className="text-sm text-muted-foreground">Not available</p>
                         </div>
                       </div>
                     ))}
@@ -175,18 +175,18 @@ export function QuickAssignGuideModal({
             </div>
           ) : (
             <div className="text-center py-8">
-              <AlertCircle className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No guides found</p>
-              <p className="text-xs text-gray-400 mt-1">Add guides in the Guides section</p>
+              <AlertCircle className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No guides found</p>
+              <p className="text-xs text-muted-foreground mt-1">Add guides in the Guides section</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-border bg-muted">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="w-full px-4 py-2 text-sm font-medium text-foreground bg-background border border-input rounded-lg hover:bg-muted transition-colors"
           >
             Cancel
           </button>

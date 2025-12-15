@@ -47,27 +47,27 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-red-600">Error loading manifest: {error.message}</p>
+      <div className="rounded-lg border border-destructive bg-destructive/10 p-6">
+        <p className="text-destructive">Error loading manifest: {error.message}</p>
       </div>
     );
   }
 
   if (!manifest) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <p className="text-gray-500">Manifest not found</p>
+      <div className="rounded-lg border border-border bg-card p-6">
+        <p className="text-muted-foreground">Manifest not found</p>
       </div>
     );
   }
 
   const getPaymentStatusBadge = (status: string) => {
     const styles = {
-      pending: "bg-yellow-100 text-yellow-800",
-      partial: "bg-orange-100 text-orange-800",
-      paid: "bg-green-100 text-green-800",
-      refunded: "bg-gray-100 text-gray-800",
-      failed: "bg-red-100 text-red-800",
+      pending: "status-pending",
+      partial: "bg-warning/20 text-warning",
+      paid: "status-confirmed",
+      refunded: "bg-muted text-muted-foreground",
+      failed: "status-cancelled",
     };
     return styles[status as keyof typeof styles] || styles.pending;
   };
@@ -78,7 +78,7 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
       <div className="flex gap-3 print:hidden">
         <button
           onClick={handlePrint}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Printer className="h-4 w-4" />
           Print Manifest
@@ -86,7 +86,7 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
         {manifest.guide && (
           <button
             onClick={handleEmailGuide}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
           >
             <Mail className="h-4 w-4" />
             Email to Guide
@@ -95,23 +95,23 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
       </div>
 
       {/* Manifest Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{manifest.tour.name}</h2>
-            <p className="text-gray-600 mt-1">
+            <h2 className="text-2xl font-bold text-foreground">{manifest.tour.name}</h2>
+            <p className="text-muted-foreground mt-1">
               Tour Manifest - {format(new Date(manifest.schedule.startsAt), "EEEE, MMMM d, yyyy")}
             </p>
           </div>
           <span
             className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
               manifest.schedule.status === "scheduled"
-                ? "bg-blue-100 text-blue-800"
+                ? "bg-primary/10 text-primary"
                 : manifest.schedule.status === "in_progress"
-                ? "bg-yellow-100 text-yellow-800"
+                ? "status-pending"
                 : manifest.schedule.status === "completed"
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
+                ? "status-completed"
+                : "status-cancelled"
             }`}
           >
             {manifest.schedule.status === "in_progress" ? "In Progress" : manifest.schedule.status}
@@ -121,12 +121,12 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
         {/* Schedule Details Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Clock className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Clock className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Time</p>
-              <p className="font-semibold text-gray-900">
+              <p className="text-sm text-muted-foreground">Time</p>
+              <p className="font-semibold text-foreground">
                 {format(new Date(manifest.schedule.startsAt), "h:mm a")} -{" "}
                 {format(new Date(manifest.schedule.endsAt), "h:mm a")}
               </p>
@@ -134,59 +134,59 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Users className="h-5 w-5 text-purple-600" />
+            <div className="p-2 bg-info/10 rounded-lg">
+              <Users className="h-5 w-5 text-info" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Capacity</p>
-              <p className="font-semibold text-gray-900">
+              <p className="text-sm text-muted-foreground">Capacity</p>
+              <p className="font-semibold text-foreground">
                 {manifest.summary.totalParticipants} / {manifest.schedule.maxParticipants}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <DollarSign className="h-5 w-5 text-green-600" />
+            <div className="p-2 bg-success/10 rounded-lg">
+              <DollarSign className="h-5 w-5 text-success" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Total Revenue</p>
-              <p className="font-semibold text-gray-900">
+              <p className="text-sm text-muted-foreground">Total Revenue</p>
+              <p className="font-semibold text-foreground">
                 ${parseFloat(manifest.summary.totalRevenue).toFixed(2)}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Calendar className="h-5 w-5 text-orange-600" />
+            <div className="p-2 bg-warning/10 rounded-lg">
+              <Calendar className="h-5 w-5 text-warning" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Bookings</p>
-              <p className="font-semibold text-gray-900">{manifest.summary.totalBookings}</p>
+              <p className="text-sm text-muted-foreground">Bookings</p>
+              <p className="font-semibold text-foreground">{manifest.summary.totalBookings}</p>
             </div>
           </div>
         </div>
 
         {/* Guide Info */}
         {manifest.guide && (
-          <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Assigned Guide</h3>
+          <div className="border-t border-border pt-4">
+            <h3 className="text-sm font-semibold text-foreground mb-2">Assigned Guide</h3>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-900">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">
                   {manifest.guide.firstName} {manifest.guide.lastName}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600">{manifest.guide.email}</span>
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">{manifest.guide.email}</span>
               </div>
               {manifest.guide.phone && (
                 <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-600">{manifest.guide.phone}</span>
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">{manifest.guide.phone}</span>
                 </div>
               )}
             </div>
@@ -195,14 +195,14 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
 
         {/* Meeting Point */}
         {manifest.schedule.meetingPoint && (
-          <div className="border-t border-gray-200 pt-4 mt-4">
+          <div className="border-t border-border pt-4 mt-4">
             <div className="flex items-start gap-3">
-              <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+              <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Meeting Point</h3>
-                <p className="text-gray-600 mt-1">{manifest.schedule.meetingPoint}</p>
+                <h3 className="text-sm font-semibold text-foreground">Meeting Point</h3>
+                <p className="text-muted-foreground mt-1">{manifest.schedule.meetingPoint}</p>
                 {manifest.schedule.meetingPointDetails && (
-                  <p className="text-gray-500 text-sm mt-1">
+                  <p className="text-muted-foreground text-sm mt-1">
                     {manifest.schedule.meetingPointDetails}
                   </p>
                 )}
@@ -213,71 +213,71 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
       </div>
 
       {/* Participants Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Participants</h3>
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
+          <h3 className="text-lg font-semibold text-foreground">Participants</h3>
         </div>
 
         {manifest.bookings.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No confirmed bookings yet</p>
+            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">No confirmed bookings yet</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Ref #
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Customer
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Contact
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Tickets
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Payment
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Special Notes
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-border">
                 {manifest.bookings.map((booking) => (
-                  <tr key={booking.id} className="hover:bg-gray-50">
+                  <tr key={booking.id} className="hover:bg-muted/50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-foreground">
                         {booking.referenceNumber}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-900">{booking.customerName}</span>
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-foreground">{booking.customerName}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm text-gray-600">{booking.customerEmail}</span>
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">{booking.customerEmail}</span>
                         </div>
                         {booking.customerPhone && (
                           <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm text-gray-600">{booking.customerPhone}</span>
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">{booking.customerPhone}</span>
                           </div>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-foreground">
                         {booking.adultCount > 0 && <div>{booking.adultCount} Adult(s)</div>}
                         {booking.childCount > 0 && <div>{booking.childCount} Child(ren)</div>}
                         {booking.infantCount > 0 && <div>{booking.infantCount} Infant(s)</div>}
@@ -292,7 +292,7 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
                         >
                           {booking.paymentStatus}
                         </span>
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-foreground">
                           ${parseFloat(booking.total).toFixed(2)}
                         </div>
                       </div>
@@ -301,51 +301,51 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
                       <div className="space-y-2 max-w-md">
                         {booking.specialRequests && (
                           <div className="flex items-start gap-2">
-                            <MessageSquare className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm text-gray-600">{booking.specialRequests}</span>
+                            <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground">{booking.specialRequests}</span>
                           </div>
                         )}
                         {booking.dietaryRequirements && (
                           <div className="flex items-start gap-2">
-                            <Utensils className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm text-gray-600">
+                            <Utensils className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground">
                               {booking.dietaryRequirements}
                             </span>
                           </div>
                         )}
                         {booking.accessibilityNeeds && (
                           <div className="flex items-start gap-2">
-                            <Accessibility className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm text-gray-600">
+                            <Accessibility className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground">
                               {booking.accessibilityNeeds}
                             </span>
                           </div>
                         )}
                         {booking.internalNotes && (
                           <div className="flex items-start gap-2">
-                            <FileText className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm text-gray-600 italic">
+                            <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground italic">
                               {booking.internalNotes}
                             </span>
                           </div>
                         )}
                         {booking.participants.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <p className="text-xs font-semibold text-gray-700 mb-2">
+                          <div className="mt-3 pt-3 border-t border-border">
+                            <p className="text-xs font-semibold text-foreground mb-2">
                               Individual Participants:
                             </p>
                             <div className="space-y-1">
                               {booking.participants.map((participant) => (
                                 <div
                                   key={participant.id}
-                                  className="text-xs text-gray-600 flex items-center gap-2"
+                                  className="text-xs text-muted-foreground flex items-center gap-2"
                                 >
                                   <span className="font-medium">
                                     {participant.firstName} {participant.lastName}
                                   </span>
-                                  <span className="text-gray-400">({participant.type})</span>
+                                  <span className="text-muted-foreground">({participant.type})</span>
                                   {participant.email && (
-                                    <span className="text-gray-500">{participant.email}</span>
+                                    <span className="text-muted-foreground">{participant.email}</span>
                                   )}
                                 </div>
                               ))}
@@ -363,25 +363,25 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
 
         {/* Summary Footer */}
         {manifest.bookings.length > 0 && (
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="px-6 py-4 bg-muted border-t border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-8">
                 <div>
-                  <p className="text-sm text-gray-500">Total Bookings</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <p className="text-sm text-muted-foreground">Total Bookings</p>
+                  <p className="text-lg font-semibold text-foreground">
                     {manifest.summary.totalBookings}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Total Participants</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <p className="text-sm text-muted-foreground">Total Participants</p>
+                  <p className="text-lg font-semibold text-foreground">
                     {manifest.summary.totalParticipants}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-500">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <p className="text-2xl font-bold text-foreground">
                   ${parseFloat(manifest.summary.totalRevenue).toFixed(2)}
                 </p>
               </div>

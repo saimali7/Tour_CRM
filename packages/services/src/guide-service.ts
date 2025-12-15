@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, count, ilike, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, ilike, or, gte, lte } from "drizzle-orm";
 import {
   guides,
   schedules,
@@ -251,10 +251,10 @@ export class GuideService extends BaseService {
     ];
 
     if (dateRange?.from) {
-      conditions.push(sql`${schedules.startsAt} >= ${dateRange.from}`);
+      conditions.push(gte(schedules.startsAt, dateRange.from));
     }
     if (dateRange?.to) {
-      conditions.push(sql`${schedules.startsAt} <= ${dateRange.to}`);
+      conditions.push(lte(schedules.startsAt, dateRange.to));
     }
 
     return this.db.query.schedules.findMany({

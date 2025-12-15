@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, count, sql, lt, or, ilike } from "drizzle-orm";
+import { eq, and, desc, asc, count, sql, lt, or, ilike, gte, lte } from "drizzle-orm";
 import {
   abandonedCarts,
   tours,
@@ -98,10 +98,10 @@ export class AbandonedCartService extends BaseService {
       );
     }
     if (filters.dateFrom) {
-      conditions.push(sql`${abandonedCarts.createdAt} >= ${filters.dateFrom}`);
+      conditions.push(gte(abandonedCarts.createdAt, filters.dateFrom));
     }
     if (filters.dateTo) {
-      conditions.push(sql`${abandonedCarts.createdAt} <= ${filters.dateTo}`);
+      conditions.push(lte(abandonedCarts.createdAt, filters.dateTo));
     }
 
     const orderBy =

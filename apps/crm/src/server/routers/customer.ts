@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure } from "../trpc";
 import { createServices } from "@tour/services";
+import { createCustomerSchema as validatorCreateCustomerSchema, updateCustomerSchema as validatorUpdateCustomerSchema } from "@tour/validators";
 
 const customerFilterSchema = z.object({
   search: z.string().optional(),
@@ -19,24 +20,30 @@ const sortSchema = z.object({
   direction: z.enum(["asc", "desc"]).default("desc"),
 });
 
-const createCustomerSchema = z.object({
-  email: z.string().email(),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  country: z.string().optional(),
-  postalCode: z.string().optional(),
-  language: z.string().optional(),
-  currency: z.string().optional(),
-  notes: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  source: z.enum(["manual", "website", "api", "import", "referral"]).optional(),
-  sourceDetails: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
-});
+const createCustomerSchema = z
+  .object({
+    email: z.string().email().optional(),
+    firstName: z.string().min(1),
+    lastName: z.string().min(1),
+    phone: z.string().optional(),
+    contactPreference: z.enum(["email", "phone", "both"]).default("email"),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    country: z.string().optional(),
+    postalCode: z.string().optional(),
+    language: z.string().optional(),
+    currency: z.string().optional(),
+    notes: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    source: z.enum(["manual", "website", "api", "import", "referral"]).optional(),
+    sourceDetails: z.string().optional(),
+    metadata: z.record(z.unknown()).optional(),
+  })
+  .refine((data) => data.email || data.phone, {
+    message: "Customer must have either email or phone number",
+    path: ["email"],
+  });
 
 export const customerRouter = createRouter({
   list: protectedProcedure
@@ -95,12 +102,12 @@ export const customerRouter = createRouter({
     .input(
       z.object({
         id: z.string(),
-        data: createCustomerSchema.partial(),
+        data: validatorUpdateCustomerSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.customer.update(input.id, input.data);
+      return services.customer.update(input.id, input.data as any);
     }),
 
   delete: protectedProcedure

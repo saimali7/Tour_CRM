@@ -29,6 +29,8 @@ interface BookingConfirmationEmailProps {
   organizationEmail?: string;
   organizationPhone?: string;
   viewBookingUrl?: string;
+  paymentUrl?: string;
+  paymentStatus?: "pending" | "partial" | "paid" | "refunded" | "failed";
   logoUrl?: string;
 }
 
@@ -47,6 +49,8 @@ export const BookingConfirmationEmail = ({
   organizationEmail = "info@tourcompany.com",
   organizationPhone = "+1 234 567 890",
   viewBookingUrl = "https://example.com/booking/123",
+  paymentUrl,
+  paymentStatus = "pending",
   logoUrl,
 }: BookingConfirmationEmailProps) => {
   const previewText = `Your booking for ${tourName} is confirmed!`;
@@ -110,6 +114,36 @@ export const BookingConfirmationEmail = ({
               <Button style={button} href={viewBookingUrl}>
                 View Booking Details
               </Button>
+            </Section>
+          )}
+
+          {/* Payment Button - Show if payment is pending or partial */}
+          {paymentUrl && (paymentStatus === "pending" || paymentStatus === "partial") && (
+            <>
+              <Section style={paymentNotice}>
+                <Text style={paymentNoticeText}>
+                  <strong>Payment Required</strong>
+                </Text>
+                <Text style={paymentNoticeSubtext}>
+                  {paymentStatus === "partial"
+                    ? "You have a remaining balance on this booking."
+                    : "Please complete your payment to confirm your booking."}
+                </Text>
+              </Section>
+              <Section style={buttonContainer}>
+                <Button style={paymentButton} href={paymentUrl}>
+                  Pay Now
+                </Button>
+              </Section>
+            </>
+          )}
+
+          {/* Payment Confirmed Notice */}
+          {paymentStatus === "paid" && (
+            <Section style={paidNotice}>
+              <Text style={paidNoticeText}>
+                ✓ Payment Confirmed
+              </Text>
             </Section>
           )}
 
@@ -245,4 +279,55 @@ const footerText = {
 const link = {
   color: "#2563eb",
   textDecoration: "none",
+};
+
+const paymentNotice = {
+  backgroundColor: "#fef3c7",
+  borderRadius: "8px",
+  margin: "24px 40px 16px",
+  padding: "16px 24px",
+  border: "1px solid #fbbf24",
+};
+
+const paymentNoticeText = {
+  fontSize: "15px",
+  lineHeight: "1.4",
+  color: "#92400e",
+  margin: "0 0 4px",
+};
+
+const paymentNoticeSubtext = {
+  fontSize: "13px",
+  lineHeight: "1.4",
+  color: "#78350f",
+  margin: "0",
+};
+
+const paymentButton = {
+  backgroundColor: "#16a34a",
+  borderRadius: "6px",
+  color: "#fff",
+  fontSize: "15px",
+  fontWeight: "600",
+  textDecoration: "none",
+  textAlign: "center" as const,
+  display: "inline-block",
+  padding: "12px 32px",
+};
+
+const paidNotice = {
+  backgroundColor: "#d1fae5",
+  borderRadius: "8px",
+  margin: "24px 40px",
+  padding: "12px 24px",
+  border: "1px solid #10b981",
+};
+
+const paidNoticeText = {
+  fontSize: "15px",
+  lineHeight: "1.4",
+  color: "#065f46",
+  margin: "0",
+  textAlign: "center" as const,
+  fontWeight: "600",
 };

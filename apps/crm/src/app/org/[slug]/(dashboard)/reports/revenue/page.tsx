@@ -82,7 +82,7 @@ export default function RevenueReportPage() {
       header: "Tour",
       sortable: true,
       render: (row) => (
-        <span className="font-medium text-gray-900">{row.tourName}</span>
+        <span className="font-medium text-foreground">{row.tourName}</span>
       ),
     },
     {
@@ -91,7 +91,7 @@ export default function RevenueReportPage() {
       sortable: true,
       align: "right" as const,
       render: (row: RevenueByTour) => (
-        <span className="font-semibold text-gray-900">
+        <span className="font-semibold text-foreground">
           {formatCurrency(parseFloat(row.revenue))}
         </span>
       ),
@@ -102,7 +102,7 @@ export default function RevenueReportPage() {
       sortable: true,
       align: "center" as const,
       render: (row: RevenueByTour) => (
-        <span className="text-gray-700">{row.bookingCount}</span>
+        <span className="text-foreground">{row.bookingCount}</span>
       ),
     },
     {
@@ -111,7 +111,7 @@ export default function RevenueReportPage() {
       sortable: false,
       align: "right" as const,
       render: (row: RevenueByTour) => (
-        <span className="text-gray-700">
+        <span className="text-foreground">
           {formatCurrency(row.bookingCount > 0 ? parseFloat(row.revenue) / row.bookingCount : 0)}
         </span>
       ),
@@ -182,8 +182,8 @@ export default function RevenueReportPage() {
       </ReportChart>
 
       {/* Revenue by tour table */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">
           Revenue by Tour
         </h2>
         <ReportTable

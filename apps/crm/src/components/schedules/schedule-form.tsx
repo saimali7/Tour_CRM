@@ -67,7 +67,7 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
     onSuccess: () => {
       utils.schedule.list.invalidate();
       toast.success("Schedule created successfully");
-      router.push(`/org/${slug}/schedules`);
+      router.push(`/org/${slug}/availability`);
     },
     onError: (error) => {
       toast.error(error.message || "Failed to create schedule");
@@ -79,7 +79,7 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
       utils.schedule.list.invalidate();
       utils.schedule.getById.invalidate({ id: schedule?.id });
       toast.success("Schedule updated successfully");
-      router.push(`/org/${slug}/schedules`);
+      router.push(`/org/${slug}/availability`);
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update schedule");
@@ -194,36 +194,36 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
     onToggle: () => void;
     children: React.ReactNode;
   }) => (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
+    <div className="border border-border rounded-xl overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 bg-muted hover:bg-accent transition-colors"
       >
-        <div className="flex items-center gap-2 text-gray-700">
+        <div className="flex items-center gap-2 text-foreground">
           <Icon className="h-4 w-4" />
           <span className="font-medium">{title}</span>
-          <span className="text-xs text-gray-400">(optional)</span>
+          <span className="text-xs text-muted-foreground">(optional)</span>
         </div>
-        {isOpen ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+        {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
-      {isOpen && <div className="p-4 bg-white">{children}</div>}
+      {isOpen && <div className="p-4 bg-card">{children}</div>}
     </div>
   );
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-600">{error.message}</p>
+        <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{error.message}</p>
         </div>
       )}
 
       {/* Tour Selection - Visual Cards */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Select Tour</h2>
-          <p className="text-sm text-gray-500 mt-1">Which tour is this schedule for?</p>
+          <h2 className="text-lg font-semibold text-foreground">Select Tour</h2>
+          <p className="text-sm text-muted-foreground mt-1">Which tour is this schedule for?</p>
         </div>
 
         {isEditing ? (
@@ -234,13 +234,13 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
                 {selectedTour.coverImageUrl ? (
                   <img src={selectedTour.coverImageUrl} alt="" className="w-20 h-20 rounded-lg object-cover" />
                 ) : (
-                  <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center">
-                    <MapPin className="h-8 w-8 text-gray-300" />
+                  <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
+                    <MapPin className="h-8 w-8 text-muted-foreground" />
                   </div>
                 )}
                 <div>
-                  <h3 className="font-semibold text-gray-900">{selectedTour.name}</h3>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                  <h3 className="font-semibold text-foreground">{selectedTour.name}</h3>
+                  <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
                       {formatDuration(selectedTour.durationMinutes)}
@@ -250,14 +250,14 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
                       Max {selectedTour.maxParticipants}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">Tour cannot be changed after creation</p>
+                  <p className="text-xs text-muted-foreground mt-2">Tour cannot be changed after creation</p>
                 </div>
               </div>
             </div>
           )
         ) : toursLoading ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : toursData?.data && toursData.data.length > 0 ? (
           <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -270,27 +270,27 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
                   "w-full text-left p-4 rounded-xl border-2 transition-all",
                   formData.tourId === tour.id
                     ? "border-primary bg-primary/5"
-                    : "border-gray-200 hover:border-gray-300"
+                    : "border-border hover:border-input"
                 )}
               >
                 <div className="flex gap-4">
                   {tour.coverImageUrl ? (
                     <img src={tour.coverImageUrl} alt="" className="w-16 h-16 rounded-lg object-cover" />
                   ) : (
-                    <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center">
-                      <MapPin className="h-6 w-6 text-gray-300" />
+                    <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
+                      <MapPin className="h-6 w-6 text-muted-foreground" />
                     </div>
                   )}
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900">{tour.name}</h3>
+                      <h3 className="font-semibold text-foreground">{tour.name}</h3>
                       {formData.tourId === tour.id && (
                         <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="h-3 w-3 text-white" />
+                          <Check className="h-3 w-3 text-primary-foreground" />
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
                         {formatDuration(tour.durationMinutes)}
@@ -306,8 +306,8 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
-            <MapPin className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+          <div className="text-center py-8 text-muted-foreground">
+            <MapPin className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
             <p>No active tours available</p>
           </div>
         )}
@@ -315,49 +315,49 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
 
       {/* Date & Time - Shown after tour selection */}
       {formData.tourId && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <div className="bg-card rounded-xl border border-border p-6 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">When?</h2>
-            <p className="text-sm text-gray-500 mt-1">Set the date and start time</p>
+            <h2 className="text-lg font-semibold text-foreground">When?</h2>
+            <p className="text-sm text-muted-foreground mt-1">Set the date and start time</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Date *</label>
               <input
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
                 min={new Date().toISOString().split("T")[0]}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Start Time *</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Start Time *</label>
               <input
                 type="time"
                 value={formData.startTime}
                 onChange={(e) => handleStartTimeChange(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
           </div>
 
           {/* Auto-calculated info */}
           {selectedTour && formData.date && formData.startTime && (
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-muted rounded-lg p-4">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500">Ends at</p>
-                  <p className="font-medium text-gray-900">{formData.endTime}</p>
+                  <p className="text-muted-foreground">Ends at</p>
+                  <p className="font-medium text-foreground">{formData.endTime}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Duration</p>
-                  <p className="font-medium text-gray-900">{formatDuration(selectedTour.durationMinutes)}</p>
+                  <p className="text-muted-foreground">Duration</p>
+                  <p className="font-medium text-foreground">{formatDuration(selectedTour.durationMinutes)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Capacity</p>
-                  <p className="font-medium text-gray-900">{formData.maxParticipants} guests</p>
+                  <p className="text-muted-foreground">Capacity</p>
+                  <p className="font-medium text-foreground">{formData.maxParticipants} guests</p>
                 </div>
               </div>
             </div>
@@ -373,7 +373,7 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
             <select
               value={formData.guideId}
               onChange={(e) => setFormData((prev) => ({ ...prev, guideId: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
               <option value="">No guide assigned yet</option>
               {guidesData?.data.map((guide) => (
@@ -382,7 +382,7 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-400 mt-2">You can also assign guides later from the schedule detail page</p>
+            <p className="text-xs text-muted-foreground mt-2">You can also assign guides later from the schedule detail page</p>
           </CollapsibleSection>
 
           {/* Overrides */}
@@ -390,44 +390,44 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Price Override ($)</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Price Override ($)</label>
                   <input
                     type="text"
                     value={formData.price}
                     onChange={(e) => setFormData((prev) => ({ ...prev, price: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     placeholder={selectedTour ? `Default: $${selectedTour.basePrice}` : "Enter price"}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Max Participants</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Max Participants</label>
                   <input
                     type="number"
                     min="1"
                     value={formData.maxParticipants}
                     onChange={(e) => setFormData((prev) => ({ ...prev, maxParticipants: parseInt(e.target.value) || 1 }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Meeting Point Override</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Meeting Point Override</label>
                 <input
                   type="text"
                   value={formData.meetingPoint}
                   onChange={(e) => setFormData((prev) => ({ ...prev, meetingPoint: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   placeholder={selectedTour?.meetingPoint || "Enter meeting point"}
                 />
               </div>
               {formData.meetingPoint && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Meeting Point Details</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Meeting Point Details</label>
                   <input
                     type="text"
                     value={formData.meetingPointDetails}
                     onChange={(e) => setFormData((prev) => ({ ...prev, meetingPointDetails: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     placeholder="Additional directions or info"
                   />
                 </div>
@@ -439,22 +439,22 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
           <CollapsibleSection title="Notes" icon={FileText} isOpen={showNotes} onToggle={() => setShowNotes(!showNotes)}>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Internal Notes</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Internal Notes</label>
                 <textarea
                   value={formData.internalNotes}
                   onChange={(e) => setFormData((prev) => ({ ...prev, internalNotes: e.target.value }))}
                   rows={2}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                  className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                   placeholder="Notes for staff only..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Public Notes</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Public Notes</label>
                 <textarea
                   value={formData.publicNotes}
                   onChange={(e) => setFormData((prev) => ({ ...prev, publicNotes: e.target.value }))}
                   rows={2}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                  className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                   placeholder="Notes shown to customers on confirmation..."
                 />
               </div>
@@ -468,14 +468,14 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-4 py-2.5 text-gray-600 hover:text-gray-900 transition-colors"
+          className="px-4 py-2.5 text-muted-foreground hover:text-foreground transition-colors"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting || !canSubmit}
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isEditing ? "Update Schedule" : "Create Schedule"}

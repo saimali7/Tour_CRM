@@ -76,7 +76,7 @@ export function ReportTable<T extends Record<string, any>>({
 
   if (data.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-muted-foreground">
         <p>{emptyMessage}</p>
       </div>
     );
@@ -84,20 +84,20 @@ export function ReportTable<T extends Record<string, any>>({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+      <table className="min-w-full divide-y divide-border">
+        <thead className="bg-muted">
           <tr>
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${getAlignClass(
+                className={`px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider ${getAlignClass(
                   column.align
                 )}`}
               >
                 {column.sortable ? (
                   <button
                     onClick={() => handleSort(column.key)}
-                    className="flex items-center gap-1 hover:text-gray-700"
+                    className="flex items-center gap-1 hover:text-foreground"
                   >
                     {column.header}
                     {sortKey === column.key ? (
@@ -117,9 +117,9 @@ export function ReportTable<T extends Record<string, any>>({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-card divide-y divide-border">
           {sortedData.map((row, rowIndex) => (
-            <tr key={rowIndex} className="hover:bg-gray-50">
+            <tr key={rowIndex} className="hover:bg-muted">
               {columns.map((column) => (
                 <td
                   key={column.key}

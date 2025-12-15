@@ -105,7 +105,7 @@ export default function DashboardPage() {
           actions={[
             {
               label: "View Schedule",
-              onClick: () => router.push(`/org/${slug}/schedules/${schedule.scheduleId}`),
+              onClick: () => router.push(`/org/${slug}/availability/${schedule.scheduleId}`),
             },
             {
               label: "Cancel Tour",
@@ -154,7 +154,7 @@ export default function DashboardPage() {
           actions={[
             {
               label: "View Schedule",
-              onClick: () => router.push(`/org/${slug}/schedules/${schedule.scheduleId}`),
+              onClick: () => router.push(`/org/${slug}/availability/${schedule.scheduleId}`),
             },
             {
               label: "View Customers",
@@ -192,7 +192,7 @@ export default function DashboardPage() {
           actions={[
             {
               label: "View Manifest",
-              onClick: () => router.push(`/org/${slug}/schedules/${schedule.scheduleId}`),
+              onClick: () => router.push(`/org/${slug}/availability/${schedule.scheduleId}`),
             },
           ]}
           onDismiss={() => handleDismissAlert(`upcoming-soon-${schedule.scheduleId}`)}
@@ -205,8 +205,8 @@ export default function DashboardPage() {
 
   if (operationsError || businessError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-red-600">
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+        <p className="text-destructive">
           Error loading dashboard: {operationsError?.message || businessError?.message}
         </p>
       </div>
@@ -216,14 +216,14 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-border">
         <nav className="-mb-px flex gap-8">
           <button
             onClick={() => setActiveTab("operations")}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === "operations"
                 ? "border-primary text-primary"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
             }`}
           >
             Today
@@ -233,7 +233,7 @@ export default function DashboardPage() {
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === "business"
                 ? "border-primary text-primary"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
             }`}
           >
             Business
@@ -253,22 +253,22 @@ export default function DashboardPage() {
               {/* Human Greeting Header */}
               <div className="flex items-baseline justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">
+                  <h1 className="text-title text-foreground">
                     {getGreeting()}!{" "}
-                    <span className="font-normal text-gray-600">
+                    <span className="font-normal text-muted-foreground">
                       Here's what needs your attention.
                     </span>
                   </h1>
                 </div>
-                <p className="text-sm text-gray-500">{formatDate()}</p>
+                <p className="text-sm text-muted-foreground">{formatDate()}</p>
               </div>
 
               {/* NEEDS ACTION Section - First and Prominent */}
               {alerts.length > 0 && (
-                <div className="rounded-xl border-2 border-amber-200 bg-amber-50/50 p-5">
+                <div className="rounded-xl border-2 border-warning/30 bg-warning/10 p-5">
                   <div className="flex items-center gap-2 mb-4">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                    <h2 className="text-lg font-semibold text-amber-900">
+                    <AlertTriangle className="h-5 w-5 text-warning" />
+                    <h2 className="text-lg font-semibold text-warning-foreground">
                       Needs Action ({alerts.length})
                     </h2>
                   </div>
@@ -278,24 +278,24 @@ export default function DashboardPage() {
 
               {/* All Clear Message */}
               {alerts.length === 0 && (
-                <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
-                  <div className="mx-auto h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
-                    <UserCheck className="h-6 w-6 text-green-600" />
+                <div className="rounded-xl border border-success/30 bg-success/10 p-6 text-center">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-success/20 flex items-center justify-center mb-3">
+                    <UserCheck className="h-6 w-6 text-success" />
                   </div>
-                  <h3 className="text-lg font-medium text-green-900">All clear!</h3>
-                  <p className="text-sm text-green-700 mt-1">
+                  <h3 className="text-lg font-medium text-success-foreground">All clear!</h3>
+                  <p className="text-sm text-success-foreground/80 mt-1">
                     No urgent items need your attention right now.
                   </p>
                 </div>
               )}
 
               {/* TODAY'S TOURS Section */}
-              <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-subheading text-foreground">
                     Today's Tours
                   </h2>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-muted-foreground">
                     {operationsData.upcomingSchedules.length} scheduled
                   </span>
                 </div>
@@ -332,44 +332,44 @@ export default function DashboardPage() {
               </div>
 
               {/* QUICK STATS Section - At Bottom */}
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
-                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">
+              <div className="rounded-xl border border-border bg-muted/50 p-5">
+                <h2 className="text-overline text-muted-foreground mb-4">
                   Quick Stats
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <div className="bg-card rounded-lg p-4 border border-border">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Calendar className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase">Tours Today</span>
+                      <span className="text-overline">Tours Today</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-foreground">
                       {operationsData.todaysOperations.scheduledTours}
                     </p>
                   </div>
-                  <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <div className="bg-card rounded-lg p-4 border border-border">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Users className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase">Guests Today</span>
+                      <span className="text-overline">Guests Today</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-foreground">
                       {operationsData.todaysOperations.totalParticipants}
                     </p>
                   </div>
-                  <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <div className="bg-card rounded-lg p-4 border border-border">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <UserCheck className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase">Guides Working</span>
+                      <span className="text-overline">Guides Working</span>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-foreground">
                       {operationsData.todaysOperations.guidesWorking}
                     </p>
                   </div>
-                  <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center gap-2 text-gray-500 mb-1">
+                  <div className="bg-card rounded-lg p-4 border border-border">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <AlertTriangle className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase">Unassigned</span>
+                      <span className="text-overline">Unassigned</span>
                     </div>
-                    <p className={`text-2xl font-bold ${operationsData.upcomingSchedules.filter(s => s.hasUnconfirmedGuide).length > 0 ? 'text-amber-600' : 'text-gray-900'}`}>
+                    <p className={`text-2xl font-bold ${operationsData.upcomingSchedules.filter(s => s.hasUnconfirmedGuide).length > 0 ? 'text-warning' : 'text-foreground'}`}>
                       {operationsData.upcomingSchedules.filter(s => s.hasUnconfirmedGuide).length}
                     </p>
                   </div>
@@ -377,12 +377,12 @@ export default function DashboardPage() {
               </div>
 
               {/* Recent Activity - Collapsible/Secondary */}
-              <details className="rounded-xl border border-gray-200 bg-white group">
-                <summary className="p-5 cursor-pointer flex items-center justify-between hover:bg-gray-50 rounded-xl">
-                  <h2 className="text-lg font-semibold text-gray-900">
+              <details className="rounded-xl border border-border bg-card group">
+                <summary className="p-5 cursor-pointer flex items-center justify-between hover:bg-accent rounded-xl">
+                  <h2 className="text-subheading text-foreground">
                     Recent Activity
                   </h2>
-                  <span className="text-sm text-gray-500 group-open:hidden">
+                  <span className="text-sm text-muted-foreground group-open:hidden">
                     Click to expand
                   </span>
                 </summary>
@@ -417,8 +417,8 @@ export default function DashboardPage() {
             <div className="space-y-6">
               {/* Business Header */}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Business Overview</h1>
-                <p className="text-gray-500 mt-1">Track revenue, bookings, and performance</p>
+                <h1 className="text-title text-foreground">Business Overview</h1>
+                <p className="text-body text-muted-foreground mt-1">Track revenue, bookings, and performance</p>
               </div>
 
               {/* Revenue Cards */}

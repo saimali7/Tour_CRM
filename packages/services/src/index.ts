@@ -28,6 +28,7 @@ import { DashboardService } from "./dashboard-service";
 import { CustomerIntelligenceService } from "./customer-intelligence-service";
 // High-Impact Features
 import { ReviewService } from "./review-service";
+import { PaymentService } from "./payment-service";
 
 export interface Services {
   tour: TourService;
@@ -59,6 +60,7 @@ export interface Services {
   customerIntelligence: CustomerIntelligenceService;
   // High-Impact Features
   review: ReviewService;
+  payment: PaymentService;
 }
 
 /**
@@ -102,6 +104,7 @@ export function createServices(ctx: ServiceContext): Services {
     customerIntelligence: new CustomerIntelligenceService(ctx),
     // High-Impact Features
     review: new ReviewService(ctx),
+    payment: new PaymentService(ctx),
   };
 }
 
@@ -135,6 +138,7 @@ export { DashboardService } from "./dashboard-service";
 export { CustomerIntelligenceService } from "./customer-intelligence-service";
 // High-Impact Features
 export { ReviewService } from "./review-service";
+export { PaymentService } from "./payment-service";
 
 // Export types
 export * from "./types";
@@ -299,6 +303,12 @@ export type {
   ReviewStats,
   GuideRatingStats,
 } from "./review-service";
+export type {
+  PaymentFilters,
+  PaymentSortField,
+  CreatePaymentInput,
+  PaymentStats,
+} from "./payment-service";
 
 // Storage service (separate from org-scoped services, created with createStorageService)
 export { StorageService, createStorageService, type UploadResult } from "./storage-service";

@@ -140,25 +140,40 @@ export function NewBookingFlow({
 
     const basePrice = parseFloat(selectedSchedule.price || selectedTour?.basePrice || "0");
 
-    const adultPrice = pricingTiers?.find(t => t.name === "adult")?.price
-      ? parseFloat(pricingTiers.find(t => t.name === "adult")!.price)
-      : basePrice;
-    const childPrice = pricingTiers?.find(t => t.name === "child")?.price
-      ? parseFloat(pricingTiers.find(t => t.name === "child")!.price)
-      : basePrice * 0.5;
-    const infantPrice = pricingTiers?.find(t => t.name === "infant")?.price
-      ? parseFloat(pricingTiers.find(t => t.name === "infant")!.price)
-      : 0;
+    // Find pricing tiers from database
+    const adultTier = pricingTiers?.find(t => t.name === "adult");
+    const childTier = pricingTiers?.find(t => t.name === "child");
+    const infantTier = pricingTiers?.find(t => t.name === "infant");
+
+    // Use tier prices if available, otherwise fall back to base price
+    const adultPrice = adultTier?.price ? parseFloat(adultTier.price) : basePrice;
+    const childPrice = childTier?.price ? parseFloat(childTier.price) : basePrice;
+    const infantPrice = infantTier?.price ? parseFloat(infantTier.price) : 0;
 
     const breakdown = [];
     if (guestCounts.adults > 0) {
-      breakdown.push({ label: "Adults", count: guestCounts.adults, price: adultPrice, total: guestCounts.adults * adultPrice });
+      breakdown.push({
+        label: adultTier?.label || "Adults",
+        count: guestCounts.adults,
+        price: adultPrice,
+        total: guestCounts.adults * adultPrice
+      });
     }
     if (guestCounts.children > 0) {
-      breakdown.push({ label: "Children", count: guestCounts.children, price: childPrice, total: guestCounts.children * childPrice });
+      breakdown.push({
+        label: childTier?.label || "Children",
+        count: guestCounts.children,
+        price: childPrice,
+        total: guestCounts.children * childPrice
+      });
     }
     if (guestCounts.infants > 0) {
-      breakdown.push({ label: "Infants", count: guestCounts.infants, price: infantPrice, total: guestCounts.infants * infantPrice });
+      breakdown.push({
+        label: infantTier?.label || "Infants",
+        count: guestCounts.infants,
+        price: infantPrice,
+        total: guestCounts.infants * infantPrice
+      });
     }
 
     const subtotal = breakdown.reduce((sum, item) => sum + item.total, 0);
@@ -183,7 +198,7 @@ export function NewBookingFlow({
         (c) =>
           c.firstName.toLowerCase().includes(search) ||
           c.lastName.toLowerCase().includes(search) ||
-          c.email.toLowerCase().includes(search)
+          c.email?.toLowerCase().includes(search)
       )
       .slice(0, 8);
   }, [customersData?.data, customerSearch]);
@@ -236,7 +251,7 @@ export function NewBookingFlow({
         const customer = await createCustomerMutation.mutateAsync({
           firstName: newCustomer.firstName.trim(),
           lastName: newCustomer.lastName.trim() || "-", // Default for optional lastName
-          email: newCustomer.email.trim() || `${Date.now()}@placeholder.local`, // Fallback for phone-only
+          email: newCustomer.email.trim() || undefined,
           phone: newCustomer.phone.trim() || undefined,
         });
         customerId = customer.id;
@@ -313,17 +328,17 @@ export function NewBookingFlow({
   }) => (
     <div className="flex items-center justify-between py-3">
       <div>
-        <p className="font-medium text-gray-900">{label}</p>
-        <p className="text-sm text-gray-500">{sublabel}</p>
+        <p className="font-medium text-foreground">{label}</p>
+        <p className="text-sm text-muted-foreground">{sublabel}</p>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-500 w-16 text-right">{price}</span>
+        <span className="text-sm text-muted-foreground w-16 text-right">{price}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onDecrement}
             disabled={count <= min}
-            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <Minus className="h-4 w-4" />
           </button>
@@ -332,7 +347,7 @@ export function NewBookingFlow({
             type="button"
             onClick={onIncrement}
             disabled={disabled}
-            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -359,16 +374,16 @@ export function NewBookingFlow({
                   disabled={!isClickable}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-full transition-all",
-                    isActive && "bg-primary text-white shadow-sm",
-                    isCompleted && "bg-green-100 text-green-700",
-                    !isActive && !isCompleted && "bg-gray-100 text-gray-400",
-                    isClickable && !isActive && "hover:bg-gray-200 cursor-pointer"
+                    isActive && "bg-primary text-primary-foreground shadow-sm",
+                    isCompleted && "status-confirmed",
+                    !isActive && !isCompleted && "bg-muted text-muted-foreground",
+                    isClickable && !isActive && "hover:bg-accent cursor-pointer"
                   )}
                 >
                   <span className={cn(
                     "w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium",
-                    isActive && "bg-white/20",
-                    isCompleted && "bg-green-500 text-white"
+                    isActive && "bg-primary-foreground/20",
+                    isCompleted && "bg-success text-success-foreground"
                   )}>
                     {isCompleted ? <Check className="h-4 w-4" /> : index + 1}
                   </span>
@@ -377,7 +392,7 @@ export function NewBookingFlow({
                 {index < STEPS.length - 1 && (
                   <ChevronRight className={cn(
                     "h-5 w-5 mx-1",
-                    index < stepIndex ? "text-green-500" : "text-gray-300"
+                    index < stepIndex ? "text-success" : "text-muted-foreground"
                   )} />
                 )}
               </div>
@@ -387,18 +402,18 @@ export function NewBookingFlow({
       </div>
 
       {/* Step Content */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         {/* STEP 1: Tour Selection */}
         {currentStep === "tour" && (
           <div className="p-6">
             <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Which tour?</h2>
-              <p className="text-gray-500 mt-1">Select the experience to book</p>
+              <h2 className="text-xl font-semibold text-foreground">Which tour?</h2>
+              <p className="text-muted-foreground mt-1">Select the experience to book</p>
             </div>
 
             {toursLoading ? (
               <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : toursData?.data && toursData.data.length > 0 ? (
               <div className="space-y-3">
@@ -416,7 +431,7 @@ export function NewBookingFlow({
                       "w-full text-left p-4 rounded-xl border-2 transition-all",
                       selectedTourId === tour.id
                         ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        : "border-border hover:border-border/80 hover:bg-accent"
                     )}
                   >
                     <div className="flex gap-4">
@@ -427,20 +442,20 @@ export function NewBookingFlow({
                           className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
                         />
                       ) : (
-                        <div className="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                          <MapPin className="h-10 w-10 text-gray-300" />
+                        <div className="w-24 h-24 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                          <MapPin className="h-10 w-10 text-muted-foreground" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
-                          <h3 className="font-semibold text-gray-900 text-lg">{tour.name}</h3>
+                          <h3 className="font-semibold text-foreground text-lg">{tour.name}</h3>
                           {selectedTourId === tour.id && (
                             <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                              <Check className="h-4 w-4 text-white" />
+                              <Check className="h-4 w-4 text-primary-foreground" />
                             </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
                             {formatDuration(tour.durationMinutes)}
@@ -452,7 +467,7 @@ export function NewBookingFlow({
                         </div>
                         <p className="mt-2 text-xl font-bold text-primary">
                           ${parseFloat(tour.basePrice).toFixed(0)}
-                          <span className="text-sm font-normal text-gray-500"> / person</span>
+                          <span className="text-sm font-normal text-muted-foreground"> / person</span>
                         </p>
                       </div>
                     </div>
@@ -461,8 +476,8 @@ export function NewBookingFlow({
               </div>
             ) : (
               <div className="text-center py-12">
-                <MapPin className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No active tours available</p>
+                <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No active tours available</p>
               </div>
             )}
           </div>
@@ -473,18 +488,18 @@ export function NewBookingFlow({
           <div>
             {/* Selected Tour Header */}
             {selectedTour && (
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <div className="px-6 py-4 bg-muted border-b border-border">
                 <div className="flex items-center gap-3">
                   {selectedTour.coverImageUrl ? (
                     <img src={selectedTour.coverImageUrl} alt="" className="w-12 h-12 rounded-lg object-cover" />
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                      <MapPin className="h-5 w-5 text-gray-400" />
+                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+                      <MapPin className="h-5 w-5 text-muted-foreground" />
                     </div>
                   )}
                   <div>
-                    <h3 className="font-semibold text-gray-900">{selectedTour.name}</h3>
-                    <p className="text-sm text-gray-500">{formatDuration(selectedTour.durationMinutes)}</p>
+                    <h3 className="font-semibold text-foreground">{selectedTour.name}</h3>
+                    <p className="text-sm text-muted-foreground">{formatDuration(selectedTour.durationMinutes)}</p>
                   </div>
                 </div>
               </div>
@@ -493,17 +508,17 @@ export function NewBookingFlow({
             <div className="p-6 space-y-6">
               {/* Date & Time Section */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">When?</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">When?</h3>
 
                 {schedulesLoading ? (
                   <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : schedulesData?.data && schedulesData.data.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Dates */}
                     <div>
-                      <p className="text-sm font-medium text-gray-600 mb-2">Select date</p>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Select date</p>
                       <div className="space-y-2 max-h-[200px] overflow-y-auto">
                         {Array.from(schedulesByDate.entries()).map(([dateKey, schedules]) => {
                           const date = new Date(dateKey);
@@ -521,16 +536,16 @@ export function NewBookingFlow({
                                 "w-full text-left px-4 py-3 rounded-lg border transition-all",
                                 isSelected
                                   ? "border-primary bg-primary/5"
-                                  : "border-gray-200 hover:border-gray-300"
+                                  : "border-border hover:border-border/80"
                               )}
                             >
                               <div className="flex items-center justify-between">
-                                <span className="font-medium text-gray-900">{formatDate(date)}</span>
+                                <span className="font-medium text-foreground">{formatDate(date)}</span>
                                 <span className={cn(
                                   "text-sm font-medium px-2 py-0.5 rounded-full",
-                                  totalSpots > 10 ? "bg-green-100 text-green-700" :
-                                  totalSpots > 3 ? "bg-amber-100 text-amber-700" :
-                                  "bg-red-100 text-red-700"
+                                  totalSpots > 10 ? "status-confirmed" :
+                                  totalSpots > 3 ? "status-warning" :
+                                  "status-cancelled"
                                 )}>
                                   {totalSpots} spots
                                 </span>
@@ -543,7 +558,7 @@ export function NewBookingFlow({
 
                     {/* Times */}
                     <div>
-                      <p className="text-sm font-medium text-gray-600 mb-2">Select time</p>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Select time</p>
                       {selectedDate && schedulesByDate.get(selectedDate.toDateString()) ? (
                         <div className="space-y-2">
                           {schedulesByDate.get(selectedDate.toDateString())!.map((schedule) => {
@@ -558,25 +573,25 @@ export function NewBookingFlow({
                                   "w-full text-left px-4 py-3 rounded-lg border transition-all",
                                   isSelected
                                     ? "border-primary bg-primary/5"
-                                    : "border-gray-200 hover:border-gray-300"
+                                    : "border-border hover:border-border/80"
                                 )}
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <div className={cn(
                                       "w-2.5 h-2.5 rounded-full",
-                                      spots > 5 ? "bg-green-500" : spots > 0 ? "bg-amber-500" : "bg-red-500"
+                                      spots > 5 ? "bg-success" : spots > 0 ? "bg-warning" : "bg-destructive"
                                     )} />
-                                    <span className="font-semibold text-gray-900">{formatTime(schedule.startsAt)}</span>
+                                    <span className="font-semibold text-foreground">{formatTime(schedule.startsAt)}</span>
                                   </div>
-                                  <span className="text-sm text-gray-500">{spots} left</span>
+                                  <span className="text-sm text-muted-foreground">{spots} left</span>
                                 </div>
                               </button>
                             );
                           })}
                         </div>
                       ) : (
-                        <div className="text-center py-8 text-gray-400 border border-dashed border-gray-200 rounded-lg">
+                        <div className="text-center py-8 text-muted-foreground border border-dashed border-border rounded-lg">
                           <Calendar className="h-8 w-8 mx-auto mb-2" />
                           <p className="text-sm">Select a date first</p>
                         </div>
@@ -584,34 +599,34 @@ export function NewBookingFlow({
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
-                    <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">No schedules available</p>
-                    <p className="text-sm text-gray-400 mt-1">Create schedules first</p>
+                  <div className="text-center py-8 border border-dashed border-border rounded-lg">
+                    <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">No schedules available</p>
+                    <p className="text-sm text-muted-foreground mt-1">Create schedules first</p>
                   </div>
                 )}
               </div>
 
               {/* Guest Count Section */}
               {selectedScheduleId && (
-                <div className="border-t border-gray-200 pt-6">
+                <div className="border-t border-border pt-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">How many guests?</h3>
+                    <h3 className="text-lg font-semibold text-foreground">How many guests?</h3>
                     <span className={cn(
                       "text-sm font-medium px-3 py-1 rounded-full",
-                      availableSpots > 5 ? "bg-green-100 text-green-700" :
-                      availableSpots > 0 ? "bg-amber-100 text-amber-700" :
-                      "bg-red-100 text-red-700"
+                      availableSpots > 5 ? "status-confirmed" :
+                      availableSpots > 0 ? "status-warning" :
+                      "status-cancelled"
                     )}>
                       {availableSpots} spots available
                     </span>
                   </div>
 
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-border">
                     <GuestCounter
-                      label="Adults"
-                      sublabel="Ages 13+"
-                      price={`$${(pricing.breakdown.find(b => b.label === "Adults")?.price || parseFloat(selectedSchedule?.price || "0")).toFixed(0)}`}
+                      label={pricingTiers?.find(t => t.name === "adult")?.label || "Adults"}
+                      sublabel={pricingTiers?.find(t => t.name === "adult")?.description || "Ages 13+"}
+                      price={`$${(pricing.breakdown.find(b => b.label.includes("Adult"))?.price || parseFloat(selectedSchedule?.price || "0")).toFixed(0)}`}
                       count={guestCounts.adults}
                       min={1}
                       onDecrement={() => setGuestCounts(prev => ({ ...prev, adults: Math.max(1, prev.adults - 1) }))}
@@ -619,18 +634,18 @@ export function NewBookingFlow({
                       disabled={totalGuests >= availableSpots}
                     />
                     <GuestCounter
-                      label="Children"
-                      sublabel="Ages 3-12"
-                      price={`$${(pricing.breakdown.find(b => b.label === "Children")?.price || parseFloat(selectedSchedule?.price || "0") * 0.5).toFixed(0)}`}
+                      label={pricingTiers?.find(t => t.name === "child")?.label || "Children"}
+                      sublabel={pricingTiers?.find(t => t.name === "child")?.description || "Ages 3-12"}
+                      price={`$${(pricing.breakdown.find(b => b.label.includes("Child"))?.price || parseFloat(selectedSchedule?.price || "0")).toFixed(0)}`}
                       count={guestCounts.children}
                       onDecrement={() => setGuestCounts(prev => ({ ...prev, children: Math.max(0, prev.children - 1) }))}
                       onIncrement={() => setGuestCounts(prev => ({ ...prev, children: prev.children + 1 }))}
                       disabled={totalGuests >= availableSpots}
                     />
                     <GuestCounter
-                      label="Infants"
-                      sublabel="Under 3"
-                      price="Free"
+                      label={pricingTiers?.find(t => t.name === "infant")?.label || "Infants"}
+                      sublabel={pricingTiers?.find(t => t.name === "infant")?.description || "Under 3"}
+                      price={pricing.breakdown.find(b => b.label.includes("Infant"))?.price === 0 ? "Free" : `$${(pricing.breakdown.find(b => b.label.includes("Infant"))?.price || 0).toFixed(0)}`}
                       count={guestCounts.infants}
                       onDecrement={() => setGuestCounts(prev => ({ ...prev, infants: Math.max(0, prev.infants - 1) }))}
                       onIncrement={() => setGuestCounts(prev => ({ ...prev, infants: prev.infants + 1 }))}
@@ -639,21 +654,21 @@ export function NewBookingFlow({
                   </div>
 
                   {totalGuests > availableSpots && (
-                    <div className="mt-4 flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">
+                    <div className="mt-4 flex items-center gap-2 text-destructive text-sm bg-destructive/10 px-3 py-2 rounded-lg">
                       <AlertCircle className="h-4 w-4 flex-shrink-0" />
                       <span>Only {availableSpots} spots available for this time</span>
                     </div>
                   )}
 
                   {/* Price Summary */}
-                  <div className="mt-6 bg-gray-50 rounded-xl p-4">
+                  <div className="mt-6 bg-muted rounded-xl p-4">
                     {pricing.breakdown.map((item) => (
                       <div key={item.label} className="flex justify-between text-sm py-1">
-                        <span className="text-gray-600">{item.count} × {item.label}</span>
-                        <span className="text-gray-900">${item.total.toFixed(2)}</span>
+                        <span className="text-muted-foreground">{item.count} × {item.label}</span>
+                        <span className="text-foreground">${item.total.toFixed(2)}</span>
                       </div>
                     ))}
-                    <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-semibold">
+                    <div className="border-t border-border mt-2 pt-2 flex justify-between font-semibold">
                       <span>Total</span>
                       <span className="text-xl text-primary">${pricing.total.toFixed(2)}</span>
                     </div>
@@ -668,19 +683,19 @@ export function NewBookingFlow({
         {currentStep === "book" && (
           <div>
             {/* Booking Summary Header */}
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="px-6 py-4 bg-muted border-b border-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {selectedTour?.coverImageUrl ? (
                     <img src={selectedTour.coverImageUrl} alt="" className="w-12 h-12 rounded-lg object-cover" />
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                      <MapPin className="h-5 w-5 text-gray-400" />
+                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+                      <MapPin className="h-5 w-5 text-muted-foreground" />
                     </div>
                   )}
                   <div>
-                    <h3 className="font-semibold text-gray-900">{selectedTour?.name}</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="font-semibold text-foreground">{selectedTour?.name}</h3>
+                    <p className="text-sm text-muted-foreground">
                       {selectedSchedule && formatDate(selectedSchedule.startsAt)} at {selectedSchedule && formatTime(selectedSchedule.startsAt)} · {totalGuests} guest{totalGuests > 1 ? "s" : ""}
                     </p>
                   </div>
@@ -694,7 +709,7 @@ export function NewBookingFlow({
             <div className="p-6 space-y-6">
               {/* Customer Selection */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact details</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Contact details</h3>
 
                 {/* Toggle */}
                 <div className="flex gap-2 mb-4">
@@ -703,8 +718,8 @@ export function NewBookingFlow({
                     className={cn(
                       "flex-1 py-2.5 px-4 rounded-lg font-medium transition-all text-sm",
                       customerMode === "new"
-                        ? "bg-primary text-white shadow-sm"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-accent"
                     )}
                   >
                     New Customer
@@ -714,8 +729,8 @@ export function NewBookingFlow({
                     className={cn(
                       "flex-1 py-2.5 px-4 rounded-lg font-medium transition-all text-sm",
                       customerMode === "existing"
-                        ? "bg-primary text-white shadow-sm"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-accent"
                     )}
                   >
                     Existing Customer
@@ -726,22 +741,22 @@ export function NewBookingFlow({
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">First Name *</label>
                         <input
                           type="text"
                           value={newCustomer.firstName}
                           onChange={(e) => setNewCustomer(prev => ({ ...prev, firstName: e.target.value }))}
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                          className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                           placeholder="John"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Last Name</label>
                         <input
                           type="text"
                           value={newCustomer.lastName}
                           onChange={(e) => setNewCustomer(prev => ({ ...prev, lastName: e.target.value }))}
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                          className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                           placeholder="Smith (optional)"
                         />
                       </div>
@@ -749,29 +764,29 @@ export function NewBookingFlow({
 
                     {/* Email OR Phone - at least one required */}
                     <div className="space-y-3">
-                      <p className="text-sm text-gray-500">Email or phone required (at least one)</p>
+                      <p className="text-sm text-muted-foreground">Email or phone required (at least one)</p>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <input
                           type="email"
                           value={newCustomer.email}
                           onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
                           className={cn(
                             "w-full pl-10 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors",
-                            !hasValidContact ? "border-amber-300" : "border-gray-300"
+                            !hasValidContact ? "border-warning" : "border-input"
                           )}
                           placeholder="john@example.com"
                         />
                       </div>
                       <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <input
                           type="tel"
                           value={newCustomer.phone}
                           onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
                           className={cn(
                             "w-full pl-10 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors",
-                            !hasValidContact ? "border-amber-300" : "border-gray-300"
+                            !hasValidContact ? "border-warning" : "border-input"
                           )}
                           placeholder="+1 (555) 123-4567"
                         />
@@ -786,13 +801,13 @@ export function NewBookingFlow({
                         placeholder="Search by name or email..."
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                        className="w-full px-4 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       />
                     </div>
 
                     {customersLoading ? (
                       <div className="flex justify-center py-6">
-                        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-[200px] overflow-y-auto">
@@ -804,12 +819,12 @@ export function NewBookingFlow({
                               "w-full text-left px-4 py-3 rounded-lg border transition-all flex items-center justify-between",
                               selectedCustomerId === customer.id
                                 ? "border-primary bg-primary/5"
-                                : "border-gray-200 hover:border-gray-300"
+                                : "border-border hover:border-border/80"
                             )}
                           >
                             <div>
-                              <p className="font-medium text-gray-900">{customer.firstName} {customer.lastName}</p>
-                              <p className="text-sm text-gray-500">{customer.email}</p>
+                              <p className="font-medium text-foreground">{customer.firstName} {customer.lastName}</p>
+                              <p className="text-sm text-muted-foreground">{customer.email || customer.phone || "No contact"}</p>
                             </div>
                             {selectedCustomerId === customer.id && (
                               <Check className="h-5 w-5 text-primary" />
@@ -824,14 +839,14 @@ export function NewBookingFlow({
 
               {/* Pickup Location */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Location / Hotel</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Pickup Location / Hotel</label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <input
                     type="text"
                     value={pickupLocation}
                     onChange={(e) => setPickupLocation(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                    className="w-full pl-10 pr-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                     placeholder="Hotel name, address, or meeting point"
                   />
                 </div>
@@ -839,12 +854,12 @@ export function NewBookingFlow({
 
               {/* Special Requests */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Special requests (optional)</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Special requests (optional)</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                  className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                   placeholder="Dietary requirements, accessibility needs, celebration..."
                 />
               </div>
@@ -858,7 +873,7 @@ export function NewBookingFlow({
         <button
           onClick={prevStep}
           disabled={currentStep === "tour"}
-          className="flex items-center gap-2 px-4 py-2.5 text-gray-600 hover:text-gray-900 disabled:opacity-0 disabled:cursor-default transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 text-muted-foreground hover:text-foreground disabled:opacity-0 disabled:cursor-default transition-colors"
         >
           <ChevronLeft className="h-5 w-5" />
           Back
@@ -868,7 +883,7 @@ export function NewBookingFlow({
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || !canProceed()}
-            className="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
+            className="flex items-center gap-2 px-8 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
           >
             {isSubmitting && <Loader2 className="h-5 w-5 animate-spin" />}
             {isSubmitting ? "Creating..." : `Book · $${pricing.total.toFixed(2)}`}
@@ -877,7 +892,7 @@ export function NewBookingFlow({
           <button
             onClick={nextStep}
             disabled={!canProceed()}
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
+            className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
           >
             Continue
             <ChevronRight className="h-5 w-5" />

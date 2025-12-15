@@ -108,7 +108,32 @@ export const bookingRouter = createRouter({
     .input(createBookingSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.booking.create(input);
+      const booking = await services.booking.create(input);
+
+      // Send booking created email via Inngest (only if customer has email)
+      if (booking.customer?.email && booking.schedule && booking.tour) {
+        await inngest.send({
+          name: "booking/created",
+          data: {
+            organizationId: ctx.orgContext.organizationId,
+            bookingId: booking.id,
+            customerId: booking.customerId,
+            customerEmail: booking.customer.email,
+            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+            bookingReference: booking.referenceNumber,
+            tourName: booking.tour.name,
+            tourDate: format(new Date(booking.schedule.startsAt), "MMMM d, yyyy"),
+            tourTime: format(new Date(booking.schedule.startsAt), "h:mm a"),
+            participants: booking.totalParticipants,
+            totalAmount: booking.total,
+            currency: booking.currency,
+            meetingPoint: booking.tour.meetingPoint || undefined,
+            meetingPointDetails: booking.tour.meetingPointDetails || undefined,
+          },
+        });
+      }
+
+      return booking;
     }),
 
   update: adminProcedure
@@ -129,8 +154,8 @@ export const bookingRouter = createRouter({
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       const booking = await services.booking.confirm(input.id);
 
-      // Send confirmation email via Inngest if enabled
-      if (input.sendConfirmationEmail && booking.customer && booking.schedule && booking.tour) {
+      // Send confirmation email via Inngest if enabled (only if customer has email)
+      if (input.sendConfirmationEmail && booking.customer?.email && booking.schedule && booking.tour) {
         await inngest.send({
           name: "booking/confirmed",
           data: {
@@ -164,8 +189,8 @@ export const bookingRouter = createRouter({
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       const booking = await services.booking.cancel(input.id, input.reason);
 
-      // Send cancellation email via Inngest if enabled
-      if (input.sendCancellationEmail && booking.customer && booking.schedule && booking.tour) {
+      // Send cancellation email via Inngest if enabled (only if customer has email)
+      if (input.sendCancellationEmail && booking.customer?.email && booking.schedule && booking.tour) {
         await inngest.send({
           name: "booking/cancelled",
           data: {
@@ -206,6 +231,7 @@ export const bookingRouter = createRouter({
     .input(z.object({
       id: z.string(),
       newScheduleId: z.string(),
+      sendRescheduleEmail: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -215,12 +241,24 @@ export const bookingRouter = createRouter({
       const oldScheduleDate = oldBooking.schedule
         ? format(new Date(oldBooking.schedule.startsAt), "MMMM d, yyyy 'at' h:mm a")
         : "unknown";
+      const oldTourDate = oldBooking.schedule
+        ? format(new Date(oldBooking.schedule.startsAt), "MMMM d, yyyy")
+        : "unknown";
+      const oldTourTime = oldBooking.schedule
+        ? format(new Date(oldBooking.schedule.startsAt), "h:mm a")
+        : "unknown";
 
       // Reschedule the booking
       const booking = await services.booking.reschedule(input.id, input.newScheduleId);
 
       const newScheduleDate = booking.schedule
         ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy 'at' h:mm a")
+        : "unknown";
+      const newTourDate = booking.schedule
+        ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy")
+        : "unknown";
+      const newTourTime = booking.schedule
+        ? format(new Date(booking.schedule.startsAt), "h:mm a")
         : "unknown";
 
       // Log the activity
@@ -246,6 +284,29 @@ export const bookingRouter = createRouter({
           },
         }
       );
+
+      // Send reschedule email via Inngest if enabled (only if customer has email)
+      if (input.sendRescheduleEmail && booking.customer?.email && booking.schedule && booking.tour) {
+        await inngest.send({
+          name: "booking/rescheduled",
+          data: {
+            organizationId: ctx.orgContext.organizationId,
+            bookingId: booking.id,
+            customerId: booking.customerId,
+            customerEmail: booking.customer.email,
+            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+            bookingReference: booking.referenceNumber,
+            tourName: booking.tour.name,
+            oldTourDate,
+            oldTourTime,
+            newTourDate,
+            newTourTime,
+            participants: booking.totalParticipants,
+            meetingPoint: booking.tour.meetingPoint || undefined,
+            meetingPointDetails: booking.tour.meetingPointDetails || undefined,
+          },
+        });
+      }
 
       return booking;
     }),
@@ -312,4 +373,124 @@ export const bookingRouter = createRouter({
     const services = createServices({ organizationId: ctx.orgContext.organizationId });
     return services.booking.getTodaysBookings();
   }),
+
+  // Payment operations
+  createPaymentLink: adminProcedure
+    .input(
+      z.object({
+        bookingId: z.string(),
+        successUrl: z.string().url().optional(),
+        cancelUrl: z.string().url().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+
+      // Get booking with all details
+      const booking = await services.booking.getById(input.bookingId);
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+
+      // Get organization to get Stripe Connect account
+      const organization = await services.organization.get();
+      if (!organization) {
+        throw new Error("Organization not found");
+      }
+
+      if (!organization.stripeConnectAccountId) {
+        throw new Error("Stripe Connect account not configured for this organization");
+      }
+
+      if (!organization.stripeConnectOnboarded) {
+        throw new Error("Stripe Connect account not fully onboarded");
+      }
+
+      // Check if already paid
+      if (booking.paymentStatus === "paid") {
+        throw new Error("This booking has already been paid");
+      }
+
+      // Import stripe functions dynamically to avoid circular dependencies
+      const { createPaymentLink } = await import("@/lib/stripe");
+
+      // Calculate amount to charge (total - already paid)
+      const totalAmount = parseFloat(booking.total);
+      const paidAmount = parseFloat(booking.paidAmount || "0");
+      const amountDue = totalAmount - paidAmount;
+
+      if (amountDue <= 0) {
+        throw new Error("No payment due for this booking");
+      }
+
+      // Convert to cents
+      const amountInCents = Math.round(amountDue * 100);
+
+      // Create Stripe Checkout session
+      const session = await createPaymentLink({
+        amount: amountInCents,
+        currency: booking.currency,
+        metadata: {
+          organizationId: ctx.orgContext.organizationId,
+          bookingId: booking.id,
+          customerId: booking.customerId,
+          bookingReference: booking.referenceNumber,
+        },
+        successUrl:
+          input.successUrl ||
+          `${process.env.NEXT_PUBLIC_APP_URL}/org/${organization.slug}/bookings/${booking.id}?payment=success`,
+        cancelUrl:
+          input.cancelUrl ||
+          `${process.env.NEXT_PUBLIC_APP_URL}/org/${organization.slug}/bookings/${booking.id}?payment=cancelled`,
+        customerEmail: booking.customer?.email || undefined,
+        stripeAccountId: organization.stripeConnectAccountId,
+        // Optional: platform fee (e.g., 2% platform fee)
+        // applicationFeeAmount: Math.round(amountInCents * 0.02),
+      });
+
+      return {
+        url: session.url,
+        sessionId: session.id,
+        amountDue: amountDue.toFixed(2),
+        currency: booking.currency,
+      };
+    }),
+
+  getPaymentStatus: protectedProcedure
+    .input(z.object({ bookingId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+
+      const booking = await services.booking.getById(input.bookingId);
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+
+      // Get all manual payments
+      const payments = await services.payment.listByBooking(input.bookingId);
+
+      // Calculate totals
+      const totalAmount = parseFloat(booking.total);
+      const paidAmount = parseFloat(booking.paidAmount || "0");
+      const balance = totalAmount - paidAmount;
+
+      return {
+        bookingId: booking.id,
+        referenceNumber: booking.referenceNumber,
+        total: booking.total,
+        paidAmount: booking.paidAmount || "0",
+        balance: balance.toFixed(2),
+        currency: booking.currency,
+        paymentStatus: booking.paymentStatus,
+        stripePaymentIntentId: booking.stripePaymentIntentId,
+        payments: payments.map((p) => ({
+          id: p.id,
+          amount: p.amount,
+          method: p.method,
+          reference: p.reference,
+          recordedAt: p.recordedAt,
+          recordedByName: p.recordedByName,
+        })),
+      };
+    }),
 });

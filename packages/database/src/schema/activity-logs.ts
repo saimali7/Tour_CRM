@@ -16,6 +16,8 @@ export type ActivityAction =
   | "booking.participant_added"
   | "booking.participant_removed"
   | "booking.email_sent"
+  | "booking.payment_recorded"
+  | "booking.payment_deleted"
   // Schedule actions
   | "schedule.created"
   | "schedule.updated"

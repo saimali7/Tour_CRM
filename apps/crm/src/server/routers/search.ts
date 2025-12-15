@@ -176,7 +176,7 @@ export const searchRouter = createRouter({
           id: customer.id,
           type: "customer",
           title: `${customer.firstName} ${customer.lastName}`,
-          subtitle: customer.email,
+          subtitle: customer.email || customer.phone || undefined,
         });
       }
 
@@ -265,6 +265,7 @@ export const searchRouter = createRouter({
             firstName: customers.firstName,
             lastName: customers.lastName,
             email: customers.email,
+            phone: customers.phone,
           })
           .from(customers)
           .where(eq(customers.organizationId, orgId))
@@ -307,7 +308,7 @@ export const searchRouter = createRouter({
           id: customer.id,
           type: "customer",
           title: `${customer.firstName} ${customer.lastName}`,
-          subtitle: customer.email,
+          subtitle: customer.email || customer.phone || undefined,
         });
       }
 

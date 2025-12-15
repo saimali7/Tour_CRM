@@ -2,6 +2,8 @@ import { Resend } from "resend";
 import { BookingConfirmationEmail } from "./templates/booking-confirmation";
 import { BookingCancellationEmail } from "./templates/booking-cancellation";
 import { BookingReminderEmail } from "./templates/booking-reminder";
+import { BookingRescheduleEmail } from "./templates/booking-reschedule";
+import { BookingRefundEmail } from "./templates/booking-refund";
 import { GuideAssignmentEmail } from "./templates/guide-assignment";
 import { GuideReminderEmail } from "./templates/guide-reminder";
 import { GuideDailyManifestEmail } from "./templates/guide-daily-manifest";
@@ -79,6 +81,21 @@ export interface ReminderEmailData {
   hoursUntilTour: number;
 }
 
+export interface RescheduleEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingReference: string;
+  tourName: string;
+  oldTourDate: string;
+  oldTourTime: string;
+  newTourDate: string;
+  newTourTime: string;
+  participants: number;
+  meetingPoint?: string;
+  meetingPointDetails?: string;
+  viewBookingUrl?: string;
+}
+
 export interface GuideAssignmentEmailData {
   guideName: string;
   guideEmail: string;
@@ -115,6 +132,19 @@ export interface GuideDailyManifestEmailData {
     meetingPoint?: string;
     manifestUrl?: string;
   }>;
+}
+
+export interface RefundEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingReference: string;
+  tourName: string;
+  tourDate: string;
+  tourTime: string;
+  refundAmount: string;
+  currency?: string;
+  refundReason: string;
+  rebookUrl?: string;
 }
 
 export interface ReviewRequestEmailData {
@@ -267,6 +297,48 @@ export class EmailService {
   }
 
   /**
+   * Send booking reschedule email
+   */
+  async sendBookingReschedule(data: RescheduleEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject: `Booking Rescheduled - ${data.tourName} (${data.bookingReference})`,
+        react: React.createElement(BookingRescheduleEmail, {
+          customerName: data.customerName,
+          bookingReference: data.bookingReference,
+          tourName: data.tourName,
+          oldTourDate: data.oldTourDate,
+          oldTourTime: data.oldTourTime,
+          newTourDate: data.newTourDate,
+          newTourTime: data.newTourTime,
+          participants: data.participants,
+          meetingPoint: data.meetingPoint,
+          meetingPointDetails: data.meetingPointDetails,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          viewBookingUrl: data.viewBookingUrl,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
    * Send guide assignment email
    */
   async sendGuideAssignment(data: GuideAssignmentEmailData): Promise<EmailResult> {
@@ -362,6 +434,46 @@ export class EmailService {
           organizationName: this.org.name,
           organizationEmail: this.org.email,
           organizationPhone: this.org.phone,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send refund confirmation email
+   */
+  async sendRefundConfirmation(data: RefundEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject: `Refund Processed - ${data.tourName} (${data.bookingReference})`,
+        react: React.createElement(BookingRefundEmail, {
+          customerName: data.customerName,
+          bookingReference: data.bookingReference,
+          tourName: data.tourName,
+          tourDate: data.tourDate,
+          tourTime: data.tourTime,
+          refundAmount: data.refundAmount,
+          currency: data.currency || "USD",
+          refundReason: data.refundReason,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          rebookUrl: data.rebookUrl,
           logoUrl: this.org.logoUrl,
         }),
       });

@@ -8,7 +8,7 @@ import {
   CalendarDays,
   Users,
   Map,
-  Calendar,
+  CalendarCheck,
   UserCircle,
   Settings,
   Mail,
@@ -46,7 +46,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { name: "Dashboard", href: "", icon: LayoutDashboard },
       { name: "Bookings", href: "/bookings", icon: CalendarDays },
-      { name: "Schedules", href: "/schedules", icon: Calendar },
+      { name: "Availability", href: "/availability", icon: CalendarCheck },
     ],
   },
   {

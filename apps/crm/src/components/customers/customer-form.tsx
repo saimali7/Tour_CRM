@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 interface CustomerFormProps {
   customer?: {
     id: string;
-    email: string;
+    email: string | null;
     firstName: string;
     lastName: string;
     phone: string | null;
@@ -109,7 +109,7 @@ export function CustomerForm({ customer }: CustomerFormProps) {
     }
 
     const submitData = {
-      email: formData.email.trim() || `${Date.now()}@placeholder.local`,
+      email: formData.email.trim() || undefined,
       firstName: formData.firstName.trim(),
       lastName: formData.lastName.trim() || "-",
       phone: formData.phone.trim() || undefined,
@@ -158,65 +158,65 @@ export function CustomerForm({ customer }: CustomerFormProps) {
     onToggle: () => void;
     children: React.ReactNode;
   }) => (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
+    <div className="border border-border rounded-xl overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 bg-muted hover:bg-accent transition-colors"
       >
-        <div className="flex items-center gap-2 text-gray-700">
+        <div className="flex items-center gap-2 text-foreground">
           <Icon className="h-4 w-4" />
           <span className="font-medium">{title}</span>
-          <span className="text-xs text-gray-400">(optional)</span>
+          <span className="text-xs text-muted-foreground">(optional)</span>
         </div>
         {isOpen ? (
-          <ChevronUp className="h-4 w-4 text-gray-400" />
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-gray-400" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
-      {isOpen && <div className="p-4 bg-white">{children}</div>}
+      {isOpen && <div className="p-4 bg-card">{children}</div>}
     </div>
   );
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-600">{error.message}</p>
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{error.message}</p>
         </div>
       )}
 
       {/* Essential Info - Always visible */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+      <div className="bg-card rounded-xl border border-border p-6 space-y-5">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
-          <p className="text-sm text-gray-500 mt-1">Name and contact information</p>
+          <h2 className="text-lg font-semibold text-foreground">Customer Details</h2>
+          <p className="text-sm text-muted-foreground mt-1">Name and contact information</p>
         </div>
 
         {/* Name */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               First Name *
             </label>
             <input
               type="text"
               value={formData.firstName}
               onChange={(e) => setFormData((prev) => ({ ...prev, firstName: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+              className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               placeholder="John"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Last Name
             </label>
             <input
               type="text"
               value={formData.lastName}
               onChange={(e) => setFormData((prev) => ({ ...prev, lastName: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+              className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               placeholder="Smith (optional)"
             />
           </div>
@@ -224,30 +224,30 @@ export function CustomerForm({ customer }: CustomerFormProps) {
 
         {/* Contact - Email OR Phone */}
         <div className="space-y-3">
-          <p className="text-sm text-gray-500">Email or phone required (at least one)</p>
+          <p className="text-sm text-muted-foreground">Email or phone required (at least one)</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 className={cn(
                   "w-full pl-10 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors",
-                  !hasValidContact ? "border-amber-300" : "border-gray-300"
+                  !hasValidContact ? "border-warning" : "border-input"
                 )}
                 placeholder="john@example.com"
               />
             </div>
             <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                 className={cn(
                   "w-full pl-10 pr-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors",
-                  !hasValidContact ? "border-amber-300" : "border-gray-300"
+                  !hasValidContact ? "border-warning" : "border-input"
                 )}
                 placeholder="+1 (555) 123-4567"
               />
@@ -270,7 +270,7 @@ export function CustomerForm({ customer }: CustomerFormProps) {
               type="text"
               value={formData.address}
               onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               placeholder="Street address"
             />
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -278,28 +278,28 @@ export function CustomerForm({ customer }: CustomerFormProps) {
                 type="text"
                 value={formData.city}
                 onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
-                className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="City"
               />
               <input
                 type="text"
                 value={formData.state}
                 onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value }))}
-                className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="State"
               />
               <input
                 type="text"
                 value={formData.postalCode}
                 onChange={(e) => setFormData((prev) => ({ ...prev, postalCode: e.target.value }))}
-                className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="Postal code"
               />
               <input
                 type="text"
                 value={formData.country}
                 onChange={(e) => setFormData((prev) => ({ ...prev, country: e.target.value }))}
-                className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 placeholder="Country"
               />
             </div>
@@ -315,11 +315,11 @@ export function CustomerForm({ customer }: CustomerFormProps) {
         >
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Language</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-1">Language</label>
               <select
                 value={formData.language}
                 onChange={(e) => setFormData((prev) => ({ ...prev, language: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="">Select language</option>
                 <option value="en">English</option>
@@ -334,11 +334,11 @@ export function CustomerForm({ customer }: CustomerFormProps) {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Currency</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-1">Currency</label>
               <select
                 value={formData.currency}
                 onChange={(e) => setFormData((prev) => ({ ...prev, currency: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="">Select currency</option>
                 <option value="USD">USD - US Dollar</option>
@@ -372,12 +372,12 @@ export function CustomerForm({ customer }: CustomerFormProps) {
                   }
                 }}
                 placeholder="Add a tag and press Enter"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="flex-1 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
               <button
                 type="button"
                 onClick={addTag}
-                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-3 py-2 bg-muted text-foreground rounded-lg hover:bg-accent transition-colors"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -411,7 +411,7 @@ export function CustomerForm({ customer }: CustomerFormProps) {
             value={formData.notes}
             onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
             rows={3}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+            className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
             placeholder="Internal notes about this customer..."
           />
         </CollapsibleSection>
@@ -422,14 +422,14 @@ export function CustomerForm({ customer }: CustomerFormProps) {
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-4 py-2.5 text-gray-600 hover:text-gray-900 transition-colors"
+          className="px-4 py-2.5 text-muted-foreground hover:text-foreground transition-colors"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting || !canSubmit}
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isEditing ? "Update Customer" : "Create Customer"}

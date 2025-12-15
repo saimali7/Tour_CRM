@@ -37,7 +37,7 @@ export type BookingSortField = "createdAt" | "total" | "referenceNumber";
 export interface BookingWithRelations extends Booking {
   customer?: {
     id: string;
-    email: string;
+    email: string | null;
     firstName: string;
     lastName: string;
     phone: string | null;
@@ -52,6 +52,8 @@ export interface BookingWithRelations extends Booking {
     id: string;
     name: string;
     slug: string;
+    meetingPoint: string | null;
+    meetingPointDetails: string | null;
   };
   participants?: BookingParticipant[];
 }
@@ -168,6 +170,8 @@ export class BookingService extends BaseService {
             id: tours.id,
             name: tours.name,
             slug: tours.slug,
+            meetingPoint: tours.meetingPoint,
+            meetingPointDetails: tours.meetingPointDetails,
           },
         })
         .from(bookings)
@@ -222,6 +226,8 @@ export class BookingService extends BaseService {
           id: tours.id,
           name: tours.name,
           slug: tours.slug,
+          meetingPoint: tours.meetingPoint,
+          meetingPointDetails: tours.meetingPointDetails,
         },
       })
       .from(bookings)
@@ -278,6 +284,8 @@ export class BookingService extends BaseService {
           id: tours.id,
           name: tours.name,
           slug: tours.slug,
+          meetingPoint: tours.meetingPoint,
+          meetingPointDetails: tours.meetingPointDetails,
         },
       })
       .from(bookings)
@@ -907,6 +915,8 @@ export class BookingService extends BaseService {
           id: tours.id,
           name: tours.name,
           slug: tours.slug,
+          meetingPoint: tours.meetingPoint,
+          meetingPointDetails: tours.meetingPointDetails,
         },
       })
       .from(bookings)

@@ -266,13 +266,13 @@ export default function PricingSettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pricing Settings</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Pricing Settings</h1>
+          <p className="text-muted-foreground mt-1">
             Configure seasonal pricing and group discounts
           </p>
         </div>
         {saveSuccess && (
-          <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
+          <div className="flex items-center gap-2 text-success bg-success/10 px-4 py-2 rounded-lg">
             <CheckCircle className="h-4 w-4" />
             <span className="text-sm">Changes saved successfully</span>
           </div>
@@ -280,7 +280,7 @@ export default function PricingSettingsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-border">
         <nav className="flex space-x-8">
           {tabs.map((tab) => (
             <button
@@ -289,7 +289,7 @@ export default function PricingSettingsPage() {
               className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === tab.id
                   ? "border-primary text-primary"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-input"
               }`}
             >
               <tab.icon className="h-4 w-4" />
@@ -303,7 +303,7 @@ export default function PricingSettingsPage() {
       {activeTab === "seasonal" && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Adjust prices based on dates and seasons
             </p>
             <button
@@ -312,73 +312,73 @@ export default function PricingSettingsPage() {
                 setEditingSeasonalId(null);
                 setShowSeasonalModal(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
               <Plus className="h-4 w-4" />
               Add Season
             </button>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-card rounded-lg border border-border overflow-hidden">
             {seasonalLoading ? (
               <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : !seasonalPricing || seasonalPricing.length === 0 ? (
               <div className="p-12 text-center">
-                <Calendar className="mx-auto h-12 w-12 text-gray-300" />
-                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-medium text-foreground">
                   No seasonal pricing yet
                 </h3>
-                <p className="mt-2 text-gray-500">
+                <p className="mt-2 text-muted-foreground">
                   Create seasonal pricing rules to adjust tour prices for specific date
                   ranges.
                 </p>
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Dates
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Adjustment
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Applies To
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-border">
                   {seasonalPricing.map((season) => (
-                    <tr key={season.id} className="hover:bg-gray-50">
+                    <tr key={season.id} className="hover:bg-muted">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           {season.name}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           Priority: {season.priority}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {formatDate(season.startDate)} - {formatDate(season.endDate)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             parseFloat(season.adjustmentValue) > 0
-                              ? "bg-red-100 text-red-800"
-                              : "bg-green-100 text-green-800"
+                              ? "bg-destructive/10 text-destructive"
+                              : "bg-success/10 text-success"
                           }`}
                         >
                           {parseFloat(season.adjustmentValue) > 0 ? "+" : ""}
@@ -386,7 +386,7 @@ export default function PricingSettingsPage() {
                           {season.adjustmentType === "percentage" ? "%" : " USD"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {season.appliesTo === "all" ? (
                           "All tours"
                         ) : (
@@ -399,8 +399,8 @@ export default function PricingSettingsPage() {
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             season.isActive
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
+                              ? "bg-success/10 text-success"
+                              : "bg-muted text-foreground"
                           }`}
                         >
                           {season.isActive ? "Active" : "Inactive"}
@@ -410,7 +410,7 @@ export default function PricingSettingsPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleEditSeasonal(season)}
-                            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded"
                             title="Edit"
                           >
                             <Edit className="h-4 w-4" />
@@ -428,7 +428,7 @@ export default function PricingSettingsPage() {
                                 deleteSeasonalMutation.mutate({ id: season.id });
                               }
                             }}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                            className="p-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 rounded"
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -448,7 +448,7 @@ export default function PricingSettingsPage() {
       {activeTab === "groupDiscounts" && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Offer discounts based on group size
             </p>
             <button
@@ -457,74 +457,74 @@ export default function PricingSettingsPage() {
                 setEditingGroupId(null);
                 setShowGroupModal(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
             >
               <Plus className="h-4 w-4" />
               Add Tier
             </button>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-card rounded-lg border border-border overflow-hidden">
             {groupLoading ? (
               <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : !groupDiscounts || groupDiscounts.length === 0 ? (
               <div className="p-12 text-center">
-                <Users className="mx-auto h-12 w-12 text-gray-300" />
-                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                <Users className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-medium text-foreground">
                   No group discounts yet
                 </h3>
-                <p className="mt-2 text-gray-500">
+                <p className="mt-2 text-muted-foreground">
                   Create group discount tiers to incentivize larger bookings.
                 </p>
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Group Size
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Discount
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Applies To
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-border">
                   {groupDiscounts.map((discount) => (
-                    <tr key={discount.id} className="hover:bg-gray-50">
+                    <tr key={discount.id} className="hover:bg-muted">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           {discount.name}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           Priority: {discount.priority}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {discount.minParticipants}
                         {discount.maxParticipants ? ` - ${discount.maxParticipants}` : "+"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success">
                           {discount.discountValue}
                           {discount.discountType === "percentage" ? "%" : " USD"} off
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {discount.appliesTo === "all" ? (
                           "All tours"
                         ) : (
@@ -537,8 +537,8 @@ export default function PricingSettingsPage() {
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             discount.isActive
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
+                              ? "bg-success/10 text-success"
+                              : "bg-muted text-foreground"
                           }`}
                         >
                           {discount.isActive ? "Active" : "Inactive"}
@@ -548,7 +548,7 @@ export default function PricingSettingsPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleEditGroup(discount)}
-                            className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded"
                             title="Edit"
                           >
                             <Edit className="h-4 w-4" />
@@ -566,7 +566,7 @@ export default function PricingSettingsPage() {
                                 deleteGroupMutation.mutate({ id: discount.id });
                               }
                             }}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                            className="p-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 rounded"
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -585,9 +585,9 @@ export default function PricingSettingsPage() {
       {/* Seasonal Pricing Modal */}
       {showSeasonalModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">
                 {editingSeasonalId ? "Edit Seasonal Pricing" : "Add Seasonal Pricing"}
               </h3>
               <button
@@ -596,7 +596,7 @@ export default function PricingSettingsPage() {
                   setEditingSeasonalId(null);
                   resetSeasonalForm();
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-muted-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -604,7 +604,7 @@ export default function PricingSettingsPage() {
 
             <form onSubmit={handleSubmitSeasonal} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Season Name *
                 </label>
                 <input
@@ -615,13 +615,13 @@ export default function PricingSettingsPage() {
                   }
                   required
                   placeholder="e.g., Summer Peak, Holiday Season"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Start Date *
                   </label>
                   <input
@@ -631,11 +631,11 @@ export default function PricingSettingsPage() {
                       setSeasonalForm((prev) => ({ ...prev, startDate: e.target.value }))
                     }
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     End Date *
                   </label>
                   <input
@@ -645,14 +645,14 @@ export default function PricingSettingsPage() {
                       setSeasonalForm((prev) => ({ ...prev, endDate: e.target.value }))
                     }
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Adjustment Type *
                   </label>
                   <select
@@ -663,14 +663,14 @@ export default function PricingSettingsPage() {
                         adjustmentType: e.target.value as AdjustmentType,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   >
                     <option value="percentage">Percentage</option>
                     <option value="fixed">Fixed Amount</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Adjustment Value *
                   </label>
                   <div className="relative">
@@ -686,20 +686,20 @@ export default function PricingSettingsPage() {
                       }
                       required
                       placeholder="e.g., 20 or -15"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                       {seasonalForm.adjustmentType === "percentage" ? "%" : "$"}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Use positive for increase, negative for decrease
                   </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Applies To *
                 </label>
                 <select
@@ -710,7 +710,7 @@ export default function PricingSettingsPage() {
                       appliesTo: e.target.value as AppliesTo,
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="all">All Tours</option>
                   <option value="specific">Specific Tours</option>
@@ -719,10 +719,10 @@ export default function PricingSettingsPage() {
 
               {seasonalForm.appliesTo === "specific" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Select Tours *
                   </label>
-                  <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                  <div className="border border-input rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
                     {tours?.data.map((tour) => (
                       <label key={tour.id} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -736,9 +736,9 @@ export default function PricingSettingsPage() {
                                 : prev.tourIds.filter((id) => id !== tour.id),
                             }));
                           }}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                         />
-                        <span className="text-sm text-gray-700">{tour.name}</span>
+                        <span className="text-sm text-foreground">{tour.name}</span>
                       </label>
                     ))}
                   </div>
@@ -747,7 +747,7 @@ export default function PricingSettingsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Priority
                   </label>
                   <input
@@ -760,31 +760,31 @@ export default function PricingSettingsPage() {
                         priority: parseInt(e.target.value) || 1,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Higher priority rules apply first
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Status
                   </label>
-                  <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+                  <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
                     <input
                       type="checkbox"
                       checked={seasonalForm.isActive}
                       onChange={(e) =>
                         setSeasonalForm((prev) => ({ ...prev, isActive: e.target.checked }))
                       }
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
-                    <span className="text-sm text-gray-700">Active</span>
+                    <span className="text-sm text-foreground">Active</span>
                   </label>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
                   onClick={() => {
@@ -792,7 +792,7 @@ export default function PricingSettingsPage() {
                     setEditingSeasonalId(null);
                     resetSeasonalForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
                 >
                   Cancel
                 </button>
@@ -801,7 +801,7 @@ export default function PricingSettingsPage() {
                   disabled={
                     createSeasonalMutation.isPending || updateSeasonalMutation.isPending
                   }
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                 >
                   {createSeasonalMutation.isPending || updateSeasonalMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -819,9 +819,9 @@ export default function PricingSettingsPage() {
       {/* Group Discount Modal */}
       {showGroupModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">
                 {editingGroupId ? "Edit Group Discount" : "Add Group Discount"}
               </h3>
               <button
@@ -830,7 +830,7 @@ export default function PricingSettingsPage() {
                   setEditingGroupId(null);
                   resetGroupForm();
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-muted-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -838,7 +838,7 @@ export default function PricingSettingsPage() {
 
             <form onSubmit={handleSubmitGroup} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Tier Name *
                 </label>
                 <input
@@ -849,13 +849,13 @@ export default function PricingSettingsPage() {
                   }
                   required
                   placeholder="e.g., Small Group, Large Group"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Min Participants *
                   </label>
                   <input
@@ -869,11 +869,11 @@ export default function PricingSettingsPage() {
                       }))
                     }
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Max Participants
                   </label>
                   <input
@@ -889,14 +889,14 @@ export default function PricingSettingsPage() {
                       }))
                     }
                     placeholder="No limit"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Discount Type *
                   </label>
                   <select
@@ -907,14 +907,14 @@ export default function PricingSettingsPage() {
                         discountType: e.target.value as AdjustmentType,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   >
                     <option value="percentage">Percentage</option>
                     <option value="fixed">Fixed Amount</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Discount Value *
                   </label>
                   <div className="relative">
@@ -931,9 +931,9 @@ export default function PricingSettingsPage() {
                       }
                       required
                       placeholder="e.g., 10"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                       {groupForm.discountType === "percentage" ? "%" : "$"}
                     </span>
                   </div>
@@ -941,7 +941,7 @@ export default function PricingSettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Applies To *
                 </label>
                 <select
@@ -952,7 +952,7 @@ export default function PricingSettingsPage() {
                       appliesTo: e.target.value as AppliesTo,
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="all">All Tours</option>
                   <option value="specific">Specific Tours</option>
@@ -961,10 +961,10 @@ export default function PricingSettingsPage() {
 
               {groupForm.appliesTo === "specific" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Select Tours *
                   </label>
-                  <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                  <div className="border border-input rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
                     {tours?.data.map((tour) => (
                       <label key={tour.id} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -978,9 +978,9 @@ export default function PricingSettingsPage() {
                                 : prev.tourIds.filter((id) => id !== tour.id),
                             }));
                           }}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                         />
-                        <span className="text-sm text-gray-700">{tour.name}</span>
+                        <span className="text-sm text-foreground">{tour.name}</span>
                       </label>
                     ))}
                   </div>
@@ -989,7 +989,7 @@ export default function PricingSettingsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Priority
                   </label>
                   <input
@@ -1002,31 +1002,31 @@ export default function PricingSettingsPage() {
                         priority: parseInt(e.target.value) || 1,
                       }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Higher priority rules apply first
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Status
                   </label>
-                  <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+                  <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
                     <input
                       type="checkbox"
                       checked={groupForm.isActive}
                       onChange={(e) =>
                         setGroupForm((prev) => ({ ...prev, isActive: e.target.checked }))
                       }
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
-                    <span className="text-sm text-gray-700">Active</span>
+                    <span className="text-sm text-foreground">Active</span>
                   </label>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
                   onClick={() => {
@@ -1034,14 +1034,14 @@ export default function PricingSettingsPage() {
                     setEditingGroupId(null);
                     resetGroupForm();
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createGroupMutation.isPending || updateGroupMutation.isPending}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                 >
                   {createGroupMutation.isPending || updateGroupMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

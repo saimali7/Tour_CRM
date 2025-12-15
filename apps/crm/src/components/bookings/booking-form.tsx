@@ -28,7 +28,7 @@ interface BookingFormProps {
       id: string;
       firstName: string;
       lastName: string;
-      email: string;
+      email: string | null;
     };
     schedule?: {
       id: string;
@@ -59,6 +59,13 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
   const { data: customersData, isLoading: customersLoading } = trpc.customer.list.useQuery({
     pagination: { page: 1, limit: 500 },
   });
+
+  const selectedSchedule = schedulesData?.data.find((s) => s.id === formData.scheduleId);
+
+  const { data: pricingTiers } = trpc.tour.listPricingTiers.useQuery(
+    { tourId: selectedSchedule?.tour?.id || "" },
+    { enabled: !!selectedSchedule?.tour?.id }
+  );
 
   const [formData, setFormData] = useState({
     customerId: booking?.customerId ?? preselectedCustomerId ?? "",
@@ -115,7 +122,7 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
     return customersData.data.map((customer) => ({
       value: customer.id,
       label: `${customer.firstName} ${customer.lastName}`,
-      sublabel: customer.email,
+      sublabel: customer.email || undefined,
     }));
   }, [customersData?.data]);
 
@@ -141,11 +148,17 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
     if (formData.scheduleId && schedulesData?.data) {
       const schedule = schedulesData.data.find((s) => s.id === formData.scheduleId);
       if (schedule) {
-        const adultPrice = parseFloat(schedule.price || schedule.tour?.basePrice || "0");
-        // TODO: Fetch actual pricing tiers from tourPricingTiers table
-        // For now, use sensible defaults: children at 50% of adult price, infants free
-        const childPrice = adultPrice * 0.5;
-        const infantPrice = 0;
+        const basePrice = parseFloat(schedule.price || schedule.tour?.basePrice || "0");
+
+        // Find pricing tiers from database
+        const adultTier = pricingTiers?.find(t => t.name === "adult");
+        const childTier = pricingTiers?.find(t => t.name === "child");
+        const infantTier = pricingTiers?.find(t => t.name === "infant");
+
+        // Use tier prices if available, otherwise fall back to base price
+        const adultPrice = adultTier?.price ? parseFloat(adultTier.price) : basePrice;
+        const childPrice = childTier?.price ? parseFloat(childTier.price) : basePrice;
+        const infantPrice = infantTier?.price ? parseFloat(infantTier.price) : 0;
 
         const subtotal =
           adultPrice * formData.adultCount +
@@ -162,7 +175,7 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
         });
       }
     }
-  }, [formData.scheduleId, formData.adultCount, formData.childCount, formData.infantCount, formData.discount, formData.tax, schedulesData?.data]);
+  }, [formData.scheduleId, formData.adultCount, formData.childCount, formData.infantCount, formData.discount, formData.tax, schedulesData?.data, pricingTiers]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,33 +246,31 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
     }
   };
 
-  const handleCustomerCreated = (customer: { id: string; firstName: string; lastName: string; email: string }) => {
+  const handleCustomerCreated = (customer: { id: string; firstName: string; lastName: string; email: string | null }) => {
     setFormData((prev) => ({ ...prev, customerId: customer.id }));
     utils.customer.list.invalidate();
   };
-
-  const selectedSchedule = schedulesData?.data.find((s) => s.id === formData.scheduleId);
 
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-8">
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="text-sm text-red-600">{error.message}</p>
+          <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+            <p className="text-sm text-destructive">{error.message}</p>
           </div>
         )}
 
         {/* Customer & Schedule Selection */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900">Booking Details</h2>
+        <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">Booking Details</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Customer *
               </label>
               {isEditing ? (
-                <div className="px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                <div className="px-3 py-2 border border-border rounded-lg bg-muted text-foreground">
                   {booking?.customer?.firstName} {booking?.customer?.lastName}
                 </div>
               ) : (
@@ -280,11 +291,11 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Schedule *
               </label>
               {isEditing ? (
-                <div className="px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+                <div className="px-3 py-2 border border-border rounded-lg bg-muted text-foreground">
                   {booking?.tour?.name} - {booking?.schedule?.startsAt && formatScheduleDate(booking.schedule.startsAt)}
                 </div>
               ) : (
@@ -304,28 +315,35 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
           </div>
 
           {selectedSchedule && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">Selected Schedule</h3>
+            <div className="bg-muted rounded-lg p-4">
+              <h3 className="text-sm font-medium text-foreground mb-2">Selected Schedule</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500">Tour</p>
+                  <p className="text-muted-foreground">Tour</p>
                   <p className="font-medium">{selectedSchedule.tour?.name}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Date & Time</p>
+                  <p className="text-muted-foreground">Date & Time</p>
                   <p className="font-medium">{formatScheduleDate(selectedSchedule.startsAt)}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">Pricing</p>
-                  <p className="font-medium">
-                    Adult: ${parseFloat(selectedSchedule.price || selectedSchedule.tour?.basePrice || "0").toFixed(2)}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Child: ${(parseFloat(selectedSchedule.price || selectedSchedule.tour?.basePrice || "0") * 0.5).toFixed(2)}, Infant: Free
-                  </p>
+                  <p className="text-muted-foreground">Pricing</p>
+                  {pricingTiers && pricingTiers.length > 0 ? (
+                    <div className="space-y-1">
+                      {pricingTiers.filter(t => t.isActive).map(tier => (
+                        <p key={tier.id} className="text-sm">
+                          <span className="font-medium">{tier.label}:</span> ${parseFloat(tier.price).toFixed(2)}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="font-medium">
+                      ${parseFloat(selectedSchedule.price || selectedSchedule.tour?.basePrice || "0").toFixed(2)} per person
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-gray-500">Available spots</p>
+                  <p className="text-muted-foreground">Available spots</p>
                   <p className="font-medium">
                     {selectedSchedule.maxParticipants - (selectedSchedule.bookedCount ?? 0)}
                   </p>
@@ -336,12 +354,12 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
         </div>
 
         {/* Guest Counts */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900">Guests</h2>
+        <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">Guests</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Adults *
               </label>
               <input
@@ -355,12 +373,12 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                     adultCount: parseInt(e.target.value) || 1,
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Children
               </label>
               <input
@@ -373,12 +391,12 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                     childCount: parseInt(e.target.value) || 0,
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Infants
               </label>
               <input
@@ -391,32 +409,32 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                     infantCount: parseInt(e.target.value) || 0,
                   }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
           </div>
 
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             Total participants: {formData.adultCount + formData.childCount + formData.infantCount}
           </div>
         </div>
 
         {/* Pricing */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900">Pricing</h2>
+        <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">Pricing</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Subtotal
               </label>
-              <div className="px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-900">
+              <div className="px-3 py-2 border border-border rounded-lg bg-muted text-foreground">
                 ${calculatedPrice.subtotal}
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Discount ($)
               </label>
               <input
@@ -425,13 +443,13 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, discount: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="0.00"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Tax ($)
               </label>
               <input
@@ -440,16 +458,16 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, tax: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="0.00"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Total
               </label>
-              <div className="px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 font-semibold">
+              <div className="px-3 py-2 border border-border rounded-lg bg-muted text-foreground font-semibold">
                 ${calculatedPrice.total}
               </div>
             </div>
@@ -457,12 +475,12 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
         </div>
 
         {/* Special Requests */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900">Special Requests</h2>
+        <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">Special Requests</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Special Requests
               </label>
               <textarea
@@ -471,13 +489,13 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                   setFormData((prev) => ({ ...prev, specialRequests: e.target.value }))
                 }
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="Any special requests from the customer..."
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Dietary Requirements
               </label>
               <textarea
@@ -486,13 +504,13 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                   setFormData((prev) => ({ ...prev, dietaryRequirements: e.target.value }))
                 }
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="Allergies, vegetarian, halal, etc..."
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Accessibility Needs
               </label>
               <textarea
@@ -501,13 +519,13 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                   setFormData((prev) => ({ ...prev, accessibilityNeeds: e.target.value }))
                 }
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="Wheelchair access, mobility assistance, etc..."
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Internal Notes
               </label>
               <textarea
@@ -516,7 +534,7 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
                   setFormData((prev) => ({ ...prev, internalNotes: e.target.value }))
                 }
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="Notes visible only to staff..."
               />
             </div>
@@ -528,14 +546,14 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isEditing ? "Update Booking" : "Create Booking"}

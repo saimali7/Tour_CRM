@@ -31,6 +31,7 @@ import { reportsRouter } from "./reports";
 import { searchRouter } from "./search";
 // High-Impact Features
 import { reviewRouter } from "./review";
+import { paymentRouter } from "./payment";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -66,6 +67,7 @@ export const appRouter = createRouter({
   search: searchRouter,
   // High-Impact Features
   review: reviewRouter,
+  payment: paymentRouter,
 });
 
 export type AppRouter = typeof appRouter;

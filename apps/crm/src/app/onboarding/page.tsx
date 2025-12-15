@@ -147,15 +147,15 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen bg-muted flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-primary text-white mb-4">
+          <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4">
             <Building2 className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Your Organization</h1>
-          <p className="text-gray-500 mt-2">
+          <h1 className="text-2xl font-bold text-foreground">Create Your Organization</h1>
+          <p className="text-muted-foreground mt-2">
             Set up your tour business in just a few steps
           </p>
         </div>
@@ -165,18 +165,18 @@ export default function OnboardingPage() {
           <div
             className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium ${
               step >= 1
-                ? "bg-primary text-white"
-                : "bg-gray-200 text-gray-500"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground"
             }`}
           >
             {step > 1 ? <Check className="h-4 w-4" /> : "1"}
           </div>
-          <div className={`h-1 w-12 rounded ${step >= 2 ? "bg-primary" : "bg-gray-200"}`} />
+          <div className={`h-1 w-12 rounded ${step >= 2 ? "bg-primary" : "bg-muted"}`} />
           <div
             className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium ${
               step >= 2
-                ? "bg-primary text-white"
-                : "bg-gray-200 text-gray-500"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground"
             }`}
           >
             2
@@ -184,15 +184,15 @@ export default function OnboardingPage() {
         </div>
 
         {/* Form Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
           <form onSubmit={handleSubmit}>
             {step === 1 && (
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                  <h2 className="text-lg font-semibold text-foreground mb-1">
                     Business Details
                   </h2>
-                  <p className="text-sm text-gray-500 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Tell us about your tour business
                   </p>
                 </div>
@@ -201,7 +201,7 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="name"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     Business Name *
                   </label>
@@ -213,11 +213,11 @@ export default function OnboardingPage() {
                     onChange={handleChange}
                     placeholder="Awesome Tours Inc."
                     className={`w-full px-3 py-2 rounded-lg border ${
-                      errors.name ? "border-red-500" : "border-gray-300"
+                      errors.name ? "border-destructive" : "border-input"
                     } focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary`}
                   />
                   {errors.name && (
-                    <p className="mt-1 text-sm text-red-500">{errors.name}</p>
+                    <p className="mt-1 text-sm text-destructive">{errors.name}</p>
                   )}
                 </div>
 
@@ -225,12 +225,12 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="slug"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     URL Slug *
                   </label>
                   <div className="flex items-center">
-                    <span className="text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-l-lg border border-r-0 border-gray-300">
+                    <span className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-l-lg border border-r-0 border-input">
                       app.tourcrm.com/org/
                     </span>
                     <input
@@ -241,22 +241,22 @@ export default function OnboardingPage() {
                       onChange={handleChange}
                       placeholder="awesome-tours"
                       className={`flex-1 px-3 py-2 rounded-r-lg border ${
-                        errors.slug ? "border-red-500" : "border-gray-300"
+                        errors.slug ? "border-destructive" : "border-input"
                       } focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary`}
                     />
                   </div>
                   {errors.slug ? (
-                    <p className="mt-1 text-sm text-red-500">{errors.slug}</p>
+                    <p className="mt-1 text-sm text-destructive">{errors.slug}</p>
                   ) : formData.slug.length >= 3 && slugCheck.isLoading ? (
-                    <p className="mt-1 text-sm text-gray-500 flex items-center gap-1">
+                    <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
                       <Loader2 className="h-3 w-3 animate-spin" /> Checking availability...
                     </p>
                   ) : slugCheck.data?.available ? (
-                    <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
+                    <p className="mt-1 text-sm text-success flex items-center gap-1">
                       <Check className="h-3 w-3" /> This slug is available
                     </p>
                   ) : slugCheck.data && !slugCheck.data.available ? (
-                    <p className="mt-1 text-sm text-red-500">This slug is already taken</p>
+                    <p className="mt-1 text-sm text-destructive">This slug is already taken</p>
                   ) : null}
                 </div>
 
@@ -264,7 +264,7 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     Business Email *
                   </label>
@@ -276,18 +276,18 @@ export default function OnboardingPage() {
                     onChange={handleChange}
                     placeholder="contact@awesometours.com"
                     className={`w-full px-3 py-2 rounded-lg border ${
-                      errors.email ? "border-red-500" : "border-gray-300"
+                      errors.email ? "border-destructive" : "border-input"
                     } focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary`}
                   />
                   {errors.email && (
-                    <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                    <p className="mt-1 text-sm text-destructive">{errors.email}</p>
                   )}
                 </div>
 
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="w-full flex items-center justify-center gap-2 bg-primary text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors"
                 >
                   Continue
                   <ArrowRight className="h-4 w-4" />
@@ -298,10 +298,10 @@ export default function OnboardingPage() {
             {step === 2 && (
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                  <h2 className="text-lg font-semibold text-foreground mb-1">
                     Preferences
                   </h2>
-                  <p className="text-sm text-gray-500 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Configure your default settings
                   </p>
                 </div>
@@ -310,7 +310,7 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="timezone"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     Timezone
                   </label>
@@ -319,7 +319,7 @@ export default function OnboardingPage() {
                     name="timezone"
                     value={formData.timezone}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                    className="w-full px-3 py-2 rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-background"
                   >
                     {timezones.map((tz) => (
                       <option key={tz.value} value={tz.value}>
@@ -333,7 +333,7 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="currency"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     Default Currency
                   </label>
@@ -342,7 +342,7 @@ export default function OnboardingPage() {
                     name="currency"
                     value={formData.currency}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                    className="w-full px-3 py-2 rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-background"
                   >
                     {currencies.map((curr) => (
                       <option key={curr.value} value={curr.value}>
@@ -353,8 +353,8 @@ export default function OnboardingPage() {
                 </div>
 
                 {errors.submit && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600">{errors.submit}</p>
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="text-sm text-destructive">{errors.submit}</p>
                   </div>
                 )}
 
@@ -362,14 +362,14 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     onClick={() => setStep(1)}
-                    className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-input text-foreground hover:bg-accent transition-colors"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={createOrg.isPending}
-                    className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {createOrg.isPending ? (
                       <>
@@ -390,7 +390,7 @@ export default function OnboardingPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-sm text-muted-foreground mt-6">
           You can update these settings later in your organization settings.
         </p>
       </div>

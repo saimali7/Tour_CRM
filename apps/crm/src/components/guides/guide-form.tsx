@@ -165,21 +165,21 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-600">{error.message}</p>
+        <div className="rounded-lg border status-cancelled p-4">
+          <p className="text-sm">{error.message}</p>
         </div>
       )}
 
       {/* Personal Information */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+      <div className="bg-card rounded-lg border border-border p-6 space-y-6">
         <div className="flex items-center gap-2">
-          <User className="h-5 w-5 text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900">Personal Information</h2>
+          <User className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold text-foreground">Personal Information</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               First Name *
             </label>
             <input
@@ -189,12 +189,12 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, firstName: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Last Name *
             </label>
             <input
@@ -204,12 +204,12 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, lastName: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Email *
             </label>
             <input
@@ -219,12 +219,12 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, email: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Phone
             </label>
             <input
@@ -233,13 +233,13 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, phone: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             Short Bio
           </label>
           <input
@@ -249,15 +249,15 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               setFormData((prev) => ({ ...prev, shortBio: e.target.value }))
             }
             placeholder="Brief description (1-2 sentences)"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Used for quick previews and listings
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             Full Bio
           </label>
           <textarea
@@ -266,25 +266,25 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               setFormData((prev) => ({ ...prev, bio: e.target.value }))
             }
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="Detailed biography, experience, and expertise..."
           />
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Displayed on guide profile pages
           </p>
         </div>
       </div>
 
       {/* Contact & Emergency */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+      <div className="bg-card rounded-lg border border-border p-6 space-y-6">
         <div className="flex items-center gap-2">
-          <Phone className="h-5 w-5 text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900">Emergency Contact</h2>
+          <Phone className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold text-foreground">Emergency Contact</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Emergency Contact Name
             </label>
             <input
@@ -293,12 +293,12 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, emergencyContactName: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Emergency Contact Phone
             </label>
             <input
@@ -307,22 +307,22 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, emergencyContactPhone: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
         </div>
       </div>
 
       {/* Qualifications */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+      <div className="bg-card rounded-lg border border-border p-6 space-y-6">
         <div className="flex items-center gap-2">
-          <Award className="h-5 w-5 text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900">Qualifications</h2>
+          <Award className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold text-foreground">Qualifications</h2>
         </div>
 
         {/* Languages */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Languages Spoken *
           </label>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -333,22 +333,22 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
                 onClick={() => toggleLanguage(lang.code)}
                 className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                   formData.languages.includes(lang.code)
-                    ? "bg-primary text-white border-primary"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-accent"
                 }`}
               >
                 {lang.name}
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             Select all languages the guide can conduct tours in
           </p>
         </div>
 
         {/* Certifications */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Certifications & Licenses
           </label>
           <div className="space-y-4">
@@ -364,12 +364,12 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
                   }
                 }}
                 placeholder="Add a certification..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                className="flex-1 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
               />
               <button
                 type="button"
                 onClick={addCertification}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-muted/80"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -380,13 +380,13 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
                 {formData.certifications.map((cert) => (
                   <span
                     key={cert}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
                   >
                     {cert}
                     <button
                       type="button"
                       onClick={() => removeCertification(cert)}
-                      className="hover:text-blue-900"
+                      className="hover:text-primary/80"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -399,7 +399,7 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
 
         {/* Availability Notes */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-foreground mb-1">
             Availability Notes
           </label>
           <textarea
@@ -408,22 +408,22 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               setFormData((prev) => ({ ...prev, availabilityNotes: e.target.value }))
             }
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="E.g., Available weekends only, Prefers morning tours, etc."
           />
         </div>
       </div>
 
       {/* Settings */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+      <div className="bg-card rounded-lg border border-border p-6 space-y-6">
         <div className="flex items-center gap-2">
-          <Globe className="h-5 w-5 text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
+          <Globe className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold text-foreground">Settings</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Status *
             </label>
             <select
@@ -431,7 +431,7 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, status: e.target.value as "active" | "inactive" | "on_leave" }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -447,13 +447,13 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, isPublic: e.target.checked }))
                 }
-                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-2 focus:ring-primary"
+                className="w-4 h-4 text-primary border-input rounded focus:ring-2 focus:ring-primary"
               />
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-foreground">
                 Show on Booking Website
               </span>
             </label>
-            <p className="text-xs text-gray-500 mt-1 ml-6">
+            <p className="text-xs text-muted-foreground mt-1 ml-6">
               Display this guide's profile on the public booking website
             </p>
           </div>
@@ -461,10 +461,10 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
       </div>
 
       {/* Internal Notes */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+      <div className="bg-card rounded-lg border border-border p-6 space-y-6">
         <div className="flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900">Internal Notes</h2>
+          <AlertCircle className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold text-foreground">Internal Notes</h2>
         </div>
 
         <div>
@@ -474,7 +474,7 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               setFormData((prev) => ({ ...prev, notes: e.target.value }))
             }
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
             placeholder="Private notes about this guide (not visible to customers)..."
           />
         </div>
@@ -493,14 +493,14 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
               router.push(`/org/${slug}/guides` as Route);
             }
           }}
-          className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+          className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {isEditing ? "Update Guide" : "Create Guide"}
