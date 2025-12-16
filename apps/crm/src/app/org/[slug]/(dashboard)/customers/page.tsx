@@ -10,12 +10,14 @@ import {
   Phone,
   Calendar,
   UserPlus,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Customer360Sheet } from "@/components/customers/customer-360-sheet";
 
 // Design system components
 import { PageHeader, PageHeaderAction, StatsRow, StatCard } from "@/components/ui/page-header";
@@ -52,6 +54,7 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const { confirm, ConfirmModal } = useConfirmModal();
 
   const { data, isLoading, error } = trpc.customer.list.useQuery({
@@ -277,6 +280,12 @@ export default function CustomersPage() {
                   </TableCell>
                   <TableCell>
                     <TableActions>
+                      <ActionButton
+                        tooltip="360 View"
+                        onClick={() => setSelectedCustomerId(customer.id)}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                      </ActionButton>
                       <Link href={`/org/${slug}/customers/${customer.id}` as Route}>
                         <ActionButton tooltip="View customer">
                           <Eye className="h-4 w-4" />
@@ -315,6 +324,16 @@ export default function CustomersPage() {
       )}
 
       {ConfirmModal}
+
+      {/* Customer 360 Sheet */}
+      {selectedCustomerId && (
+        <Customer360Sheet
+          customerId={selectedCustomerId}
+          orgSlug={slug}
+          open={!!selectedCustomerId}
+          onOpenChange={(open) => !open && setSelectedCustomerId(null)}
+        />
+      )}
     </div>
   );
 }
