@@ -1,8 +1,8 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** December 15, 2025
+**Last Updated:** December 16, 2025
 **Status:** Sequential Phase Development
-**Current Phase:** CRM Completion (remaining features)
+**Current Phase:** Phase 7 - Operations Excellence
 **Main Branch:** `main`
 
 > This document is the single source of truth for implementation progress. We follow a **sequential phase-by-phase** development strategy - completing each phase fully before moving to the next.
@@ -51,7 +51,7 @@
 | **4** | Pricing & Promotions | ✅ COMPLETE | 100% |
 | **5** | Reporting & Analytics | ✅ COMPLETE | 100% |
 | **6** | UX Overhaul | ✅ COMPLETE | 100% |
-| **7** | **Operations Excellence** | 🔄 NEXT | 0% |
+| **7** | **Operations Excellence** | 🔄 IN PROGRESS | 40% |
 
 ### Web Application (Customer Portal)
 
@@ -523,7 +523,7 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 
 ---
 
-## Phase 7: Operations Excellence 🔄 NEXT
+## Phase 7: Operations Excellence 🔄 IN PROGRESS
 
 > **Goal:** Transform from feature-complete to operations-first world-class CRM.
 > **Detailed Plan:** See [`docs/PHASE7_OPERATIONS_EXCELLENCE.md`](./PHASE7_OPERATIONS_EXCELLENCE.md)
@@ -532,56 +532,56 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 
 | Sub-Phase | Focus | Duration | Status |
 |-----------|-------|----------|--------|
-| **7.1** | Production Completion | 1 week | ⬜ TODO |
-| **7.2** | Operational Speed | 2 weeks | ⬜ TODO |
-| **7.3** | Intelligence Surface | 1 week | ⬜ TODO |
-| **7.4** | High-Impact Features | 3 weeks | ⬜ TODO |
+| **7.1** | Production Completion | 1 week | ✅ COMPLETE |
+| **7.2** | Operational Speed | 2 weeks | 🔄 PARTIAL |
+| **7.3** | Intelligence Surface | 1 week | ✅ COMPLETE |
+| **7.4** | High-Impact Features | 3 weeks | ✅ COMPLETE |
 | **7.5** | Guide Mobile PWA | 1 week | ⬜ TODO |
 
-### 7.1 Production Completion (Week 1)
+### 7.1 Production Completion ✅ COMPLETE
 
 Wire existing infrastructure so operators can run end-to-end:
 
 | Task | What Exists | What's Missing | Status |
 |------|-------------|----------------|--------|
-| **Payment Recording UI** | Schema, service, router | UI components | ⬜ TODO |
-| **Email Automation Wiring** | Templates, handlers | `booking/created` trigger | ⬜ TODO |
-| **Pricing Tier Integration** | Tiers table, service | Booking form fetch | ⬜ TODO |
-| **Refund Flow Completion** | Refund table, service | Balance update, email | ⬜ TODO |
+| **Payment Recording UI** | Schema, service, router | UI components | ✅ Already built on booking detail |
+| **Email Automation Wiring** | Templates, handlers | `booking/created` trigger | ✅ Inngest job wired |
+| **Pricing Tier Integration** | Tiers table, service | Booking form fetch | ✅ Integrated |
+| **Refund Flow Completion** | Refund table, service | Balance update, email | ✅ Complete with email |
 
-### 7.2 Operational Speed (Weeks 2-3)
+### 7.2 Operational Speed 🔄 PARTIAL
 
 Every common operation under 60 seconds:
 
 | Task | Current State | Target | Status |
 |------|---------------|--------|--------|
 | **Quick Booking Flow** | 12+ clicks, 4-5 min | < 60 seconds | ⬜ TODO |
-| **Customer 360 View** | Navigate 3+ pages | Single page | ⬜ TODO |
-| **Morning Briefing** | Open 5 tabs | One-click view | ⬜ TODO |
-| **Batch Operations** | One at a time | Multi-select + bulk | ⬜ TODO |
+| **Customer 360 View** | Navigate 3+ pages | Single page | ✅ Customer 360 Sheet |
+| **Morning Briefing** | Open 5 tabs | One-click view | ✅ Dashboard + Print Manifests |
+| **Batch Operations** | One at a time | Multi-select + bulk | ✅ Bulk reschedule/email |
 
-### 7.3 Intelligence Surface (Week 4)
+### 7.3 Intelligence Surface ✅ COMPLETE
 
 Surface existing intelligence proactively:
 
 | Task | What Exists | What's Missing | Status |
 |------|-------------|----------------|--------|
-| **Customer Intelligence UI** | Scoring service | UI display | ⬜ TODO |
-| **Forecasting Dashboard** | Historical data | Projection logic | ⬜ TODO |
-| **Goal Tracking** | N/A | Schema + UI | ⬜ TODO |
-| **Proactive Alerts** | Some alerts | Alert system | ⬜ TODO |
+| **Customer Intelligence UI** | Scoring service | UI display | ✅ Customer 360 Sheet |
+| **Forecasting Dashboard** | Historical data | Projection logic | ✅ Analytics service |
+| **Goal Tracking** | N/A | Schema + UI | ✅ Goals schema, service, UI |
+| **Proactive Alerts** | Some alerts | Alert system | ✅ 9 insight types |
 
-### 7.4 High-Impact Features (Weeks 5-7)
+### 7.4 High-Impact Features ✅ COMPLETE
 
 Features operators can't run business without:
 
 | Feature | Why Critical | Status |
 |---------|--------------|--------|
-| **Digital Waivers** | Insurance requires signed waivers | ⬜ TODO |
-| **Deposits & Payment Plans** | Can't sell $500+ tours without deposits | ⬜ TODO |
-| **Check-In & Attendance** | Verify who showed, track no-shows | ⬜ TODO |
-| **Booking Add-Ons** | Direct revenue increase | ⬜ TODO |
-| **Gift Vouchers** | B2B revenue, pre-paid cash | ⬜ TODO |
+| **Digital Waivers** | Insurance requires signed waivers | ✅ WaiverService + Settings UI |
+| **Deposits & Payment Plans** | Can't sell $500+ tours without deposits | ✅ DepositService + PaymentService |
+| **Check-In & Attendance** | Verify who showed, track no-shows | ✅ CheckInService + Manifest UI |
+| **Booking Add-Ons** | Direct revenue increase | ✅ AddOnService + schema |
+| **Gift Vouchers** | B2B revenue, pre-paid cash | ✅ VoucherService + Settings UI |
 
 ### 7.5 Guide Mobile PWA (Week 8)
 
@@ -735,6 +735,43 @@ pnpm build ✅ (both CRM and Web apps)
 ---
 
 ## Changelog
+
+### December 16, 2025 - Phase 7.1 + 7.4 Implementation Complete
+
+Implemented backend services and UI for high-impact features:
+
+**Backend Services (all complete):**
+- `CheckInService`: Participant check-in, no-show, undo, bulk check-in
+- `VoucherService`: Gift vouchers with amounts, codes, expiration, redemption
+- `WaiverService`: Digital waiver templates, signing, PDF generation
+- `DepositService`: Configurable deposits with balance tracking
+- `AddOnService`: Optional extras for tours with inventory
+
+**Database Schema:**
+- `add-ons.ts`: Tour add-ons with pricing and inventory
+- `waivers.ts`: Waiver templates and signed waivers
+
+**tRPC Routers:**
+- `check-in.ts`: Schedule/booking check-in endpoints
+- `voucher.ts`: Voucher CRUD, redemption, balance
+- `waiver.ts`: Template management, signing
+- `deposit.ts`: Deposit collection, balance updates
+- `add-on.ts`: Add-on management for tours
+
+**UI Features:**
+- Voucher management page (`/settings/vouchers`)
+- Waiver management page (`/settings/waivers`)
+- Check-in functionality on schedule manifest with progress bar
+- Customer 360 Sheet integration on customers page
+
+**Sprint 1-2 Features (previously completed):**
+- Goal tracking system (schema, service, UI)
+- Phone booking flow (quick booking modal)
+- Customer 360 View
+- Batch operations (bulk reschedule/email)
+- Morning briefing + print manifests
+
+---
 
 ### December 16, 2025 - Phase 7: Operations Excellence Planning
 
