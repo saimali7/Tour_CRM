@@ -17,6 +17,7 @@ import {
   Settings,
   ArrowRight,
   Sparkles,
+  Phone,
 } from "lucide-react";
 import {
   CommandDialog,
@@ -230,12 +231,18 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
           {!search && (
             <>
               <CommandGroup heading="Quick Actions">
-                <CommandItem onSelect={() => navigate(`${basePath}/bookings/new`)}>
+                <CommandItem onSelect={() => navigate(`${basePath}/bookings?phone=1`)}>
                   <div className="h-8 w-8 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-600">
+                    <Phone className="h-4 w-4" />
+                  </div>
+                  <span className="font-medium">Phone Booking</span>
+                  <CommandShortcut>⌘P</CommandShortcut>
+                </CommandItem>
+                <CommandItem onSelect={() => navigate(`${basePath}/bookings/new`)}>
+                  <div className="h-8 w-8 rounded-xl bg-indigo-500/15 flex items-center justify-center text-indigo-600">
                     <Plus className="h-4 w-4" />
                   </div>
-                  <span className="font-medium">New Booking</span>
-                  <CommandShortcut>⌘B</CommandShortcut>
+                  <span className="font-medium">New Booking (Full Form)</span>
                 </CommandItem>
                 <CommandItem onSelect={() => navigate(`${basePath}/customers/new`)}>
                   <div className="h-8 w-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-600">

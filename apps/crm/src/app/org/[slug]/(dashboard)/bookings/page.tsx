@@ -17,8 +17,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams } from "next/navigation";
-import { useState, useCallback, useMemo } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { ConfirmModal, useConfirmModal } from "@/components/ui/confirm-modal";
 import {
   Dialog,
@@ -78,6 +78,8 @@ const PAYMENT_OPTIONS: { value: PaymentFilter; label: string }[] = [
 
 export default function BookingsPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -92,6 +94,27 @@ export default function BookingsPage() {
   const [showBulkRescheduleModal, setShowBulkRescheduleModal] = useState(false);
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
   const [showPhoneBooking, setShowPhoneBooking] = useState(false);
+
+  // Auto-open phone booking from URL param (e.g., from command palette)
+  useEffect(() => {
+    if (searchParams.get("phone") === "1") {
+      setShowPhoneBooking(true);
+      // Remove the query param to prevent re-opening on refresh
+      router.replace(`/org/${slug}/bookings`, { scroll: false });
+    }
+  }, [searchParams, router, slug]);
+
+  // Keyboard shortcut: Cmd+P to open phone booking
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+        e.preventDefault();
+        setShowPhoneBooking(true);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const { data, isLoading, error } = trpc.booking.list.useQuery({
     pagination: { page, limit: 20 },

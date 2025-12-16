@@ -234,6 +234,24 @@ export function QuickBookingModal({
     }
   }, [open, resetForm]);
 
+  // Keyboard shortcut: Cmd+Enter to submit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && open) {
+        e.preventDefault();
+        if (customerId && scheduleId && !createBookingMutation.isPending && !createCustomerMutation.isPending) {
+          const form = document.querySelector('form[data-quick-booking-form]') as HTMLFormElement;
+          if (form) {
+            form.requestSubmit();
+          }
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, customerId, scheduleId, createBookingMutation.isPending, createCustomerMutation.isPending]);
+
   // Handle quick create customer
   const handleQuickCreateCustomer = () => {
     if (!quickFirstName.trim() || !quickLastName.trim()) {
@@ -304,7 +322,7 @@ export function QuickBookingModal({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" data-quick-booking-form>
           {/* Grid layout for main sections */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* CUSTOMER SECTION */}
