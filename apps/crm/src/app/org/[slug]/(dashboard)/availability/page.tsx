@@ -51,7 +51,7 @@ export default function AvailabilityPage() {
   // Calendar query
   const calendarQuery = trpc.schedule.list.useQuery(
     {
-      pagination: { page: 1, limit: 500 },
+      pagination: { page: 1, limit: 100 },
       filters: {
         dateRange: calendarDateRange,
         tourId: tourFilter,

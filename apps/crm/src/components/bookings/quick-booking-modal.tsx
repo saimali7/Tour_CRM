@@ -70,7 +70,7 @@ export function QuickBookingModal({
   });
 
   const { data: customersData, isLoading: customersLoading } = trpc.customer.list.useQuery({
-    pagination: { page: 1, limit: 500 },
+    pagination: { page: 1, limit: 100 },
   });
 
   // Fetch schedules for selected tour in the next 30 days

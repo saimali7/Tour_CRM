@@ -55,7 +55,7 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
   }, [weekDates]);
 
   const { data, isLoading, error } = trpc.schedule.list.useQuery({
-    pagination: { page: 1, limit: 200 },
+    pagination: { page: 1, limit: 100 },
     filters: {
       dateRange,
     },

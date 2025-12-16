@@ -51,13 +51,13 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
   const isEditing = !!booking;
 
   const { data: schedulesData, isLoading: schedulesLoading } = trpc.schedule.list.useQuery({
-    pagination: { page: 1, limit: 500 },
+    pagination: { page: 1, limit: 100 },
     filters: { status: "scheduled" },
     sort: { field: "startsAt", direction: "asc" },
   });
 
   const { data: customersData, isLoading: customersLoading } = trpc.customer.list.useQuery({
-    pagination: { page: 1, limit: 500 },
+    pagination: { page: 1, limit: 100 },
   });
 
   const selectedSchedule = schedulesData?.data.find((s) => s.id === formData.scheduleId);
