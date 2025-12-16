@@ -21,6 +21,11 @@ import {
   ActionableAlert,
   AlertsPanel,
 } from "@/components/dashboard";
+import { MorningBriefing } from "@/components/dashboard/morning-briefing";
+import { IntelligenceSurface } from "@/components/dashboard/intelligence-surface";
+import { CustomerIntelligenceCard } from "@/components/dashboard/customer-intelligence-card";
+import { GoalCard } from "@/components/goals/goal-card";
+import { GoalModal } from "@/components/goals/goal-modal";
 
 type TabType = "operations" | "business";
 
@@ -45,6 +50,7 @@ export default function DashboardPage() {
   const slug = params.slug as string;
   const [activeTab, setActiveTab] = useState<TabType>("operations");
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const [showGoalModal, setShowGoalModal] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -250,18 +256,8 @@ export default function DashboardPage() {
             </div>
           ) : operationsData ? (
             <div className="space-y-6">
-              {/* Human Greeting Header */}
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <h1 className="text-title text-foreground">
-                    {getGreeting()}!{" "}
-                    <span className="font-normal text-muted-foreground">
-                      Here's what needs your attention.
-                    </span>
-                  </h1>
-                </div>
-                <p className="text-sm text-muted-foreground">{formatDate()}</p>
-              </div>
+              {/* Morning Briefing - Consolidated Today View with Print All */}
+              <MorningBriefing orgSlug={slug} />
 
               {/* NEEDS ACTION Section - First and Prominent */}
               {alerts.length > 0 && (
@@ -421,6 +417,15 @@ export default function DashboardPage() {
                 <p className="text-body text-muted-foreground mt-1">Track revenue, bookings, and performance</p>
               </div>
 
+              {/* Intelligence Surface - Forecasting & Insights */}
+              <IntelligenceSurface orgSlug={slug} />
+
+              {/* Intelligence Grid - Customer Intelligence + Goals */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <CustomerIntelligenceCard orgSlug={slug} />
+                <GoalCard orgSlug={slug} onAddGoal={() => setShowGoalModal(true)} />
+              </div>
+
               {/* Revenue Cards */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <StatCard
@@ -514,6 +519,12 @@ export default function DashboardPage() {
           ) : null}
         </>
       )}
+
+      {/* Goal Modal */}
+      <GoalModal
+        open={showGoalModal}
+        onOpenChange={setShowGoalModal}
+      />
     </div>
   );
 }

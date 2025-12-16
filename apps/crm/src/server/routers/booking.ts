@@ -493,4 +493,143 @@ export const bookingRouter = createRouter({
         })),
       };
     }),
+
+  // ============================================
+  // Bulk Operations
+  // ============================================
+
+  bulkConfirm: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()).min(1).max(100),
+      sendConfirmationEmails: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      const result = await services.booking.bulkConfirm(input.ids);
+
+      // Send confirmation emails via Inngest for successful confirmations
+      if (input.sendConfirmationEmails && result.confirmed.length > 0) {
+        // Get booking details for emails
+        for (const id of result.confirmed) {
+          const booking = await services.booking.getById(id);
+          if (booking.customer?.email && booking.schedule && booking.tour) {
+            await inngest.send({
+              name: "booking/confirmed",
+              data: {
+                organizationId: ctx.orgContext.organizationId,
+                bookingId: booking.id,
+                customerId: booking.customerId,
+                customerEmail: booking.customer.email,
+                customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+                bookingReference: booking.referenceNumber,
+                tourName: booking.tour.name,
+                tourDate: format(booking.schedule.startsAt, "EEEE, MMMM d, yyyy"),
+                tourTime: format(booking.schedule.startsAt, "h:mm a"),
+                participants: booking.totalParticipants,
+                totalAmount: booking.total,
+                currency: booking.currency,
+                meetingPoint: booking.tour.meetingPoint ?? undefined,
+                meetingPointDetails: booking.tour.meetingPointDetails ?? undefined,
+              },
+            });
+          }
+        }
+      }
+
+      return result;
+    }),
+
+  bulkCancel: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()).min(1).max(100),
+      reason: z.string().optional(),
+      sendCancellationEmails: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      const result = await services.booking.bulkCancel(input.ids, input.reason);
+
+      // Send cancellation emails via Inngest for successful cancellations
+      if (input.sendCancellationEmails && result.cancelled.length > 0) {
+        for (const id of result.cancelled) {
+          const booking = await services.booking.getById(id);
+          if (booking.customer?.email && booking.schedule && booking.tour) {
+            await inngest.send({
+              name: "booking/cancelled",
+              data: {
+                organizationId: ctx.orgContext.organizationId,
+                bookingId: booking.id,
+                customerId: booking.customerId,
+                customerEmail: booking.customer.email,
+                customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+                bookingReference: booking.referenceNumber,
+                tourName: booking.tour.name,
+                tourDate: format(booking.schedule.startsAt, "EEEE, MMMM d, yyyy"),
+                tourTime: format(booking.schedule.startsAt, "h:mm a"),
+                cancellationReason: input.reason,
+                currency: booking.currency,
+              },
+            });
+          }
+        }
+      }
+
+      return result;
+    }),
+
+  bulkUpdatePaymentStatus: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()).min(1).max(100),
+      paymentStatus: z.enum(["pending", "partial", "paid", "refunded", "failed"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.booking.bulkUpdatePaymentStatus(input.ids, input.paymentStatus);
+    }),
+
+  bulkReschedule: adminProcedure
+    .input(z.object({
+      ids: z.array(z.string()).min(1).max(100),
+      newScheduleId: z.string(),
+      sendRescheduleEmails: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      const result = await services.booking.bulkReschedule(input.ids, input.newScheduleId);
+
+      // Get new schedule info for emails
+      const newSchedule = await services.schedule.getById(input.newScheduleId);
+      const newTourDate = newSchedule ? format(new Date(newSchedule.startsAt), "MMMM d, yyyy") : "unknown";
+      const newTourTime = newSchedule ? format(new Date(newSchedule.startsAt), "h:mm a") : "unknown";
+
+      // Send reschedule emails via Inngest for successful reschedules
+      if (input.sendRescheduleEmails && result.rescheduled.length > 0) {
+        for (const id of result.rescheduled) {
+          const booking = await services.booking.getById(id);
+          if (booking.customer?.email && booking.tour) {
+            await inngest.send({
+              name: "booking/rescheduled",
+              data: {
+                organizationId: ctx.orgContext.organizationId,
+                bookingId: booking.id,
+                customerId: booking.customerId,
+                customerEmail: booking.customer.email,
+                customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+                bookingReference: booking.referenceNumber,
+                tourName: booking.tour.name,
+                oldTourDate: "Previous date",
+                oldTourTime: "Previous time",
+                newTourDate,
+                newTourTime,
+                participants: booking.totalParticipants,
+                meetingPoint: booking.tour.meetingPoint || undefined,
+                meetingPointDetails: booking.tour.meetingPointDetails || undefined,
+              },
+            });
+          }
+        }
+      }
+
+      return result;
+    }),
 });

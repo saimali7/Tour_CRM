@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure } from "../trpc";
-import { createServices } from "@tour/services";
-import { createCustomerSchema as validatorCreateCustomerSchema, updateCustomerSchema as validatorUpdateCustomerSchema } from "@tour/validators";
+import { createServices, type UpdateCustomerInput } from "@tour/services";
+import { updateCustomerSchema as validatorUpdateCustomerSchema } from "@tour/validators";
 
 const customerFilterSchema = z.object({
   search: z.string().optional(),
@@ -107,7 +107,7 @@ export const customerRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.customer.update(input.id, input.data as any);
+      return services.customer.update(input.id, input.data as UpdateCustomerInput);
     }),
 
   delete: protectedProcedure
@@ -171,4 +171,49 @@ export const customerRouter = createRouter({
       await services.customer.anonymizeForGdpr(input.id);
       return { success: true };
     }),
+
+  // ============================================
+  // Customer Intelligence
+  // ============================================
+
+  getSegmentDistribution: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.customerIntelligence.getSegmentDistribution();
+  }),
+
+  getAtRiskCustomers: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.customerIntelligence.getAtRiskCustomers();
+  }),
+
+  getTopCustomersByCLV: protectedProcedure
+    .input(z.object({ limit: z.number().min(1).max(100).default(10) }).optional())
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.customerIntelligence.getTopCustomersByCLV(input?.limit ?? 10);
+    }),
+
+  getReengagementCandidates: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.customerIntelligence.getReengagementCandidates();
+  }),
+
+  getCustomerWithScore: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.customerIntelligence.getCustomerWithScore(input.id);
+    }),
+
+  calculateCustomerScore: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.customerIntelligence.calculateCustomerScore(input.id);
+    }),
+
+  getCLVBySource: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.customerIntelligence.getCLVBySource();
+  }),
 });

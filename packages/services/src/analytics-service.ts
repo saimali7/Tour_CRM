@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, sql, desc, count, sum } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, count } from "drizzle-orm";
 import {
   bookings,
   schedules,
@@ -7,7 +7,6 @@ import {
   guideAssignments,
   refunds,
   activityLogs,
-  type BookingStatus,
   type BookingSource,
 } from "@tour/database";
 import { BaseService } from "./base-service";
@@ -849,5 +848,607 @@ export class AnalyticsService extends BaseService {
         entityType: log.entityType,
       };
     });
+  }
+
+  // ==========================================================================
+  // FORECASTING & INTELLIGENCE
+  // ==========================================================================
+
+  /**
+   * Revenue forecasting based on booking pace
+   * Compares current month pace to historical data to predict month-end revenue
+   */
+  async getRevenueForecasting(): Promise<{
+    currentMonth: {
+      name: string;
+      revenueToDate: number;
+      daysElapsed: number;
+      daysRemaining: number;
+      projectedRevenue: number;
+      dailyPace: number;
+      confidence: "low" | "medium" | "high";
+    };
+    comparison: {
+      lastMonth: {
+        name: string;
+        totalRevenue: number;
+        avgDailyRevenue: number;
+      };
+      sameMonthLastYear: {
+        name: string;
+        totalRevenue: number;
+        percentChange: number;
+      } | null;
+    };
+    weeklyTrend: Array<{
+      weekLabel: string;
+      revenue: number;
+      bookings: number;
+    }>;
+  }> {
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const daysInMonth = currentMonthEnd.getDate();
+    const daysElapsed = now.getDate();
+    const daysRemaining = daysInMonth - daysElapsed;
+
+    // Get current month revenue (excluding cancelled)
+    const currentMonthResult = await this.db
+      .select({
+        total: sql<string>`COALESCE(SUM(${bookings.total}::numeric), 0)::text`,
+        count: count(),
+      })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          gte(bookings.createdAt, currentMonthStart),
+          lte(bookings.createdAt, now),
+          sql`${bookings.status} != 'cancelled'`
+        )
+      );
+
+    const revenueToDate = parseFloat(currentMonthResult[0]?.total ?? "0");
+    const dailyPace = daysElapsed > 0 ? revenueToDate / daysElapsed : 0;
+    const projectedRevenue = dailyPace * daysInMonth;
+
+    // Get last month revenue
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const lastMonthDays = lastMonthEnd.getDate();
+
+    const lastMonthResult = await this.db
+      .select({
+        total: sql<string>`COALESCE(SUM(${bookings.total}::numeric), 0)::text`,
+      })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          gte(bookings.createdAt, lastMonthStart),
+          lte(bookings.createdAt, lastMonthEnd),
+          sql`${bookings.status} != 'cancelled'`
+        )
+      );
+
+    const lastMonthRevenue = parseFloat(lastMonthResult[0]?.total ?? "0");
+
+    // Get same month last year (if available)
+    let sameMonthLastYear = null;
+    const lastYearStart = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+    const lastYearEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0);
+
+    const lastYearResult = await this.db
+      .select({
+        total: sql<string>`COALESCE(SUM(${bookings.total}::numeric), 0)::text`,
+      })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          gte(bookings.createdAt, lastYearStart),
+          lte(bookings.createdAt, lastYearEnd),
+          sql`${bookings.status} != 'cancelled'`
+        )
+      );
+
+    const lastYearRevenue = parseFloat(lastYearResult[0]?.total ?? "0");
+    if (lastYearRevenue > 0) {
+      const percentChange = ((projectedRevenue - lastYearRevenue) / lastYearRevenue) * 100;
+      sameMonthLastYear = {
+        name: lastYearStart.toLocaleString("default", { month: "long", year: "numeric" }),
+        totalRevenue: lastYearRevenue,
+        percentChange: Math.round(percentChange * 10) / 10,
+      };
+    }
+
+    // Get weekly trend (last 4 weeks)
+    const weeklyTrend: Array<{ weekLabel: string; revenue: number; bookings: number }> = [];
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = new Date(now);
+      weekStart.setDate(weekStart.getDate() - (i * 7 + 6));
+      weekStart.setHours(0, 0, 0, 0);
+
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const weekResult = await this.db
+        .select({
+          total: sql<string>`COALESCE(SUM(${bookings.total}::numeric), 0)::text`,
+          count: count(),
+        })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.organizationId, this.organizationId),
+            gte(bookings.createdAt, weekStart),
+            lte(bookings.createdAt, weekEnd),
+            sql`${bookings.status} != 'cancelled'`
+          )
+        );
+
+      weeklyTrend.push({
+        weekLabel: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+        revenue: parseFloat(weekResult[0]?.total ?? "0"),
+        bookings: weekResult[0]?.count ?? 0,
+      });
+    }
+
+    // Determine confidence based on data availability
+    let confidence: "low" | "medium" | "high" = "low";
+    if (daysElapsed >= 20) confidence = "high";
+    else if (daysElapsed >= 10) confidence = "medium";
+
+    return {
+      currentMonth: {
+        name: currentMonthStart.toLocaleString("default", { month: "long", year: "numeric" }),
+        revenueToDate,
+        daysElapsed,
+        daysRemaining,
+        projectedRevenue,
+        dailyPace,
+        confidence,
+      },
+      comparison: {
+        lastMonth: {
+          name: lastMonthStart.toLocaleString("default", { month: "long" }),
+          totalRevenue: lastMonthRevenue,
+          avgDailyRevenue: lastMonthDays > 0 ? lastMonthRevenue / lastMonthDays : 0,
+        },
+        sameMonthLastYear,
+      },
+      weeklyTrend,
+    };
+  }
+
+  /**
+   * Generate proactive business insights
+   * Returns actionable alerts about opportunities and risks
+   */
+  async getProactiveInsights(): Promise<Array<{
+    id: string;
+    type: "opportunity" | "warning" | "info" | "success";
+    title: string;
+    description: string;
+    action?: {
+      label: string;
+      href: string;
+    };
+    metric?: {
+      value: string;
+      trend?: "up" | "down" | "stable";
+    };
+  }>> {
+    const insights: Array<{
+      id: string;
+      type: "opportunity" | "warning" | "info" | "success";
+      title: string;
+      description: string;
+      action?: { label: string; href: string };
+      metric?: { value: string; trend?: "up" | "down" | "stable" };
+    }> = [];
+
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now);
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+    // 1. Low capacity warning - Upcoming schedules with < 30% booking
+    const lowCapacitySchedules = await this.db
+      .select({
+        scheduleId: schedules.id,
+        tourName: tours.name,
+        startsAt: schedules.startsAt,
+        bookedCount: schedules.bookedCount,
+        maxParticipants: schedules.maxParticipants,
+      })
+      .from(schedules)
+      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .where(
+        and(
+          eq(schedules.organizationId, this.organizationId),
+          eq(schedules.status, "scheduled"),
+          gte(schedules.startsAt, now),
+          lte(schedules.startsAt, sevenDaysFromNow),
+          sql`${schedules.maxParticipants} > 0`,
+          sql`(${schedules.bookedCount}::float / ${schedules.maxParticipants}::float) < 0.3`,
+          sql`${schedules.bookedCount} > 0`
+        )
+      )
+      .orderBy(schedules.startsAt)
+      .limit(5);
+
+    if (lowCapacitySchedules.length > 0) {
+      const firstSchedule = lowCapacitySchedules[0];
+      if (firstSchedule) {
+        const utilization = firstSchedule.maxParticipants > 0
+          ? Math.round(((firstSchedule.bookedCount ?? 0) / firstSchedule.maxParticipants) * 100)
+          : 0;
+        insights.push({
+          id: "low-capacity-upcoming",
+          type: "warning",
+          title: `${lowCapacitySchedules.length} tours running below capacity`,
+          description: `${firstSchedule.tourName ?? "Tour"} on ${new Date(firstSchedule.startsAt).toLocaleDateString()} is only ${utilization}% booked`,
+          action: {
+            label: "View schedules",
+            href: "/schedules",
+          },
+          metric: {
+            value: `${lowCapacitySchedules.length} tours`,
+            trend: "down",
+          },
+        });
+      }
+    }
+
+    // 2. High demand opportunity - Tours consistently selling out
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const highDemandTours = await this.db
+      .select({
+        tourId: tours.id,
+        tourName: tours.name,
+        avgUtilization: sql<number>`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100)`.as("avg_utilization"),
+        scheduleCount: count(),
+      })
+      .from(schedules)
+      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .where(
+        and(
+          eq(schedules.organizationId, this.organizationId),
+          gte(schedules.startsAt, thirtyDaysAgo),
+          lte(schedules.startsAt, now),
+          sql`${schedules.status} != 'cancelled'`,
+          sql`${schedules.maxParticipants} > 0`
+        )
+      )
+      .groupBy(tours.id, tours.name)
+      .having(sql`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100) > 85`)
+      .orderBy(desc(sql`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100)`))
+      .limit(3);
+
+    if (highDemandTours.length > 0) {
+      const topTour = highDemandTours[0];
+      if (topTour && topTour.tourName && topTour.avgUtilization != null) {
+        insights.push({
+          id: "high-demand-tour",
+          type: "opportunity",
+          title: `${topTour.tourName} is in high demand`,
+          description: `This tour averaged ${Math.round(topTour.avgUtilization)}% capacity over the last 30 days. Consider adding more time slots.`,
+          action: {
+            label: "View tour",
+            href: `/tours`,
+          },
+          metric: {
+            value: `${Math.round(topTour.avgUtilization)}% full`,
+            trend: "up",
+          },
+        });
+      }
+    }
+
+    // 3. Revenue pace - Compare to last month's same point
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthSamePoint = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const [currentRevenue, lastMonthRevenue] = await Promise.all([
+      this.db
+        .select({ total: sql<string>`COALESCE(SUM(${bookings.total}::numeric), 0)::text` })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.organizationId, this.organizationId),
+            gte(bookings.createdAt, currentMonthStart),
+            lte(bookings.createdAt, now),
+            sql`${bookings.status} != 'cancelled'`
+          )
+        ),
+      this.db
+        .select({ total: sql<string>`COALESCE(SUM(${bookings.total}::numeric), 0)::text` })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.organizationId, this.organizationId),
+            gte(bookings.createdAt, lastMonthStart),
+            lte(bookings.createdAt, lastMonthSamePoint),
+            sql`${bookings.status} != 'cancelled'`
+          )
+        ),
+    ]);
+
+    const currentRev = parseFloat(currentRevenue[0]?.total ?? "0");
+    const lastMonthRev = parseFloat(lastMonthRevenue[0]?.total ?? "0");
+    const percentChange = lastMonthRev > 0 ? ((currentRev - lastMonthRev) / lastMonthRev) * 100 : 0;
+
+    if (percentChange >= 10) {
+      insights.push({
+        id: "revenue-pace-up",
+        type: "success",
+        title: "Revenue ahead of last month's pace",
+        description: `You're ${Math.round(percentChange)}% ahead of where you were at this point last month.`,
+        metric: {
+          value: `+${Math.round(percentChange)}%`,
+          trend: "up",
+        },
+      });
+    } else if (percentChange <= -10) {
+      insights.push({
+        id: "revenue-pace-down",
+        type: "warning",
+        title: "Revenue behind last month's pace",
+        description: `You're ${Math.abs(Math.round(percentChange))}% behind where you were at this point last month.`,
+        action: {
+          label: "View reports",
+          href: "/reports",
+        },
+        metric: {
+          value: `${Math.round(percentChange)}%`,
+          trend: "down",
+        },
+      });
+    }
+
+    // 4. Unassigned guides for upcoming tours
+    const unassignedSchedules = await this.db
+      .select({
+        count: count(),
+      })
+      .from(schedules)
+      .leftJoin(guideAssignments, eq(schedules.id, guideAssignments.scheduleId))
+      .where(
+        and(
+          eq(schedules.organizationId, this.organizationId),
+          eq(schedules.status, "scheduled"),
+          gte(schedules.startsAt, now),
+          lte(schedules.startsAt, sevenDaysFromNow),
+          sql`${guideAssignments.id} IS NULL`
+        )
+      );
+
+    const unassignedCount = unassignedSchedules[0]?.count ?? 0;
+    if (unassignedCount > 0) {
+      insights.push({
+        id: "unassigned-guides",
+        type: "warning",
+        title: `${unassignedCount} tours without guide assignment`,
+        description: "Upcoming tours in the next 7 days need guides assigned.",
+        action: {
+          label: "Assign guides",
+          href: "/availability",
+        },
+        metric: {
+          value: `${unassignedCount} tours`,
+          trend: "stable",
+        },
+      });
+    }
+
+    // 5. All guides assigned (success)
+    if (unassignedCount === 0 && lowCapacitySchedules.length === 0) {
+      insights.push({
+        id: "operations-healthy",
+        type: "success",
+        title: "Operations looking good",
+        description: "All upcoming tours have guides assigned and healthy booking levels.",
+      });
+    }
+
+    // 6. Tour trending up (>20% booking increase WoW)
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(thisWeekStart.getDate() - 7);
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+    const trendingToursQuery = await this.db
+      .select({
+        tourId: tours.id,
+        tourName: tours.name,
+        thisWeekBookings: sql<number>`COUNT(*) FILTER (WHERE ${bookings.createdAt} >= ${thisWeekStart})`,
+        lastWeekBookings: sql<number>`COUNT(*) FILTER (WHERE ${bookings.createdAt} >= ${lastWeekStart} AND ${bookings.createdAt} < ${thisWeekStart})`,
+      })
+      .from(bookings)
+      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
+      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          gte(bookings.createdAt, lastWeekStart),
+          sql`${bookings.status} != 'cancelled'`
+        )
+      )
+      .groupBy(tours.id, tours.name);
+
+    for (const tour of trendingToursQuery) {
+      const thisWeek = Number(tour.thisWeekBookings || 0);
+      const lastWeek = Number(tour.lastWeekBookings || 0);
+      if (lastWeek > 0 && thisWeek > lastWeek) {
+        const increase = ((thisWeek - lastWeek) / lastWeek) * 100;
+        if (increase >= 20 && tour.tourName) {
+          insights.push({
+            id: `trending-up-${tour.tourId}`,
+            type: "opportunity",
+            title: `${tour.tourName} is trending up`,
+            description: `Bookings increased ${Math.round(increase)}% this week compared to last week.`,
+            action: {
+              label: "View tour",
+              href: `/tours/${tour.tourId}`,
+            },
+            metric: {
+              value: `+${Math.round(increase)}%`,
+              trend: "up",
+            },
+          });
+          break; // Only show one trending insight
+        }
+      }
+    }
+
+    // 7. Peak capacity alert (Tour at 95%+ for upcoming schedules)
+    const peakCapacityTours = await this.db
+      .select({
+        tourId: tours.id,
+        tourName: tours.name,
+        avgUtilization: sql<number>`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100)`,
+        scheduleCount: count(),
+      })
+      .from(schedules)
+      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .where(
+        and(
+          eq(schedules.organizationId, this.organizationId),
+          eq(schedules.status, "scheduled"),
+          gte(schedules.startsAt, now),
+          lte(schedules.startsAt, sevenDaysFromNow),
+          sql`${schedules.maxParticipants} > 0`
+        )
+      )
+      .groupBy(tours.id, tours.name)
+      .having(sql`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100) >= 95`);
+
+    if (peakCapacityTours.length > 0) {
+      const peakTour = peakCapacityTours[0];
+      if (peakTour && peakTour.tourName) {
+        insights.push({
+          id: `peak-capacity-${peakTour.tourId}`,
+          type: "success",
+          title: `${peakTour.tourName} is nearly sold out!`,
+          description: `Upcoming schedules are at ${Math.round(peakTour.avgUtilization || 0)}% capacity. Consider adding more time slots.`,
+          action: {
+            label: "Add schedule",
+            href: `/schedules/new?tourId=${peakTour.tourId}`,
+          },
+          metric: {
+            value: `${Math.round(peakTour.avgUtilization || 0)}%`,
+            trend: "up",
+          },
+        });
+      }
+    }
+
+    // 8. Slow day alert (Days with low bookings historically)
+    const dayOfWeek = now.getDay();
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    const slowDayQuery = await this.db
+      .select({
+        dayOfWeek: sql<number>`EXTRACT(DOW FROM ${schedules.startsAt})`,
+        avgUtilization: sql<number>`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100)`,
+        scheduleCount: count(),
+      })
+      .from(schedules)
+      .where(
+        and(
+          eq(schedules.organizationId, this.organizationId),
+          gte(schedules.startsAt, thirtyDaysAgo),
+          lte(schedules.startsAt, now),
+          sql`${schedules.status} != 'cancelled'`,
+          sql`${schedules.maxParticipants} > 0`
+        )
+      )
+      .groupBy(sql`EXTRACT(DOW FROM ${schedules.startsAt})`)
+      .having(sql`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100) < 40`);
+
+    // Check if we have slow days in the upcoming week
+    for (const slowDay of slowDayQuery) {
+      const slowDayNum = Number(slowDay.dayOfWeek);
+      // Check if this slow day has scheduled tours in the next 7 days
+      const upcomingSlowDaySchedules = await this.db
+        .select({ count: count() })
+        .from(schedules)
+        .where(
+          and(
+            eq(schedules.organizationId, this.organizationId),
+            eq(schedules.status, "scheduled"),
+            gte(schedules.startsAt, now),
+            lte(schedules.startsAt, sevenDaysFromNow),
+            sql`EXTRACT(DOW FROM ${schedules.startsAt}) = ${slowDayNum}`
+          )
+        );
+
+      if ((upcomingSlowDaySchedules[0]?.count ?? 0) > 0) {
+        insights.push({
+          id: `slow-day-${slowDayNum}`,
+          type: "info",
+          title: `${dayNames[slowDayNum] || "Day"} typically has lower bookings`,
+          description: `Historical data shows ${Math.round(slowDay.avgUtilization || 0)}% average capacity on ${dayNames[slowDayNum] || "this day"}s. Consider promotions or reduced schedules.`,
+          action: {
+            label: "View schedules",
+            href: "/schedules",
+          },
+          metric: {
+            value: `${Math.round(slowDay.avgUtilization || 0)}% avg`,
+            trend: "down",
+          },
+        });
+        break; // Only show one slow day alert
+      }
+    }
+
+    // 9. Seasonal opportunity (Compare to same period last year)
+    const lastYearSamePeriodStart = new Date(now);
+    lastYearSamePeriodStart.setFullYear(lastYearSamePeriodStart.getFullYear() - 1);
+    lastYearSamePeriodStart.setDate(lastYearSamePeriodStart.getDate() - 7);
+    const lastYearSamePeriodEnd = new Date(lastYearSamePeriodStart);
+    lastYearSamePeriodEnd.setDate(lastYearSamePeriodEnd.getDate() + 14);
+
+    const lastYearSeasonalResult = await this.db
+      .select({
+        total: sql<string>`COALESCE(SUM(${bookings.total}::numeric), 0)::text`,
+        count: count(),
+      })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          gte(bookings.createdAt, lastYearSamePeriodStart),
+          lte(bookings.createdAt, lastYearSamePeriodEnd),
+          sql`${bookings.status} != 'cancelled'`
+        )
+      );
+
+    const lastYearSeasonalRevenue = parseFloat(lastYearSeasonalResult[0]?.total ?? "0");
+    const lastYearSeasonalBookings = lastYearSeasonalResult[0]?.count ?? 0;
+
+    if (lastYearSeasonalRevenue > currentRev * 1.2 && lastYearSeasonalBookings > 5) {
+      insights.push({
+        id: "seasonal-opportunity",
+        type: "opportunity",
+        title: "Seasonal booking opportunity",
+        description: `This time last year had ${Math.round(((lastYearSeasonalRevenue - currentRev) / currentRev) * 100)}% higher revenue. Consider targeted marketing.`,
+        action: {
+          label: "View reports",
+          href: "/reports/revenue",
+        },
+        metric: {
+          value: `$${Math.round(lastYearSeasonalRevenue - currentRev)} potential`,
+          trend: "up",
+        },
+      });
+    }
+
+    return insights;
   }
 }

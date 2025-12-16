@@ -22,6 +22,12 @@ import {
   X,
   Plus,
   RefreshCw,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Star,
+  Target,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -30,6 +36,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { toast } from "sonner";
+import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
+import { cn } from "@/lib/utils";
 
 export default function CustomerDetailPage() {
   const params = useParams();
@@ -40,11 +48,23 @@ export default function CustomerDetailPage() {
   const [newNote, setNewNote] = useState("");
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
 
+  const { openQuickBooking } = useQuickBookingContext();
   const utils = trpc.useUtils();
 
   const { data: customer, isLoading, error } = trpc.customer.getByIdWithStats.useQuery({
     id: customerId,
   });
+
+  // Customer Intelligence data
+  const { data: customerScore } = trpc.customerIntelligence.getCustomerScore.useQuery(
+    { customerId },
+    { enabled: !!customerId }
+  );
+
+  const { data: customerCLV } = trpc.customerIntelligence.getCustomerCLV.useQuery(
+    { customerId },
+    { enabled: !!customerId }
+  );
 
   const { data: bookings } = trpc.customer.getBookings.useQuery({ id: customerId });
 
@@ -106,8 +126,36 @@ export default function CustomerDetailPage() {
   };
 
   const handleQuickBook = () => {
-    // Navigate to booking form with customer pre-selected
-    router.push(`/org/${slug}/bookings/new?customerId=${customerId}` as Route);
+    // Open quick booking modal with customer pre-selected
+    openQuickBooking({ customerId });
+  };
+
+  // Segment styling helpers
+  const getSegmentBadge = (segment?: string) => {
+    if (!segment) return null;
+    const styles = {
+      vip: { bg: "bg-amber-500/10", text: "text-amber-600", icon: Star },
+      loyal: { bg: "bg-emerald-500/10", text: "text-emerald-600", icon: TrendingUp },
+      promising: { bg: "bg-blue-500/10", text: "text-blue-600", icon: Target },
+      at_risk: { bg: "bg-orange-500/10", text: "text-orange-600", icon: AlertTriangle },
+      dormant: { bg: "bg-gray-500/10", text: "text-gray-600", icon: Clock },
+    };
+    const style = styles[segment as keyof typeof styles] || styles.dormant;
+    const Icon = style.icon;
+    return (
+      <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium", style.bg, style.text)}>
+        <Icon className="h-3 w-3" />
+        {segment.replace("_", " ").toUpperCase()}
+      </span>
+    );
+  };
+
+  const getScoreColor = (score?: number) => {
+    if (!score) return "text-muted-foreground";
+    if (score >= 80) return "text-emerald-600";
+    if (score >= 60) return "text-blue-600";
+    if (score >= 40) return "text-amber-600";
+    return "text-red-600";
   };
 
   const handleRebook = (booking: { tourId?: string | null; scheduleId: string }) => {
@@ -216,6 +264,95 @@ export default function CustomerDetailPage() {
           </Link>
         </div>
       </div>
+
+      {/* Customer Intelligence Panel */}
+      {(customerScore || customerCLV) && (
+        <div className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-xl border border-primary/20 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Customer Insights</h2>
+            {customerScore?.segment && getSegmentBadge(customerScore.segment)}
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {/* Customer Score */}
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Health Score</p>
+              <div className="flex items-baseline gap-2">
+                <span className={cn("text-3xl font-bold", getScoreColor(customerScore?.score))}>
+                  {customerScore?.score ?? "—"}
+                </span>
+                <span className="text-sm text-muted-foreground">/ 100</span>
+              </div>
+              {customerScore?.score && customerScore.score < 40 && (
+                <p className="text-xs text-orange-600 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Needs attention
+                </p>
+              )}
+            </div>
+
+            {/* Lifetime Value */}
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Lifetime Value</p>
+              <p className="text-3xl font-bold text-foreground">
+                ${parseFloat(customerCLV?.historicalCLV ?? "0").toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+              {customerCLV?.predictedCLV && parseFloat(customerCLV.predictedCLV) > 0 && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +${parseFloat(customerCLV.predictedCLV).toLocaleString(undefined, { maximumFractionDigits: 0 })} predicted
+                </p>
+              )}
+            </div>
+
+            {/* Booking Frequency */}
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Avg Order Value</p>
+              <p className="text-3xl font-bold text-foreground">
+                ${parseFloat(customerCLV?.averageOrderValue ?? "0").toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+              {customerCLV?.bookingFrequency && (
+                <p className="text-xs text-muted-foreground">
+                  {customerCLV.bookingFrequency.toFixed(1)} bookings/year
+                </p>
+              )}
+            </div>
+
+            {/* Days Since Last Booking */}
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Days Since Last</p>
+              <p className={cn(
+                "text-3xl font-bold",
+                customerScore?.daysSinceLastBooking && customerScore.daysSinceLastBooking > 90
+                  ? "text-orange-600"
+                  : "text-foreground"
+              )}>
+                {customerScore?.daysSinceLastBooking ?? "—"}
+              </p>
+              {customerScore?.daysSinceLastBooking && customerScore.daysSinceLastBooking > 60 && (
+                <p className="text-xs text-orange-600 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Time for outreach
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions for at-risk customers */}
+          {customerScore?.segment === "at_risk" && (
+            <div className="mt-4 pt-4 border-t border-primary/20 flex items-center justify-between">
+              <p className="text-sm text-orange-600 font-medium">
+                This customer is at risk of churning. Consider reaching out with a special offer.
+              </p>
+              <Button size="sm" variant="outline" onClick={handleQuickBook} className="gap-1">
+                <Plus className="h-3 w-3" />
+                Quick Book
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

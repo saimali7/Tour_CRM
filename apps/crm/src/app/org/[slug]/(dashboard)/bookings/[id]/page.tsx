@@ -1382,7 +1382,7 @@ export default function BookingDetailPage() {
                 </label>
                 <select
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as any)}
+                  onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card" | "bank_transfer" | "check" | "other")}
                   className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
                 >
                   <option value="cash">Cash</option>

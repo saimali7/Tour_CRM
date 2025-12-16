@@ -24,3 +24,12 @@ export * from "./pricing";
 
 // High-Impact Features: Reviews & Feedback
 export * from "./reviews";
+
+// High-Impact Features: Digital Waivers
+export * from "./waivers";
+
+// High-Impact Features: Add-ons & Gift Vouchers
+export * from "./add-ons";
+
+// Phase 7: Operations Excellence - Goals
+export * from "./goals";

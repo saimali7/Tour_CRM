@@ -38,7 +38,7 @@ export function getDb() {
 // For backwards compatibility - uses Proxy for lazy access
 // The proxy only triggers getDb() when a property is actually accessed
 export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
-  get(target, prop, receiver) {
+  get(_target, prop, _receiver) {
     // Skip certain properties that might be checked during build/bundling
     if (prop === "then" || prop === Symbol.toStringTag || prop === Symbol.iterator) {
       return undefined;

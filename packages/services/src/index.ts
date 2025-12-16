@@ -29,6 +29,13 @@ import { CustomerIntelligenceService } from "./customer-intelligence-service";
 // High-Impact Features
 import { ReviewService } from "./review-service";
 import { PaymentService } from "./payment-service";
+import { WaiverService } from "./waiver-service";
+import { AddOnService } from "./add-on-service";
+import { VoucherService } from "./voucher-service";
+import { CheckInService } from "./check-in-service";
+import { DepositService } from "./deposit-service";
+// Phase 7: Operations Excellence
+import { GoalService } from "./goal-service";
 
 export interface Services {
   tour: TourService;
@@ -61,6 +68,13 @@ export interface Services {
   // High-Impact Features
   review: ReviewService;
   payment: PaymentService;
+  waiver: WaiverService;
+  addOn: AddOnService;
+  voucher: VoucherService;
+  checkIn: CheckInService;
+  deposit: DepositService;
+  // Phase 7: Operations Excellence
+  goal: GoalService;
 }
 
 /**
@@ -105,6 +119,13 @@ export function createServices(ctx: ServiceContext): Services {
     // High-Impact Features
     review: new ReviewService(ctx),
     payment: new PaymentService(ctx),
+    waiver: new WaiverService(ctx),
+    addOn: new AddOnService(ctx),
+    voucher: new VoucherService(ctx),
+    checkIn: new CheckInService(ctx),
+    deposit: new DepositService(ctx),
+    // Phase 7: Operations Excellence
+    goal: new GoalService(ctx),
   };
 }
 
@@ -139,6 +160,19 @@ export { CustomerIntelligenceService } from "./customer-intelligence-service";
 // High-Impact Features
 export { ReviewService } from "./review-service";
 export { PaymentService } from "./payment-service";
+export { WaiverService } from "./waiver-service";
+export { AddOnService } from "./add-on-service";
+export { VoucherService } from "./voucher-service";
+export { CheckInService } from "./check-in-service";
+export { DepositService, type DepositCalculation } from "./deposit-service";
+// Phase 7: Operations Excellence
+export { GoalService } from "./goal-service";
+export type {
+  CreateGoalInput,
+  UpdateGoalInput,
+  GoalWithProgress,
+  GoalFilters,
+} from "./goal-service";
 
 // Export types
 export * from "./types";
@@ -309,6 +343,18 @@ export type {
   CreatePaymentInput,
   PaymentStats,
 } from "./payment-service";
+export type {
+  WaiverSortField,
+  WaiverTemplateFilters,
+  CreateWaiverTemplateInput,
+  UpdateWaiverTemplateInput,
+  CreateTourWaiverInput,
+  CreateSignedWaiverInput,
+  WaiverTemplateWithTours,
+  TourWaiverWithTemplate,
+  SignedWaiverWithRelations,
+  BookingWaiverStatus,
+} from "./waiver-service";
 
 // Storage service (separate from org-scoped services, created with createStorageService)
 export { StorageService, createStorageService, type UploadResult } from "./storage-service";
