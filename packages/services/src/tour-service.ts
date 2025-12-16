@@ -121,7 +121,7 @@ export class TourService extends BaseService {
 
   /**
    * Get all tours with schedule stats (upcoming count, capacity, utilization)
-   * Uses a single query with aggregation for efficiency
+   * Uses LEFT JOIN with aggregation for efficiency
    */
   async getAllWithScheduleStats(
     filters: TourFilters = {},
@@ -130,7 +130,6 @@ export class TourService extends BaseService {
   ): Promise<PaginatedResult<TourWithScheduleStats>> {
     const { page = 1, limit = 20 } = pagination;
     const offset = (page - 1) * limit;
-    const now = new Date();
 
     const conditions = [eq(tours.organizationId, this.organizationId)];
 
@@ -155,45 +154,10 @@ export class TourService extends BaseService {
     const orderBy =
       sort.direction === "asc" ? asc(tours[sort.field]) : desc(tours[sort.field]);
 
-    // Query tours with schedule stats using subquery
-    // Note: Using sql.raw for "tours"."id" because Drizzle doesn't qualify column references in subqueries
-    const [data, countResult] = await Promise.all([
+    // First, get filtered/sorted tours
+    const [toursResult, countResult] = await Promise.all([
       this.db
-        .select({
-          tour: tours,
-          upcomingCount: sql<number>`(
-            SELECT COUNT(*)::int
-            FROM ${schedules}
-            WHERE ${schedules.tourId} = "tours"."id"
-              AND ${schedules.organizationId} = ${this.organizationId}
-              AND ${schedules.startsAt} > ${now}
-              AND ${schedules.status} != 'cancelled'
-          )`.as('upcoming_count'),
-          totalCapacity: sql<number>`(
-            SELECT COALESCE(SUM(${schedules.maxParticipants}), 0)::int
-            FROM ${schedules}
-            WHERE ${schedules.tourId} = "tours"."id"
-              AND ${schedules.organizationId} = ${this.organizationId}
-              AND ${schedules.startsAt} > ${now}
-              AND ${schedules.status} != 'cancelled'
-          )`.as('total_capacity'),
-          totalBooked: sql<number>`(
-            SELECT COALESCE(SUM(${schedules.bookedCount}), 0)::int
-            FROM ${schedules}
-            WHERE ${schedules.tourId} = "tours"."id"
-              AND ${schedules.organizationId} = ${this.organizationId}
-              AND ${schedules.startsAt} > ${now}
-              AND ${schedules.status} != 'cancelled'
-          )`.as('total_booked'),
-          nextScheduleDate: sql<Date | null>`(
-            SELECT MIN(${schedules.startsAt})
-            FROM ${schedules}
-            WHERE ${schedules.tourId} = "tours"."id"
-              AND ${schedules.organizationId} = ${this.organizationId}
-              AND ${schedules.startsAt} > ${now}
-              AND ${schedules.status} != 'cancelled'
-          )`.as('next_schedule_date'),
-        })
+        .select()
         .from(tours)
         .where(and(...conditions))
         .orderBy(orderBy)
@@ -207,23 +171,58 @@ export class TourService extends BaseService {
 
     const total = countResult[0]?.total ?? 0;
 
+    // If no tours, return early
+    if (toursResult.length === 0) {
+      return {
+        data: [],
+        ...this.paginationMeta(total, page, limit),
+      };
+    }
+
+    // Get schedule stats for these tours in a separate query
+    const tourIds = toursResult.map(t => t.id);
+    const now = new Date();
+
+    const scheduleStats = await this.db
+      .select({
+        tourId: schedules.tourId,
+        upcomingCount: sql<number>`COUNT(*)::int`,
+        totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)::int`,
+        totalBooked: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)::int`,
+        nextScheduleDate: sql<Date | null>`MIN(${schedules.startsAt})`,
+      })
+      .from(schedules)
+      .where(
+        and(
+          sql`${schedules.tourId} = ANY(${tourIds})`,
+          eq(schedules.organizationId, this.organizationId),
+          sql`${schedules.startsAt} > ${now}`,
+          sql`${schedules.status} != 'cancelled'`
+        )
+      )
+      .groupBy(schedules.tourId);
+
+    // Create a map for quick lookup
+    const statsMap = new Map(scheduleStats.map(s => [s.tourId, s]));
+
     // Transform data to include scheduleStats
-    const toursWithStats: TourWithScheduleStats[] = data.map((row) => {
-      const upcomingCount = Number(row.upcomingCount) || 0;
-      const totalCapacity = Number(row.totalCapacity) || 0;
-      const totalBooked = Number(row.totalBooked) || 0;
+    const toursWithStats: TourWithScheduleStats[] = toursResult.map((tour) => {
+      const stats = statsMap.get(tour.id);
+      const upcomingCount = Number(stats?.upcomingCount) || 0;
+      const totalCapacity = Number(stats?.totalCapacity) || 0;
+      const totalBooked = Number(stats?.totalBooked) || 0;
       const utilizationPercent = totalCapacity > 0
         ? Math.round((totalBooked / totalCapacity) * 100)
         : 0;
 
       return {
-        ...row.tour,
+        ...tour,
         scheduleStats: {
           upcomingCount,
           totalCapacity,
           totalBooked,
           utilizationPercent,
-          nextScheduleDate: row.nextScheduleDate,
+          nextScheduleDate: stats?.nextScheduleDate ?? null,
         },
       };
     });
