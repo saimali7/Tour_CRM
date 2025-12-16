@@ -2,6 +2,7 @@
 
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
+import { useState } from "react";
 import {
   Printer,
   Mail,
@@ -16,16 +17,102 @@ import {
   Users,
   DollarSign,
   Calendar,
+  CheckCircle,
+  XCircle,
+  UserMinus,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ScheduleManifestProps {
   scheduleId: string;
 }
 
 export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
+  const [checkingIn, setCheckingIn] = useState<string | null>(null);
+
+  const utils = trpc.useUtils();
+
   const { data: manifest, isLoading, error } = trpc.manifest.getForSchedule.useQuery({
     scheduleId,
   });
+
+  const { data: checkInStatus, refetch: refetchCheckIn } = trpc.checkIn.getScheduleCheckInStatus.useQuery(
+    { scheduleId },
+    { enabled: !!scheduleId }
+  );
+
+  const checkInMutation = trpc.checkIn.checkInParticipant.useMutation({
+    onSuccess: () => {
+      refetchCheckIn();
+      utils.manifest.getForSchedule.invalidate({ scheduleId });
+      toast.success("Participant checked in");
+    },
+    onError: (error) => {
+      toast.error(`Failed to check in: ${error.message}`);
+    },
+    onSettled: () => {
+      setCheckingIn(null);
+    },
+  });
+
+  const noShowMutation = trpc.checkIn.markNoShow.useMutation({
+    onSuccess: () => {
+      refetchCheckIn();
+      utils.manifest.getForSchedule.invalidate({ scheduleId });
+      toast.success("Marked as no-show");
+    },
+    onError: (error) => {
+      toast.error(`Failed to mark no-show: ${error.message}`);
+    },
+    onSettled: () => {
+      setCheckingIn(null);
+    },
+  });
+
+  const undoCheckInMutation = trpc.checkIn.undoCheckIn.useMutation({
+    onSuccess: () => {
+      refetchCheckIn();
+      utils.manifest.getForSchedule.invalidate({ scheduleId });
+      toast.success("Check-in undone");
+    },
+    onError: (error) => {
+      toast.error(`Failed to undo check-in: ${error.message}`);
+    },
+    onSettled: () => {
+      setCheckingIn(null);
+    },
+  });
+
+  const bulkCheckInMutation = trpc.checkIn.checkInAllForBooking.useMutation({
+    onSuccess: () => {
+      refetchCheckIn();
+      utils.manifest.getForSchedule.invalidate({ scheduleId });
+      toast.success("All participants checked in");
+    },
+    onError: (error) => {
+      toast.error(`Failed to check in: ${error.message}`);
+    },
+  });
+
+  const handleCheckIn = (participantId: string) => {
+    setCheckingIn(participantId);
+    checkInMutation.mutate({ participantId });
+  };
+
+  const handleNoShow = (participantId: string) => {
+    setCheckingIn(participantId);
+    noShowMutation.mutate({ participantId });
+  };
+
+  const handleUndoCheckIn = (participantId: string) => {
+    setCheckingIn(participantId);
+    undoCheckInMutation.mutate({ participantId });
+  };
+
+  const handleBulkCheckIn = (bookingId: string) => {
+    bulkCheckInMutation.mutate({ bookingId });
+  };
 
   const handlePrint = () => {
     window.print();
@@ -35,6 +122,10 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
     if (manifest?.guide) {
       window.location.href = `mailto:${manifest.guide.email}?subject=Manifest for ${manifest.tour.name} - ${format(new Date(manifest.schedule.startsAt), "MMMM d, yyyy")}`;
     }
+  };
+
+  const getParticipantCheckInStatus = (participantId: string) => {
+    return checkInStatus?.participants.find((p: { id: string }) => p.id === participantId);
   };
 
   if (isLoading) {
@@ -75,22 +166,49 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
   return (
     <div className="space-y-6">
       {/* Action Buttons - Hide on print */}
-      <div className="flex gap-3 print:hidden">
-        <button
-          onClick={handlePrint}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Printer className="h-4 w-4" />
-          Print Manifest
-        </button>
-        {manifest.guide && (
+      <div className="flex items-center justify-between print:hidden">
+        <div className="flex gap-3">
           <button
-            onClick={handleEmailGuide}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            onClick={handlePrint}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            <Mail className="h-4 w-4" />
-            Email to Guide
+            <Printer className="h-4 w-4" />
+            Print Manifest
           </button>
+          {manifest.guide && (
+            <button
+              onClick={handleEmailGuide}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              <Mail className="h-4 w-4" />
+              Email to Guide
+            </button>
+          )}
+        </div>
+
+        {/* Check-in Progress */}
+        {checkInStatus && checkInStatus.total > 0 && (
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm font-medium text-foreground">
+                {checkInStatus.checkedIn} / {checkInStatus.total} checked in
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {checkInStatus.noShows > 0 && `${checkInStatus.noShows} no-show(s)`}
+                {checkInStatus.noShows > 0 && checkInStatus.pending > 0 && " • "}
+                {checkInStatus.pending > 0 && `${checkInStatus.pending} pending`}
+              </p>
+            </div>
+            <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-success rounded-full transition-all"
+                style={{ width: `${checkInStatus.percentComplete}%` }}
+              />
+            </div>
+            <span className="text-sm font-medium text-foreground">
+              {checkInStatus.percentComplete}%
+            </span>
+          </div>
         )}
       </div>
 
@@ -228,6 +346,9 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider print:hidden">
+                    Check-in
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Ref #
                   </th>
@@ -249,8 +370,120 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">
-                {manifest.bookings.map((booking) => (
+                {manifest.bookings.map((booking) => {
+                  // Get check-in status for all participants in this booking
+                  const bookingParticipants = booking.participants.map((p) => ({
+                    ...p,
+                    checkInStatus: getParticipantCheckInStatus(p.id),
+                  }));
+                  const allCheckedIn = bookingParticipants.length > 0 &&
+                    bookingParticipants.every((p) => p.checkInStatus?.checkedIn === "yes");
+                  const someCheckedIn = bookingParticipants.some((p) => p.checkInStatus?.checkedIn === "yes");
+                  const someNoShow = bookingParticipants.some((p) => p.checkInStatus?.checkedIn === "no_show");
+
+                  return (
                   <tr key={booking.id} className="hover:bg-muted/50">
+                    {/* Check-in Cell */}
+                    <td className="px-6 py-4 print:hidden">
+                      <div className="space-y-2">
+                        {/* Booking-level quick check-in */}
+                        {booking.participants.length > 0 && !allCheckedIn && (
+                          <button
+                            onClick={() => handleBulkCheckIn(booking.id)}
+                            disabled={bulkCheckInMutation.isPending}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-success/10 text-success text-xs font-medium rounded hover:bg-success/20 transition-colors disabled:opacity-50"
+                          >
+                            {bulkCheckInMutation.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <CheckCircle className="h-3 w-3" />
+                            )}
+                            Check in all
+                          </button>
+                        )}
+
+                        {/* Status indicator */}
+                        {allCheckedIn && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-success/10 text-success text-xs font-medium rounded">
+                            <CheckCircle className="h-3 w-3" />
+                            All checked in
+                          </span>
+                        )}
+
+                        {/* Individual participant check-ins */}
+                        {booking.participants.length > 0 && (
+                          <div className="space-y-1">
+                            {bookingParticipants.map((participant) => {
+                              const status = participant.checkInStatus?.checkedIn;
+                              const isChecking = checkingIn === participant.id;
+
+                              return (
+                                <div key={participant.id} className="flex items-center gap-2 text-xs">
+                                  <span className="text-muted-foreground truncate max-w-[100px]">
+                                    {participant.firstName}
+                                  </span>
+                                  {status === "yes" ? (
+                                    <button
+                                      onClick={() => handleUndoCheckIn(participant.id)}
+                                      disabled={isChecking}
+                                      className="text-success hover:text-success/80 disabled:opacity-50"
+                                      title="Undo check-in"
+                                    >
+                                      {isChecking ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <CheckCircle className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                  ) : status === "no_show" ? (
+                                    <button
+                                      onClick={() => handleUndoCheckIn(participant.id)}
+                                      disabled={isChecking}
+                                      className="text-destructive hover:text-destructive/80 disabled:opacity-50"
+                                      title="Undo no-show"
+                                    >
+                                      {isChecking ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <UserMinus className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => handleCheckIn(participant.id)}
+                                        disabled={isChecking}
+                                        className="p-1 text-muted-foreground hover:text-success hover:bg-success/10 rounded disabled:opacity-50"
+                                        title="Check in"
+                                      >
+                                        {isChecking ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <CheckCircle className="h-4 w-4" />
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => handleNoShow(participant.id)}
+                                        disabled={isChecking}
+                                        className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded disabled:opacity-50"
+                                        title="Mark no-show"
+                                      >
+                                        <UserMinus className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Legacy: If no participants, show booking-level status */}
+                        {booking.participants.length === 0 && (
+                          <span className="text-xs text-muted-foreground italic">No participants</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-medium text-foreground">
                         {booking.referenceNumber}
@@ -355,7 +588,8 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
