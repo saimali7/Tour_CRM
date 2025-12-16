@@ -21,17 +21,17 @@
 │   Phase 0-6: Core CRM ──────────────────────────────► ✅ COMPLETE           │
 │   (Foundation, Booking, Customers, Guides, Pricing, Reports, UX)            │
 │                                                                              │
-│   High-Impact Features ─────────────────────────────► 🔄 CURRENT            │
-│   (Waivers, Deposits, Resources, Add-Ons, Check-In, Vouchers, Affiliates)   │
+│   Phase 7: Operations Excellence ───────────────────► 🔄 NEXT               │
+│   (Production Wiring, Speed, Intelligence, Waivers, Check-In, Vouchers)     │
 │                                                                              │
 │   ═══════════════════ WEB APPLICATION ═══════════════════════               │
 │                                                                              │
-│   Phase 7: Web App & Booking ───────────────────────► ⏳ PENDING            │
-│   Phase 8: Web Optimization ────────────────────────► ⏳ PENDING            │
+│   Phase 8: Web App & Booking ───────────────────────► ⏳ PENDING            │
+│   Phase 9: Web Optimization ────────────────────────► ⏳ PENDING            │
 │                                                                              │
 │   ═══════════════════ PLATFORM (FUTURE) ═══════════════════════             │
 │                                                                              │
-│   Phase 9+: SaaS & Public API ──────────────────────► ⏳ FUTURE             │
+│   Phase 10+: SaaS & Public API ─────────────────────► ⏳ FUTURE             │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -51,20 +51,20 @@
 | **4** | Pricing & Promotions | ✅ COMPLETE | 100% |
 | **5** | Reporting & Analytics | ✅ COMPLETE | 100% |
 | **6** | UX Overhaul | ✅ COMPLETE | 100% |
-| **—** | **High-Impact Features** | 🔄 CURRENT | 12.5% |
+| **7** | **Operations Excellence** | 🔄 NEXT | 0% |
 
 ### Web Application (Customer Portal)
 
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
-| **7** | Web App & Booking Flow | ⏳ PENDING | 0% |
-| **8** | Web Optimization | ⏳ PENDING | 0% |
+| **8** | Web App & Booking Flow | ⏳ PENDING | 0% |
+| **9** | Web Optimization | ⏳ PENDING | 0% |
 
 ### Platform (SaaS & API)
 
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
-| **9+** | SaaS Platform & Public API | ⏳ FUTURE | 0% |
+| **10+** | SaaS Platform & Public API | ⏳ FUTURE | 0% |
 
 **Legend:** ✅ Complete | 🔄 In Progress | ⏳ Pending
 
@@ -523,61 +523,95 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 
 ---
 
-## CRM High-Impact Features 🔄 IN PROGRESS
+## Phase 7: Operations Excellence 🔄 NEXT
 
-> **Goal:** Build features that real tour operators can't run their business without.
+> **Goal:** Transform from feature-complete to operations-first world-class CRM.
+> **Detailed Plan:** See [`docs/PHASE7_OPERATIONS_EXCELLENCE.md`](./PHASE7_OPERATIONS_EXCELLENCE.md)
 
-### CRITICAL - Operations Blockers
+### Overview
 
-| Feature | Why Critical | Status | Complexity |
-|---------|--------------|--------|------------|
-| **Digital Waivers** | Legally required for liability protection. Insurance mandates signed waivers. | ⬜ TODO | Medium |
-| **Deposit & Payment Plans** | Can't sell $500+ tours without deposits. Industry standard 20-50% upfront. | ⬜ TODO | Medium |
-| **Resource Management** | Tours need boats, bikes, vehicles - not just guides. Real inventory constraints. | ⬜ TODO | Medium |
+| Sub-Phase | Focus | Duration | Status |
+|-----------|-------|----------|--------|
+| **7.1** | Production Completion | 1 week | ⬜ TODO |
+| **7.2** | Operational Speed | 2 weeks | ⬜ TODO |
+| **7.3** | Intelligence Surface | 1 week | ⬜ TODO |
+| **7.4** | High-Impact Features | 3 weeks | ⬜ TODO |
+| **7.5** | Guide Mobile PWA | 1 week | ⬜ TODO |
 
-### HIGH - Revenue & Operations Impact
+### 7.1 Production Completion (Week 1)
 
-| Feature | Why Important | Status | Complexity |
-|---------|---------------|--------|------------|
-| **Booking Add-Ons & Upsells** | Direct revenue increase (photo packages, meal upgrades, equipment rental). | ⬜ TODO | Medium |
-| **Check-In & Attendance** | Guides verify who showed up. No-show tracking. Waiver verification. | ⬜ TODO | Low |
-| **Gift Vouchers** | B2B revenue (hotels buy packs). Pre-paid = cash before service. | ⬜ TODO | Low |
-| **Affiliate/Reseller Network** | Hotels, agents drive 30-50% of bookings. Commission tracking. | ⬜ TODO | Medium |
+Wire existing infrastructure so operators can run end-to-end:
 
-### MEDIUM - Competitive Parity
+| Task | What Exists | What's Missing | Status |
+|------|-------------|----------------|--------|
+| **Payment Recording UI** | Schema, service, router | UI components | ⬜ TODO |
+| **Email Automation Wiring** | Templates, handlers | `booking/created` trigger | ⬜ TODO |
+| **Pricing Tier Integration** | Tiers table, service | Booking form fetch | ⬜ TODO |
+| **Refund Flow Completion** | Refund table, service | Balance update, email | ⬜ TODO |
 
-| Feature | Why Useful | Status | Complexity |
-|---------|------------|--------|------------|
-| **Review & Feedback System** | Post-tour reviews, guide ratings, testimonials for marketing. | ✅ DONE | Low |
-| **Multi-Day Tours** | Support itineraries spanning multiple days with accommodations. | ⬜ TODO | High |
-| **Dynamic Pricing** | Auto-adjust prices based on demand, last-minute premiums. | ⬜ TODO | Medium |
+### 7.2 Operational Speed (Weeks 2-3)
 
-#### Review System Implementation (Completed)
-- **Database:** `reviews` table with ratings (overall, tour, guide, value), comments, testimonial support
-- **Service:** Full CRUD, stats aggregation, guide/tour ratings, public testimonials
-- **API:** tRPC router with list, create, respond, approve/reject, flag, stats endpoints
-- **Automation:** Inngest jobs - review request 24h after tour, reminder at 72h
-- **UI:** Reviews management page with stats, rating distribution, guide performance
-- **Profiles:** Guide and Tour detail pages now show average ratings
+Every common operation under 60 seconds:
 
-### Deferred (Nice-to-Have)
+| Task | Current State | Target | Status |
+|------|---------------|--------|--------|
+| **Quick Booking Flow** | 12+ clicks, 4-5 min | < 60 seconds | ⬜ TODO |
+| **Customer 360 View** | Navigate 3+ pages | Single page | ⬜ TODO |
+| **Morning Briefing** | Open 5 tabs | One-click view | ⬜ TODO |
+| **Batch Operations** | One at a time | Multi-select + bulk | ⬜ TODO |
 
-| Feature | Notes |
-|---------|-------|
-| Rich text editor | Can use markdown for now |
-| Drag-drop calendar | Functional without it |
-| PDF manifest export | Browser print works |
-| Real-time dashboard | Manual refresh acceptable |
+### 7.3 Intelligence Surface (Week 4)
 
-### What Operators Say
+Surface existing intelligence proactively:
 
-> *"I can't sell my boat tours without tracking which boat is available"* → **Resource Management**
+| Task | What Exists | What's Missing | Status |
+|------|-------------|----------------|--------|
+| **Customer Intelligence UI** | Scoring service | UI display | ⬜ TODO |
+| **Forecasting Dashboard** | Historical data | Projection logic | ⬜ TODO |
+| **Goal Tracking** | N/A | Schema + UI | ⬜ TODO |
+| **Proactive Alerts** | Some alerts | Alert system | ⬜ TODO |
 
-> *"My insurance requires signed waivers or I'm not covered"* → **Digital Waivers**
+### 7.4 High-Impact Features (Weeks 5-7)
 
-> *"Customers won't book my $3K safari paying in full today"* → **Payment Plans**
+Features operators can't run business without:
 
-> *"I'm losing 20% revenue because I don't capture upsells"* → **Add-Ons**
+| Feature | Why Critical | Status |
+|---------|--------------|--------|
+| **Digital Waivers** | Insurance requires signed waivers | ⬜ TODO |
+| **Deposits & Payment Plans** | Can't sell $500+ tours without deposits | ⬜ TODO |
+| **Check-In & Attendance** | Verify who showed, track no-shows | ⬜ TODO |
+| **Booking Add-Ons** | Direct revenue increase | ⬜ TODO |
+| **Gift Vouchers** | B2B revenue, pre-paid cash | ⬜ TODO |
+
+### 7.5 Guide Mobile PWA (Week 8)
+
+Mobile-first experience for guides:
+
+| Feature | Status |
+|---------|--------|
+| PWA install support | ⬜ TODO |
+| Offline manifest caching | ⬜ TODO |
+| Push notifications | ⬜ TODO |
+| Mobile-first UI | ⬜ TODO |
+| Check-in from phone | ⬜ TODO |
+
+### Previously Completed (Review System)
+
+✅ **Review & Feedback System** - Complete
+- Database: `reviews` table with ratings, comments, testimonials
+- Service: Full CRUD, stats, guide/tour ratings
+- API: tRPC router with all endpoints
+- Automation: Inngest jobs for review requests
+- UI: Reviews management page with analytics
+
+### Deferred to Future Phases
+
+| Feature | Reason | Future Phase |
+|---------|--------|--------------|
+| Resource Management | Guide-only sufficient for now | Phase 8+ |
+| Multi-Day Tours | Day tours for launch | Phase 8+ |
+| Dynamic Pricing | Manual pricing sufficient | Phase 8+ |
+| Affiliate Network | No partners yet | Phase 10+ |
 
 ---
 
@@ -587,7 +621,7 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 
 ---
 
-## Phase 7: Web App & Booking Flow ⏳ PENDING (0%)
+## Phase 8: Web App & Booking Flow ⏳ PENDING (0%)
 
 > **Goal:** Customer-facing booking website with complete checkout flow
 
@@ -611,7 +645,7 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 
 ---
 
-## Phase 8: Web Optimization ⏳ PENDING (0%)
+## Phase 9: Web Optimization ⏳ PENDING (0%)
 
 > **Goal:** Performance and conversion optimization
 
@@ -623,7 +657,7 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 
 ---
 
-## Phase 9+: SaaS Platform & Public API ⏳ FUTURE (0%)
+## Phase 10+: SaaS Platform & Public API ⏳ FUTURE (0%)
 
 > **Goal:** Enable selling platform to other tour operators
 
@@ -701,6 +735,41 @@ pnpm build ✅ (both CRM and Web apps)
 ---
 
 ## Changelog
+
+### December 16, 2025 - Phase 7: Operations Excellence Planning
+
+Created comprehensive implementation plan for Phase 7 transformation:
+
+**Strategic Analysis:**
+- Created `docs/STRATEGIC_ANALYSIS.md` with first-principles CRM evaluation
+- Analyzed 4 user personas (Operations Manager, Customer Service, Business Owner, Guide)
+- Mapped daily/weekly/monthly/annual operations gaps
+- Identified transformation path: Work → Fast → Smart → Unique
+
+**Phase 7 Implementation Plan (`docs/PHASE7_OPERATIONS_EXCELLENCE.md`):**
+
+| Sub-Phase | Focus | Key Deliverables |
+|-----------|-------|------------------|
+| 7.1 | Production Completion | Payment UI, email triggers, pricing tiers |
+| 7.2 | Operational Speed | Quick booking (<60s), Customer 360, batch ops |
+| 7.3 | Intelligence Surface | Forecasting, goal tracking, proactive alerts |
+| 7.4 | High-Impact Features | Waivers, deposits, check-in, add-ons, vouchers |
+| 7.5 | Guide Mobile PWA | Offline manifests, push notifications |
+
+**Key Insights:**
+- Architecture is production-grade (multi-tenant, services, schema)
+- Gap is workflow efficiency + proactive intelligence
+- Payment infrastructure exists but no UI
+- Email services work but not all triggers wired
+- Customer intelligence calculated but never displayed
+
+**Phase Renumbering:**
+- Phase 7: Operations Excellence (NEW - 8 weeks)
+- Phase 8: Web App & Booking (was 7)
+- Phase 9: Web Optimization (was 8)
+- Phase 10+: SaaS & API (was 9+)
+
+---
 
 ### December 13, 2025 - Phase 6 UX Overhaul Started
 - Created comprehensive UX Overhaul plan
