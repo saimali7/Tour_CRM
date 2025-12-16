@@ -51,7 +51,7 @@
 | **4** | Pricing & Promotions | ✅ COMPLETE | 100% |
 | **5** | Reporting & Analytics | ✅ COMPLETE | 100% |
 | **6** | UX Overhaul | ✅ COMPLETE | 100% |
-| **7** | **Operations Excellence** | 🔄 IN PROGRESS | 40% |
+| **7** | **Operations Excellence** | 🔄 IN PROGRESS | 80% |
 
 ### Web Application (Customer Portal)
 
@@ -533,7 +533,7 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 | Sub-Phase | Focus | Duration | Status |
 |-----------|-------|----------|--------|
 | **7.1** | Production Completion | 1 week | ✅ COMPLETE |
-| **7.2** | Operational Speed | 2 weeks | 🔄 PARTIAL |
+| **7.2** | Operational Speed | 2 weeks | ✅ COMPLETE |
 | **7.3** | Intelligence Surface | 1 week | ✅ COMPLETE |
 | **7.4** | High-Impact Features | 3 weeks | ✅ COMPLETE |
 | **7.5** | Guide Mobile PWA | 1 week | ⬜ TODO |
@@ -549,16 +549,25 @@ Wire existing infrastructure so operators can run end-to-end:
 | **Pricing Tier Integration** | Tiers table, service | Booking form fetch | ✅ Integrated |
 | **Refund Flow Completion** | Refund table, service | Balance update, email | ✅ Complete with email |
 
-### 7.2 Operational Speed 🔄 PARTIAL
+### 7.2 Operational Speed ✅ COMPLETE
 
 Every common operation under 60 seconds:
 
 | Task | Current State | Target | Status |
 |------|---------------|--------|--------|
-| **Quick Booking Flow** | 12+ clicks, 4-5 min | < 60 seconds | ⬜ TODO |
+| **Quick Booking Flow** | 12+ clicks, 4-5 min | < 60 seconds | ✅ Phone Booking Sheet (⌘P) |
 | **Customer 360 View** | Navigate 3+ pages | Single page | ✅ Customer 360 Sheet |
 | **Morning Briefing** | Open 5 tabs | One-click view | ✅ Dashboard + Print Manifests |
 | **Batch Operations** | One at a time | Multi-select + bulk | ✅ Bulk reschedule/email |
+
+**Phone Booking Features:**
+- Visual tour card selection
+- Horizontal 14-day date scroller
+- Time slots with capacity indicators (green/orange/red)
+- Inline customer search + quick create
+- Live price calculation
+- ⌘+Enter to submit
+- Accessible via ⌘P or command palette
 
 ### 7.3 Intelligence Surface ✅ COMPLETE
 
@@ -735,6 +744,36 @@ pnpm build ✅ (both CRM and Web apps)
 ---
 
 ## Changelog
+
+### December 16, 2025 - Phase 7.2 Complete (60-Second Phone Booking)
+
+Completed the remaining 25% of Phase 7.2:
+
+**Quick Booking Enhancements:**
+- Added `⌘+Enter` keyboard shortcut to submit booking form
+- Form targeting via `data-quick-booking-form` attribute
+
+**Command Palette Updates:**
+- Added "Phone Booking" as top quick action (`⌘P`)
+- Phone icon with blue styling
+- Renamed "New Booking" to "New Booking (Full Form)" for clarity
+
+**Bookings Page Integration:**
+- Global `⌘P` shortcut opens phone booking
+- URL query param support (`?phone=1`) for deep linking
+- Auto-opens when accessed from command palette
+
+**Phone Booking Flow (already existed, now fully integrated):**
+- Visual tour cards selection
+- Horizontal 14-day date scroller
+- Time slots with color-coded capacity
+- Inline customer search + quick create
+- Live price calculation
+- `⌘+Enter` to submit
+
+**Phase 7 Status: 80% complete** (only 7.5 Guide Mobile PWA remains)
+
+---
 
 ### December 16, 2025 - Phase 7.1 + 7.4 Implementation Complete
 
