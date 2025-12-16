@@ -106,7 +106,7 @@ export default function RevenueReportPage() {
       ),
     },
     {
-      key: "bookingCount",
+      key: "averageValue",
       header: "Avg Value",
       sortable: false,
       align: "right" as const,
