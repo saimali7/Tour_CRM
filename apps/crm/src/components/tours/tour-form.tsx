@@ -7,7 +7,7 @@ import { Loader2, X, Plus } from "lucide-react";
 import { SingleImageUploader, ImageUploader } from "@/components/uploads/image-uploader";
 import { toast } from "sonner";
 
-interface TourFormData {
+export interface TourFormData {
   name: string;
   slug: string;
   description: string;
@@ -32,8 +32,16 @@ interface TourFormData {
 }
 
 interface TourFormProps {
-  /** Optional callback when tour is successfully created */
+  /** Mode: create or edit */
+  mode?: "create" | "edit";
+  /** Tour ID required for edit mode */
+  tourId?: string;
+  /** Initial data for edit mode */
+  initialData?: Partial<TourFormData>;
+  /** Optional callback when tour is successfully created/updated */
   onSuccess?: (tourId: string) => void;
+  /** Optional cancel handler */
+  onCancel?: () => void;
 }
 
 const COMMON_CATEGORIES = [
@@ -51,12 +59,18 @@ const COMMON_CATEGORIES = [
   "Group Tours",
 ];
 
-export function TourForm({ onSuccess }: TourFormProps) {
+export function TourForm({
+  mode = "create",
+  tourId,
+  initialData,
+  onSuccess,
+  onCancel,
+}: TourFormProps) {
   const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
 
-  const [formData, setFormData] = useState<TourFormData>({
+  const defaultFormData: TourFormData = {
     name: "",
     slug: "",
     description: "",
@@ -78,6 +92,17 @@ export function TourForm({ onSuccess }: TourFormProps) {
     cancellationHours: 24,
     metaTitle: "",
     metaDescription: "",
+  };
+
+  const [formData, setFormData] = useState<TourFormData>({
+    ...defaultFormData,
+    ...initialData,
+    // Ensure arrays are properly initialized
+    tags: initialData?.tags ?? [],
+    images: initialData?.images ?? [],
+    includes: initialData?.includes ?? [],
+    excludes: initialData?.excludes ?? [],
+    requirements: initialData?.requirements ?? [],
   });
 
   const [includeInput, setIncludeInput] = useState("");
@@ -104,11 +129,26 @@ export function TourForm({ onSuccess }: TourFormProps) {
     },
   });
 
-  const isSubmitting = createMutation.isPending;
+  const updateMutation = trpc.tour.update.useMutation({
+    onSuccess: () => {
+      utils.tour.list.invalidate();
+      utils.tour.getById.invalidate({ id: tourId! });
+      toast.success("Tour updated successfully");
+      if (onSuccess && tourId) {
+        onSuccess(tourId);
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update tour");
+    },
+  });
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate({
+
+    const payload = {
       name: formData.name,
       slug: formData.slug || undefined,
       description: formData.description || undefined,
@@ -130,7 +170,13 @@ export function TourForm({ onSuccess }: TourFormProps) {
       cancellationHours: formData.cancellationHours,
       metaTitle: formData.metaTitle || undefined,
       metaDescription: formData.metaDescription || undefined,
-    });
+    };
+
+    if (mode === "edit" && tourId) {
+      updateMutation.mutate({ id: tourId, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   const generateSlug = (name: string) => {
@@ -175,9 +221,11 @@ export function TourForm({ onSuccess }: TourFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {createMutation.error && (
+      {(createMutation.error || updateMutation.error) && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-          <p className="text-sm text-destructive">{createMutation.error.message}</p>
+          <p className="text-sm text-destructive">
+            {createMutation.error?.message || updateMutation.error?.message}
+          </p>
         </div>
       )}
 
@@ -740,7 +788,7 @@ export function TourForm({ onSuccess }: TourFormProps) {
       <div className="flex items-center justify-end gap-4">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={onCancel ?? (() => router.back())}
           className="px-4 py-2 text-foreground hover:bg-muted rounded-lg"
         >
           Cancel
@@ -751,7 +799,7 @@ export function TourForm({ onSuccess }: TourFormProps) {
           className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
         >
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          Create Tour
+          {mode === "edit" ? "Save Changes" : "Create Tour"}
         </button>
       </div>
     </form>

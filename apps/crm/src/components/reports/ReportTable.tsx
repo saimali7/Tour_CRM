@@ -20,6 +20,7 @@ interface ReportTableProps<T> {
 
 type SortDirection = "asc" | "desc" | null;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ReportTable<T extends Record<string, any>>({
   columns,
   data,

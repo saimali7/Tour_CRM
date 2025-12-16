@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, count, gte, lte, sum } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, gte, lte } from "drizzle-orm";
 import {
   payments,
   bookings,

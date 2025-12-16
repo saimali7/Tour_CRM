@@ -424,18 +424,32 @@ export class BookingService extends BaseService {
       );
     }
 
-    await this.db
+    // Atomic update with capacity check to prevent race conditions
+    const updateResult = await this.db
       .update(schedules)
       .set({
-        bookedCount: sql`${schedules.bookedCount} + ${totalParticipants}`,
+        bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants}`,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(schedules.id, input.scheduleId),
-          eq(schedules.organizationId, this.organizationId)
+          eq(schedules.organizationId, this.organizationId),
+          // Atomic capacity check - only update if there's room
+          sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants} <= ${schedules.maxParticipants}`
         )
-      );
+      )
+      .returning();
+
+    // If no rows updated, capacity was exceeded (race condition caught)
+    if (updateResult.length === 0) {
+      // Rollback the booking
+      await this.db.delete(bookings).where(eq(bookings.id, booking.id));
+      if (input.participants && input.participants.length > 0) {
+        await this.db.delete(bookingParticipants).where(eq(bookingParticipants.bookingId, booking.id));
+      }
+      throw new ValidationError("Schedule capacity exceeded. Please try again with fewer participants.");
+    }
 
     return this.getById(booking.id);
   }
@@ -939,5 +953,133 @@ export class BookingService extends BaseService {
       schedule: row.schedule?.id ? row.schedule : undefined,
       tour: row.tour?.id ? row.tour : undefined,
     }));
+  }
+
+  /**
+   * Bulk confirm multiple bookings
+   * @returns Array of successfully confirmed booking IDs and any errors
+   */
+  async bulkConfirm(ids: string[]): Promise<{
+    confirmed: string[];
+    errors: Array<{ id: string; error: string }>;
+  }> {
+    const confirmed: string[] = [];
+    const errors: Array<{ id: string; error: string }> = [];
+
+    for (const id of ids) {
+      try {
+        await this.confirm(id);
+        confirmed.push(id);
+      } catch (error) {
+        errors.push({
+          id,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    return { confirmed, errors };
+  }
+
+  /**
+   * Bulk cancel multiple bookings
+   * @returns Array of successfully cancelled booking IDs and any errors
+   */
+  async bulkCancel(
+    ids: string[],
+    reason?: string
+  ): Promise<{
+    cancelled: string[];
+    errors: Array<{ id: string; error: string }>;
+  }> {
+    const cancelled: string[] = [];
+    const errors: Array<{ id: string; error: string }> = [];
+
+    for (const id of ids) {
+      try {
+        await this.cancel(id, reason);
+        cancelled.push(id);
+      } catch (error) {
+        errors.push({
+          id,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    return { cancelled, errors };
+  }
+
+  /**
+   * Bulk update payment status for multiple bookings
+   * @returns Array of successfully updated booking IDs and any errors
+   */
+  async bulkUpdatePaymentStatus(
+    ids: string[],
+    paymentStatus: PaymentStatus
+  ): Promise<{
+    updated: string[];
+    errors: Array<{ id: string; error: string }>;
+  }> {
+    const updated: string[] = [];
+    const errors: Array<{ id: string; error: string }> = [];
+
+    for (const id of ids) {
+      try {
+        // Verify booking exists and belongs to org
+        await this.getById(id);
+
+        await this.db
+          .update(bookings)
+          .set({
+            paymentStatus,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(bookings.id, id),
+              eq(bookings.organizationId, this.organizationId)
+            )
+          );
+
+        updated.push(id);
+      } catch (error) {
+        errors.push({
+          id,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    return { updated, errors };
+  }
+
+  /**
+   * Bulk reschedule multiple bookings to a new schedule
+   * @returns Array of successfully rescheduled booking IDs and any errors
+   */
+  async bulkReschedule(
+    ids: string[],
+    newScheduleId: string
+  ): Promise<{
+    rescheduled: string[];
+    errors: Array<{ id: string; error: string }>;
+  }> {
+    const rescheduled: string[] = [];
+    const errors: Array<{ id: string; error: string }> = [];
+
+    for (const id of ids) {
+      try {
+        await this.reschedule(id, newScheduleId);
+        rescheduled.push(id);
+      } catch (error) {
+        errors.push({
+          id,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    return { rescheduled, errors };
   }
 }

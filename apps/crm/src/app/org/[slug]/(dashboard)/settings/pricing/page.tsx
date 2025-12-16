@@ -184,7 +184,18 @@ export default function PricingSettingsPage() {
     });
   };
 
-  const handleEditSeasonal = (seasonal: any) => {
+  const handleEditSeasonal = (seasonal: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    adjustmentType: "percentage" | "fixed";
+    adjustmentValue: string;
+    appliesTo: "all" | "specific";
+    tourIds?: string[] | null;
+    priority: number | null;
+    isActive: boolean | null;
+  }) => {
     setEditingSeasonalId(seasonal.id);
     setSeasonalForm({
       name: seasonal.name,
@@ -194,13 +205,24 @@ export default function PricingSettingsPage() {
       adjustmentValue: parseFloat(seasonal.adjustmentValue),
       appliesTo: seasonal.appliesTo,
       tourIds: seasonal.tourIds || [],
-      priority: seasonal.priority,
-      isActive: seasonal.isActive,
+      priority: seasonal.priority ?? 1,
+      isActive: seasonal.isActive ?? true,
     });
     setShowSeasonalModal(true);
   };
 
-  const handleEditGroup = (group: any) => {
+  const handleEditGroup = (group: {
+    id: string;
+    name: string;
+    minParticipants: number;
+    maxParticipants: number | null;
+    discountType: "percentage" | "fixed";
+    discountValue: string;
+    appliesTo: "all" | "specific";
+    tourIds?: string[] | null;
+    priority: number | null;
+    isActive: boolean | null;
+  }) => {
     setEditingGroupId(group.id);
     setGroupForm({
       name: group.name,
@@ -210,8 +232,8 @@ export default function PricingSettingsPage() {
       discountValue: parseFloat(group.discountValue),
       appliesTo: group.appliesTo,
       tourIds: group.tourIds || [],
-      priority: group.priority,
-      isActive: group.isActive,
+      priority: group.priority ?? 1,
+      isActive: group.isActive ?? true,
     });
     setShowGroupModal(true);
   };

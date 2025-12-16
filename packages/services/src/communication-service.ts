@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, count, sql, or, ilike, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, count, or, ilike, gte, lte } from "drizzle-orm";
 import {
   communicationLogs,
   emailTemplates,

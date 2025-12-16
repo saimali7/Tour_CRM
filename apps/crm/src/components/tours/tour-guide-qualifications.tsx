@@ -148,8 +148,8 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-primary font-medium text-sm">
-                      {qualification.guide.firstName[0]}
-                      {qualification.guide.lastName[0]}
+                      {qualification.guide.firstName?.charAt(0) ?? ""}
+                      {qualification.guide.lastName?.charAt(0) ?? ""}
                     </span>
                   </div>
                 )}

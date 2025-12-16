@@ -1,12 +1,12 @@
-import { eq, and, sql, gte, lte } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import {
   guideAssignments,
   schedules,
   guides,
-  tours,
   type GuideAssignment,
   type GuideAssignmentStatus,
 } from "@tour/database";
+import type { tours } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
   type DateRangeFilter,

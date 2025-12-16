@@ -141,8 +141,8 @@ export default function GuideDetailPage() {
                 />
               ) : (
                 <span className="text-primary font-semibold text-xl">
-                  {guide.firstName[0]}
-                  {guide.lastName[0]}
+                  {guide.firstName?.charAt(0) ?? ""}
+                  {guide.lastName?.charAt(0) ?? ""}
                 </span>
               )}
             </div>

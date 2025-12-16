@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, lte, gte, lt, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, lte, gte, lt } from "drizzle-orm";
 import { promoCodes, promoCodeUsage, type PromoCode, type PromoCodeUsage } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
@@ -419,19 +419,29 @@ export class PromoCodeService extends BaseService {
       throw new Error("Failed to record promo code usage");
     }
 
-    // Increment current uses
-    await this.db
+    // Atomic increment with max uses check to prevent race conditions
+    const updateResult = await this.db
       .update(promoCodes)
       .set({
-        currentUses: sql`${promoCodes.currentUses} + 1`,
+        currentUses: sql`COALESCE(${promoCodes.currentUses}, 0) + 1`,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(promoCodes.id, promoCode.id),
-          eq(promoCodes.organizationId, this.organizationId)
+          eq(promoCodes.organizationId, this.organizationId),
+          // Only increment if we haven't hit max uses (race condition protection)
+          sql`${promoCodes.maxUses} IS NULL OR COALESCE(${promoCodes.currentUses}, 0) < ${promoCodes.maxUses}`
         )
-      );
+      )
+      .returning();
+
+    // If no rows updated, max uses was exceeded (race condition caught)
+    if (updateResult.length === 0) {
+      // Rollback the usage record
+      await this.db.delete(promoCodeUsage).where(eq(promoCodeUsage.id, usage.id));
+      throw new ValidationError("Promo code usage limit reached. Please try a different code.");
+    }
 
     return usage;
   }

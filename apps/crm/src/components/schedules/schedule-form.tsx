@@ -95,8 +95,14 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
     [toursData?.data, formData.tourId]
   );
 
+  // Validate end time is after start time
+  const isValidTimeRange = useMemo(() => {
+    if (!formData.startTime || !formData.endTime) return false;
+    return formData.endTime > formData.startTime;
+  }, [formData.startTime, formData.endTime]);
+
   // Can submit
-  const canSubmit = formData.tourId && formData.date && formData.startTime;
+  const canSubmit = formData.tourId && formData.date && formData.startTime && formData.endTime && isValidTimeRange;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

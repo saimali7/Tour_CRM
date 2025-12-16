@@ -45,6 +45,13 @@ export const bookings = pgTable("bookings", {
   paidAmount: numeric("paid_amount", { precision: 10, scale: 2 }).default("0"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
 
+  // Deposit tracking
+  depositRequired: numeric("deposit_required", { precision: 10, scale: 2 }), // Required deposit amount
+  depositPaid: numeric("deposit_paid", { precision: 10, scale: 2 }).default("0"), // Paid deposit
+  depositPaidAt: timestamp("deposit_paid_at", { withTimezone: true }),
+  balanceDueDate: timestamp("balance_due_date", { withTimezone: true }), // When full payment is due
+  balancePaidAt: timestamp("balance_paid_at", { withTimezone: true }), // When balance was paid
+
   // Status
   status: text("status").$type<BookingStatus>().notNull().default("pending"),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
@@ -108,11 +115,17 @@ export const bookingParticipants = pgTable("booking_participants", {
   accessibilityNeeds: text("accessibility_needs"),
   notes: text("notes"),
 
+  // Check-in tracking
+  checkedIn: text("checked_in").$type<"yes" | "no" | "no_show">().default("no"),
+  checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+  checkedInBy: text("checked_in_by"), // User ID who checked them in
+
   // Timestamps
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   orgIdx: index("participants_org_idx").on(table.organizationId),
   bookingIdx: index("participants_booking_idx").on(table.bookingId),
+  checkedInIdx: index("participants_checked_in_idx").on(table.checkedIn),
 }));
 
 // Relations
@@ -149,6 +162,7 @@ export type BookingStatus = "pending" | "confirmed" | "cancelled" | "completed" 
 export type PaymentStatus = "pending" | "partial" | "paid" | "refunded" | "failed";
 export type BookingSource = "manual" | "website" | "api" | "phone" | "walk_in";
 export type ParticipantType = "adult" | "child" | "infant";
+export type CheckedInStatus = "yes" | "no" | "no_show";
 
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { getDateRangeFromString } from "@/lib/report-utils";
+import { downloadCsv } from "@/lib/utils";
 import { ReportHeader } from "@/components/reports/ReportHeader";
 import { SummaryCards } from "@/components/reports/SummaryCards";
 import { ReportChart } from "@/components/reports/ReportChart";
@@ -48,17 +49,17 @@ export default function BookingReportPage() {
       name: "Total Participants",
       value: data?.totalParticipants ?? 0,
       icon: Users,
-      subtitle: `${data?.averagePartySize.toFixed(1) ?? 0} avg party size`,
+      subtitle: `${(data?.averagePartySize ?? 0).toFixed(1)} avg party size`,
     },
     {
       name: "Avg Lead Time",
-      value: `${data?.averageLeadTime.toFixed(1) ?? 0} days`,
+      value: `${(data?.averageLeadTime ?? 0).toFixed(1)} days`,
       icon: Clock,
       subtitle: "Days before tour date",
     },
     {
       name: "Cancellation Rate",
-      value: `${data?.cancellationRate.toFixed(1) ?? 0}%`,
+      value: `${(data?.cancellationRate ?? 0).toFixed(1)}%`,
       icon: XCircle,
       changeType: ((data?.cancellationRate ?? 0) > 10 ? "negative" : "neutral") as "positive" | "negative" | "neutral",
     },
@@ -68,7 +69,7 @@ export default function BookingReportPage() {
   const additionalMetrics = [
     {
       name: "No-Show Rate",
-      value: `${data?.noShowRate.toFixed(1) ?? 0}%`,
+      value: `${(data?.noShowRate ?? 0).toFixed(1)}%`,
       icon: AlertCircle,
     },
   ];
@@ -131,7 +132,7 @@ export default function BookingReportPage() {
 
   // Handle export
   const handleExport = () => {
-    if (!data) return;
+    if (!data || data.bookingsByTour.length === 0) return;
 
     const exportData = data.bookingsByTour.map((row) => ({
       Tour: row.tourName,
@@ -140,31 +141,7 @@ export default function BookingReportPage() {
       "Average Party Size": row.bookingCount > 0 ? (row.participantCount / row.bookingCount).toFixed(1) : "0",
     }));
 
-    // Create CSV
-    if (exportData.length === 0) return;
-    const headers = Object.keys(exportData[0]!);
-    const csvContent = [
-      headers.join(","),
-      ...exportData.map((row) =>
-        headers
-          .map((header) => {
-            const value = row[header as keyof typeof row];
-            return String(value ?? "");
-          })
-          .join(",")
-      ),
-    ].join("\n");
-
-    // Download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `booking-report-${dateRangeString}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(exportData, `booking-report-${dateRangeString}`);
   };
 
   return (

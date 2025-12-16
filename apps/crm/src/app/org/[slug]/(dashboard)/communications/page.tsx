@@ -767,9 +767,9 @@ export default function CommunicationsPage() {
                   />
                   {showPreview && (
                     <div className="border border-border rounded-lg p-4 bg-muted overflow-auto">
-                      <div
-                        dangerouslySetInnerHTML={{
-                          __html: templateForm.contentHtml
+                      <iframe
+                        srcDoc={`<!DOCTYPE html><html><head><style>body{font-family:system-ui,sans-serif;margin:0;padding:0;}</style></head><body>${
+                          templateForm.contentHtml
                             .replace(/\{\{customer_name\}\}/g, "John Doe")
                             .replace(/\{\{customer_first_name\}\}/g, "John")
                             .replace(/\{\{tour_name\}\}/g, "Amazing City Tour")
@@ -778,8 +778,11 @@ export default function CommunicationsPage() {
                             .replace(/\{\{booking_reference\}\}/g, "BK-123456")
                             .replace(/\{\{booking_total\}\}/g, "$150.00")
                             .replace(/\{\{participants\}\}/g, "2")
-                            .replace(/\{\{organization_name\}\}/g, "Your Company"),
-                        }}
+                            .replace(/\{\{organization_name\}\}/g, "Your Company")
+                        }</body></html>`}
+                        sandbox=""
+                        className="w-full h-64 border-0"
+                        title="Email Preview"
                       />
                     </div>
                   )}

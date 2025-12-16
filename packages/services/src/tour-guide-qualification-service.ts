@@ -1,4 +1,4 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray, isNotNull } from "drizzle-orm";
 import {
   tourGuideQualifications,
   tours,
@@ -346,8 +346,8 @@ export class TourGuideQualificationService extends BaseService {
     const conflictConditions = [
       eq(schedules.organizationId, this.organizationId),
       eq(schedules.status, "scheduled"),
-      sql`${schedules.guideId} IS NOT NULL`,
-      sql`${schedules.guideId} = ANY(${guideIds})`,
+      isNotNull(schedules.guideId),
+      inArray(schedules.guideId, guideIds),
       sql`(${schedules.startsAt}, ${schedules.endsAt}) OVERLAPS (${startsAt}, ${endsAt})`,
     ];
 

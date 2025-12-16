@@ -5,7 +5,6 @@ import {
   guides,
   bookings,
   customers,
-  bookingParticipants,
   type BookingParticipant,
 } from "@tour/database";
 import { BaseService } from "./base-service";
@@ -187,7 +186,10 @@ export class ManifestService extends BaseService {
 
     if (bookingIds.length > 0) {
       const participantResults = await this.db.query.bookingParticipants.findMany({
-        where: (bp, { inArray }) => inArray(bp.bookingId, bookingIds),
+        where: (bp, { inArray, and, eq }) => and(
+          inArray(bp.bookingId, bookingIds),
+          eq(bp.organizationId, this.organizationId)
+        ),
       });
       participants.push(...participantResults);
     }
@@ -320,7 +322,7 @@ export class ManifestService extends BaseService {
       startsAt: result.schedule.startsAt,
       endsAt: result.schedule.endsAt,
       tourName: result.tour?.name || "Unknown Tour",
-      totalParticipants: result.schedule.maxParticipants,
+      totalParticipants: result.schedule.bookedCount || 0,
       bookedCount: result.schedule.bookedCount || 0,
     }));
 
@@ -414,7 +416,7 @@ export class ManifestService extends BaseService {
       guideName: result.guide?.id
         ? `${result.guide.firstName} ${result.guide.lastName}`
         : null,
-      totalParticipants: result.schedule.maxParticipants,
+      totalParticipants: result.schedule.bookedCount || 0,
       bookedCount: result.schedule.bookedCount || 0,
     }));
 

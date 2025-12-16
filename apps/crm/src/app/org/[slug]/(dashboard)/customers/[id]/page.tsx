@@ -237,8 +237,8 @@ export default function CustomerDetailPage() {
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
               <span className="text-primary font-semibold text-xl">
-                {customer.firstName[0]}
-                {customer.lastName[0]}
+                {customer.firstName?.charAt(0) ?? ""}
+                {customer.lastName?.charAt(0) ?? ""}
               </span>
             </div>
             <div>

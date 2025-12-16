@@ -174,7 +174,7 @@ export const reportsRouter = createRouter({
         case "customer":
           reportData = await services.customerIntelligence.getCustomerStats(input.dateRange);
           break;
-        case "guide":
+        case "guide": {
           // Get guide report data using the same logic as getGuideReport
           const guidesData = await services.guide.getAll();
           reportData = await Promise.all(
@@ -213,6 +213,7 @@ export const reportsRouter = createRouter({
             })
           );
           break;
+        }
       }
 
       // Format based on requested format
@@ -235,7 +236,7 @@ export const reportsRouter = createRouter({
 });
 
 // Helper function to convert JSON to CSV
-function convertToCSV(data: any): string {
+function convertToCSV(data: unknown): string {
   if (!data || typeof data !== "object") {
     return "";
   }
@@ -260,9 +261,10 @@ function convertToCSV(data: any): string {
   }
 
   // If it's an object, flatten it
-  const headers = Object.keys(data);
+  const dataRecord = data as Record<string, unknown>;
+  const headers = Object.keys(dataRecord);
   const values = headers.map(header => {
-    const value = data[header];
+    const value = dataRecord[header];
     if (typeof value === "string" && (value.includes(",") || value.includes('"'))) {
       return `"${value.replace(/"/g, '""')}"`;
     }

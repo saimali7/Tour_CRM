@@ -155,11 +155,11 @@ export default function ScheduleDetailPage() {
             </Button>
           )}
           <Link
-            href={`/org/${slug}/availability/${schedule.id}/edit` as Route}
+            href={`/org/${slug}/tours/${schedule.tourId}?tab=schedules` as Route}
             className="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
           >
             <Edit className="h-4 w-4" />
-            Edit
+            Edit in Tour
           </Link>
         </div>
       </div>

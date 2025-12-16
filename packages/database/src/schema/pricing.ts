@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, boolean, integer, numeric, index, unique, dat
 import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
-import { tours } from "./tours";
+// Note: tours import removed - tourIds columns store arrays of tour IDs as text, not foreign keys
 import { bookings } from "./bookings";
 import { customers } from "./customers";
 

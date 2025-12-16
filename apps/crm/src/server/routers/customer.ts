@@ -22,23 +22,23 @@ const sortSchema = z.object({
 
 const createCustomerSchema = z
   .object({
-    email: z.string().email().optional(),
-    firstName: z.string().min(1),
-    lastName: z.string().min(1),
-    phone: z.string().optional(),
+    email: z.string().email().max(255).optional(),
+    firstName: z.string().min(1).max(100),
+    lastName: z.string().min(1).max(100),
+    phone: z.string().max(30).optional(),
     contactPreference: z.enum(["email", "phone", "both"]).default("email"),
-    address: z.string().optional(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-    country: z.string().optional(),
-    postalCode: z.string().optional(),
-    language: z.string().optional(),
-    currency: z.string().optional(),
-    notes: z.string().optional(),
-    tags: z.array(z.string()).optional(),
+    address: z.string().max(500).optional(),
+    city: z.string().max(100).optional(),
+    state: z.string().max(100).optional(),
+    country: z.string().max(100).optional(),
+    postalCode: z.string().max(20).optional(),
+    language: z.string().max(10).optional(),
+    currency: z.string().length(3).optional(),
+    notes: z.string().max(5000).optional(),
+    tags: z.array(z.string().max(50)).max(20).optional(),
     source: z.enum(["manual", "website", "api", "import", "referral"]).optional(),
-    sourceDetails: z.string().optional(),
-    metadata: z.record(z.unknown()).optional(),
+    sourceDetails: z.string().max(500).optional(),
+    // Removed unvalidated metadata field - use specific fields instead
   })
   .refine((data) => data.email || data.phone, {
     message: "Customer must have either email or phone number",

@@ -144,7 +144,21 @@ export default function PromoCodesPage() {
     setForm((prev) => ({ ...prev, code }));
   };
 
-  const handleEdit = (promo: any) => {
+  const handleEdit = (promo: {
+    id: string;
+    code: string;
+    description?: string | null;
+    discountType: "percentage" | "fixed";
+    discountValue: string;
+    validFrom?: string | Date | null;
+    validUntil?: string | Date | null;
+    maxUses?: number | null;
+    maxUsesPerCustomer?: number | null;
+    minBookingAmount?: string | null;
+    appliesTo: AppliesTo;
+    tourIds?: string[] | null;
+    isActive: boolean | null;
+  }) => {
     setEditingId(promo.id);
     setForm({
       code: promo.code,
@@ -158,7 +172,7 @@ export default function PromoCodesPage() {
       minBookingAmount: promo.minBookingAmount ? parseFloat(promo.minBookingAmount) : null,
       appliesTo: promo.appliesTo,
       tourIds: promo.tourIds || [],
-      isActive: promo.isActive,
+      isActive: promo.isActive ?? true,
     });
     setShowModal(true);
   };
@@ -215,7 +229,7 @@ export default function PromoCodesPage() {
     }).format(new Date(date));
   };
 
-  const getStatusColor = (promo: any) => {
+  const getStatusColor = (promo: { isActive: boolean | null; validUntil?: string | Date | null; maxUses?: number | null; currentUses?: number | null }) => {
     if (!promo.isActive) return "bg-secondary text-secondary-foreground";
     const now = new Date();
     if (promo.validUntil) {
@@ -227,7 +241,7 @@ export default function PromoCodesPage() {
     return "status-confirmed";
   };
 
-  const getStatusLabel = (promo: any) => {
+  const getStatusLabel = (promo: { isActive: boolean | null; validUntil?: string | Date | null; maxUses?: number | null; currentUses?: number | null }) => {
     if (!promo.isActive) return "Inactive";
     const now = new Date();
     if (promo.validUntil) {

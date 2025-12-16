@@ -78,7 +78,7 @@ export default function PromoCodeDetailPage() {
     }).format(new Date(date));
   };
 
-  const getStatusColor = (promo: any) => {
+  const getStatusColor = (promo: { isActive: boolean | null; validUntil?: string | Date | null; maxUses?: number | null; currentUses?: number | null }) => {
     if (!promo.isActive) return "bg-secondary text-secondary-foreground";
     const now = new Date();
     if (promo.validUntil) {
@@ -90,7 +90,7 @@ export default function PromoCodeDetailPage() {
     return "status-confirmed";
   };
 
-  const getStatusLabel = (promo: any) => {
+  const getStatusLabel = (promo: { isActive: boolean | null; validUntil?: string | Date | null; maxUses?: number | null; currentUses?: number | null }) => {
     if (!promo.isActive) return "Inactive";
     const now = new Date();
     if (promo.validUntil) {

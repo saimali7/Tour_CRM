@@ -158,10 +158,21 @@ export const getOrgContext = cache(async (orgSlug: string): Promise<OrgContext> 
     }
   }
 
+  // For super admins without membership, create a synthetic membership
+  const effectiveMembership = membership ?? {
+    id: `superadmin-${user.id}-${org.id}`,
+    organizationId: org.id,
+    userId: user.id,
+    role: "admin" as const,
+    status: "active" as const,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
   return {
     organizationId: org.id,
     organization: org,
-    membership: membership!,
+    membership: effectiveMembership as typeof organizationMembers.$inferSelect,
     user,
     role: membership?.role ?? (user.isSuperAdmin ? "admin" : "support"),
   };

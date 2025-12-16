@@ -31,45 +31,47 @@ const sortSchema = z.object({
 });
 
 const participantSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email().max(255).optional(),
+  phone: z.string().max(30).optional(),
   type: z.enum(["adult", "child", "infant"]),
-  dietaryRequirements: z.string().optional(),
-  accessibilityNeeds: z.string().optional(),
-  notes: z.string().optional(),
+  dietaryRequirements: z.string().max(500).optional(),
+  accessibilityNeeds: z.string().max(500).optional(),
+  notes: z.string().max(1000).optional(),
 });
 
+const priceStringSchema = z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid decimal (e.g., 99.99)");
+
 const createBookingSchema = z.object({
-  customerId: z.string(),
-  scheduleId: z.string(),
-  adultCount: z.number().min(1),
-  childCount: z.number().min(0).optional(),
-  infantCount: z.number().min(0).optional(),
-  specialRequests: z.string().optional(),
-  dietaryRequirements: z.string().optional(),
-  accessibilityNeeds: z.string().optional(),
-  internalNotes: z.string().optional(),
+  customerId: z.string().max(100),
+  scheduleId: z.string().max(100),
+  adultCount: z.number().min(1).max(100),
+  childCount: z.number().min(0).max(100).optional(),
+  infantCount: z.number().min(0).max(100).optional(),
+  specialRequests: z.string().max(2000).optional(),
+  dietaryRequirements: z.string().max(500).optional(),
+  accessibilityNeeds: z.string().max(500).optional(),
+  internalNotes: z.string().max(5000).optional(),
   source: z.enum(["manual", "website", "api", "phone", "walk_in"]).optional(),
-  sourceDetails: z.string().optional(),
-  participants: z.array(participantSchema).optional(),
-  subtotal: z.string().optional(),
-  discount: z.string().optional(),
-  tax: z.string().optional(),
-  total: z.string().optional(),
+  sourceDetails: z.string().max(500).optional(),
+  participants: z.array(participantSchema).max(100).optional(),
+  subtotal: priceStringSchema.optional(),
+  discount: priceStringSchema.optional(),
+  tax: priceStringSchema.optional(),
+  total: priceStringSchema.optional(),
 });
 
 const updateBookingSchema = z.object({
-  adultCount: z.number().min(1).optional(),
-  childCount: z.number().min(0).optional(),
-  infantCount: z.number().min(0).optional(),
-  specialRequests: z.string().optional(),
-  dietaryRequirements: z.string().optional(),
-  accessibilityNeeds: z.string().optional(),
-  internalNotes: z.string().optional(),
-  discount: z.string().optional(),
-  tax: z.string().optional(),
+  adultCount: z.number().min(1).max(100).optional(),
+  childCount: z.number().min(0).max(100).optional(),
+  infantCount: z.number().min(0).max(100).optional(),
+  specialRequests: z.string().max(2000).optional(),
+  dietaryRequirements: z.string().max(500).optional(),
+  accessibilityNeeds: z.string().max(500).optional(),
+  internalNotes: z.string().max(5000).optional(),
+  discount: priceStringSchema.optional(),
+  tax: priceStringSchema.optional(),
 });
 
 export const bookingRouter = createRouter({
@@ -180,10 +182,10 @@ export const bookingRouter = createRouter({
 
   cancel: adminProcedure
     .input(z.object({
-      id: z.string(),
-      reason: z.string().optional(),
+      id: z.string().max(100),
+      reason: z.string().max(1000).optional(),
       sendCancellationEmail: z.boolean().default(true),
-      refundAmount: z.string().optional(),
+      refundAmount: priceStringSchema.optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -541,8 +543,8 @@ export const bookingRouter = createRouter({
 
   bulkCancel: adminProcedure
     .input(z.object({
-      ids: z.array(z.string()).min(1).max(100),
-      reason: z.string().optional(),
+      ids: z.array(z.string().max(100)).min(1).max(100),
+      reason: z.string().max(1000).optional(),
       sendCancellationEmails: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {

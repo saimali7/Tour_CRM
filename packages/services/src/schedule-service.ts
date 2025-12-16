@@ -1,10 +1,12 @@
-import { eq, and, desc, asc, gte, lte, sql, count } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql, count, inArray } from "drizzle-orm";
 import {
   schedules,
   tours,
   guides,
+  guideAssignments,
   type Schedule,
   type ScheduleStatus,
+  type GuideAssignmentStatus,
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
@@ -113,6 +115,33 @@ export interface AvailableScheduleResult {
   bookedCount: number;
   price: string | null;
   guideName: string | null;
+}
+
+// Today's schedules with assignments for morning briefing
+export interface TodayScheduleWithAssignments {
+  id: string;
+  tourId: string;
+  startsAt: Date;
+  endsAt: Date;
+  maxParticipants: number;
+  bookedCount: number | null;
+  price: string | null;
+  status: ScheduleStatus;
+  tour?: {
+    id: string;
+    name: string;
+    slug: string;
+    basePrice: string;
+  };
+  assignments: Array<{
+    id: string;
+    status: GuideAssignmentStatus;
+    guide: {
+      id: string;
+      firstName: string;
+      lastName: string | null;
+    } | null;
+  }>;
 }
 
 export class ScheduleService extends BaseService {
@@ -883,7 +912,7 @@ export class ScheduleService extends BaseService {
       eq(tours.status, "active"),
     ];
     if (tourIds && tourIds.length > 0) {
-      tourConditions.push(sql`${tours.id} = ANY(${tourIds})`);
+      tourConditions.push(inArray(tours.id, tourIds));
     }
 
     const tourList = await this.db
@@ -1022,6 +1051,130 @@ export class ScheduleService extends BaseService {
       guideName: row.guideFirstName
         ? `${row.guideFirstName} ${row.guideLastName || ""}`.trim()
         : null,
+    }));
+  }
+
+  /**
+   * Get today's schedules with guide assignments for morning briefing
+   * Includes tour info and all guide assignments with their status
+   */
+  async getTodaysSchedules(): Promise<TodayScheduleWithAssignments[]> {
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // First get today's schedules with tour info
+    const scheduleResults = await this.db
+      .select({
+        schedule: {
+          id: schedules.id,
+          tourId: schedules.tourId,
+          startsAt: schedules.startsAt,
+          endsAt: schedules.endsAt,
+          maxParticipants: schedules.maxParticipants,
+          bookedCount: schedules.bookedCount,
+          price: schedules.price,
+          status: schedules.status,
+        },
+        tour: {
+          id: tours.id,
+          name: tours.name,
+          slug: tours.slug,
+          basePrice: tours.basePrice,
+        },
+      })
+      .from(schedules)
+      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .where(
+        and(
+          eq(schedules.organizationId, this.organizationId),
+          gte(schedules.startsAt, startOfDay),
+          lte(schedules.startsAt, endOfDay),
+          sql`${schedules.status} != 'cancelled'`
+        )
+      )
+      .orderBy(asc(schedules.startsAt));
+
+    if (scheduleResults.length === 0) {
+      return [];
+    }
+
+    // Get schedule IDs
+    const scheduleIds = scheduleResults.map((r) => r.schedule.id);
+
+    // Get all assignments for these schedules
+    const assignmentResults = await this.db
+      .select({
+        assignment: {
+          id: guideAssignments.id,
+          scheduleId: guideAssignments.scheduleId,
+          status: guideAssignments.status,
+        },
+        guide: {
+          id: guides.id,
+          firstName: guides.firstName,
+          lastName: guides.lastName,
+        },
+      })
+      .from(guideAssignments)
+      .leftJoin(guides, eq(guideAssignments.guideId, guides.id))
+      .where(
+        and(
+          eq(guideAssignments.organizationId, this.organizationId),
+          inArray(guideAssignments.scheduleId, scheduleIds)
+        )
+      );
+
+    // Group assignments by schedule ID
+    const assignmentsBySchedule = new Map<
+      string,
+      Array<{
+        id: string;
+        status: GuideAssignmentStatus;
+        guide: { id: string; firstName: string; lastName: string | null } | null;
+      }>
+    >();
+
+    for (const row of assignmentResults) {
+      const scheduleId = row.assignment.scheduleId;
+      if (!assignmentsBySchedule.has(scheduleId)) {
+        assignmentsBySchedule.set(scheduleId, []);
+      }
+      assignmentsBySchedule.get(scheduleId)!.push({
+        id: row.assignment.id,
+        status: row.assignment.status as GuideAssignmentStatus,
+        guide: row.guide?.id
+          ? {
+              id: row.guide.id,
+              firstName: row.guide.firstName,
+              lastName: row.guide.lastName,
+            }
+          : null,
+      });
+    }
+
+    // Combine schedules with their assignments
+    return scheduleResults.map((row) => ({
+      id: row.schedule.id,
+      tourId: row.schedule.tourId,
+      startsAt: row.schedule.startsAt,
+      endsAt: row.schedule.endsAt,
+      maxParticipants: row.schedule.maxParticipants,
+      bookedCount: row.schedule.bookedCount,
+      price: row.schedule.price,
+      status: row.schedule.status as ScheduleStatus,
+      tour: row.tour?.id
+        ? {
+            id: row.tour.id,
+            name: row.tour.name,
+            slug: row.tour.slug,
+            basePrice: row.tour.basePrice,
+          }
+        : undefined,
+      assignments: assignmentsBySchedule.get(row.schedule.id) ?? [],
     }));
   }
 }

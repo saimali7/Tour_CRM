@@ -1,8 +1,7 @@
 import { z } from "zod";
-import { format } from "date-fns";
 import { createRouter, protectedProcedure } from "../trpc";
 import { createServices } from "@tour/services";
-import { stripe, getConnectAccount } from "@/lib/stripe";
+import { stripe } from "@/lib/stripe";
 import { inngest } from "@/inngest";
 
 const dateRangeSchema = z.object({

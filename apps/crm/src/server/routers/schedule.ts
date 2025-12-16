@@ -25,39 +25,41 @@ const sortSchema = z.object({
   direction: z.enum(["asc", "desc"]).default("asc"),
 });
 
+const priceStringSchema = z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid decimal (e.g., 99.99)");
+
 const createScheduleSchema = z.object({
-  tourId: z.string(),
-  guideId: z.string().optional(),
+  tourId: z.string().max(100),
+  guideId: z.string().max(100).optional(),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date().optional(),
-  maxParticipants: z.number().min(1).optional(),
-  price: z.string().optional(),
-  currency: z.string().optional(),
-  meetingPoint: z.string().optional(),
-  meetingPointDetails: z.string().optional(),
+  maxParticipants: z.number().min(1).max(1000).optional(),
+  price: priceStringSchema.optional(),
+  currency: z.string().length(3).optional(),
+  meetingPoint: z.string().max(500).optional(),
+  meetingPointDetails: z.string().max(1000).optional(),
   status: z.enum(["scheduled", "in_progress", "completed", "cancelled"]).optional(),
-  internalNotes: z.string().optional(),
-  publicNotes: z.string().optional(),
+  internalNotes: z.string().max(5000).optional(),
+  publicNotes: z.string().max(2000).optional(),
 });
 
 const bulkCreateSchema = z.object({
-  tourId: z.string(),
-  guideId: z.string().optional(),
-  dates: z.array(z.coerce.date()),
+  tourId: z.string().max(100),
+  guideId: z.string().max(100).optional(),
+  dates: z.array(z.coerce.date()).max(365), // Max 1 year of dates
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
-  maxParticipants: z.number().min(1).optional(),
-  price: z.string().optional(),
+  maxParticipants: z.number().min(1).max(1000).optional(),
+  price: priceStringSchema.optional(),
 });
 
 const autoGenerateSchema = z.object({
-  tourId: z.string(),
-  guideId: z.string().optional(),
+  tourId: z.string().max(100),
+  guideId: z.string().max(100).optional(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
-  daysOfWeek: z.array(z.number().min(0).max(6)),
-  times: z.array(z.string().regex(/^\d{2}:\d{2}$/)),
-  maxParticipants: z.number().min(1).optional(),
-  price: z.string().optional(),
+  daysOfWeek: z.array(z.number().min(0).max(6)).max(7),
+  times: z.array(z.string().regex(/^\d{2}:\d{2}$/)).max(10), // Max 10 time slots per day
+  maxParticipants: z.number().min(1).max(1000).optional(),
+  price: priceStringSchema.optional(),
   skipExisting: z.boolean().optional().default(true),
 });
 
@@ -215,5 +217,15 @@ export const scheduleRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.schedule.searchAvailability(input);
+    }),
+
+  // ============================================
+  // Morning Briefing Endpoints
+  // ============================================
+
+  getTodaysSchedules: protectedProcedure
+    .query(async ({ ctx }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.schedule.getTodaysSchedules();
     }),
 });

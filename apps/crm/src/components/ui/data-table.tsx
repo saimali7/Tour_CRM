@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ChevronUp, ChevronDown, ChevronsUpDown, MoreHorizontal, Eye } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, MoreHorizontal, Eye, X, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -402,6 +403,199 @@ function TableRowActions({
   );
 }
 
+// =============================================================================
+// SELECTION COMPONENTS
+// For batch operations with multi-select
+// =============================================================================
+
+interface SelectAllCheckboxProps {
+  checked: boolean | "indeterminate";
+  onChange: (checked: boolean) => void;
+  className?: string;
+}
+
+function SelectAllCheckbox({ checked, onChange, className }: SelectAllCheckboxProps) {
+  return (
+    <Checkbox
+      checked={checked === "indeterminate" ? "indeterminate" : checked}
+      onCheckedChange={onChange}
+      className={cn("data-[state=indeterminate]:bg-primary/50", className)}
+      aria-label="Select all rows"
+    />
+  );
+}
+
+interface SelectRowCheckboxProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  className?: string;
+}
+
+function SelectRowCheckbox({ checked, onChange, className }: SelectRowCheckboxProps) {
+  return (
+    <Checkbox
+      checked={checked}
+      onCheckedChange={onChange}
+      className={className}
+      aria-label="Select row"
+    />
+  );
+}
+
+// =============================================================================
+// BULK ACTION BAR
+// Floating action bar that appears when items are selected
+// =============================================================================
+
+interface BulkAction {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  variant?: "default" | "destructive";
+  loading?: boolean;
+  disabled?: boolean;
+}
+
+interface BulkActionBarProps {
+  selectedCount: number;
+  totalCount: number;
+  onClearSelection: () => void;
+  actions: BulkAction[];
+  className?: string;
+}
+
+function BulkActionBar({
+  selectedCount,
+  totalCount,
+  onClearSelection,
+  actions,
+  className,
+}: BulkActionBarProps) {
+  if (selectedCount === 0) return null;
+
+  return (
+    <div
+      className={cn(
+        "fixed bottom-6 left-1/2 -translate-x-1/2 z-50",
+        "flex items-center gap-3 px-4 py-3 rounded-xl",
+        "bg-foreground text-background shadow-lg",
+        "animate-in slide-in-from-bottom-4 fade-in duration-200",
+        className
+      )}
+    >
+      {/* Selection count */}
+      <div className="flex items-center gap-2 pr-3 border-r border-background/20">
+        <span className="text-sm font-medium">
+          {selectedCount} selected
+        </span>
+        <button
+          onClick={onClearSelection}
+          className="p-1 rounded-md hover:bg-background/10 transition-colors"
+          aria-label="Clear selection"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        {actions.map((action, index) => (
+          <button
+            key={index}
+            onClick={action.onClick}
+            disabled={action.loading || action.disabled}
+            className={cn(
+              "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium",
+              "transition-colors",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              action.variant === "destructive"
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : "bg-background/10 hover:bg-background/20 text-background"
+            )}
+          >
+            {action.loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              action.icon
+            )}
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// SELECTION HOOK
+// For managing multi-select state
+// =============================================================================
+
+interface UseTableSelectionOptions<T> {
+  items: T[];
+  getItemId: (item: T) => string;
+}
+
+function useTableSelection<T>({ items, getItemId }: UseTableSelectionOptions<T>) {
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+
+  const allSelected = items.length > 0 && selectedIds.size === items.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < items.length;
+  const noneSelected = selectedIds.size === 0;
+
+  const selectAll = React.useCallback(() => {
+    setSelectedIds(new Set(items.map(getItemId)));
+  }, [items, getItemId]);
+
+  const clearSelection = React.useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const toggleAll = React.useCallback(() => {
+    if (allSelected) {
+      clearSelection();
+    } else {
+      selectAll();
+    }
+  }, [allSelected, selectAll, clearSelection]);
+
+  const toggleItem = React.useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const isSelected = React.useCallback(
+    (id: string) => selectedIds.has(id),
+    [selectedIds]
+  );
+
+  const getSelectedItems = React.useCallback(() => {
+    return items.filter((item) => selectedIds.has(getItemId(item)));
+  }, [items, selectedIds, getItemId]);
+
+  return {
+    selectedIds,
+    selectedCount: selectedIds.size,
+    allSelected,
+    someSelected,
+    noneSelected,
+    selectAll,
+    clearSelection,
+    toggleAll,
+    toggleItem,
+    isSelected,
+    getSelectedItems,
+    checkboxState: allSelected ? true : someSelected ? "indeterminate" as const : false,
+  };
+}
+
 export {
   Table,
   TableHeader,
@@ -415,5 +609,10 @@ export {
   TableActions,
   ActionButton,
   TableRowActions,
+  SelectAllCheckbox,
+  SelectRowCheckbox,
+  BulkActionBar,
+  useTableSelection,
   type RowAction,
+  type BulkAction,
 };

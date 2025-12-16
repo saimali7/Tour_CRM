@@ -1,9 +1,10 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
 import { createServices } from "@tour/services";
-import { db, schedules, bookings, type Booking } from "@tour/database";
+import { db, schedules, bookings, organizations, type Booking } from "@tour/database";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { format } from "date-fns";
+import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
 // Type for booking with relations for daily reminder query
 interface BookingWithRelations extends Booking {
@@ -442,7 +443,7 @@ export const sendRefundProcessedEmail = inngest.createFunction(
 
 /**
  * Cron job to check for bookings happening in 24 hours and send reminders
- * Runs daily at 9 AM
+ * Runs every hour to handle different organization timezones
  */
 export const dailyBookingReminderCheck = inngest.createFunction(
   {
@@ -450,54 +451,62 @@ export const dailyBookingReminderCheck = inngest.createFunction(
     name: "Daily Booking Reminder Check",
     retries: 2,
   },
-  { cron: "0 9 * * *" }, // Run at 9 AM every day
+  { cron: "0 * * * *" }, // Run every hour to handle different timezones
   async ({ step }) => {
-    // Get all organizations with bookings tomorrow
-    const organizations = await step.run("get-organizations-with-bookings", async () => {
-      const now = new Date();
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
+    // Get all organizations with their timezones
+    const orgsWithTimezones = await step.run("get-organizations-with-timezones", async () => {
+      const orgs = await db
+        .select({
+          organizationId: organizations.id,
+          timezone: organizations.timezone,
+        })
+        .from(organizations);
 
-      const dayAfter = new Date(tomorrow);
-      dayAfter.setDate(dayAfter.getDate() + 1);
-
-      const schedulesResult = await db
-        .select({ organizationId: schedules.organizationId })
-        .from(schedules)
-        .where(
-          and(
-            gte(schedules.startsAt, tomorrow),
-            lte(schedules.startsAt, dayAfter),
-            eq(schedules.status, "scheduled")
-          )
-        )
-        .groupBy(schedules.organizationId);
-
-      return schedulesResult.map((s: { organizationId: string }) => s.organizationId);
+      return orgs;
     });
 
     const results = [];
 
-    // Process each organization
-    for (const organizationId of organizations) {
+    // Process each organization using their timezone
+    for (const org of orgsWithTimezones) {
       const orgResult = await step.run(
-        `process-org-${organizationId}`,
+        `process-org-${org.organizationId}`,
         async () => {
-          const services = createServices({ organizationId });
+          const services = createServices({ organizationId: org.organizationId });
+          const timezone = org.timezone || "UTC";
 
-          // Get tomorrow's bookings
-          const now = new Date();
-          const tomorrow = new Date(now);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          tomorrow.setHours(0, 0, 0, 0);
+          // Get current time in org timezone
+          const nowUtc = new Date();
+          const nowInOrgTz = toZonedTime(nowUtc, timezone);
+          const currentHourInOrgTz = nowInOrgTz.getHours();
 
-          const dayAfter = new Date(tomorrow);
-          dayAfter.setDate(dayAfter.getDate() + 1);
+          // Only send reminders if it's 9 AM in the organization's timezone
+          if (currentHourInOrgTz !== 9) {
+            return {
+              organizationId: org.organizationId,
+              skipped: true,
+              reason: `Not 9 AM in timezone ${timezone} (current hour: ${currentHourInOrgTz})`,
+              bookingsChecked: 0,
+              remindersSent: 0,
+            };
+          }
+
+          // Calculate tomorrow's date range in UTC based on org timezone
+          // Get start of tomorrow in org timezone, then convert to UTC for query
+          const tomorrowInOrgTz = new Date(nowInOrgTz);
+          tomorrowInOrgTz.setDate(tomorrowInOrgTz.getDate() + 1);
+          tomorrowInOrgTz.setHours(0, 0, 0, 0);
+
+          const dayAfterInOrgTz = new Date(tomorrowInOrgTz);
+          dayAfterInOrgTz.setDate(dayAfterInOrgTz.getDate() + 1);
+
+          // Convert to UTC for database query
+          const tomorrowUtc = new Date(tomorrowInOrgTz.getTime() - getTimezoneOffset(timezone, tomorrowInOrgTz));
+          const dayAfterUtc = new Date(dayAfterInOrgTz.getTime() - getTimezoneOffset(timezone, dayAfterInOrgTz));
 
           const tomorrowsBookings = await db.query.bookings.findMany({
             where: and(
-              eq(bookings.organizationId, organizationId),
+              eq(bookings.organizationId, org.organizationId),
               eq(bookings.status, "confirmed")
             ),
             with: {
@@ -510,11 +519,11 @@ export const dailyBookingReminderCheck = inngest.createFunction(
             },
           }) as BookingWithRelations[];
 
-          // Filter bookings where schedule is tomorrow
+          // Filter bookings where schedule is tomorrow in org timezone
           const bookingsToRemind = tomorrowsBookings.filter((booking) => {
             if (!booking.schedule) return false;
             const scheduleDate = new Date(booking.schedule.startsAt);
-            return scheduleDate >= tomorrow && scheduleDate < dayAfter;
+            return scheduleDate >= tomorrowUtc && scheduleDate < dayAfterUtc;
           });
 
           let remindersSent = 0;
@@ -527,22 +536,26 @@ export const dailyBookingReminderCheck = inngest.createFunction(
 
             const scheduleDate = new Date(booking.schedule.startsAt);
             const hoursUntilTour = Math.round(
-              (scheduleDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+              (scheduleDate.getTime() - nowUtc.getTime()) / (1000 * 60 * 60)
             );
+
+            // Format dates in organization's timezone for customer-facing content
+            const tourDateFormatted = formatInTimeZone(scheduleDate, timezone, "MMMM d, yyyy");
+            const tourTimeFormatted = formatInTimeZone(scheduleDate, timezone, "h:mm a");
 
             // Send reminder event
             await inngest.send({
               name: "booking/reminder",
               data: {
-                organizationId,
+                organizationId: org.organizationId,
                 bookingId: booking.id,
                 customerId: booking.customerId,
                 customerEmail: booking.customer.email,
                 customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
                 bookingReference: booking.referenceNumber,
                 tourName: booking.schedule.tour.name,
-                tourDate: format(scheduleDate, "MMMM d, yyyy"),
-                tourTime: format(scheduleDate, "h:mm a"),
+                tourDate: tourDateFormatted,
+                tourTime: tourTimeFormatted,
                 participants: booking.totalParticipants,
                 meetingPoint: booking.schedule.tour.meetingPoint || undefined,
                 meetingPointDetails: booking.schedule.tour.meetingPointDetails || undefined,
@@ -554,7 +567,8 @@ export const dailyBookingReminderCheck = inngest.createFunction(
           }
 
           return {
-            organizationId,
+            organizationId: org.organizationId,
+            skipped: false,
             bookingsChecked: bookingsToRemind.length,
             remindersSent,
           };
@@ -564,10 +578,21 @@ export const dailyBookingReminderCheck = inngest.createFunction(
       results.push(orgResult);
     }
 
+    const processedResults = results.filter((r) => !r.skipped);
     return {
-      processedOrganizations: organizations.length,
-      totalReminders: results.reduce((sum, r) => sum + r.remindersSent, 0),
+      processedOrganizations: processedResults.length,
+      skippedOrganizations: results.filter((r) => r.skipped).length,
+      totalReminders: processedResults.reduce((sum, r) => sum + r.remindersSent, 0),
       results,
     };
   }
 );
+
+/**
+ * Helper function to get timezone offset in milliseconds
+ */
+function getTimezoneOffset(timezone: string, date: Date): number {
+  const utcDate = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
+  const tzDate = new Date(date.toLocaleString("en-US", { timeZone: timezone }));
+  return tzDate.getTime() - utcDate.getTime();
+}

@@ -4,10 +4,25 @@ import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { getDateRangeFromString } from "@/lib/report-utils";
+import { downloadCsv } from "@/lib/utils";
 import { ReportHeader } from "@/components/reports/ReportHeader";
 import { SummaryCards } from "@/components/reports/SummaryCards";
-import { ReportTable, ColumnDef } from "@/components/reports/ReportTable";
-import { UserCircle, Map, Users, Star } from "lucide-react";
+import { ReportTable, type ColumnDef } from "@/components/reports/ReportTable";
+import { UserCircle, Map, Users } from "lucide-react";
+
+interface GuideReportRow {
+  guideId: string;
+  guideName: string;
+  email: string;
+  phone: string | null;
+  totalAssignments: number;
+  confirmedAssignments: number;
+  pendingAssignments: number;
+  declinedAssignments: number;
+  totalParticipants: number;
+  confirmationRate: number;
+  averageParticipantsPerTour: number;
+}
 
 export default function GuideReportPage() {
   const params = useParams();
@@ -15,117 +30,97 @@ export default function GuideReportPage() {
   const [dateRangeString, setDateRangeString] = useState("this_month");
   const dateRange = useMemo(() => getDateRangeFromString(dateRangeString), [dateRangeString]);
 
-  // Fetch report data - this returns guide assignments
+  // Fetch report data - this returns guide performance metrics
   const { data, isLoading } = trpc.reports.getGuideReport.useQuery({
     dateRange,
   });
 
-  // Calculate basic stats from guide assignments
-  const totalAssignments = data?.length ?? 0;
-  const confirmedAssignments = data?.filter((a: any) => a.status === "confirmed").length ?? 0;
-  const uniqueGuides = new Set(data?.map((a: any) => a.guideId)).size;
+  // Calculate stats from guide report data
+  const totalGuides = data?.length ?? 0;
+  const totalAssignments = data?.reduce((sum: number, g: GuideReportRow) => sum + g.totalAssignments, 0) ?? 0;
+  const totalParticipants = data?.reduce((sum: number, g: GuideReportRow) => sum + g.totalParticipants, 0) ?? 0;
 
   // Prepare summary cards
   const summaryCards = [
+    {
+      name: "Active Guides",
+      value: totalGuides,
+      icon: Users,
+    },
     {
       name: "Total Assignments",
       value: totalAssignments,
       icon: Map,
     },
     {
-      name: "Confirmed",
-      value: confirmedAssignments,
+      name: "Total Participants",
+      value: totalParticipants,
       icon: UserCircle,
-    },
-    {
-      name: "Active Guides",
-      value: uniqueGuides,
-      icon: Users,
     },
   ];
 
-  // Prepare assignment table columns - using any since data is empty array for now
-  const assignmentColumns: ColumnDef<any>[] = [
+  // Prepare guide performance table columns
+  const guideColumns: ColumnDef<GuideReportRow>[] = [
     {
-      key: "scheduleId",
-      header: "Schedule",
-      render: (row: any) => (
-        <span className="font-medium text-foreground">{row.scheduleId?.slice(0, 8)}...</span>
-      ),
-    },
-    {
-      key: "guideId",
+      key: "guideName",
       header: "Guide",
-      render: (row: any) => (
-        <span className="text-foreground">{row.guideId?.slice(0, 8)}...</span>
+      render: (row: GuideReportRow) => (
+        <span className="font-medium text-foreground">{row.guideName}</span>
       ),
     },
     {
-      key: "status",
-      header: "Status",
+      key: "totalAssignments",
+      header: "Assignments",
       sortable: true,
       align: "center",
-      render: (row: any) => (
-        <span
-          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-            row.status === "confirmed"
-              ? "bg-success/10 text-success"
-              : row.status === "pending"
-              ? "bg-warning/10 text-warning"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          {row.status || "N/A"}
-        </span>
+      render: (row: GuideReportRow) => (
+        <span className="text-foreground">{row.totalAssignments}</span>
       ),
     },
     {
-      key: "createdAt",
-      header: "Assigned",
-      render: (row: any) => (
-        <span className="text-foreground">
-          {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "N/A"}
-        </span>
+      key: "confirmedAssignments",
+      header: "Confirmed",
+      sortable: true,
+      align: "center",
+      render: (row: GuideReportRow) => (
+        <span className="text-success">{row.confirmedAssignments}</span>
+      ),
+    },
+    {
+      key: "confirmationRate",
+      header: "Confirmation Rate",
+      sortable: true,
+      align: "center",
+      render: (row: GuideReportRow) => (
+        <span className="text-foreground">{row.confirmationRate}%</span>
+      ),
+    },
+    {
+      key: "totalParticipants",
+      header: "Participants",
+      sortable: true,
+      align: "center",
+      render: (row: GuideReportRow) => (
+        <span className="text-foreground">{row.totalParticipants}</span>
       ),
     },
   ];
 
   // Handle export
   const handleExport = () => {
-    if (!data) return;
+    if (!data || data.length === 0) return;
 
-    const exportData = data.map((row: any) => ({
-      "Schedule ID": row.scheduleId,
-      "Guide ID": row.guideId,
-      Status: row.status,
-      "Assigned At": new Date(row.createdAt).toLocaleDateString(),
+    const exportData = data.map((row: GuideReportRow) => ({
+      "Guide Name": row.guideName,
+      "Email": row.email,
+      "Total Assignments": row.totalAssignments,
+      "Confirmed": row.confirmedAssignments,
+      "Declined": row.declinedAssignments,
+      "Confirmation Rate": `${row.confirmationRate}%`,
+      "Total Participants": row.totalParticipants,
     }));
 
-    // Create CSV
-    if (exportData.length === 0) return;
-    const headers = Object.keys(exportData[0]!);
-    const csvContent = [
-      headers.join(","),
-      ...exportData.map((row) =>
-        headers
-          .map((header) => {
-            const value = row[header as keyof typeof row];
-            return String(value ?? "");
-          })
-          .join(",")
-      ),
-    ].join("\n");
-
-    // Download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `guide-report-${dateRangeString}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(exportData, `guide-report-${dateRangeString}`);
   };
 
   return (
@@ -141,16 +136,16 @@ export default function GuideReportPage() {
       {/* Summary cards */}
       <SummaryCards cards={summaryCards} />
 
-      {/* Guide assignments table */}
+      {/* Guide performance table */}
       <div className="rounded-lg border border-border bg-card p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">
-          Guide Assignments
+          Guide Performance
         </h2>
         <ReportTable
-          columns={assignmentColumns}
+          columns={guideColumns}
           data={data ?? []}
           isLoading={isLoading}
-          emptyMessage="No guide assignments for the selected period"
+          emptyMessage="No guide data for the selected period"
         />
       </div>
     </div>

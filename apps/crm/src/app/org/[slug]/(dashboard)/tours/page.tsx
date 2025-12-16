@@ -433,7 +433,7 @@ export default function ToursPage() {
                                   <Eye className="h-4 w-4" />
                                 </ActionButton>
                               </Link>
-                              <Link href={`/org/${slug}/tours/${tour.id}/edit` as Route}>
+                              <Link href={`/org/${slug}/tours/${tour.id}?tab=details` as Route}>
                                 <ActionButton tooltip="Edit tour">
                                   <Edit className="h-4 w-4" />
                                 </ActionButton>

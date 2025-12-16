@@ -10,8 +10,8 @@ const dateRangeSchema = z.object({
 const guideFilterSchema = z.object({
   status: z.enum(["active", "inactive", "on_leave"]).optional(),
   isPublic: z.boolean().optional(),
-  search: z.string().optional(),
-  language: z.string().optional(),
+  search: z.string().max(100).optional(),
+  language: z.string().max(50).optional(),
 });
 
 const paginationSchema = z.object({
@@ -25,22 +25,22 @@ const sortSchema = z.object({
 });
 
 const createGuideSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().optional(),
-  avatarUrl: z.string().url().optional(),
-  bio: z.string().optional(),
-  shortBio: z.string().optional(),
-  languages: z.array(z.string()).optional(),
-  certifications: z.array(z.string()).optional(),
-  availabilityNotes: z.string().optional(),
-  emergencyContactName: z.string().optional(),
-  emergencyContactPhone: z.string().optional(),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email().max(255),
+  phone: z.string().max(30).optional(),
+  avatarUrl: z.string().url().max(2048).optional(),
+  bio: z.string().max(5000).optional(),
+  shortBio: z.string().max(500).optional(),
+  languages: z.array(z.string().max(50)).max(10).optional(),
+  certifications: z.array(z.string().max(200)).max(20).optional(),
+  availabilityNotes: z.string().max(1000).optional(),
+  emergencyContactName: z.string().max(100).optional(),
+  emergencyContactPhone: z.string().max(30).optional(),
   status: z.enum(["active", "inactive", "on_leave"]).optional(),
   isPublic: z.boolean().optional(),
-  notes: z.string().optional(),
-  userId: z.string().optional(),
+  notes: z.string().max(5000).optional(),
+  userId: z.string().max(100).optional(),
 });
 
 export const guideRouter = createRouter({

@@ -1,7 +1,8 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
 import { createServices } from "@tour/services";
-import { eq, and, gte, lte, db, schedules, bookings } from "@tour/database";
+import { eq, and, gte, lte, db, schedules, bookings, organizations } from "@tour/database";
+import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
 /**
  * Send assignment notification when a guide is assigned to a schedule
@@ -30,21 +31,14 @@ export const sendGuideAssignmentEmail = inngest.createFunction(
       logoUrl: org.logoUrl ?? undefined,
     };
 
-    // Format dates for display
-    const tourDate = new Date(data.startsAt).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    // Use organization timezone for date/time formatting
+    const timezone = org.timezone || "UTC";
 
-    const tourTime = `${new Date(data.startsAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    })} - ${new Date(data.endsAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    })}`;
+    // Format dates for display in org timezone
+    const tourDate = formatInTimeZone(new Date(data.startsAt), timezone, "EEEE, MMMM d, yyyy");
+    const startTime = formatInTimeZone(new Date(data.startsAt), timezone, "h:mm a");
+    const endTime = formatInTimeZone(new Date(data.endsAt), timezone, "h:mm a");
+    const tourTime = `${startTime} - ${endTime}`;
 
     // Guide portal URLs - guides access via magic link authentication
     const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/confirm`;
@@ -144,21 +138,14 @@ export const sendPendingAssignmentReminder = inngest.createFunction(
       logoUrl: org.logoUrl ?? undefined,
     };
 
-    // Format dates for display
-    const tourDate = new Date(data.startsAt).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    // Use organization timezone for date/time formatting
+    const timezone = org.timezone || "UTC";
 
-    const tourTime = `${new Date(data.startsAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    })} - ${new Date(data.endsAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    })}`;
+    // Format dates for display in org timezone
+    const tourDate = formatInTimeZone(new Date(data.startsAt), timezone, "EEEE, MMMM d, yyyy");
+    const startTime = formatInTimeZone(new Date(data.startsAt), timezone, "h:mm a");
+    const endTime = formatInTimeZone(new Date(data.endsAt), timezone, "h:mm a");
+    const tourTime = `${startTime} - ${endTime}`;
 
     const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/confirm`;
     const declineUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/decline`;
@@ -228,21 +215,14 @@ export const sendGuideScheduleReminder = inngest.createFunction(
       logoUrl: org.logoUrl ?? undefined,
     };
 
-    // Format dates for display
-    const tourDate = new Date(data.startsAt).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    // Use organization timezone for date/time formatting
+    const timezone = org.timezone || "UTC";
 
-    const tourTime = `${new Date(data.startsAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    })} - ${new Date(data.endsAt).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    })}`;
+    // Format dates for display in org timezone
+    const tourDate = formatInTimeZone(new Date(data.startsAt), timezone, "EEEE, MMMM d, yyyy");
+    const startTime = formatInTimeZone(new Date(data.startsAt), timezone, "h:mm a");
+    const endTime = formatInTimeZone(new Date(data.endsAt), timezone, "h:mm a");
+    const tourTime = `${startTime} - ${endTime}`;
 
     const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${data.scheduleId}/manifest`;
 
@@ -289,7 +269,7 @@ export const sendGuideScheduleReminder = inngest.createFunction(
 
 /**
  * Send daily manifest to all guides with tours today
- * Runs at 6 AM daily via cron
+ * Runs every hour to handle different organization timezones
  */
 export const sendGuideDailyManifest = inngest.createFunction(
   {
@@ -297,52 +277,61 @@ export const sendGuideDailyManifest = inngest.createFunction(
     name: "Send Guide Daily Manifest",
     retries: 2,
   },
-  { cron: "0 6 * * *" }, // Run at 6 AM every day
+  { cron: "0 * * * *" }, // Run every hour to handle different timezones
   async ({ step }) => {
-    // Get all organizations
-    const organizations = await step.run("get-all-organizations", async () => {
-      // TODO: Implement organization listing service method
-      // For now, we'll get unique org IDs from schedules
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get all organizations with their timezones
+    const orgsWithTimezones = await step.run("get-all-organizations", async () => {
+      const orgs = await db
+        .select({
+          organizationId: organizations.id,
+          timezone: organizations.timezone,
+        })
+        .from(organizations);
 
-      const schedulesResult = await db
-        .select({ organizationId: schedules.organizationId })
-        .from(schedules)
-        .where(
-          and(
-            gte(schedules.startsAt, today),
-            lte(schedules.startsAt, tomorrow),
-            eq(schedules.status, "scheduled")
-          )
-        )
-        .groupBy(schedules.organizationId);
-
-      return schedulesResult.map((s: { organizationId: string }) => s.organizationId);
+      return orgs;
     });
 
     const results = [];
 
-    // Process each organization
-    for (const organizationId of organizations) {
+    // Process each organization using their timezone
+    for (const orgData of orgsWithTimezones) {
       const orgResult = await step.run(
-        `process-org-${organizationId}`,
+        `process-org-${orgData.organizationId}`,
         async () => {
-          const services = createServices({ organizationId });
+          const services = createServices({ organizationId: orgData.organizationId });
+          const timezone = orgData.timezone || "UTC";
 
-          // Get today's schedules with guides assigned
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
+          // Get current time in org timezone
+          const nowUtc = new Date();
+          const nowInOrgTz = toZonedTime(nowUtc, timezone);
+          const currentHourInOrgTz = nowInOrgTz.getHours();
+
+          // Only send manifests if it's 6 AM in the organization's timezone
+          if (currentHourInOrgTz !== 6) {
+            return {
+              organizationId: orgData.organizationId,
+              skipped: true,
+              reason: `Not 6 AM in timezone ${timezone} (current hour: ${currentHourInOrgTz})`,
+              guidesNotified: 0,
+            };
+          }
+
+          // Calculate today's date range in UTC based on org timezone
+          const todayInOrgTz = new Date(nowInOrgTz);
+          todayInOrgTz.setHours(0, 0, 0, 0);
+
+          const tomorrowInOrgTz = new Date(todayInOrgTz);
+          tomorrowInOrgTz.setDate(tomorrowInOrgTz.getDate() + 1);
+
+          // Convert to UTC for database query
+          const todayUtc = new Date(todayInOrgTz.getTime() - getTimezoneOffset(timezone, todayInOrgTz));
+          const tomorrowUtc = new Date(tomorrowInOrgTz.getTime() - getTimezoneOffset(timezone, tomorrowInOrgTz));
 
           const todaysSchedules = await db.query.schedules.findMany({
             where: and(
-              eq(schedules.organizationId, organizationId),
-              gte(schedules.startsAt, today),
-              lte(schedules.startsAt, tomorrow),
+              eq(schedules.organizationId, orgData.organizationId),
+              gte(schedules.startsAt, todayUtc),
+              lte(schedules.startsAt, tomorrowUtc),
               eq(schedules.status, "scheduled")
             ),
             with: {
@@ -384,7 +373,7 @@ export const sendGuideDailyManifest = inngest.createFunction(
                   .where(
                     and(
                       eq(bookings.scheduleId, gs.id),
-                      eq(bookings.organizationId, organizationId)
+                      eq(bookings.organizationId, orgData.organizationId)
                     )
                   );
 
@@ -393,13 +382,10 @@ export const sendGuideDailyManifest = inngest.createFunction(
                   0
                 );
 
-                const tourTime = `${new Date(gs.startsAt).toLocaleTimeString("en-US", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })} - ${new Date(gs.endsAt).toLocaleTimeString("en-US", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}`;
+                // Format time in org timezone
+                const startTime = formatInTimeZone(new Date(gs.startsAt), timezone, "h:mm a");
+                const endTime = formatInTimeZone(new Date(gs.endsAt), timezone, "h:mm a");
+                const tourTime = `${startTime} - ${endTime}`;
 
                 return {
                   tourName: gs.tour?.name || "Unknown Tour",
@@ -421,12 +407,8 @@ export const sendGuideDailyManifest = inngest.createFunction(
               logoUrl: org.logoUrl ?? undefined,
             };
 
-            const dateString = today.toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            });
+            // Format date in org timezone
+            const dateString = formatInTimeZone(todayInOrgTz, timezone, "EEEE, MMMM d, yyyy");
 
             // Send email
             const emailService = createEmailService(orgConfig);
@@ -464,7 +446,8 @@ export const sendGuideDailyManifest = inngest.createFunction(
           }
 
           return {
-            organizationId,
+            organizationId: orgData.organizationId,
+            skipped: false,
             guidesNotified: emailResults.length,
             results: emailResults,
           };
@@ -474,9 +457,21 @@ export const sendGuideDailyManifest = inngest.createFunction(
       results.push(orgResult);
     }
 
+    const processedResults = results.filter((r) => !r.skipped);
     return {
-      processedOrganizations: organizations.length,
+      processedOrganizations: processedResults.length,
+      skippedOrganizations: results.filter((r) => r.skipped).length,
+      totalGuidesNotified: processedResults.reduce((sum, r) => sum + r.guidesNotified, 0),
       results,
     };
   }
 );
+
+/**
+ * Helper function to get timezone offset in milliseconds
+ */
+function getTimezoneOffset(timezone: string, date: Date): number {
+  const utcDate = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
+  const tzDate = new Date(date.toLocaleString("en-US", { timeZone: timezone }));
+  return tzDate.getTime() - utcDate.getTime();
+}

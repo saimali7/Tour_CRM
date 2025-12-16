@@ -1,6 +1,7 @@
-import { pgTable, uuid, varchar, decimal, timestamp, text, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, varchar, decimal, timestamp, text, pgEnum, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations";
+import { createId } from "../utils";
 
 // Enums
 export const goalMetricTypeEnum = pgEnum("goal_metric_type", [
@@ -24,8 +25,8 @@ export const goalStatusEnum = pgEnum("goal_status", [
 
 // Goals table
 export const goals = pgTable("goals", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: uuid("organization_id")
+  id: text("id").primaryKey().$defaultFn(createId),
+  organizationId: text("organization_id")
     .notNull()
     .references(() => organizations.id, { onDelete: "cascade" }),
 
@@ -47,7 +48,10 @@ export const goals = pgTable("goals", {
   createdBy: varchar("created_by", { length: 255 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  orgIdx: index("goals_org_idx").on(table.organizationId),
+  statusIdx: index("goals_status_idx").on(table.status),
+}));
 
 // Relations
 export const goalsRelations = relations(goals, ({ one }) => ({

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { getDateRangeFromString } from "@/lib/report-utils";
+import { downloadCsv } from "@/lib/utils";
 import { ReportHeader } from "@/components/reports/ReportHeader";
 import { SummaryCards } from "@/components/reports/SummaryCards";
 import { ReportChart } from "@/components/reports/ReportChart";
@@ -114,38 +115,14 @@ export default function CustomerReportPage() {
 
   // Handle export
   const handleExport = () => {
-    if (!data) return;
+    if (!data || acquisitionBySource.length === 0) return;
 
     const exportData = acquisitionBySource.map((row) => ({
       Source: row.source,
       Customers: row.count,
     }));
 
-    // Create CSV
-    if (exportData.length === 0) return;
-    const headers = Object.keys(exportData[0]!);
-    const csvContent = [
-      headers.join(","),
-      ...exportData.map((row) =>
-        headers
-          .map((header) => {
-            const value = row[header as keyof typeof row];
-            return String(value ?? "");
-          })
-          .join(",")
-      ),
-    ].join("\n");
-
-    // Download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `customer-report-${dateRangeString}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(exportData, `customer-report-${dateRangeString}`);
   };
 
   return (

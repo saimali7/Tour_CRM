@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, count, ilike, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, ilike, or, inArray } from "drizzle-orm";
 import { tours, tourPricingTiers, tourVariants, schedules, type Tour, type TourStatus, type TourPricingTier, type TourVariant, type PriceModifierType } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
@@ -194,7 +194,7 @@ export class TourService extends BaseService {
       .from(schedules)
       .where(
         and(
-          sql`${schedules.tourId} = ANY(${tourIds})`,
+          inArray(schedules.tourId, tourIds),
           eq(schedules.organizationId, this.organizationId),
           sql`${schedules.startsAt} > ${now}`,
           sql`${schedules.status} != 'cancelled'`
