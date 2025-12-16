@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, count, ilike, or, gte } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, ilike, or } from "drizzle-orm";
 import { tours, tourPricingTiers, tourVariants, schedules, type Tour, type TourStatus, type TourPricingTier, type TourVariant, type PriceModifierType } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
@@ -156,6 +156,7 @@ export class TourService extends BaseService {
       sort.direction === "asc" ? asc(tours[sort.field]) : desc(tours[sort.field]);
 
     // Query tours with schedule stats using subquery
+    // Note: Using sql.raw for "tours"."id" because Drizzle doesn't qualify column references in subqueries
     const [data, countResult] = await Promise.all([
       this.db
         .select({
@@ -163,7 +164,7 @@ export class TourService extends BaseService {
           upcomingCount: sql<number>`(
             SELECT COUNT(*)::int
             FROM ${schedules}
-            WHERE ${schedules.tourId} = ${tours.id}
+            WHERE ${schedules.tourId} = "tours"."id"
               AND ${schedules.organizationId} = ${this.organizationId}
               AND ${schedules.startsAt} > ${now}
               AND ${schedules.status} != 'cancelled'
@@ -171,7 +172,7 @@ export class TourService extends BaseService {
           totalCapacity: sql<number>`(
             SELECT COALESCE(SUM(${schedules.maxParticipants}), 0)::int
             FROM ${schedules}
-            WHERE ${schedules.tourId} = ${tours.id}
+            WHERE ${schedules.tourId} = "tours"."id"
               AND ${schedules.organizationId} = ${this.organizationId}
               AND ${schedules.startsAt} > ${now}
               AND ${schedules.status} != 'cancelled'
@@ -179,7 +180,7 @@ export class TourService extends BaseService {
           totalBooked: sql<number>`(
             SELECT COALESCE(SUM(${schedules.bookedCount}), 0)::int
             FROM ${schedules}
-            WHERE ${schedules.tourId} = ${tours.id}
+            WHERE ${schedules.tourId} = "tours"."id"
               AND ${schedules.organizationId} = ${this.organizationId}
               AND ${schedules.startsAt} > ${now}
               AND ${schedules.status} != 'cancelled'
@@ -187,7 +188,7 @@ export class TourService extends BaseService {
           nextScheduleDate: sql<Date | null>`(
             SELECT MIN(${schedules.startsAt})
             FROM ${schedules}
-            WHERE ${schedules.tourId} = ${tours.id}
+            WHERE ${schedules.tourId} = "tours"."id"
               AND ${schedules.organizationId} = ${this.organizationId}
               AND ${schedules.startsAt} > ${now}
               AND ${schedules.status} != 'cancelled'
