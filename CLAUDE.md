@@ -24,6 +24,7 @@ All planning and design documents are in the `docs/` folder:
 | `docs/PHASE6_UX_OVERHAUL.md` | Phase 6 refactor details - design philosophy, feature list, technical approach |
 | `docs/UI_UX_DESIGN_PRINCIPLES.md` | First-principles UI/UX guide - Rams/Norman principles, visual system, interaction patterns |
 | `docs/DESIGN_SYSTEM.md` | shadcn/ui-based design system - semantic tokens, component patterns, migration guide |
+| `docs/STRATEGIC_ANALYSIS.md` | First-principles analysis of world-class tour CRM - user personas, operations gaps, roadmap |
 
 **Always consult these documents before making architectural decisions.**
 
