@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Building2, ArrowRight, ArrowLeft, Check, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { StripeConnectStep } from "@/components/onboarding/stripe-connect-step";
 import { BusinessProfileStep } from "@/components/onboarding/business-profile-step";
 
 function generateSlug(name: string): string {
@@ -43,9 +42,9 @@ const currencies = [
   { value: "SGD", label: "SGD - Singapore Dollar" },
 ];
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 3;
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
@@ -90,7 +89,7 @@ export default function OnboardingPage() {
   const createOrg = trpc.onboarding.createOrganization.useMutation({
     onSuccess: (data) => {
       setCreatedOrgSlug(data.organization.slug);
-      setStep(3); // Move to Stripe Connect step
+      setStep(3); // Move to Business Profile step
     },
     onError: (error) => {
       setErrors({ submit: error.message });
@@ -169,14 +168,6 @@ export default function OnboardingPage() {
     });
   };
 
-  const handleStripeComplete = () => {
-    setStep(4);
-  };
-
-  const handleStripeSkip = () => {
-    setStep(4);
-  };
-
   const handleBusinessProfileComplete = () => {
     if (createdOrgSlug) {
       router.push(`/org/${createdOrgSlug}`);
@@ -192,7 +183,6 @@ export default function OnboardingPage() {
   const stepLabels = [
     "Business Details",
     "Preferences",
-    "Payments",
     "Profile",
   ];
 
@@ -210,8 +200,7 @@ export default function OnboardingPage() {
           <p className="text-muted-foreground mt-2">
             {step === 1 && "Tell us about your tour business"}
             {step === 2 && "Configure your default settings"}
-            {step === 3 && "Set up payment processing"}
-            {step === 4 && "Add your business details"}
+            {step === 3 && "Add your business details"}
           </p>
         </div>
 
@@ -456,17 +445,8 @@ export default function OnboardingPage() {
             </form>
           )}
 
-          {/* Step 3: Stripe Connect */}
-          {step === 3 && createdOrgSlug && (
-            <StripeConnectStep
-              orgSlug={createdOrgSlug}
-              onComplete={handleStripeComplete}
-              onSkip={handleStripeSkip}
-            />
-          )}
-
-          {/* Step 4: Business Profile */}
-          {step === 4 && (
+          {/* Step 3: Business Profile */}
+          {step === 3 && (
             <BusinessProfileStep
               onComplete={handleBusinessProfileComplete}
               onSkip={handleBusinessProfileSkip}
@@ -482,5 +462,22 @@ export default function OnboardingPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+// Wrapper with Suspense boundary for useSearchParams (required by Next.js 15)
+export default function OnboardingPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-muted flex flex-col items-center justify-center p-6">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </main>
+      }
+    >
+      <OnboardingContent />
+    </Suspense>
   );
 }

@@ -394,18 +394,16 @@ export const bookingRouter = createRouter({
         throw new Error("Booking not found");
       }
 
-      // Get organization to get Stripe Connect account
+      // Get organization for URLs
       const organization = await services.organization.get();
       if (!organization) {
         throw new Error("Organization not found");
       }
 
-      if (!organization.stripeConnectAccountId) {
-        throw new Error("Stripe Connect account not configured for this organization");
-      }
-
-      if (!organization.stripeConnectOnboarded) {
-        throw new Error("Stripe Connect account not fully onboarded");
+      // Check if Stripe is configured
+      const { isStripeConfigured } = await import("@/lib/stripe");
+      if (!isStripeConfigured()) {
+        throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY to your environment.");
       }
 
       // Check if already paid
@@ -414,7 +412,7 @@ export const bookingRouter = createRouter({
       }
 
       // Import stripe functions dynamically to avoid circular dependencies
-      const { createPaymentLink } = await import("@/lib/stripe");
+      const { createCheckoutSession } = await import("@/lib/stripe");
 
       // Calculate amount to charge (total - already paid)
       const totalAmount = parseFloat(booking.total);
@@ -429,7 +427,7 @@ export const bookingRouter = createRouter({
       const amountInCents = Math.round(amountDue * 100);
 
       // Create Stripe Checkout session
-      const session = await createPaymentLink({
+      const session = await createCheckoutSession({
         amount: amountInCents,
         currency: booking.currency,
         metadata: {
@@ -445,9 +443,6 @@ export const bookingRouter = createRouter({
           input.cancelUrl ||
           `${process.env.NEXT_PUBLIC_APP_URL}/org/${organization.slug}/bookings/${booking.id}?payment=cancelled`,
         customerEmail: booking.customer?.email || undefined,
-        stripeAccountId: organization.stripeConnectAccountId,
-        // Optional: platform fee (e.g., 2% platform fee)
-        // applicationFeeAmount: Math.round(amountInCents * 0.02),
       });
 
       return {
@@ -521,12 +516,10 @@ export const bookingRouter = createRouter({
 
       const orgSettings = await services.organization.getSettings();
 
-      if (!organization.stripeConnectAccountId) {
-        throw new Error("Stripe Connect account not configured");
-      }
-
-      if (!organization.stripeConnectOnboarded) {
-        throw new Error("Stripe Connect account not fully onboarded");
+      // Check if Stripe is configured
+      const { isStripeConfigured, createCheckoutSession } = await import("@/lib/stripe");
+      if (!isStripeConfigured()) {
+        throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY to your environment.");
       }
 
       // Get payment settings with defaults
@@ -546,11 +539,8 @@ export const bookingRouter = createRouter({
         throw new Error("No payment due for this booking");
       }
 
-      // Import stripe functions
-      const { createPaymentLink } = await import("@/lib/stripe");
-
       // Create Stripe Checkout session
-      const session = await createPaymentLink({
+      const session = await createCheckoutSession({
         amount: Math.round(amountDue * 100),
         currency: booking.currency,
         metadata: {
@@ -562,7 +552,6 @@ export const bookingRouter = createRouter({
         successUrl: `${process.env.NEXT_PUBLIC_APP_URL}/org/${organization.slug}/bookings/${booking.id}?payment=success`,
         cancelUrl: `${process.env.NEXT_PUBLIC_APP_URL}/org/${organization.slug}/bookings/${booking.id}?payment=cancelled`,
         customerEmail: booking.customer.email,
-        stripeAccountId: organization.stripeConnectAccountId,
         expiresInHours: paymentLinkExpirationHours,
       });
 

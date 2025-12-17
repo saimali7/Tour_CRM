@@ -845,11 +845,30 @@ SENTRY_ORG=your-org
 SENTRY_PROJECT=tour-crm
 ```
 
-### 7.6 BetterStack (Uptime Monitoring)
+### 7.6 BetterStack (Uptime Monitoring) - Optional
 
 1. Create account at [betterstack.com](https://betterstack.com)
 2. Create monitor for `https://app.yourdomain.com/api/health`
 3. Configure alerting (Slack, Email, PagerDuty)
+
+### 7.7 DNS Configuration
+
+Add these DNS records at your domain registrar (Cloudflare, Namecheap, etc.):
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| A | app | `<your-vps-ip>` | 300 |
+| A | book | `<your-vps-ip>` | 300 (optional - for Web app) |
+
+**If using Cloudflare:**
+- Set proxy status to "DNS only" (gray cloud) initially
+- After SSL is working, you can enable proxy (orange cloud)
+
+**Verify DNS propagation:**
+```bash
+dig app.yourdomain.com +short
+# Should return your VPS IP
+```
 
 ---
 

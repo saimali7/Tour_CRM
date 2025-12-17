@@ -43,8 +43,8 @@ export default function SettingsPage() {
   const { data: organization, isLoading } = trpc.organization.get.useQuery();
   const { data: settings } = trpc.organization.getSettings.useQuery();
   const { data: teamMembers, isLoading: teamLoading } = trpc.team.list.useQuery();
-  const { data: stripeStatus, isLoading: stripeLoading, refetch: refetchStripe } =
-    trpc.organization.getStripeConnectStatus.useQuery();
+  const { data: stripeStatus, isLoading: stripeLoading } =
+    trpc.organization.getStripeStatus.useQuery();
 
   // Team management state
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -113,42 +113,6 @@ export default function SettingsPage() {
     },
   });
 
-  // Stripe Connect mutations
-  const startStripeOnboardingMutation = trpc.organization.startStripeConnectOnboarding.useMutation({
-    onSuccess: (data) => {
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    },
-  });
-
-  const refreshStripeOnboardingMutation = trpc.organization.refreshStripeConnectOnboarding.useMutation({
-    onSuccess: (data) => {
-      if (data.alreadyOnboarded) {
-        refetchStripe();
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-      } else if (data.url) {
-        window.location.href = data.url;
-      }
-    },
-  });
-
-  const getStripeDashboardMutation = trpc.organization.getStripeDashboardLink.useMutation({
-    onSuccess: (data) => {
-      if (data.url) {
-        window.open(data.url, "_blank");
-      }
-    },
-  });
-
-  const disconnectStripeMutation = trpc.organization.disconnectStripeConnect.useMutation({
-    onSuccess: () => {
-      refetchStripe();
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    },
-  });
 
   const [businessForm, setBusinessForm] = useState({
     name: "",
@@ -1162,7 +1126,7 @@ export default function SettingsPage() {
         {/* Payments Tab */}
         <TabsContent value="payments">
           <div className="space-y-6">
-          {/* Stripe Connect Status Card */}
+          {/* Stripe Status Card */}
           <div className="bg-card rounded-lg border border-border p-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -1170,16 +1134,16 @@ export default function SettingsPage() {
                   <CreditCard className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground">Stripe Connect</h2>
+                  <h2 className="text-lg font-semibold text-foreground">Stripe Payments</h2>
                   <p className="text-sm text-muted-foreground">
-                    Accept payments directly to your bank account
+                    Accept payments using your Stripe account
                   </p>
                 </div>
               </div>
-              {stripeStatus?.onboarded && (
+              {stripeStatus?.configured && (
                 <span className="flex items-center gap-1 px-3 py-1 bg-success/20 text-success rounded-full text-sm font-medium">
                   <CheckCircle2 className="h-4 w-4" />
-                  Connected
+                  {stripeStatus.testMode ? "Test Mode" : "Live"}
                 </span>
               )}
             </div>
@@ -1188,190 +1152,85 @@ export default function SettingsPage() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : stripeStatus?.onboarded ? (
-              // Connected state
+            ) : stripeStatus?.configured ? (
               <div className="space-y-4">
                 <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="h-5 w-5 text-success mt-0.5" />
                     <div>
                       <p className="font-medium text-success">
-                        Your Stripe account is connected
+                        Stripe is configured and ready
                       </p>
                       <p className="text-sm text-success/80 mt-1">
-                        You can accept payments and they will be deposited directly to your
-                        linked bank account.
+                        {stripeStatus.message}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {stripeStatus.details && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Country</p>
-                      <p className="font-medium text-foreground mt-1">
-                        {stripeStatus.details.country || "N/A"}
-                      </p>
+                {stripeStatus.testMode && (
+                  <div className="p-4 bg-muted border border-border rounded-lg">
+                    <h4 className="font-medium text-foreground mb-2">Test Card Numbers</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Successful payment:</span>
+                        <code className="bg-background px-2 py-0.5 rounded">4242 4242 4242 4242</code>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Declined:</span>
+                        <code className="bg-background px-2 py-0.5 rounded">4000 0000 0000 0002</code>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">3D Secure:</span>
+                        <code className="bg-background px-2 py-0.5 rounded">4000 0000 0000 3220</code>
+                      </div>
                     </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Email</p>
-                      <p className="font-medium text-foreground mt-1 truncate">
-                        {stripeStatus.details.email || "N/A"}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                        Charges Enabled
-                      </p>
-                      <p className="font-medium mt-1">
-                        {stripeStatus.details.chargesEnabled ? (
-                          <span className="text-success flex items-center gap-1">
-                            <CheckCircle2 className="h-4 w-4" /> Yes
-                          </span>
-                        ) : (
-                          <span className="text-destructive flex items-center gap-1">
-                            <XCircle className="h-4 w-4" /> No
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                        Payouts Enabled
-                      </p>
-                      <p className="font-medium mt-1">
-                        {stripeStatus.details.payoutsEnabled ? (
-                          <span className="text-success flex items-center gap-1">
-                            <CheckCircle2 className="h-4 w-4" /> Yes
-                          </span>
-                        ) : (
-                          <span className="text-destructive flex items-center gap-1">
-                            <XCircle className="h-4 w-4" /> No
-                          </span>
-                        )}
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Use any future expiry date and any 3-digit CVC
+                    </p>
                   </div>
                 )}
 
-                <div className="flex gap-3 pt-4 border-t border-border">
-                  <button
-                    onClick={() => getStripeDashboardMutation.mutate()}
-                    disabled={getStripeDashboardMutation.isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted disabled:opacity-50"
-                  >
-                    {getStripeDashboardMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <ExternalLink className="h-4 w-4" />
-                    )}
-                    Open Stripe Dashboard
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const confirmed = await confirm({
-                        title: "Disconnect Stripe Account",
-                        description: "Are you sure you want to disconnect your Stripe account? You will not be able to accept payments until you reconnect. This will not affect existing transactions or payouts.",
-                        confirmLabel: "Disconnect Stripe",
-                        variant: "destructive",
-                      });
-
-                      if (confirmed) {
-                        disconnectStripeMutation.mutate();
-                      }
-                    }}
-                    disabled={disconnectStripeMutation.isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-destructive/30 text-destructive rounded-lg hover:bg-destructive/10 disabled:opacity-50"
-                  >
-                    {disconnectStripeMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                    Disconnect
-                  </button>
-                </div>
+                <a
+                  href={stripeStatus.testMode ? "https://dashboard.stripe.com/test/payments" : "https://dashboard.stripe.com/payments"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open Stripe Dashboard
+                </a>
               </div>
-            ) : stripeStatus?.connected && !stripeStatus?.onboarded ? (
-              // Partially connected - needs to complete onboarding
+            ) : (
               <div className="space-y-4">
                 <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
                     <div>
                       <p className="font-medium text-warning">
-                        Complete your Stripe setup
+                        Stripe not configured
                       </p>
                       <p className="text-sm text-warning/80 mt-1">
-                        You have started the Stripe Connect setup but haven&apos;t completed
-                        all the required steps.
+                        Add your Stripe API keys to .env.local to enable payments.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => refreshStripeOnboardingMutation.mutate({ orgSlug: slug })}
-                  disabled={refreshStripeOnboardingMutation.isPending}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {refreshStripeOnboardingMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ExternalLink className="h-4 w-4" />
-                  )}
-                  Continue Stripe Setup
-                </button>
-              </div>
-            ) : (
-              // Not connected
-              <div className="space-y-4">
                 <div className="p-4 bg-muted border border-border rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium text-foreground">
-                        Connect your Stripe account to accept payments
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        When customers book tours, payments will be processed through Stripe
-                        and deposited directly into your connected bank account.
-                      </p>
-                    </div>
-                  </div>
+                  <h4 className="font-medium text-foreground mb-2">Setup Instructions</h4>
+                  <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                    <li>Go to <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">dashboard.stripe.com/test/apikeys</a></li>
+                    <li>Copy your Secret key (starts with <code className="bg-background px-1 rounded">sk_test_</code>)</li>
+                    <li>Add to your <code className="bg-background px-1 rounded">.env.local</code> file:</li>
+                  </ol>
+                  <pre className="mt-2 p-2 bg-background rounded text-xs overflow-x-auto">
+                    STRIPE_SECRET_KEY=&quot;sk_test_...&quot;
+                  </pre>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Then restart your dev server with <code className="bg-background px-1 rounded">pnpm dev</code>
+                  </p>
                 </div>
-
-                <div className="space-y-3">
-                  <h3 className="font-medium text-foreground">What you&apos;ll need:</h3>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-success" />
-                      Business information (name, address)
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-success" />
-                      Bank account details for payouts
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-success" />
-                      Tax information (SSN/EIN for US businesses)
-                    </li>
-                  </ul>
-                </div>
-
-                <button
-                  onClick={() => startStripeOnboardingMutation.mutate({ orgSlug: slug })}
-                  disabled={startStripeOnboardingMutation.isPending}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#635bff] text-primary-foreground rounded-lg hover:bg-[#5851e5] font-medium disabled:opacity-50"
-                >
-                  {startStripeOnboardingMutation.isPending ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <CreditCard className="h-5 w-5" />
-                  )}
-                  Connect with Stripe
-                </button>
               </div>
             )}
           </div>

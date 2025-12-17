@@ -1,13 +1,6 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { createServices } from "@tour/services";
-import {
-  createConnectAccount,
-  createAccountLink,
-  getConnectAccount,
-  isAccountOnboarded,
-  createDashboardLink,
-} from "@/lib/stripe";
 
 // Service Health Types (exported for tRPC inference)
 export type ServiceStatus = "connected" | "not_configured" | "error";
@@ -133,11 +126,6 @@ export const organizationRouter = createRouter({
     return services.organization.canUseWebApp();
   }),
 
-  hasStripeConnect: protectedProcedure.query(async ({ ctx }) => {
-    const services = createServices({ organizationId: ctx.orgContext.organizationId });
-    return services.organization.hasStripeConnect();
-  }),
-
   getTimezone: protectedProcedure.query(async ({ ctx }) => {
     const services = createServices({ organizationId: ctx.orgContext.organizationId });
     return services.organization.getTimezone();
@@ -153,159 +141,24 @@ export const organizationRouter = createRouter({
     return services.organization.isActive();
   }),
 
-  // Stripe Connect endpoints
-  getStripeConnectStatus: protectedProcedure.query(async ({ ctx }) => {
-    const services = createServices({ organizationId: ctx.orgContext.organizationId });
-    const org = await services.organization.get();
+  // Stripe Status (Direct Mode - payments go to platform's Stripe account)
+  getStripeStatus: protectedProcedure.query(async () => {
+    const hasStripeKey = !!process.env.STRIPE_SECRET_KEY;
+    const isTestMode = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ?? false;
 
-    if (!org.stripeConnectAccountId) {
-      return {
-        connected: false,
-        accountId: null,
-        onboarded: false,
-        details: null,
-      };
-    }
-
-    try {
-      const account = await getConnectAccount(org.stripeConnectAccountId);
-      return {
-        connected: true,
-        accountId: org.stripeConnectAccountId,
-        onboarded: org.stripeConnectOnboarded,
-        details: {
-          businessType: account.business_type || null,
-          chargesEnabled: account.charges_enabled,
-          payoutsEnabled: account.payouts_enabled,
-          detailsSubmitted: account.details_submitted,
-          email: account.email || null,
-          country: account.country || null,
-        },
-      };
-    } catch (error) {
-      // Account may have been deleted on Stripe
-      console.error("Error fetching Stripe account:", error);
-      return {
-        connected: false,
-        accountId: org.stripeConnectAccountId,
-        onboarded: false,
-        details: null,
-        error: "Unable to retrieve account details",
-      };
-    }
-  }),
-
-  startStripeConnectOnboarding: adminProcedure
-    .input(z.object({ orgSlug: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      const org = await services.organization.get();
-
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-      if (!baseUrl) {
-        throw new Error("NEXT_PUBLIC_APP_URL environment variable must be set");
-      }
-      let accountId = org.stripeConnectAccountId;
-
-      // Create a new Stripe Connect account if one doesn't exist
-      if (!accountId) {
-        const account = await createConnectAccount(
-          ctx.orgContext.organizationId,
-          org.email || undefined
-        );
-        accountId = account.id;
-
-        // Save the account ID to the organization
-        await services.organization.updateStripeConnect(accountId, false);
-      }
-
-      // Create an account link for onboarding
-      const accountLink = await createAccountLink(
-        accountId,
-        `${baseUrl}/api/stripe/connect/refresh?org=${input.orgSlug}`,
-        `${baseUrl}/api/stripe/connect/callback?org=${input.orgSlug}&account=${accountId}`
-      );
-
-      return {
-        url: accountLink.url,
-        accountId,
-      };
-    }),
-
-  refreshStripeConnectOnboarding: adminProcedure
-    .input(z.object({ orgSlug: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      const org = await services.organization.get();
-
-      if (!org.stripeConnectAccountId) {
-        throw new Error("No Stripe Connect account found");
-      }
-
-      // Check if account is already onboarded
-      const onboarded = await isAccountOnboarded(org.stripeConnectAccountId);
-      if (onboarded && !org.stripeConnectOnboarded) {
-        // Update organization to mark as onboarded
-        await services.organization.updateStripeConnect(
-          org.stripeConnectAccountId,
-          true
-        );
-        return { alreadyOnboarded: true, url: null };
-      }
-
-      if (onboarded) {
-        return { alreadyOnboarded: true, url: null };
-      }
-
-      // Create new onboarding link
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-      if (!baseUrl) {
-        throw new Error("NEXT_PUBLIC_APP_URL environment variable must be set");
-      }
-      const accountLink = await createAccountLink(
-        org.stripeConnectAccountId,
-        `${baseUrl}/api/stripe/connect/refresh?org=${input.orgSlug}`,
-        `${baseUrl}/api/stripe/connect/callback?org=${input.orgSlug}&account=${org.stripeConnectAccountId}`
-      );
-
-      return {
-        alreadyOnboarded: false,
-        url: accountLink.url,
-      };
-    }),
-
-  getStripeDashboardLink: adminProcedure.mutation(async ({ ctx }) => {
-    const services = createServices({ organizationId: ctx.orgContext.organizationId });
-    const org = await services.organization.get();
-
-    if (!org.stripeConnectAccountId || !org.stripeConnectOnboarded) {
-      throw new Error("Stripe Connect not configured");
-    }
-
-    const loginLink = await createDashboardLink(org.stripeConnectAccountId);
-    return { url: loginLink.url };
-  }),
-
-  disconnectStripeConnect: adminProcedure.mutation(async ({ ctx }) => {
-    const services = createServices({ organizationId: ctx.orgContext.organizationId });
-    const org = await services.organization.get();
-
-    if (!org.stripeConnectAccountId) {
-      throw new Error("No Stripe Connect account to disconnect");
-    }
-
-    // Note: We don't delete the Stripe account, just remove the link
-    // The organization can reconnect later if needed
-    await services.organization.updateStripeConnect("", false);
-
-    return { success: true };
+    return {
+      configured: hasStripeKey,
+      testMode: isTestMode,
+      message: hasStripeKey
+        ? isTestMode
+          ? "Stripe configured (Test Mode)"
+          : "Stripe configured (Live Mode)"
+        : "Stripe not configured",
+    };
   }),
 
   // Service Health Check
-  getServiceHealth: adminProcedure.query(async ({ ctx }) => {
-    const services = createServices({ organizationId: ctx.orgContext.organizationId });
-    const org = await services.organization.get();
-
+  getServiceHealth: adminProcedure.query(async () => {
     const healthChecks: ServiceHealth[] = [];
 
     // Database - always check
@@ -350,32 +203,14 @@ export const organizationRouter = createRouter({
       });
     }
 
-    // Stripe Connect (organization-level)
-    if (org.stripeConnectAccountId && org.stripeConnectOnboarded) {
-      try {
-        const account = await getConnectAccount(org.stripeConnectAccountId);
-        healthChecks.push({
-          name: "payments",
-          status: "connected",
-          message: account.charges_enabled ? "Ready to accept payments" : "Pending verification",
-          details: {
-            accountId: org.stripeConnectAccountId,
-            chargesEnabled: account.charges_enabled,
-            payoutsEnabled: account.payouts_enabled,
-          },
-        });
-      } catch {
-        healthChecks.push({
-          name: "payments",
-          status: "error",
-          message: "Unable to verify Stripe account",
-        });
-      }
-    } else if (process.env.STRIPE_SECRET_KEY) {
+    // Stripe Payments
+    if (process.env.STRIPE_SECRET_KEY) {
+      const isTestMode = process.env.STRIPE_SECRET_KEY.startsWith("sk_test_");
       healthChecks.push({
         name: "payments",
-        status: "not_configured",
-        message: "Stripe Connect not set up",
+        status: "connected",
+        message: `Stripe ${isTestMode ? "(Test)" : "(Live)"}`,
+        details: { provider: "Stripe", mode: isTestMode ? "test" : "live" },
       });
     } else {
       healthChecks.push({

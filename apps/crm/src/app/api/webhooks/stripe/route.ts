@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@tour/database";
-import { bookings, organizations, customers, schedules, tours } from "@tour/database";
+import { bookings, customers, schedules } from "@tour/database";
 import { eq, and } from "drizzle-orm";
 import { inngest } from "@/inngest";
 import { format } from "date-fns";
@@ -12,7 +12,6 @@ import { format } from "date-fns";
  * Stripe Webhook Handler
  *
  * Handles Stripe webhook events for payment processing.
- * Multi-tenant: Routes events to correct organization based on Connect account.
  *
  * Events handled:
  * - payment_intent.succeeded - Payment completed successfully
@@ -59,7 +58,6 @@ export async function POST(req: Request) {
 
   console.log(`Received Stripe webhook: ${event.type}`, {
     eventId: event.id,
-    account: event.account,
   });
 
   try {
@@ -110,24 +108,6 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
 
   if (!organizationId || !bookingId) {
     console.error("Missing organizationId or bookingId in payment intent metadata");
-    return;
-  }
-
-  // Get organization to verify Stripe Connect account
-  const organization = await db.query.organizations.findFirst({
-    where: eq(organizations.id, organizationId),
-  });
-
-  if (!organization) {
-    console.error(`Organization not found: ${organizationId}`);
-    return;
-  }
-
-  // Verify the payment intent belongs to the organization's Stripe account
-  if (event.account !== organization.stripeConnectAccountId) {
-    console.error(
-      `Account mismatch: event.account=${event.account}, org.stripeConnectAccountId=${organization.stripeConnectAccountId}`
-    );
     return;
   }
 
@@ -335,20 +315,8 @@ async function handleChargeRefunded(event: Stripe.Event) {
       );
 
     console.log(`Updated booking ${booking.id} to refunded status`);
-
-    // TODO: Send refund notification via Inngest
-    // await inngest.send({
-    //   name: "booking/refunded",
-    //   data: {
-    //     organizationId: booking.organizationId,
-    //     bookingId: booking.id,
-    //     refundAmount: (charge.amount_refunded / 100).toFixed(2),
-    //     currency: charge.currency,
-    //   },
-    // });
   } else {
     // Partial refund
-    const refundedAmount = (charge.amount_refunded / 100).toFixed(2);
     const remainingAmount = ((charge.amount - charge.amount_refunded) / 100).toFixed(2);
 
     await db
