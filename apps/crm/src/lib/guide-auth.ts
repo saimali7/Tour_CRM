@@ -164,7 +164,7 @@ export async function getGuideContext(): Promise<GuideContext | null> {
       guide,
       organization,
     };
-  } catch (error) {
+  } catch {
     // Token invalid or expired
     return null;
   }

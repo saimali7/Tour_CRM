@@ -169,7 +169,7 @@ export const dailyReviewRequestCheck = inngest.createFunction(
     name: "Daily Review Request Check",
   },
   { cron: "0 10 * * *" }, // Every day at 10 AM
-  async ({ step }) => {
+  async ({ step: _step }) => {
     // This would need to be modified to work across organizations
     // For now, we'll rely on the booking/completed event approach
 

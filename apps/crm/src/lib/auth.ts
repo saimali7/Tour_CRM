@@ -256,7 +256,7 @@ export function hasPermission(role: string, permission: string): boolean {
   if (permissions.includes(permission)) return true;
 
   // Check wildcard patterns
-  const [resource, action] = permission.split(":");
+  const [resource, _action] = permission.split(":");
   if (permissions.includes(`${resource}:*`)) return true;
 
   return false;

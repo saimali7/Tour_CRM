@@ -136,7 +136,7 @@ export class GoalService extends BaseService {
    * List goals with optional filters
    */
   async list(filters?: GoalFilters): Promise<Goal[]> {
-    let query = this.db.query.goals.findMany({
+    const query = this.db.query.goals.findMany({
       where: eq(goals.organizationId, this.organizationId),
       orderBy: [desc(goals.createdAt)],
     });

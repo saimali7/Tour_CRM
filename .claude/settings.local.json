@@ -95,7 +95,15 @@
       "Bash(pnpm turbo typecheck:*)",
       "Bash(pnpm typecheck:crm:*)",
       "Bash(pnpm --filter @tour/config exec tsc --noEmit)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_tabs",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_snapshot",
+      "Bash(git reset:*)"
     ]
   }
 }

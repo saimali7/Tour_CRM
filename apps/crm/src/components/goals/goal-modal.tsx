@@ -130,11 +130,12 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
         start = new Date(now.getFullYear(), now.getMonth(), 1);
         end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         break;
-      case "quarterly":
+      case "quarterly": {
         const quarter = Math.floor(now.getMonth() / 3);
         start = new Date(now.getFullYear(), quarter * 3, 1);
         end = new Date(now.getFullYear(), quarter * 3 + 3, 0);
         break;
+      }
       case "yearly":
         start = new Date(now.getFullYear(), 0, 1);
         end = new Date(now.getFullYear(), 11, 31);

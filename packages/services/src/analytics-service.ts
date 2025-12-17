@@ -1349,7 +1349,7 @@ export class AnalyticsService extends BaseService {
     }
 
     // 8. Slow day alert (Days with low bookings historically)
-    const dayOfWeek = now.getDay();
+    const _dayOfWeek = now.getDay(); // Current day (unused but kept for potential future use)
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
     const slowDayQuery = await this.db

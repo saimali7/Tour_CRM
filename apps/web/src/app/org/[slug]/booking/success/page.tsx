@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organization";
-import { db, bookings, schedules, eq, and } from "@tour/database";
+import { db, bookings, eq, and } from "@tour/database";
 import { CheckCircle } from "lucide-react";
 import Link from "next/link";
 

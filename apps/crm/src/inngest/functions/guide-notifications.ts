@@ -110,7 +110,7 @@ export const sendPendingAssignmentReminder = inngest.createFunction(
       const services = createServices({ organizationId: data.organizationId });
       try {
         return await services.guideAssignment.getById(data.assignmentId);
-      } catch (error) {
+      } catch {
         // Assignment might have been deleted
         return null;
       }

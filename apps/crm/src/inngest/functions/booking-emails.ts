@@ -1,8 +1,8 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
 import { createServices } from "@tour/services";
-import { db, schedules, bookings, organizations, type Booking } from "@tour/database";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { db, bookings, organizations, type Booking } from "@tour/database";
+import { eq, and } from "drizzle-orm";
 import { format } from "date-fns";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
@@ -472,7 +472,7 @@ export const dailyBookingReminderCheck = inngest.createFunction(
       const orgResult = await step.run(
         `process-org-${org.organizationId}`,
         async () => {
-          const services = createServices({ organizationId: org.organizationId });
+          const _services = createServices({ organizationId: org.organizationId });
           const timezone = org.timezone || "UTC";
 
           // Get current time in org timezone

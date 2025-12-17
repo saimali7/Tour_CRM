@@ -2,7 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Plus, LucideIcon } from "lucide-react";
+import { ChevronRight, Plus, type LucideIcon } from "lucide-react";
 
 // =============================================================================
 // PAGE HEADER
