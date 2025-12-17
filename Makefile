@@ -5,7 +5,7 @@
 .PHONY: help install dev build lint typecheck format clean
 .PHONY: docker-up docker-down docker-logs docker-ps docker-clean
 .PHONY: db-generate db-push db-studio db-seed
-.PHONY: setup check
+.PHONY: setup check deploy-staging deploy-prod pre-deploy
 
 # Default target
 .DEFAULT_GOAL := help
@@ -36,6 +36,9 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(GREEN)Database:$(RESET)"
 	@grep -E '^db-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
+	@echo ""
+	@echo "$(GREEN)Deployment:$(RESET)"
+	@grep -E '^(deploy-|pre-deploy).*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
 
 # =============================================================================
@@ -182,9 +185,37 @@ logs: docker-logs ## Alias for docker-logs
 ps: docker-ps ## Alias for docker-ps
 
 # =============================================================================
-# Production
+# Production & Deployment
 # =============================================================================
 
 prod-build: ## Build for production
 	@echo "$(CYAN)Building for production...$(RESET)"
 	NODE_ENV=production pnpm build
+
+deploy-staging: ## Deploy to staging (push to dev branch)
+	@echo "$(CYAN)Deploying to staging...$(RESET)"
+	git push origin dev
+	@echo "$(GREEN)Staging deployment triggered!$(RESET)"
+	@echo "Monitor at: https://github.com/$(shell git remote get-url origin | sed 's/.*github.com[:/]//' | sed 's/.git$$//')/actions"
+
+deploy-prod: ## Deploy to production (merge dev to main)
+	@echo "$(YELLOW)Deploying to production...$(RESET)"
+	@read -p "Are you sure you want to deploy to production? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
+	git checkout main
+	git pull origin main
+	git merge dev --no-edit
+	git push origin main
+	git checkout dev
+	@echo "$(GREEN)Production deployment triggered!$(RESET)"
+	@echo "Monitor at: https://github.com/$(shell git remote get-url origin | sed 's/.*github.com[:/]//' | sed 's/.git$$//')/actions"
+
+# =============================================================================
+# Quick Checks Before Deploy
+# =============================================================================
+
+pre-deploy: ## Run all checks before deploying
+	@echo "$(CYAN)Running pre-deployment checks...$(RESET)"
+	@make lint
+	@make typecheck
+	@make build
+	@echo "$(GREEN)All pre-deployment checks passed!$(RESET)"

@@ -94,7 +94,8 @@
       "Bash(git -C /Users/saim/Desktop/Tour_CRM commit -m \"$(cat <<''EOF''\nFix critical tRPC 500 errors and production readiness issues\n\nCritical Bug Fixes:\n- Fix PostgreSQL array parameter bugs in schedule-service.ts, tour-service.ts,\n  and tour-guide-qualification-service.ts - replaced sql`ANY()` with inArray()\n- Fix goals table schema type mismatch - changed from uuid to text IDs to match\n  organization schema\n- Add proper null checks with isNotNull() for guide assignment queries\n\nTour Module Refactor (from plan):\n- Integrate schedule management into tour module with tabbed interface\n- Create unified tour page with Overview, Details, Schedules, Pricing, Guides tabs\n- Add schedule template form for tour creation flow\n- Remove standalone tour edit page (merged into Details tab)\n\nNew Components:\n- tour-page-header.tsx - Shared header with status and actions\n- tour-overview-tab.tsx - Read-only tour summary\n- tour-details-tab.tsx - Editable tour form\n- tour-pricing-tab.tsx - Pricing tiers management\n- schedule-template-form.tsx - Schedule pattern capture for creation\n\nFiles Deleted:\n- tours/[id]/edit/page.tsx (merged into unified page)\n- availability/[id]/edit/page.tsx (availability now read-only)\n- Various outdated docs in docs/analysis/\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(pnpm turbo typecheck:*)",
       "Bash(pnpm typecheck:crm:*)",
-      "Bash(pnpm --filter @tour/config exec tsc --noEmit)"
+      "Bash(pnpm --filter @tour/config exec tsc --noEmit)",
+      "Bash(chmod:*)"
     ]
   }
 }

@@ -1,429 +1,1441 @@
-# Production Deployment Guide
+# Production Deployment & DevOps Guide
 
-This guide covers deploying Tour CRM to production using Coolify on a VPS with Supabase as the database.
+> **YC-Level Development Pipeline**: From code change to production in minutes, with confidence.
 
-## Architecture Overview
+This guide establishes a world-class development workflow with automated CI/CD, staging environments, zero-downtime deployments, and comprehensive monitoring.
+
+---
+
+## Table of Contents
+
+1. [Philosophy & Principles](#1-philosophy--principles)
+2. [Architecture Overview](#2-architecture-overview)
+3. [Local Development Setup](#3-local-development-setup)
+4. [Git Workflow & Branch Strategy](#4-git-workflow--branch-strategy)
+5. [Code Quality Gates](#5-code-quality-gates)
+6. [CI/CD Pipeline](#6-cicd-pipeline)
+7. [External Services Setup](#7-external-services-setup)
+8. [Coolify Configuration](#8-coolify-configuration)
+9. [Environment Management](#9-environment-management)
+10. [Database Management](#10-database-management)
+11. [Monitoring & Observability](#11-monitoring--observability)
+12. [Incident Response & Rollbacks](#12-incident-response--rollbacks)
+13. [Security Checklist](#13-security-checklist)
+14. [Runbooks](#14-runbooks)
+
+---
+
+## 1. Philosophy & Principles
+
+### The Golden Rules
+
+1. **Ship Fast, Ship Safe**: Automated pipelines catch bugs before users do
+2. **Everything is Code**: Infrastructure, config, and deployments are version controlled
+3. **Fail Fast, Recover Faster**: Detect issues in seconds, rollback in one click
+4. **Zero Manual Steps**: If you're SSH-ing to fix something, automate it next time
+5. **Observability by Default**: If it's not monitored, it doesn't exist
+
+### Deployment Flow
 
 ```
-                    ┌─────────────────────────────────────┐
-                    │           EXTERNAL SERVICES          │
-                    ├─────────────────────────────────────┤
-                    │  Supabase (Database)                │
-                    │  Clerk (Authentication)             │
-                    │  Stripe (Payments)                  │
-                    │  Resend (Email)                     │
-                    └──────────────┬──────────────────────┘
-                                   │
-                    ┌──────────────▼──────────────────────┐
-                    │         HOSTINGER VPS + COOLIFY      │
-                    ├─────────────────────────────────────┤
-                    │  ┌─────────┐  ┌─────────┐           │
-                    │  │   CRM   │  │   Web   │ (optional)│
-                    │  │  :3000  │  │  :3001  │           │
-                    │  └────┬────┘  └────┬────┘           │
-                    │       │            │                │
-                    │  ┌────▼────────────▼────┐           │
-                    │  │   Traefik (SSL/LB)   │           │
-                    │  └──────────────────────┘           │
-                    │       │                             │
-                    │  ┌────▼────┐                        │
-                    │  │  Redis  │                        │
-                    │  └─────────┘                        │
-                    └─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           DEVELOPMENT PIPELINE                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   LOCAL DEV          GITHUB              STAGING            PRODUCTION       │
+│   ─────────          ──────              ───────            ──────────       │
+│                                                                              │
+│   ┌─────────┐       ┌─────────┐        ┌─────────┐        ┌─────────┐       │
+│   │  Code   │──────▶│   PR    │───────▶│   Dev   │───────▶│  Main   │       │
+│   │ Change  │       │ Created │        │ Branch  │        │ Branch  │       │
+│   └─────────┘       └────┬────┘        └────┬────┘        └────┬────┘       │
+│        │                 │                  │                   │            │
+│        ▼                 ▼                  ▼                   ▼            │
+│   ┌─────────┐       ┌─────────┐        ┌─────────┐        ┌─────────┐       │
+│   │Pre-commit│      │CI Checks│        │ Auto    │        │ Auto    │       │
+│   │  Hooks  │       │ ✓ Lint  │        │ Deploy  │        │ Deploy  │       │
+│   │ ✓ Lint  │       │ ✓ Types │        │   to    │        │   to    │       │
+│   │ ✓ Types │       │ ✓ Tests │        │ Staging │        │  Prod   │       │
+│   │ ✓ Format│       │ ✓ Build │        └────┬────┘        └────┬────┘       │
+│   └─────────┘       └─────────┘             │                   │            │
+│                                              ▼                   ▼            │
+│                                         ┌─────────┐        ┌─────────┐       │
+│                                         │ E2E     │        │ Smoke   │       │
+│                                         │ Tests   │        │ Tests   │       │
+│                                         │ + QA    │        │ + Alert │       │
+│                                         └─────────┘        └─────────┘       │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Prerequisites
+## 2. Architecture Overview
 
-Before starting, ensure you have:
+### Infrastructure Topology
 
-- [ ] A VPS with Coolify installed (KVM4 or better recommended)
-- [ ] A domain name with DNS access
-- [ ] SSH access to your server
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              INTERNET                                        │
+│                                  │                                           │
+│                    ┌─────────────┴─────────────┐                            │
+│                    │      CLOUDFLARE (DNS)      │                            │
+│                    │   *.yourdomain.com → VPS   │                            │
+│                    └─────────────┬─────────────┘                            │
+│                                  │                                           │
+├──────────────────────────────────┼──────────────────────────────────────────┤
+│                    HOSTINGER VPS │ + COOLIFY                                 │
+│                    ┌─────────────┴─────────────┐                            │
+│                    │     TRAEFIK (Reverse Proxy)│                            │
+│                    │  • Auto SSL (Let's Encrypt)│                            │
+│                    │  • Load Balancing          │                            │
+│                    │  • Rate Limiting           │                            │
+│                    └──────┬──────────────┬─────┘                            │
+│                           │              │                                   │
+│            ┌──────────────┴──┐    ┌──────┴──────────────┐                   │
+│            │                 │    │                     │                   │
+│      ┌─────▼─────┐    ┌──────▼────▼─┐    ┌────────────┐                    │
+│      │ STAGING   │    │ PRODUCTION   │    │   REDIS    │                    │
+│      │ (dev)     │    │ (main)       │    │  Cache +   │                    │
+│      │           │    │              │    │  Sessions  │                    │
+│      │ CRM:3000  │    │ CRM:3000     │    └────────────┘                    │
+│      │ Web:3001  │    │ Web:3001     │                                      │
+│      └───────────┘    └──────────────┘                                      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                  │
+                    ┌─────────────┴─────────────┐
+                    │      EXTERNAL SERVICES     │
+                    ├────────────────────────────┤
+                    │  Supabase    → Database    │
+                    │  Clerk       → Auth        │
+                    │  Stripe      → Payments    │
+                    │  Resend      → Email       │
+                    │  Inngest     → Background  │
+                    │  Sentry      → Errors      │
+                    │  BetterStack → Monitoring  │
+                    └────────────────────────────┘
+```
+
+### Environments
+
+| Environment | Branch | URL | Purpose |
+|-------------|--------|-----|---------|
+| **Local** | Any | `localhost:3000` | Development |
+| **Staging** | `dev` | `staging.yourdomain.com` | QA & Testing |
+| **Production** | `main` | `app.yourdomain.com` | Live Users |
 
 ---
 
-## Step 1: External Services Setup
+## 3. Local Development Setup
 
-### 1.1 Supabase (Database)
-
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Wait for the project to be provisioned (~2 minutes)
-3. Go to **Settings → Database → Connection string**
-4. Copy both connection strings:
+### One-Command Setup
 
 ```bash
-# Transaction pooler (for app queries) - use port 6543
+# Clone and setup (first time only)
+git clone https://github.com/your-org/tour-crm.git
+cd tour-crm
+make setup  # or: ./scripts/setup.sh
+
+# Daily development
+make dev    # or: pnpm dev
+```
+
+### Prerequisites
+
+- **Node.js 20+**: `nvm install 20 && nvm use 20`
+- **pnpm 9+**: `npm install -g pnpm`
+- **Docker Desktop**: For local Postgres/Redis (optional)
+
+### Setup Script (`scripts/setup.sh`)
+
+```bash
+#!/bin/bash
+set -e
+
+echo "🚀 Setting up Tour CRM development environment..."
+
+# 1. Check prerequisites
+command -v node >/dev/null 2>&1 || { echo "❌ Node.js required"; exit 1; }
+command -v pnpm >/dev/null 2>&1 || { echo "📦 Installing pnpm..."; npm install -g pnpm; }
+
+# 2. Install dependencies
+echo "📦 Installing dependencies..."
+pnpm install
+
+# 3. Setup environment
+if [ ! -f .env.local ]; then
+    echo "⚙️  Creating .env.local from example..."
+    cp .env.local.example .env.local
+    echo "⚠️  Please update .env.local with your credentials"
+fi
+
+# 4. Setup git hooks
+echo "🪝 Setting up git hooks..."
+pnpm exec husky install
+
+# 5. Setup database (if using local Docker)
+if command -v docker >/dev/null 2>&1; then
+    echo "🐳 Starting local services..."
+    docker compose up -d postgres redis
+    sleep 3
+fi
+
+# 6. Push database schema
+echo "🗄️  Pushing database schema..."
+pnpm db:push
+
+# 7. Seed database (optional)
+read -p "Seed database with sample data? (y/N) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    pnpm db:seed
+fi
+
+echo "✅ Setup complete! Run 'pnpm dev' to start developing."
+```
+
+### Makefile (Developer Convenience)
+
+```makefile
+.PHONY: dev setup test lint build deploy-staging deploy-prod
+
+# Development
+dev:
+	pnpm dev
+
+setup:
+	./scripts/setup.sh
+
+# Quality
+lint:
+	pnpm lint && pnpm typecheck
+
+test:
+	pnpm test
+
+test-e2e:
+	pnpm test:e2e
+
+# Build
+build:
+	pnpm build
+
+# Database
+db-push:
+	pnpm db:push
+
+db-studio:
+	pnpm db:studio
+
+db-migrate:
+	pnpm db:generate && pnpm db:push
+
+# Deployment (manual triggers)
+deploy-staging:
+	git push origin dev
+
+deploy-prod:
+	@echo "⚠️  Deploying to production..."
+	@read -p "Are you sure? (y/N) " confirm && [ "$$confirm" = "y" ]
+	git checkout main && git merge dev && git push origin main
+	git checkout dev
+
+# Utilities
+clean:
+	rm -rf node_modules .next .turbo
+	pnpm install
+
+logs-staging:
+	ssh coolify 'docker logs tour-crm-staging --tail 100 -f'
+
+logs-prod:
+	ssh coolify 'docker logs tour-crm-prod --tail 100 -f'
+```
+
+### Local Docker Compose (`docker-compose.yml`)
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tour_crm
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+---
+
+## 4. Git Workflow & Branch Strategy
+
+### Branch Structure
+
+```
+main (production)
+ │
+ └── dev (staging)
+      │
+      ├── feature/add-booking-export
+      ├── fix/payment-webhook-retry
+      └── chore/update-dependencies
+```
+
+### Branch Rules
+
+| Branch | Protection | Deploy To | Merge Strategy |
+|--------|------------|-----------|----------------|
+| `main` | Protected, requires PR + approval | Production | Squash & Merge |
+| `dev` | Protected, requires CI pass | Staging | Squash & Merge |
+| `feature/*` | None | Preview (optional) | — |
+| `fix/*` | None | — | — |
+| `hotfix/*` | Can merge direct to main | Production | — |
+
+### Commit Convention (Conventional Commits)
+
+```bash
+# Format: <type>(<scope>): <description>
+
+feat(booking): add CSV export functionality
+fix(payments): handle webhook retry correctly
+docs(readme): update setup instructions
+chore(deps): upgrade Next.js to 15.1
+refactor(api): simplify tour pricing logic
+test(booking): add unit tests for cancellation
+perf(queries): optimize tour list query
+```
+
+**Types**: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `ci`
+
+### Pull Request Template (`.github/pull_request_template.md`)
+
+```markdown
+## Summary
+<!-- What does this PR do? -->
+
+## Type of Change
+- [ ] 🚀 Feature (new functionality)
+- [ ] 🐛 Bug Fix (non-breaking fix)
+- [ ] 💥 Breaking Change (fix/feature causing existing functionality to change)
+- [ ] 📝 Documentation
+- [ ] 🧹 Chore (refactoring, dependencies, etc.)
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Manually tested locally
+- [ ] Tested on staging (if applicable)
+
+## Checklist
+- [ ] Code follows project conventions
+- [ ] Self-reviewed my code
+- [ ] No console.logs or debug code
+- [ ] No hardcoded secrets or credentials
+- [ ] Database migrations are backwards compatible
+
+## Screenshots (if applicable)
+<!-- Add screenshots for UI changes -->
+
+## Related Issues
+<!-- Closes #123 -->
+```
+
+---
+
+## 5. Code Quality Gates
+
+### Pre-commit Hooks (Husky + lint-staged)
+
+Install hooks:
+```bash
+pnpm add -D husky lint-staged
+pnpm exec husky install
+```
+
+`.husky/pre-commit`:
+```bash
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+pnpm exec lint-staged
+```
+
+`package.json`:
+```json
+{
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}
+```
+
+### Pre-push Hook (Type Check)
+
+`.husky/pre-push`:
+```bash
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Running type check before push..."
+pnpm typecheck || {
+    echo "❌ Type check failed. Push aborted."
+    exit 1
+}
+```
+
+### ESLint Configuration
+
+Ensure strict rules in `.eslintrc.js`:
+```javascript
+module.exports = {
+  extends: ['next/core-web-vitals', 'prettier'],
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'react-hooks/exhaustive-deps': 'error',
+  },
+};
+```
+
+### TypeScript Strict Mode
+
+`tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+---
+
+## 6. CI/CD Pipeline
+
+### GitHub Actions Workflows
+
+#### Main CI Workflow (`.github/workflows/ci.yml`)
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  # ============================================
+  # QUALITY CHECKS
+  # ============================================
+  quality:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type Check
+        run: pnpm typecheck
+
+      - name: Check formatting
+        run: pnpm exec prettier --check .
+
+  # ============================================
+  # BUILD
+  # ============================================
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: |
+            apps/crm/.next
+            apps/web/.next
+          retention-days: 1
+
+  # ============================================
+  # TESTS
+  # ============================================
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: quality
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tour_crm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test --coverage
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tour_crm_test
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+
+  # ============================================
+  # DEPLOY TO STAGING (dev branch only)
+  # ============================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: https://staging.yourdomain.com
+    steps:
+      - name: Trigger Coolify Deployment
+        run: |
+          curl -X POST "${{ secrets.COOLIFY_WEBHOOK_STAGING }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
+
+      - name: Wait for deployment
+        run: sleep 60
+
+      - name: Health check
+        run: |
+          for i in {1..10}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" https://staging.yourdomain.com/api/health)
+            if [ "$status" = "200" ]; then
+              echo "✅ Staging is healthy"
+              exit 0
+            fi
+            echo "Waiting for staging... (attempt $i)"
+            sleep 10
+          done
+          echo "❌ Staging health check failed"
+          exit 1
+
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '✅' || '❌' }} Staging deployment ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Staging Deployment ${{ job.status }}*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+  # ============================================
+  # DEPLOY TO PRODUCTION (main branch only)
+  # ============================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://app.yourdomain.com
+    steps:
+      - name: Trigger Coolify Deployment
+        run: |
+          curl -X POST "${{ secrets.COOLIFY_WEBHOOK_PROD }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
+
+      - name: Wait for deployment
+        run: sleep 90
+
+      - name: Health check
+        run: |
+          for i in {1..10}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" https://app.yourdomain.com/api/health)
+            if [ "$status" = "200" ]; then
+              echo "✅ Production is healthy"
+              exit 0
+            fi
+            echo "Waiting for production... (attempt $i)"
+            sleep 10
+          done
+          echo "❌ Production health check failed"
+          exit 1
+
+      - name: Smoke tests
+        run: |
+          # Basic API smoke tests
+          curl -sf https://app.yourdomain.com/api/health | jq .
+          echo "✅ Smoke tests passed"
+
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '🚀' || '🚨' }} Production deployment ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Production Deployment ${{ job.status }}*\nCommit: `${{ github.sha }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Create Sentry release
+        if: success()
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: tour-crm
+        with:
+          environment: production
+          version: ${{ github.sha }}
+```
+
+#### Dependency Updates (`.github/workflows/dependencies.yml`)
+
+```yaml
+name: Dependencies
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9am
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Update dependencies
+        run: pnpm update --latest
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet pnpm-lock.yaml; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: 'chore(deps): update dependencies'
+          title: 'chore(deps): Weekly dependency updates'
+          body: |
+            Automated dependency updates from `pnpm update --latest`.
+
+            Please review changes and ensure all tests pass.
+          branch: chore/update-dependencies
+          delete-branch: true
+```
+
+---
+
+## 7. External Services Setup
+
+### 7.1 Supabase (Database)
+
+1. Create project at [supabase.com](https://supabase.com)
+2. Go to **Settings → Database → Connection string**
+3. Copy connection strings:
+
+```bash
+# Pooled connection (for app - port 6543)
 DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
 
-# Direct connection (for migrations) - use port 5432
+# Direct connection (for migrations - port 5432)
 DIRECT_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
 ```
 
-> **Important:** Enable "Connection Pooling" in Supabase settings for better performance.
+**Important Settings:**
+- Enable connection pooling (Settings → Database → Connection Pooling)
+- Upgrade to Pro plan for production (automatic backups, no pausing)
 
-### 1.2 Clerk (Authentication)
+### 7.2 Clerk (Authentication)
 
-1. Go to [clerk.com](https://clerk.com) and create an application
-2. Select authentication methods (Email, Google, etc.)
-3. Go to **API Keys** and switch to **Production** instance
-4. Copy the keys:
+1. Create application at [clerk.com](https://clerk.com)
+2. Configure sign-in methods (Email, Google, etc.)
+3. Get API keys from **API Keys** page
+4. **Create Production Instance** (separate from development)
 
 ```bash
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
 CLERK_SECRET_KEY=sk_live_...
 ```
 
-5. Go to **Webhooks** → **Add Endpoint**:
+5. Configure webhook at **Webhooks → Add Endpoint**:
    - URL: `https://app.yourdomain.com/api/webhooks/clerk`
    - Events: `user.created`, `user.updated`, `user.deleted`, `organization.*`
-   - Copy the signing secret:
 
 ```bash
 CLERK_WEBHOOK_SECRET=whsec_...
 ```
 
-### 1.3 Stripe (Payments)
+### 7.3 Stripe (Payments)
 
-1. Go to [dashboard.stripe.com](https://dashboard.stripe.com)
-2. Complete account verification for live payments
-3. Go to **Developers → API keys** (ensure "Test mode" is OFF)
-4. Copy the keys:
+1. Complete account verification at [stripe.com](https://stripe.com)
+2. Get live API keys from **Developers → API keys**
 
 ```bash
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_SECRET_KEY=sk_live_...
 ```
 
-5. Enable **Stripe Connect**:
-   - Go to **Connect → Settings**
-   - Configure your platform settings
-   - Set OAuth redirect URI: `https://app.yourdomain.com/api/stripe/connect/callback`
-
-6. Set up **Webhooks**:
-   - Go to **Developers → Webhooks → Add endpoint**
+3. Enable **Stripe Connect** at **Connect → Settings**
+4. Set up webhook at **Developers → Webhooks**:
    - URL: `https://app.yourdomain.com/api/webhooks/stripe`
-   - Events to listen for:
-     - `checkout.session.completed`
-     - `payment_intent.succeeded`
-     - `payment_intent.payment_failed`
-     - `account.updated`
-     - `account.application.authorized`
-     - `account.application.deauthorized`
-   - Copy the signing secret:
+   - Events: `checkout.session.completed`, `payment_intent.*`, `account.*`
 
 ```bash
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-### 1.4 Resend (Email)
+### 7.4 Resend (Email)
 
-1. Go to [resend.com](https://resend.com) and create an account
-2. **Add and verify your domain**:
-   - Go to **Domains → Add Domain**
-   - Add the DNS records they provide (SPF, DKIM, DMARC)
-   - Wait for verification (~5-10 minutes)
-3. Go to **API Keys → Create API Key**
-4. Copy the key:
+1. Create account at [resend.com](https://resend.com)
+2. **Verify your domain** at **Domains → Add Domain**
+3. Add DNS records (SPF, DKIM, DMARC)
+4. Create API key
 
 ```bash
 RESEND_API_KEY=re_...
 EMAIL_FROM=noreply@yourdomain.com
 ```
 
+### 7.5 Sentry (Error Tracking)
+
+1. Create project at [sentry.io](https://sentry.io)
+2. Get DSN from **Settings → Client Keys**
+
+```bash
+NEXT_PUBLIC_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
+SENTRY_AUTH_TOKEN=sntrys_...
+SENTRY_ORG=your-org
+SENTRY_PROJECT=tour-crm
+```
+
+### 7.6 BetterStack (Uptime Monitoring)
+
+1. Create account at [betterstack.com](https://betterstack.com)
+2. Create monitor for `https://app.yourdomain.com/api/health`
+3. Configure alerting (Slack, Email, PagerDuty)
+
 ---
 
-## Step 2: DNS Configuration
+## 8. Coolify Configuration
 
-Add these DNS records at your domain registrar:
+### 8.1 Initial Server Setup
 
-| Type | Name | Value | TTL |
-|------|------|-------|-----|
-| A | app | `<your-vps-ip>` | 300 |
-| A | book | `<your-vps-ip>` | 300 |
-| CNAME | www | app.yourdomain.com | 300 |
+```bash
+# SSH to your VPS
+ssh root@your-vps-ip
 
-Also add **Resend DNS records** for email verification (provided by Resend).
+# Install Coolify (if not already installed)
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 
----
+# Access Coolify at https://your-vps-ip:8000
+```
 
-## Step 3: Coolify Setup
+### 8.2 Project Structure in Coolify
 
-### 3.1 Create Redis Service
+```
+Tour CRM (Project)
+├── Resources
+│   ├── tour-crm-staging (Application)
+│   │   └── Source: GitHub → dev branch
+│   ├── tour-crm-production (Application)
+│   │   └── Source: GitHub → main branch
+│   ├── tour-redis (Service)
+│   │   └── Redis 7 Alpine
+│   └── tour-web-production (Application) [optional]
+│       └── Source: GitHub → main branch
+```
 
-1. In Coolify, go to **Services → New Service**
-2. Select **Redis** from the marketplace
-3. Configure:
-   - Name: `tour-redis`
-   - Password: Generate a strong password
-4. Deploy and note the internal URL: `redis://:password@tour-redis:6379`
+### 8.3 Application Configuration
 
-### 3.2 Create CRM Application
+**For each application (staging & production):**
 
-1. Go to **Projects → New Project** → Name it "Tour CRM"
-2. **Add Resource → Application**
-3. Configure source:
-   - Git Repository: Your repo URL
-   - Branch: `main`
-   - Build Pack: **Nixpacks** (recommended) or Docker
+**General Settings:**
+```
+Build Pack: Nixpacks
+Base Directory: /
+Watch Paths: (empty - use webhook)
+```
 
-4. Configure build settings:
+**Build Configuration:**
 ```bash
 # Build Command
-pnpm install && pnpm db:push && pnpm build --filter @tour/crm
+pnpm install --frozen-lockfile && pnpm db:push && pnpm build --filter @tour/crm
 
 # Start Command
 pnpm start --filter @tour/crm
-
-# Base Directory
-/
 
 # Port
 3000
 ```
 
-5. Configure domain:
-   - Add domain: `app.yourdomain.com`
-   - Enable HTTPS (Coolify handles SSL automatically)
+**Domain Configuration:**
+- Staging: `staging.yourdomain.com`
+- Production: `app.yourdomain.com`
+- Enable HTTPS (automatic via Traefik)
 
-### 3.3 Add Environment Variables
+### 8.4 Webhook Configuration
 
-In the CRM application settings, add all environment variables:
+1. In Coolify, go to each application → **Webhooks**
+2. Enable webhook and copy the URL
+3. Add to GitHub repository **Settings → Secrets → Actions**:
+   - `COOLIFY_WEBHOOK_STAGING`: Staging webhook URL
+   - `COOLIFY_WEBHOOK_PROD`: Production webhook URL
+   - `COOLIFY_API_TOKEN`: Your Coolify API token
 
-```bash
-# =============================================================================
-# DATABASE
-# =============================================================================
-DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
-DIRECT_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+### 8.5 Health Check Configuration
 
-# =============================================================================
-# AUTHENTICATION
-# =============================================================================
-ENABLE_CLERK=true
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
-CLERK_SECRET_KEY=sk_live_...
-CLERK_WEBHOOK_SECRET=whsec_...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
-
-# =============================================================================
-# PAYMENTS
-# =============================================================================
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-
-# =============================================================================
-# EMAIL
-# =============================================================================
-RESEND_API_KEY=re_...
-EMAIL_FROM=noreply@yourdomain.com
-
-# =============================================================================
-# CACHE
-# =============================================================================
-REDIS_URL=redis://:yourpassword@tour-redis:6379
-
-# =============================================================================
-# SECURITY
-# =============================================================================
-# Generate with: openssl rand -base64 32
-JWT_SECRET=your-super-secret-jwt-key-minimum-32-characters
-
-# =============================================================================
-# APP CONFIGURATION
-# =============================================================================
-NODE_ENV=production
-NEXT_PUBLIC_APP_URL=https://app.yourdomain.com
-NEXT_PUBLIC_WEB_URL=https://book.yourdomain.com
-GUIDE_PORTAL_URL=https://app.yourdomain.com/guide
+In Coolify application settings:
+```
+Health Check Path: /api/health
+Health Check Port: 3000
+Health Check Interval: 30s
+Health Check Timeout: 10s
+Health Check Retries: 3
 ```
 
-### 3.4 Deploy
+### 8.6 Resource Limits
 
-1. Click **Deploy** in Coolify
-2. Watch the build logs for any errors
-3. Once deployed, the app should be accessible at `https://app.yourdomain.com`
+**Staging:**
+```
+CPU Limit: 1 core
+Memory Limit: 1GB
+```
+
+**Production:**
+```
+CPU Limit: 2 cores
+Memory Limit: 2GB
+```
+
+### 8.7 Zero-Downtime Deployments
+
+Coolify uses rolling deployments by default. Ensure your app:
+1. Has a health check endpoint
+2. Handles graceful shutdown (SIGTERM)
+3. Doesn't rely on local file storage
+
+Add to your Next.js app (`next.config.js`):
+```javascript
+module.exports = {
+  // Enable standalone output for better container performance
+  output: 'standalone',
+};
+```
 
 ---
 
-## Step 4: Post-Deployment Verification
+## 9. Environment Management
 
-### 4.1 Health Check
+### Environment Variables by Environment
 
-Visit `https://app.yourdomain.com/api/health`
+#### Local Development (`.env.local`)
 
-Expected response:
+```bash
+# =============================================================================
+# DATABASE (local Docker or Supabase dev project)
+# =============================================================================
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/tour_crm"
+
+# =============================================================================
+# AUTHENTICATION (disabled for local dev)
+# =============================================================================
+ENABLE_CLERK="false"
+
+# =============================================================================
+# APP URLs
+# =============================================================================
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NEXT_PUBLIC_WEB_URL="http://localhost:3001"
+
+# =============================================================================
+# OPTIONAL - Enable as needed for testing
+# =============================================================================
+# STRIPE_SECRET_KEY="sk_test_..."
+# RESEND_API_KEY="re_..."
+```
+
+#### Staging (Coolify Environment Variables)
+
+```bash
+# Database - Separate Supabase project for staging
+DATABASE_URL="postgresql://postgres.[ref]:[password]@...staging..."
+DIRECT_URL="postgresql://postgres.[ref]:[password]@...staging..."
+
+# Auth - Clerk development instance
+ENABLE_CLERK="true"
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_..."
+CLERK_SECRET_KEY="sk_test_..."
+
+# Payments - Stripe test mode
+STRIPE_SECRET_KEY="sk_test_..."
+
+# Feature flags
+ENABLE_DEBUG_MODE="true"
+LOG_LEVEL="debug"
+
+# URLs
+NODE_ENV="production"
+NEXT_PUBLIC_APP_URL="https://staging.yourdomain.com"
+```
+
+#### Production (Coolify Environment Variables)
+
+```bash
+# Database - Production Supabase
+DATABASE_URL="postgresql://postgres.[ref]:[password]@...production..."
+DIRECT_URL="postgresql://postgres.[ref]:[password]@...production..."
+
+# Auth - Clerk production instance
+ENABLE_CLERK="true"
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_live_..."
+CLERK_SECRET_KEY="sk_live_..."
+CLERK_WEBHOOK_SECRET="whsec_..."
+
+# Payments - Stripe live mode
+STRIPE_SECRET_KEY="sk_live_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+
+# Email
+RESEND_API_KEY="re_..."
+EMAIL_FROM="noreply@yourdomain.com"
+
+# Cache
+REDIS_URL="redis://:password@tour-redis:6379"
+
+# Security
+JWT_SECRET="<generate: openssl rand -base64 32>"
+
+# Monitoring
+NEXT_PUBLIC_SENTRY_DSN="https://..."
+SENTRY_AUTH_TOKEN="..."
+
+# URLs
+NODE_ENV="production"
+NEXT_PUBLIC_APP_URL="https://app.yourdomain.com"
+NEXT_PUBLIC_WEB_URL="https://book.yourdomain.com"
+```
+
+### Secret Management Best Practices
+
+1. **Never commit secrets** - Use `.env.local` (gitignored)
+2. **Rotate secrets regularly** - Especially after team changes
+3. **Use different secrets per environment** - Never share between staging/prod
+4. **Audit access** - Track who has access to production secrets
+
+---
+
+## 10. Database Management
+
+### Migration Strategy
+
+```bash
+# Development: Quick iteration
+pnpm db:push          # Push schema changes directly
+
+# Production: Safe migrations
+pnpm db:generate      # Generate migration files
+pnpm db:migrate       # Apply migrations
+```
+
+### Migration Best Practices
+
+1. **Always backwards compatible** - Old code should work with new schema
+2. **Small, incremental changes** - One logical change per migration
+3. **Test migrations on staging first** - Never run untested migrations on prod
+4. **Have a rollback plan** - Know how to undo each migration
+
+### Backup Strategy
+
+**Supabase Pro Plan:**
+- Automatic daily backups (7-day retention)
+- Point-in-time recovery (up to 7 days)
+
+**Manual Backup:**
+```bash
+# Create backup
+pg_dump $DATABASE_URL > backup-$(date +%Y%m%d).sql
+
+# Restore backup
+psql $DATABASE_URL < backup-20240101.sql
+```
+
+### Connection Pooling
+
+Always use pooled connections in production:
+```bash
+# App queries (pooled - port 6543)
+DATABASE_URL="...pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+# Migrations (direct - port 5432)
+DIRECT_URL="...pooler.supabase.com:5432/postgres"
+```
+
+---
+
+## 11. Monitoring & Observability
+
+### Health Check Endpoint
+
+Your `/api/health` should return:
+
 ```json
 {
   "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00.000Z",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "version": "1.2.3",
   "environment": "production",
   "services": [
     { "name": "database", "status": "healthy", "latency": 45 },
+    { "name": "redis", "status": "healthy", "latency": 2 },
     { "name": "clerk", "status": "healthy" },
-    { "name": "stripe", "status": "healthy", "message": "Live mode" },
-    { "name": "resend", "status": "healthy" }
+    { "name": "stripe", "status": "healthy" }
   ]
 }
 ```
 
-### 4.2 Test Authentication
+### Monitoring Stack
 
-1. Go to `https://app.yourdomain.com`
-2. Click "Sign Up" and create an account
-3. Verify you can log in
+| Tool | Purpose | Setup |
+|------|---------|-------|
+| **Sentry** | Error tracking | SDK integration |
+| **BetterStack** | Uptime monitoring | External monitor |
+| **Coolify Logs** | Application logs | Built-in |
+| **Supabase Dashboard** | Database metrics | Built-in |
 
-### 4.3 Test Organization Creation
+### Alerting Rules
 
-1. After login, you should be redirected to onboarding
-2. Create a test organization
-3. Verify you land on the dashboard
+Configure alerts for:
 
-### 4.4 Test Stripe Connect
+1. **Uptime**: Site down for > 1 minute
+2. **Error Rate**: > 1% error rate in 5 minutes
+3. **Response Time**: P95 > 2 seconds
+4. **Database**: Connection pool exhausted
+5. **Disk Space**: VPS disk > 80% full
 
-1. Go to **Settings → Payments**
-2. Click "Connect with Stripe"
-3. Complete Stripe onboarding (use test data)
-4. Verify you return to settings with "Connected" status
+### Log Levels
 
-### 4.5 Test Email
+```typescript
+// Use structured logging
+import { logger } from '@/lib/logger';
 
-1. Create a test booking
-2. Check that confirmation email is received
-3. Verify email is from your domain (not resend.dev)
-
----
-
-## Step 5: Optional - Web App (Booking Site)
-
-If you want the customer-facing booking website:
-
-### 5.1 Create Web Application in Coolify
-
-1. **Add Resource → Application** in the same project
-2. Configure:
-```bash
-# Build Command
-pnpm install && pnpm build --filter @tour/web
-
-# Start Command
-pnpm start --filter @tour/web
-
-# Port
-3001
+logger.info('Booking created', { bookingId, customerId, tourId });
+logger.warn('Payment retry', { bookingId, attempt: 3 });
+logger.error('Payment failed', { bookingId, error: error.message });
 ```
 
-3. Add domain: `book.yourdomain.com`
-4. Add the same environment variables (or reference from CRM)
-5. Deploy
-
 ---
 
-## Troubleshooting
+## 12. Incident Response & Rollbacks
 
-### Database Connection Issues
+### Incident Severity Levels
+
+| Level | Description | Response Time | Example |
+|-------|-------------|---------------|---------|
+| **P1** | Complete outage | < 15 min | Site down, payments broken |
+| **P2** | Major feature broken | < 1 hour | Booking creation failing |
+| **P3** | Minor issue | < 4 hours | UI bug, slow queries |
+| **P4** | Cosmetic/low impact | Next sprint | Typo, minor UI issue |
+
+### Rollback Procedures
+
+#### Quick Rollback (Coolify)
+
+1. Go to Coolify → Application → **Deployments**
+2. Find the last working deployment
+3. Click **Rollback** on that deployment
+4. Verify health check passes
+
+#### Git Rollback
 
 ```bash
-# Test connection from server
-psql "postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres"
+# Identify the bad commit
+git log --oneline -10
+
+# Revert the bad commit
+git revert <bad-commit-sha>
+git push origin main
+
+# Or reset to previous known-good state (destructive)
+git reset --hard <good-commit-sha>
+git push origin main --force  # ⚠️ Requires admin
 ```
 
-If connection fails:
-- Check Supabase is not paused (free tier pauses after inactivity)
-- Verify connection string has correct password
-- Ensure pooler is enabled in Supabase
+#### Database Rollback
 
-### Webhook Failures
+```bash
+# If you have migration rollback
+pnpm db:rollback
 
-**Clerk webhooks failing:**
-- Verify URL is exactly `https://app.yourdomain.com/api/webhooks/clerk`
-- Check CLERK_WEBHOOK_SECRET matches
-- View webhook logs in Clerk dashboard
+# If you need point-in-time recovery
+# → Use Supabase dashboard → Backups → Restore
+```
 
-**Stripe webhooks failing:**
-- Verify URL is exactly `https://app.yourdomain.com/api/webhooks/stripe`
-- Check STRIPE_WEBHOOK_SECRET matches
-- Use Stripe CLI to test: `stripe listen --forward-to https://app.yourdomain.com/api/webhooks/stripe`
+### Post-Incident Process
 
-### Build Failures
-
-Common issues:
-- **Memory:** Increase Coolify container memory limit
-- **pnpm not found:** Ensure Nixpacks or your Dockerfile installs pnpm
-- **Type errors:** Run `pnpm typecheck` locally first
-
-### SSL/HTTPS Issues
-
-Coolify uses Traefik for SSL. If certificates aren't working:
-1. Check DNS is pointing to correct IP
-2. Wait 5-10 minutes for certificate provisioning
-3. Check Traefik logs in Coolify
+1. **Mitigate**: Stop the bleeding
+2. **Communicate**: Update status page, notify users
+3. **Investigate**: Find root cause
+4. **Document**: Write incident report
+5. **Prevent**: Implement fixes to prevent recurrence
 
 ---
 
-## Maintenance
+## 13. Security Checklist
 
-### Updating the Application
+### Pre-Launch Security Review
 
-1. Push changes to your `main` branch
-2. In Coolify, click **Redeploy** or enable auto-deploy
+- [ ] **Secrets Management**
+  - [ ] All secrets in environment variables (not code)
+  - [ ] Different secrets for staging vs production
+  - [ ] Secrets rotated after any team departure
 
-### Database Migrations
+- [ ] **Authentication & Authorization**
+  - [ ] Clerk production instance configured
+  - [ ] Webhook signatures validated
+  - [ ] RBAC properly implemented
+  - [ ] Session timeout configured
 
-For schema changes:
+- [ ] **Data Protection**
+  - [ ] HTTPS enforced on all domains
+  - [ ] Database connections use SSL
+  - [ ] Sensitive data encrypted at rest
+  - [ ] PII handling compliant with regulations
+
+- [ ] **API Security**
+  - [ ] Rate limiting configured
+  - [ ] Input validation on all endpoints
+  - [ ] CORS properly configured
+  - [ ] No sensitive data in URLs
+
+- [ ] **Infrastructure**
+  - [ ] SSH key authentication (no passwords)
+  - [ ] Firewall configured (only necessary ports)
+  - [ ] Automatic security updates enabled
+  - [ ] Regular dependency updates
+
+- [ ] **Monitoring**
+  - [ ] Error tracking active (Sentry)
+  - [ ] Uptime monitoring active
+  - [ ] Alerting configured
+  - [ ] Audit logging for sensitive actions
+
+### Security Headers
+
+Add to `next.config.js`:
+```javascript
+const securityHeaders = [
+  { key: 'X-DNS-Prefetch-Control', value: 'on' },
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
+];
+
+module.exports = {
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders }];
+  },
+};
+```
+
+---
+
+## 14. Runbooks
+
+### Runbook: Deploy to Production
+
 ```bash
-# Locally, generate migration
+# 1. Ensure all tests pass on dev
+git checkout dev
+pnpm test && pnpm build
+
+# 2. Create release PR
+git checkout main
+git pull origin main
+git merge dev
+git push origin main
+
+# 3. Monitor deployment
+# → Watch GitHub Actions
+# → Check Coolify deployment logs
+# → Verify health check: https://app.yourdomain.com/api/health
+
+# 4. Smoke test
+curl -s https://app.yourdomain.com/api/health | jq .
+
+# 5. Monitor for 15 minutes
+# → Check Sentry for new errors
+# → Check BetterStack for latency spikes
+```
+
+### Runbook: Database Migration
+
+```bash
+# 1. Generate migration locally
 pnpm db:generate
 
-# On deploy, migrations run automatically via:
-pnpm db:push
+# 2. Review generated SQL
+cat packages/database/drizzle/*.sql
+
+# 3. Test on staging
+# → Merge to dev
+# → Verify staging works
+
+# 4. Deploy to production
+# → Merge to main
+# → Monitor for errors
+
+# 5. Verify migration
+pnpm db:studio  # Check schema
 ```
 
-### Monitoring
+### Runbook: Rollback Deployment
 
-- **Application logs:** View in Coolify dashboard
-- **Health check:** Monitor `/api/health` endpoint
-- **Errors:** Set up Sentry (optional but recommended)
+```bash
+# 1. Identify issue
+# → Check Sentry for errors
+# → Check health endpoint
 
-### Backups
+# 2. Quick rollback via Coolify
+# → Coolify Dashboard → Application → Deployments
+# → Click "Rollback" on last working deployment
 
-- **Database:** Supabase has automatic daily backups (Pro plan)
-- **Redis:** Volatile cache, no backup needed
-- **Code:** Your Git repository
+# 3. Verify rollback
+curl -s https://app.yourdomain.com/api/health | jq .
 
----
+# 4. Investigate and fix
+git log --oneline -10  # Find bad commit
+# → Fix issue in new PR
+# → Test on staging first
+```
 
-## Security Checklist
+### Runbook: Respond to P1 Incident
 
-- [ ] All secrets stored as environment variables (never in code)
-- [ ] HTTPS enabled on all domains
-- [ ] Webhook signatures validated
-- [ ] JWT_SECRET is unique and 32+ characters
-- [ ] Production Clerk/Stripe keys (not test keys)
-- [ ] Database password is strong
-- [ ] Redis password is set
-- [ ] CORS configured for production domains only
+```
+1. ACKNOWLEDGE (< 5 min)
+   □ Acknowledge alert
+   □ Join incident channel
+   □ Assign incident commander
+
+2. ASSESS (< 10 min)
+   □ Check health endpoint
+   □ Check Sentry for errors
+   □ Check Coolify logs
+   □ Identify affected systems
+
+3. MITIGATE (< 15 min)
+   □ If bad deploy: Rollback
+   □ If database: Check Supabase status
+   □ If external service: Check status pages
+   □ If traffic spike: Enable rate limiting
+
+4. COMMUNICATE (ongoing)
+   □ Update status page
+   □ Notify affected users
+   □ Regular updates every 15 min
+
+5. RESOLVE
+   □ Verify systems healthy
+   □ Update status page: Resolved
+   □ Schedule post-mortem
+
+6. POST-MORTEM (< 48 hours)
+   □ Write incident report
+   □ Identify root cause
+   □ Create action items
+   □ Share learnings with team
+```
 
 ---
 
 ## Quick Reference
 
-| Service | Dashboard URL |
-|---------|---------------|
+### URLs
+
+| Environment | App | URL |
+|-------------|-----|-----|
+| Local | CRM | http://localhost:3000 |
+| Local | Web | http://localhost:3001 |
+| Staging | CRM | https://staging.yourdomain.com |
+| Production | CRM | https://app.yourdomain.com |
+| Production | Web | https://book.yourdomain.com |
+
+### Important Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/health` | Health check (monitoring) |
+| `/api/webhooks/clerk` | Clerk webhook receiver |
+| `/api/webhooks/stripe` | Stripe webhook receiver |
+| `/api/stripe/connect/callback` | Stripe Connect OAuth |
+
+### Service Dashboards
+
+| Service | URL |
+|---------|-----|
+| Coolify | https://your-coolify-url |
 | Supabase | https://supabase.com/dashboard |
 | Clerk | https://dashboard.clerk.com |
 | Stripe | https://dashboard.stripe.com |
 | Resend | https://resend.com/emails |
-| Coolify | https://your-coolify-url |
+| Sentry | https://sentry.io |
+| BetterStack | https://betterstack.com |
 
-| Endpoint | Purpose |
-|----------|---------|
-| `/api/health` | Health check |
-| `/api/webhooks/clerk` | Clerk webhook |
-| `/api/webhooks/stripe` | Stripe webhook |
-| `/api/stripe/connect/callback` | Stripe Connect OAuth |
+### Emergency Contacts
+
+```
+On-Call Engineer: [Your rotation system]
+Supabase Support: support@supabase.io
+Stripe Support: https://support.stripe.com
+Clerk Support: support@clerk.dev
+```
+
+---
+
+## Changelog
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2024-01-15 | Initial comprehensive guide | Team |
+| 2024-XX-XX | Added CI/CD pipeline | — |
+| 2024-XX-XX | Added monitoring section | — |
