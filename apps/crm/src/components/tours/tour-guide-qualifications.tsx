@@ -84,13 +84,13 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-700";
+        return "status-confirmed";
       case "inactive":
-        return "bg-gray-100 text-gray-700";
+        return "bg-muted text-muted-foreground";
       case "on_leave":
-        return "bg-yellow-100 text-yellow-700";
+        return "status-pending";
       default:
-        return "bg-gray-100 text-gray-700";
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -105,7 +105,7 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
 
   if (qualificationsLoading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex justify-center py-8">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
@@ -114,20 +114,20 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-card rounded-lg border border-border p-6">
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-900">Qualified Guides</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="text-lg font-semibold text-foreground">Qualified Guides</h2>
+        <p className="text-sm text-muted-foreground mt-1">
           Manage which guides are qualified to lead this tour
         </p>
       </div>
 
       {/* Qualified Guides List */}
       {qualifications.length === 0 ? (
-        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg mb-6">
-          <UserCircle className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-          <p className="text-gray-500 mb-1">No qualified guides yet</p>
-          <p className="text-sm text-gray-400">
+        <div className="text-center py-8 border-2 border-dashed border-border rounded-lg mb-6">
+          <UserCircle className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+          <p className="text-muted-foreground mb-1">No qualified guides yet</p>
+          <p className="text-sm text-muted-foreground">
             Add guides who are qualified to lead this tour
           </p>
         </div>
@@ -136,7 +136,7 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
           {qualifications.map((qualification) => (
             <div
               key={qualification.id}
-              className="flex items-center justify-between p-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
+              className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted hover:bg-accent transition-colors"
             >
               <div className="flex items-center gap-3">
                 {qualification.guide.avatarUrl ? (
@@ -148,18 +148,18 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-primary font-medium text-sm">
-                      {qualification.guide.firstName[0]}
-                      {qualification.guide.lastName[0]}
+                      {qualification.guide.firstName?.charAt(0) ?? ""}
+                      {qualification.guide.lastName?.charAt(0) ?? ""}
                     </span>
                   </div>
                 )}
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-foreground">
                       {qualification.guide.firstName} {qualification.guide.lastName}
                     </span>
                     {qualification.isPrimary && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium status-pending">
                         <Star className="h-3 w-3 fill-current" />
                         Primary
                       </span>
@@ -175,7 +175,7 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
                     </span>
                     {qualification.guide.languages &&
                       qualification.guide.languages.length > 0 && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-muted-foreground">
                           {qualification.guide.languages.map((lang) => lang.toUpperCase()).join(", ")}
                         </span>
                       )}
@@ -187,7 +187,7 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
                   <button
                     onClick={() => handleSetPrimary(qualification.guideId)}
                     disabled={setPrimaryGuideMutation.isPending}
-                    className="px-3 py-1.5 text-xs font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 text-xs font-medium text-warning bg-warning/10 hover:bg-warning/20 rounded-lg transition-colors disabled:opacity-50"
                     title="Set as primary guide"
                   >
                     <Star className="h-3.5 w-3.5" />
@@ -201,7 +201,7 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
                     )
                   }
                   disabled={removeQualificationMutation.isPending}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                  className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
                   title="Remove qualification"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -214,17 +214,17 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
 
       {/* Add Guide Section */}
       {availableGuides.length > 0 && (
-        <div className="border-t border-gray-200 pt-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Add Guide</h3>
+        <div className="border-t border-border pt-6">
+          <h3 className="text-sm font-medium text-foreground mb-3">Add Guide</h3>
           <div className="flex items-end gap-3">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-foreground mb-1">
                 Select Guide
               </label>
               <select
                 value={selectedGuideId}
                 onChange={(e) => setSelectedGuideId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
               >
                 <option value="">Choose a guide...</option>
                 {availableGuides.map((guide) => (
@@ -243,18 +243,18 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
                   type="checkbox"
                   checked={setAsPrimary}
                   onChange={(e) => setSetAsPrimary(e.target.checked)}
-                  className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                  className="w-4 h-4 text-primary border-input rounded focus:ring-primary"
                 />
-                <span className="text-gray-700 whitespace-nowrap">Set as primary</span>
+                <span className="text-foreground whitespace-nowrap">Set as primary</span>
               </label>
               <button
                 onClick={handleAddGuide}
                 disabled={!selectedGuideId || addQualificationMutation.isPending}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 {addQualificationMutation.isPending ? (
                   <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
                     Adding...
                   </>
                 ) : (
@@ -270,8 +270,8 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
       )}
 
       {availableGuides.length === 0 && qualifications.length > 0 && (
-        <div className="border-t border-gray-200 pt-6">
-          <p className="text-sm text-gray-500 text-center">
+        <div className="border-t border-border pt-6">
+          <p className="text-sm text-muted-foreground text-center">
             All active guides are already qualified for this tour
           </p>
         </div>
@@ -284,16 +284,16 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowConfirmDialog(false)}
           />
-          <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+          <div className="relative bg-card rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <XCircle className="h-6 w-6 text-red-600" />
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                <XCircle className="h-6 w-6 text-destructive" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg font-semibold text-foreground mb-2">
                   Remove Qualification
                 </h3>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                   Are you sure you want to remove <strong>{guideToRemove.name}</strong> from
                   this tour's qualified guides? They will no longer be able to lead this
                   tour.
@@ -304,18 +304,18 @@ export function TourGuideQualifications({ tourId }: TourGuideQualificationsProps
                       setShowConfirmDialog(false);
                       setGuideToRemove(null);
                     }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-foreground hover:bg-muted rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmRemove}
                     disabled={removeQualificationMutation.isPending}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                    className="px-4 py-2 text-sm font-medium text-destructive-foreground bg-destructive hover:bg-destructive/90 rounded-lg transition-colors disabled:opacity-50"
                   >
                     {removeQualificationMutation.isPending ? (
                       <span className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-destructive-foreground border-t-transparent" />
                         Removing...
                       </span>
                     ) : (

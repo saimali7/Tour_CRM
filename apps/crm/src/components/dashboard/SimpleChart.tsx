@@ -21,11 +21,11 @@ export function SimpleChart({
   if (data.length === 0) {
     return (
       <div
-        className="rounded-lg border border-gray-200 bg-white p-6"
+        className="rounded-lg border border-border bg-card p-6"
         style={{ height: height + 100 }}
       >
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-full text-gray-400">
+        <h3 className="text-lg font-semibold text-foreground mb-4">{title}</h3>
+        <div className="flex items-center justify-center h-full text-muted-foreground">
           <p>No data available</p>
         </div>
       </div>
@@ -37,11 +37,11 @@ export function SimpleChart({
   const range = maxValue - minValue || 1;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+    <div className="rounded-lg border border-border bg-card p-6">
+      <h3 className="text-lg font-semibold text-foreground mb-4">{title}</h3>
       <div className="relative" style={{ height }}>
         {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-xs text-gray-500 pr-2">
+        <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-xs text-muted-foreground pr-2">
           <span>{valueFormatter(maxValue)}</span>
           <span>{valueFormatter((maxValue + minValue) / 2)}</span>
           <span>{valueFormatter(minValue)}</span>
@@ -71,14 +71,14 @@ export function SimpleChart({
                     />
                   )}
                   {/* Tooltip on hover */}
-                  <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">
+                  <div className="absolute bottom-full mb-2 hidden group-hover:block bg-foreground text-background text-xs rounded px-2 py-1 whitespace-nowrap z-10">
                     {valueFormatter(point.value)}
                   </div>
                 </div>
 
                 {/* X-axis label */}
                 {index % Math.ceil(data.length / 6) === 0 && (
-                  <span className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-top-left">
+                  <span className="text-xs text-muted-foreground mt-2 transform -rotate-45 origin-top-left">
                     {new Date(point.date).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",

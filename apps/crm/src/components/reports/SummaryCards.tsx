@@ -17,11 +17,11 @@ export function SummaryCards({ cards }: SummaryCardsProps) {
   const getChangeColor = (type?: "positive" | "negative" | "neutral") => {
     switch (type) {
       case "positive":
-        return "text-green-600";
+        return "text-success";
       case "negative":
-        return "text-red-600";
+        return "text-destructive";
       default:
-        return "text-gray-500";
+        return "text-muted-foreground";
     }
   };
 
@@ -30,16 +30,16 @@ export function SummaryCards({ cards }: SummaryCardsProps) {
       {cards.map((card) => (
         <div
           key={card.name}
-          className="rounded-lg border border-gray-200 bg-white p-6"
+          className="rounded-lg border border-border bg-card p-6"
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-500">{card.name}</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">
+              <p className="text-sm font-medium text-muted-foreground">{card.name}</p>
+              <p className="text-2xl font-bold text-foreground mt-2">
                 {card.value}
               </p>
               {card.subtitle && (
-                <p className="text-xs text-gray-500 mt-1">{card.subtitle}</p>
+                <p className="text-xs text-muted-foreground mt-1">{card.subtitle}</p>
               )}
               {card.change && (
                 <p className={`text-sm mt-2 ${getChangeColor(card.changeType)}`}>

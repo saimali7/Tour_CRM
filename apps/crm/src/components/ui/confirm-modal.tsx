@@ -66,14 +66,9 @@ export function ConfirmModal({
             {cancelLabel}
           </Button>
           <Button
-            variant="default"
+            variant={variant === "destructive" ? "destructive" : "default"}
             onClick={handleConfirm}
             disabled={loading}
-            className={
-              variant === "destructive"
-                ? "bg-red-600 text-white hover:bg-red-700"
-                : ""
-            }
           >
             {loading ? "Loading..." : confirmLabel}
           </Button>

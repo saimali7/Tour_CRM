@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure } from "../trpc";
 import { createServices } from "@tour/services";
-import { stripe, getConnectAccount } from "@/lib/stripe";
+import { stripe } from "@/lib/stripe";
+import { inngest } from "@/inngest";
 
 const dateRangeSchema = z.object({
   from: z.coerce.date().optional(),
@@ -159,6 +160,29 @@ export const refundRouter = createRouter({
             }
           );
 
+          // Get full booking details with relations for email
+          const booking = await services.booking.getById(refund.bookingId);
+
+          // Send refund confirmation email (only if customer has email)
+          if (booking && booking.customer?.email && booking.schedule && booking.tour) {
+            await inngest.send({
+              name: "refund/processed",
+              data: {
+                organizationId: ctx.orgContext.organizationId,
+                refundId: updatedRefund.id,
+                bookingId: booking.id,
+                customerId: booking.customer.id,
+                customerEmail: booking.customer.email,
+                customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+                bookingReference: booking.referenceNumber,
+                tourName: booking.tour.name,
+                refundAmount: updatedRefund.amount,
+                currency: updatedRefund.currency,
+                reason: updatedRefund.reason || undefined,
+              },
+            });
+          }
+
           return { success: true, refund: updatedRefund };
         } else {
           // Direct refund (no Connect account)
@@ -183,6 +207,29 @@ export const refundRouter = createRouter({
               },
             }
           );
+
+          // Get full booking details with relations for email
+          const booking = await services.booking.getById(refund.bookingId);
+
+          // Send refund confirmation email (only if customer has email)
+          if (booking && booking.customer?.email && booking.schedule && booking.tour) {
+            await inngest.send({
+              name: "refund/processed",
+              data: {
+                organizationId: ctx.orgContext.organizationId,
+                refundId: updatedRefund.id,
+                bookingId: booking.id,
+                customerId: booking.customer.id,
+                customerEmail: booking.customer.email,
+                customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+                bookingReference: booking.referenceNumber,
+                tourName: booking.tour.name,
+                refundAmount: updatedRefund.amount,
+                currency: updatedRefund.currency,
+                reason: updatedRefund.reason || undefined,
+              },
+            });
+          }
 
           return { success: true, refund: updatedRefund };
         }
@@ -215,6 +262,63 @@ export const refundRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.refund.cancel(input.id);
+    }),
+
+  processManual: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+
+      const userId = ctx.user?.id || "system";
+      const userName = ctx.user
+        ? `${ctx.user.firstName || ""} ${ctx.user.lastName || ""}`.trim() || ctx.user.id
+        : "System";
+
+      // Process refund manually
+      const refund = await services.refund.processManual(input.id);
+
+      // Get booking for activity log
+      const booking = await services.booking.getById(refund.bookingId);
+
+      // Log activity
+      await services.activityLog.logBookingAction(
+        "booking.refunded",
+        refund.bookingId,
+        booking.referenceNumber,
+        `Refund of $${refund.amount} processed manually by ${userName}`,
+        {
+          actorType: "user",
+          actorId: userId,
+          actorName: userName,
+          metadata: {
+            refundId: refund.id,
+            amount: refund.amount,
+            processedManually: true,
+          },
+        }
+      );
+
+      // Send refund confirmation email (only if customer has email)
+      if (booking && booking.customer?.email && booking.schedule && booking.tour) {
+        await inngest.send({
+          name: "refund/processed",
+          data: {
+            organizationId: ctx.orgContext.organizationId,
+            refundId: refund.id,
+            bookingId: booking.id,
+            customerId: booking.customer.id,
+            customerEmail: booking.customer.email,
+            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+            bookingReference: booking.referenceNumber,
+            tourName: booking.tour.name,
+            refundAmount: refund.amount,
+            currency: refund.currency,
+            reason: refund.reason || undefined,
+          },
+        });
+      }
+
+      return refund;
     }),
 });
 

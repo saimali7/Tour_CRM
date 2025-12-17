@@ -13,15 +13,19 @@ export function getDb() {
   if (!_db) {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
-      // During build, return a mock that will fail at runtime
-      if (process.env.NODE_ENV === "production" && typeof window === "undefined") {
+      // During build, database URL may not be available - warn but don't crash
+      if (process.env.NODE_ENV === "production") {
         console.warn("DATABASE_URL not set - database calls will fail at runtime");
       }
       _initError = new Error("DATABASE_URL environment variable is not set");
       throw _initError;
     }
     try {
-      const queryClient = postgres(databaseUrl);
+      const queryClient = postgres(databaseUrl, {
+        max: 20, // Maximum connections in pool
+        idle_timeout: 20, // Seconds before idle connection is closed
+        connect_timeout: 10, // Seconds to wait for connection
+      });
       _db = drizzle(queryClient, { schema });
     } catch (err) {
       _initError = err as Error;
@@ -34,7 +38,7 @@ export function getDb() {
 // For backwards compatibility - uses Proxy for lazy access
 // The proxy only triggers getDb() when a property is actually accessed
 export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
-  get(target, prop, receiver) {
+  get(_target, prop, _receiver) {
     // Skip certain properties that might be checked during build/bundling
     if (prop === "then" || prop === Symbol.toStringTag || prop === Symbol.iterator) {
       return undefined;

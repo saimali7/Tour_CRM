@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, count, sql, or, ilike } from "drizzle-orm";
+import { eq, and, desc, asc, count, or, ilike, gte, lte } from "drizzle-orm";
 import {
   communicationLogs,
   emailTemplates,
@@ -172,10 +172,10 @@ export class CommunicationService extends BaseService {
       );
     }
     if (filters.dateFrom) {
-      conditions.push(sql`${communicationLogs.createdAt} >= ${filters.dateFrom}`);
+      conditions.push(gte(communicationLogs.createdAt, filters.dateFrom));
     }
     if (filters.dateTo) {
-      conditions.push(sql`${communicationLogs.createdAt} <= ${filters.dateTo}`);
+      conditions.push(lte(communicationLogs.createdAt, filters.dateTo));
     }
 
     const orderBy =
@@ -317,7 +317,7 @@ export class CommunicationService extends BaseService {
         .where(
           and(
             eq(communicationLogs.organizationId, this.organizationId),
-            sql`${communicationLogs.createdAt} >= ${thirtyDaysAgo}`
+            gte(communicationLogs.createdAt, thirtyDaysAgo)
           )
         ),
     ]);

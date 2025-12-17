@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface SelectProps {
   value: string;
@@ -44,7 +45,10 @@ export function Select({ value, onValueChange, children }: SelectProps) {
   );
 }
 
-export function SelectTrigger({ className = "", children }: SelectTriggerProps) {
+export function SelectTrigger({
+  className = "",
+  children,
+}: SelectTriggerProps) {
   const context = React.useContext(SelectContext);
   if (!context) throw new Error("SelectTrigger must be used within Select");
 
@@ -52,7 +56,14 @@ export function SelectTrigger({ className = "", children }: SelectTriggerProps) 
     <button
       type="button"
       onClick={() => context.setOpen(!context.open)}
-      className={`flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={cn(
+        "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm",
+        "ring-offset-background",
+        "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        "placeholder:text-muted-foreground",
+        className
+      )}
     >
       {children}
       <ChevronDown className="h-4 w-4 opacity-50" />
@@ -64,7 +75,11 @@ export function SelectValue({ placeholder }: SelectValueProps) {
   const context = React.useContext(SelectContext);
   if (!context) throw new Error("SelectValue must be used within Select");
 
-  return <span>{context.value || placeholder}</span>;
+  return (
+    <span className={cn(!context.value && "text-muted-foreground")}>
+      {context.value || placeholder}
+    </span>
+  );
 }
 
 export function SelectContent({ children }: SelectContentProps) {
@@ -79,7 +94,7 @@ export function SelectContent({ children }: SelectContentProps) {
         className="fixed inset-0 z-40"
         onClick={() => context.setOpen(false)}
       />
-      <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+      <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-md">
         {children}
       </div>
     </>
@@ -90,17 +105,22 @@ export function SelectItem({ value, children }: SelectItemProps) {
   const context = React.useContext(SelectContext);
   if (!context) throw new Error("SelectItem must be used within Select");
 
+  const isSelected = context.value === value;
+
   return (
     <div
       onClick={() => {
         context.onValueChange(value);
         context.setOpen(false);
       }}
-      className={`relative flex cursor-pointer select-none items-center px-3 py-2 text-sm outline-none hover:bg-gray-100 ${
-        context.value === value ? "bg-gray-50 font-medium" : ""
-      }`}
+      className={cn(
+        "relative flex cursor-pointer select-none items-center px-3 py-2 text-sm outline-none",
+        "hover:bg-accent hover:text-accent-foreground",
+        isSelected && "bg-accent/50 font-medium"
+      )}
     >
-      {children}
+      <span className="flex-1">{children}</span>
+      {isSelected && <Check className="h-4 w-4 text-primary" />}
     </div>
   );
 }

@@ -2,9 +2,13 @@ import { Resend } from "resend";
 import { BookingConfirmationEmail } from "./templates/booking-confirmation";
 import { BookingCancellationEmail } from "./templates/booking-cancellation";
 import { BookingReminderEmail } from "./templates/booking-reminder";
+import { BookingRescheduleEmail } from "./templates/booking-reschedule";
+import { BookingRefundEmail } from "./templates/booking-refund";
 import { GuideAssignmentEmail } from "./templates/guide-assignment";
 import { GuideReminderEmail } from "./templates/guide-reminder";
 import { GuideDailyManifestEmail } from "./templates/guide-daily-manifest";
+import { PaymentConfirmationEmail } from "./templates/payment-confirmation";
+import { PaymentLinkEmail } from "./templates/payment-link";
 import * as React from "react";
 
 // Lazy initialize Resend client
@@ -79,6 +83,21 @@ export interface ReminderEmailData {
   hoursUntilTour: number;
 }
 
+export interface RescheduleEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingReference: string;
+  tourName: string;
+  oldTourDate: string;
+  oldTourTime: string;
+  newTourDate: string;
+  newTourTime: string;
+  participants: number;
+  meetingPoint?: string;
+  meetingPointDetails?: string;
+  viewBookingUrl?: string;
+}
+
 export interface GuideAssignmentEmailData {
   guideName: string;
   guideEmail: string;
@@ -115,6 +134,54 @@ export interface GuideDailyManifestEmailData {
     meetingPoint?: string;
     manifestUrl?: string;
   }>;
+}
+
+export interface RefundEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingReference: string;
+  tourName: string;
+  tourDate: string;
+  tourTime: string;
+  refundAmount: string;
+  currency?: string;
+  refundReason: string;
+  rebookUrl?: string;
+}
+
+export interface ReviewRequestEmailData {
+  customerName: string;
+  customerEmail: string;
+  tourName: string;
+  tourDate: string;
+  reviewUrl: string;
+  isReminder?: boolean;
+}
+
+export interface PaymentConfirmationEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingReference: string;
+  tourName: string;
+  tourDate: string;
+  amount: string;
+  currency: string;
+  viewBookingUrl?: string;
+  receiptUrl?: string;
+}
+
+export interface PaymentLinkEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingReference: string;
+  tourName: string;
+  tourDate: string;
+  tourTime: string;
+  participants: number;
+  amount: string;
+  currency: string;
+  paymentUrl: string;
+  expiresAt?: string;
 }
 
 export class EmailService {
@@ -258,6 +325,48 @@ export class EmailService {
   }
 
   /**
+   * Send booking reschedule email
+   */
+  async sendBookingReschedule(data: RescheduleEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject: `Booking Rescheduled - ${data.tourName} (${data.bookingReference})`,
+        react: React.createElement(BookingRescheduleEmail, {
+          customerName: data.customerName,
+          bookingReference: data.bookingReference,
+          tourName: data.tourName,
+          oldTourDate: data.oldTourDate,
+          oldTourTime: data.oldTourTime,
+          newTourDate: data.newTourDate,
+          newTourTime: data.newTourTime,
+          participants: data.participants,
+          meetingPoint: data.meetingPoint,
+          meetingPointDetails: data.meetingPointDetails,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          viewBookingUrl: data.viewBookingUrl,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
    * Send guide assignment email
    */
   async sendGuideAssignment(data: GuideAssignmentEmailData): Promise<EmailResult> {
@@ -355,6 +464,160 @@ export class EmailService {
           organizationPhone: this.org.phone,
           logoUrl: this.org.logoUrl,
         }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send refund confirmation email
+   */
+  async sendRefundConfirmation(data: RefundEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject: `Refund Processed - ${data.tourName} (${data.bookingReference})`,
+        react: React.createElement(BookingRefundEmail, {
+          customerName: data.customerName,
+          bookingReference: data.bookingReference,
+          tourName: data.tourName,
+          tourDate: data.tourDate,
+          tourTime: data.tourTime,
+          refundAmount: data.refundAmount,
+          currency: data.currency || "USD",
+          refundReason: data.refundReason,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          rebookUrl: data.rebookUrl,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send payment confirmation email
+   */
+  async sendPaymentConfirmation(data: PaymentConfirmationEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject: `Payment Received - ${data.tourName} (${data.bookingReference})`,
+        react: React.createElement(PaymentConfirmationEmail, {
+          customerName: data.customerName,
+          bookingReference: data.bookingReference,
+          tourName: data.tourName,
+          tourDate: data.tourDate,
+          amount: data.amount,
+          currency: data.currency,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          viewBookingUrl: data.viewBookingUrl,
+          receiptUrl: data.receiptUrl,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send payment link email to customer
+   */
+  async sendPaymentLinkEmail(data: PaymentLinkEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject: `Complete Your Payment - ${data.tourName} (${data.bookingReference})`,
+        react: React.createElement(PaymentLinkEmail, {
+          customerName: data.customerName,
+          bookingReference: data.bookingReference,
+          tourName: data.tourName,
+          tourDate: data.tourDate,
+          tourTime: data.tourTime,
+          participants: data.participants,
+          amount: data.amount,
+          currency: data.currency,
+          paymentUrl: data.paymentUrl,
+          expiresAt: data.expiresAt,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send review request email
+   */
+  async sendReviewRequest(data: ReviewRequestEmailData): Promise<EmailResult> {
+    try {
+      const subject = data.isReminder
+        ? `Quick reminder: Share your ${data.tourName} experience`
+        : `How was your ${data.tourName} experience?`;
+
+      const bodyText = data.isReminder
+        ? `Hi ${data.customerName},\n\nA few days ago, you experienced ${data.tourName} with us. We noticed you haven't had a chance to leave a review yet.\n\nYour feedback is incredibly valuable - it helps other travelers make informed decisions and helps us continuously improve our tours.\n\nIt only takes a minute!\n\nLeave a Review: ${data.reviewUrl}\n\nThank you for considering leaving a review!\n\n${this.org.name}`
+        : `Hi ${data.customerName},\n\nThank you for joining us on ${data.tourName} on ${data.tourDate}!\n\nWe hope you had an amazing experience. Your feedback helps us improve and helps other travelers discover great tours.\n\nWould you mind taking a moment to share your thoughts?\n\nLeave a Review: ${data.reviewUrl}\n\nThank you for your time and for choosing us!\n\n${this.org.name}`;
+
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject,
+        text: bodyText,
       });
 
       if (error) {

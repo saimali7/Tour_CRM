@@ -48,6 +48,18 @@ export function getDateRangeFromString(rangeString: string): { from: Date; to: D
     case "this_year":
       from = new Date(now.getFullYear(), 0, 1);
       break;
+    case "this_quarter":
+      from = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+      from.setHours(0, 0, 0, 0);
+      break;
+    case "last_year":
+      from = new Date(now.getFullYear() - 1, 0, 1);
+      to = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+      break;
+    case "all_time":
+      from = new Date(2020, 0, 1); // Reasonable start for tour business
+      from.setHours(0, 0, 0, 0);
+      break;
     default:
       // Default to last 30 days
       from.setDate(now.getDate() - 30);

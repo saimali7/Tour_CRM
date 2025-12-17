@@ -21,32 +21,32 @@ const sortSchema = z.object({
 
 const createTourSchema = z.object({
   name: z.string().min(1).max(200),
-  slug: z.string().optional(),
-  description: z.string().optional(),
-  shortDescription: z.string().optional(),
-  durationMinutes: z.number().min(1),
-  minParticipants: z.number().min(1).optional(),
-  maxParticipants: z.number().min(1),
-  basePrice: z.string(),
-  currency: z.string().optional(),
-  meetingPoint: z.string().optional(),
-  meetingPointDetails: z.string().optional(),
-  meetingPointLat: z.string().optional(),
-  meetingPointLng: z.string().optional(),
-  coverImageUrl: z.string().url().optional(),
-  images: z.array(z.string().url()).optional(),
-  category: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  includes: z.array(z.string()).optional(),
-  excludes: z.array(z.string()).optional(),
-  requirements: z.array(z.string()).optional(),
-  accessibility: z.string().optional(),
-  cancellationPolicy: z.string().optional(),
-  cancellationHours: z.number().optional(),
+  slug: z.string().max(200).regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens").optional(),
+  description: z.string().max(10000).optional(),
+  shortDescription: z.string().max(500).optional(),
+  durationMinutes: z.number().min(1).max(2880), // Max 48 hours
+  minParticipants: z.number().min(0).max(1000).optional(),
+  maxParticipants: z.number().min(1).max(1000),
+  basePrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Price must be a valid decimal"),
+  currency: z.string().length(3).optional(),
+  meetingPoint: z.string().max(500).optional(),
+  meetingPointDetails: z.string().max(1000).optional(),
+  meetingPointLat: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
+  meetingPointLng: z.string().regex(/^-?\d+(\.\d+)?$/).optional(),
+  coverImageUrl: z.string().url().max(2048).optional(),
+  images: z.array(z.string().url().max(2048)).max(20).optional(),
+  category: z.string().max(100).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  includes: z.array(z.string().max(200)).max(30).optional(),
+  excludes: z.array(z.string().max(200)).max(30).optional(),
+  requirements: z.array(z.string().max(200)).max(20).optional(),
+  accessibility: z.string().max(2000).optional(),
+  cancellationPolicy: z.string().max(5000).optional(),
+  cancellationHours: z.number().min(0).max(720).optional(), // Max 30 days
   status: z.enum(["draft", "active", "paused", "archived"]).optional(),
   isPublic: z.boolean().optional(),
-  metaTitle: z.string().optional(),
-  metaDescription: z.string().optional(),
+  metaTitle: z.string().max(200).optional(),
+  metaDescription: z.string().max(500).optional(),
 });
 
 export const tourRouter = createRouter({
@@ -61,6 +61,23 @@ export const tourRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.tour.getAll(
+        input.filters,
+        input.pagination,
+        input.sort
+      );
+    }),
+
+  listWithScheduleStats: protectedProcedure
+    .input(
+      z.object({
+        filters: tourFilterSchema.optional(),
+        pagination: paginationSchema.optional(),
+        sort: sortSchema.optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.tour.getAllWithScheduleStats(
         input.filters,
         input.pagination,
         input.sort

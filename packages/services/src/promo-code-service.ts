@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, lte, gte, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, lte, gte, lt } from "drizzle-orm";
 import { promoCodes, promoCodeUsage, type PromoCode, type PromoCodeUsage } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
@@ -419,19 +419,29 @@ export class PromoCodeService extends BaseService {
       throw new Error("Failed to record promo code usage");
     }
 
-    // Increment current uses
-    await this.db
+    // Atomic increment with max uses check to prevent race conditions
+    const updateResult = await this.db
       .update(promoCodes)
       .set({
-        currentUses: sql`${promoCodes.currentUses} + 1`,
+        currentUses: sql`COALESCE(${promoCodes.currentUses}, 0) + 1`,
         updatedAt: new Date(),
       })
       .where(
         and(
           eq(promoCodes.id, promoCode.id),
-          eq(promoCodes.organizationId, this.organizationId)
+          eq(promoCodes.organizationId, this.organizationId),
+          // Only increment if we haven't hit max uses (race condition protection)
+          sql`${promoCodes.maxUses} IS NULL OR COALESCE(${promoCodes.currentUses}, 0) < ${promoCodes.maxUses}`
         )
-      );
+      )
+      .returning();
+
+    // If no rows updated, max uses was exceeded (race condition caught)
+    if (updateResult.length === 0) {
+      // Rollback the usage record
+      await this.db.delete(promoCodeUsage).where(eq(promoCodeUsage.id, usage.id));
+      throw new ValidationError("Promo code usage limit reached. Please try a different code.");
+    }
 
     return usage;
   }
@@ -513,16 +523,24 @@ export class PromoCodeService extends BaseService {
   }> {
     const now = new Date();
 
-    const statsResult = await this.db
+    // Get all promo codes for this org and calculate stats in JS
+    // This avoids PostgreSQL date serialization issues with raw SQL
+    const allCodes = await this.db
       .select({
-        total: sql<number>`COUNT(*)::int`,
-        active: sql<number>`COUNT(*) FILTER (WHERE ${promoCodes.isActive} = true)::int`,
-        inactive: sql<number>`COUNT(*) FILTER (WHERE ${promoCodes.isActive} = false OR ${promoCodes.isActive} IS NULL)::int`,
-        expired: sql<number>`COUNT(*) FILTER (WHERE ${promoCodes.validUntil} < ${now})::int`,
-        totalUses: sql<number>`COALESCE(SUM(${promoCodes.currentUses}), 0)::int`,
+        isActive: promoCodes.isActive,
+        validUntil: promoCodes.validUntil,
+        currentUses: promoCodes.currentUses,
       })
       .from(promoCodes)
       .where(eq(promoCodes.organizationId, this.organizationId));
+
+    const stats = {
+      total: allCodes.length,
+      active: allCodes.filter(c => c.isActive === true).length,
+      inactive: allCodes.filter(c => c.isActive === false || c.isActive === null).length,
+      expired: allCodes.filter(c => c.validUntil && new Date(c.validUntil) < now).length,
+      totalUses: allCodes.reduce((sum, c) => sum + (c.currentUses || 0), 0),
+    };
 
     // Get total discount from usage table
     const discountResult = await this.db
@@ -532,15 +550,14 @@ export class PromoCodeService extends BaseService {
       .from(promoCodeUsage)
       .where(eq(promoCodeUsage.organizationId, this.organizationId));
 
-    const stats = statsResult[0];
     const totalDiscount = discountResult[0]?.totalDiscount ? parseFloat(discountResult[0].totalDiscount.toString()) : 0;
 
     return {
-      total: stats?.total ?? 0,
-      active: stats?.active ?? 0,
-      inactive: stats?.inactive ?? 0,
-      expired: stats?.expired ?? 0,
-      totalUses: stats?.totalUses ?? 0,
+      total: stats.total,
+      active: stats.active,
+      inactive: stats.inactive,
+      expired: stats.expired,
+      totalUses: stats.totalUses,
       totalDiscount,
     };
   }
@@ -575,7 +592,7 @@ export class PromoCodeService extends BaseService {
         and(
           eq(promoCodes.organizationId, this.organizationId),
           eq(promoCodes.isActive, true),
-          sql`${promoCodes.validUntil} < ${now}`
+          lt(promoCodes.validUntil, now)
         )
       )
       .returning();

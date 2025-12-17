@@ -20,8 +20,13 @@ All planning and design documents are in the `docs/` folder:
 | `docs/ARCHITECTURE.md` | Domain model, database schema, API design, tech stack decisions with rationale |
 | `docs/FEATURES.md` | Feature specifications by phase, app ownership (CRM vs Web), acceptance criteria |
 | **`docs/PROGRESS.md`** | **Implementation status tracker - single source of truth for what's done vs pending** |
+| **`docs/DEPLOYMENT.md`** | **Production deployment guide - Coolify, VPS, external services setup** |
 | `docs/SPRINT.md` | Current sprint goals, tasks, and priorities |
 | `docs/PHASE6_UX_OVERHAUL.md` | Phase 6 refactor details - design philosophy, feature list, technical approach |
+| `docs/UI_UX_DESIGN_PRINCIPLES.md` | First-principles UI/UX guide - Rams/Norman principles, visual system, interaction patterns |
+| `docs/DESIGN_SYSTEM.md` | shadcn/ui-based design system - semantic tokens, component patterns, migration guide |
+| `docs/STRATEGIC_ANALYSIS.md` | First-principles analysis of world-class tour CRM - user personas, operations gaps, roadmap |
+| `docs/PHASE7_OPERATIONS_EXCELLENCE.md` | Phase 7 implementation plan - production wiring, speed, intelligence, high-impact features |
 
 **Always consult these documents before making architectural decisions.**
 
@@ -272,24 +277,28 @@ Per-organization roles:
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
 | **0** | Foundation | ✅ COMPLETE | 100% |
-| **1** | Core Booking Engine | ✅ COMPLETE | 97% |
-| **2** | Customer & Communications | ✅ COMPLETE | 95% |
-| **3** | Guide Operations | ✅ COMPLETE | 95% |
-| **4** | Pricing & Promotions | ✅ COMPLETE | 95% |
-| **5** | Reporting & Analytics | ✅ COMPLETE | 95% |
-| **6** | Polish & Optimization | 🔄 NEXT | 0% |
-| **7-11** | Web App & SaaS | ⏳ FUTURE | 0% |
+| **1** | Core Booking Engine | ✅ COMPLETE | 100% |
+| **2** | Customer & Communications | ✅ COMPLETE | 100% |
+| **3** | Guide Operations | ✅ COMPLETE | 100% |
+| **4** | Pricing & Promotions | ✅ COMPLETE | 100% |
+| **5** | Reporting & Analytics | ✅ COMPLETE | 100% |
+| **6** | UX Overhaul | ✅ COMPLETE | 100% |
+| **7** | Operations Excellence | 🔄 NEXT | 0% |
+| **8-10** | Web App & SaaS | ⏳ FUTURE | 0% |
 
-### Next Phase: Phase 6 - Polish & Optimization
+### Next Phase: Phase 7 - Operations Excellence
 
-**Key features:**
-- Query optimization (N+1 fixes, indexing)
-- Bundle optimization (code splitting, lazy loading)
-- Redis caching for hot data
-- Unit tests for critical paths
-- E2E tests with Playwright
+Transform from feature-complete to operations-first world-class CRM:
 
-> See `docs/PROGRESS.md` for detailed feature breakdowns and task lists.
+| Sub-Phase | Focus | Duration |
+|-----------|-------|----------|
+| **7.1** | Production Completion (wire existing infra) | 1 week |
+| **7.2** | Operational Speed (60-second workflows) | 2 weeks |
+| **7.3** | Intelligence Surface (proactive insights) | 1 week |
+| **7.4** | High-Impact Features (waivers, check-in, vouchers) | 3 weeks |
+| **7.5** | Guide Mobile PWA | 1 week |
+
+> See `docs/PHASE7_OPERATIONS_EXCELLENCE.md` for detailed implementation plan.
 
 ## Commands
 

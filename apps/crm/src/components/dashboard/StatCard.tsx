@@ -13,12 +13,12 @@ interface StatCardProps {
 }
 
 const colorClasses = {
-  blue: "bg-blue-100 text-blue-600",
-  green: "bg-green-100 text-green-600",
-  yellow: "bg-yellow-100 text-yellow-600",
-  red: "bg-red-100 text-red-600",
-  purple: "bg-purple-100 text-purple-600",
-  gray: "bg-gray-100 text-gray-600",
+  blue: "bg-info/10 text-info",
+  green: "bg-success/10 text-success",
+  yellow: "bg-warning/10 text-warning",
+  red: "bg-destructive/10 text-destructive",
+  purple: "bg-primary/10 text-primary",
+  gray: "bg-muted text-muted-foreground",
 };
 
 export function StatCard({
@@ -31,7 +31,7 @@ export function StatCard({
 }: StatCardProps) {
   return (
     <div
-      className={`rounded-lg border border-gray-200 bg-white p-4 ${
+      className={`rounded-lg border border-border bg-card p-4 ${
         onClick ? "cursor-pointer hover:border-primary transition-colors" : ""
       }`}
       onClick={onClick}
@@ -41,13 +41,13 @@ export function StatCard({
           <Icon className="h-5 w-5" />
         </div>
         <div className="flex-1">
-          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-sm text-muted-foreground">{title}</p>
           <div className="flex items-baseline gap-2">
-            <p className="text-xl font-semibold text-gray-900">{value}</p>
+            <p className="text-xl font-semibold text-foreground">{value}</p>
             {trend && (
               <div
                 className={`flex items-center gap-0.5 text-xs font-medium ${
-                  trend.direction === "up" ? "text-green-600" : "text-red-600"
+                  trend.direction === "up" ? "text-success" : "text-destructive"
                 }`}
               >
                 {trend.direction === "up" ? (

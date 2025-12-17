@@ -10,6 +10,7 @@ export * from "./schedules";
 export * from "./bookings";
 export * from "./activity-logs";
 export * from "./refunds";
+export * from "./payments";
 
 // Phase 2: Communications & Customer engagement
 export * from "./communications";
@@ -20,3 +21,15 @@ export * from "./guide-tokens";
 
 // Phase 4: Pricing & Promotions
 export * from "./pricing";
+
+// High-Impact Features: Reviews & Feedback
+export * from "./reviews";
+
+// High-Impact Features: Digital Waivers
+export * from "./waivers";
+
+// High-Impact Features: Add-ons & Gift Vouchers
+export * from "./add-ons";
+
+// Phase 7: Operations Excellence - Goals
+export * from "./goals";

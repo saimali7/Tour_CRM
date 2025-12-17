@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import type { NextRequest, NextFetchEvent } from "next/server";
 
 // =============================================================================
 // AUTH DISABLED FOR TESTING
@@ -10,7 +10,7 @@ import type { NextRequest } from "next/server";
 const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
 
 // Clerk middleware (only used when ENABLE_CLERK=true)
-async function clerkAuth(req: NextRequest) {
+async function clerkAuth(req: NextRequest, event: NextFetchEvent) {
   const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
 
   const isPublicRoute = createRouteMatcher([
@@ -25,17 +25,17 @@ async function clerkAuth(req: NextRequest) {
     if (!isPublicRoute(request)) {
       await auth.protect();
     }
-  })(req, {} as any);
+  })(req, event);
 }
 
-export default async function middleware(req: NextRequest) {
+export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   // If Clerk is disabled, allow all requests
   if (!ENABLE_CLERK) {
     return NextResponse.next();
   }
 
   // Otherwise use Clerk authentication
-  return clerkAuth(req);
+  return clerkAuth(req, event);
 }
 
 export const config = {

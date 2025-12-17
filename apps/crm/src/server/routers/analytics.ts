@@ -146,4 +146,18 @@ export const analyticsRouter = createRouter({
     const services = createServices({ organizationId: ctx.orgContext.organizationId });
     return services.analytics.getTodaysOperations();
   }),
+
+  // ===========================================
+  // Intelligence Surface - Forecasting & Insights
+  // ===========================================
+
+  getRevenueForecasting: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.analytics.getRevenueForecasting();
+  }),
+
+  getProactiveInsights: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.analytics.getProactiveInsights();
+  }),
 });

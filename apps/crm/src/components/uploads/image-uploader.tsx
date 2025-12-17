@@ -122,17 +122,17 @@ export function ImageUploader({
               <img
                 src={url}
                 alt={`Upload ${index + 1}`}
-                className="w-full h-full object-cover rounded-lg border border-gray-200"
+                className="w-full h-full object-cover rounded-lg border border-border"
               />
               <button
                 type="button"
                 onClick={() => removeImage(index)}
-                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="h-4 w-4" />
               </button>
               {index === 0 && (
-                <span className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded">
+                <span className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-primary-foreground text-xs rounded">
                   Cover
                 </span>
               )}
@@ -150,7 +150,7 @@ export function ImageUploader({
           onClick={() => inputRef.current?.click()}
           className={`
             relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-            ${dragOver ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400"}
+            ${dragOver ? "border-primary bg-primary/10" : "border-border hover:border-input"}
             ${uploading ? "pointer-events-none opacity-60" : ""}
           `}
         >
@@ -165,23 +165,23 @@ export function ImageUploader({
 
           {uploading ? (
             <div className="flex flex-col items-center">
-              <Loader2 className="h-10 w-10 text-blue-500 animate-spin mb-2" />
-              <p className="text-sm text-gray-600">Uploading...</p>
+              <Loader2 className="h-10 w-10 text-primary animate-spin mb-2" />
+              <p className="text-sm text-muted-foreground">Uploading...</p>
             </div>
           ) : (
             <div className="flex flex-col items-center">
               {value.length === 0 ? (
-                <ImageIcon className="h-10 w-10 text-gray-400 mb-2" />
+                <ImageIcon className="h-10 w-10 text-muted-foreground mb-2" />
               ) : (
-                <Upload className="h-10 w-10 text-gray-400 mb-2" />
+                <Upload className="h-10 w-10 text-muted-foreground mb-2" />
               )}
-              <p className="text-sm font-medium text-gray-700">
+              <p className="text-sm font-medium text-foreground">
                 {value.length === 0 ? "Upload tour images" : "Add more images"}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Drag and drop or click to select
               </p>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 JPEG, PNG, WebP up to 5MB • {value.length}/{maxFiles} uploaded
               </p>
             </div>
@@ -191,7 +191,7 @@ export function ImageUploader({
 
       {/* Error message */}
       {error && (
-        <p className="text-sm text-red-500 mt-2">{error}</p>
+        <p className="text-sm text-destructive mt-2">{error}</p>
       )}
     </div>
   );
@@ -262,7 +262,7 @@ export function SingleImageUploader({
 
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
+      <label className="block text-sm font-medium text-foreground mb-2">
         {label}
       </label>
 
@@ -271,12 +271,12 @@ export function SingleImageUploader({
           <img
             src={value}
             alt="Cover"
-            className="w-48 h-32 object-cover rounded-lg border border-gray-200"
+            className="w-48 h-32 object-cover rounded-lg border border-border"
           />
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full"
+            className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full"
           >
             <X className="h-4 w-4" />
           </button>
@@ -286,7 +286,7 @@ export function SingleImageUploader({
           onClick={() => inputRef.current?.click()}
           className={`
             w-48 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors
-            ${uploading ? "pointer-events-none opacity-60" : "border-gray-300 hover:border-gray-400"}
+            ${uploading ? "pointer-events-none opacity-60" : "border-border hover:border-input"}
           `}
         >
           <input
@@ -298,18 +298,18 @@ export function SingleImageUploader({
           />
 
           {uploading ? (
-            <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
+            <Loader2 className="h-6 w-6 text-primary animate-spin" />
           ) : (
             <>
-              <ImageIcon className="h-6 w-6 text-gray-400 mb-1" />
-              <span className="text-xs text-gray-500">Click to upload</span>
+              <ImageIcon className="h-6 w-6 text-muted-foreground mb-1" />
+              <span className="text-xs text-muted-foreground">Click to upload</span>
             </>
           )}
         </div>
       )}
 
       {error && (
-        <p className="text-sm text-red-500 mt-2">{error}</p>
+        <p className="text-sm text-destructive mt-2">{error}</p>
       )}
     </div>
   );

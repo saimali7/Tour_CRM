@@ -380,6 +380,41 @@ export class RefundService extends BaseService {
   }
 
   /**
+   * Process refund manually (mark as succeeded without Stripe)
+   * Used for manual refunds (cash, bank transfer, etc.)
+   */
+  async processManual(id: string): Promise<Refund> {
+    const refund = await this.getById(id);
+
+    if (refund.status !== "pending") {
+      throw new ValidationError(
+        `Cannot process refund in '${refund.status}' status. Only pending refunds can be processed.`
+      );
+    }
+
+    const [updatedRefund] = await this.db
+      .update(refunds)
+      .set({
+        status: "succeeded",
+        processedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(refunds.id, id), eq(refunds.organizationId, this.organizationId))
+      )
+      .returning();
+
+    if (!updatedRefund) {
+      throw new NotFoundError("Refund", id);
+    }
+
+    // Update booking payment status
+    await this.updateBookingPaymentStatus(updatedRefund.bookingId);
+
+    return updatedRefund;
+  }
+
+  /**
    * Get refund stats
    */
   async getStats(dateRange?: DateRangeFilter): Promise<{

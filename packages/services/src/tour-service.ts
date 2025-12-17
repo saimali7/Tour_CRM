@@ -1,5 +1,5 @@
-import { eq, and, desc, asc, sql, count, ilike, or } from "drizzle-orm";
-import { tours, tourPricingTiers, tourVariants, type Tour, type TourStatus, type TourPricingTier, type TourVariant, type PriceModifierType } from "@tour/database";
+import { eq, and, desc, asc, sql, count, ilike, or, inArray } from "drizzle-orm";
+import { tours, tourPricingTiers, tourVariants, schedules, type Tour, type TourStatus, type TourPricingTier, type TourVariant, type PriceModifierType } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
   type PaginationOptions,
@@ -17,6 +17,18 @@ export interface TourFilters {
 }
 
 export type TourSortField = "name" | "createdAt" | "updatedAt" | "basePrice";
+
+export interface TourScheduleStats {
+  upcomingCount: number;
+  totalCapacity: number;
+  totalBooked: number;
+  utilizationPercent: number;
+  nextScheduleDate: Date | null;
+}
+
+export interface TourWithScheduleStats extends Tour {
+  scheduleStats: TourScheduleStats;
+}
 
 export interface CreateTourInput {
   name: string;
@@ -103,6 +115,120 @@ export class TourService extends BaseService {
 
     return {
       data,
+      ...this.paginationMeta(total, page, limit),
+    };
+  }
+
+  /**
+   * Get all tours with schedule stats (upcoming count, capacity, utilization)
+   * Uses LEFT JOIN with aggregation for efficiency
+   */
+  async getAllWithScheduleStats(
+    filters: TourFilters = {},
+    pagination: PaginationOptions = {},
+    sort: SortOptions<TourSortField> = { field: "createdAt", direction: "desc" }
+  ): Promise<PaginatedResult<TourWithScheduleStats>> {
+    const { page = 1, limit = 20 } = pagination;
+    const offset = (page - 1) * limit;
+
+    const conditions = [eq(tours.organizationId, this.organizationId)];
+
+    if (filters.status) {
+      conditions.push(eq(tours.status, filters.status));
+    }
+    if (filters.isPublic !== undefined) {
+      conditions.push(eq(tours.isPublic, filters.isPublic));
+    }
+    if (filters.category) {
+      conditions.push(eq(tours.category, filters.category));
+    }
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(tours.name, `%${filters.search}%`),
+          ilike(tours.description, `%${filters.search}%`)
+        )!
+      );
+    }
+
+    const orderBy =
+      sort.direction === "asc" ? asc(tours[sort.field]) : desc(tours[sort.field]);
+
+    // First, get filtered/sorted tours
+    const [toursResult, countResult] = await Promise.all([
+      this.db
+        .select()
+        .from(tours)
+        .where(and(...conditions))
+        .orderBy(orderBy)
+        .limit(limit)
+        .offset(offset),
+      this.db
+        .select({ total: count() })
+        .from(tours)
+        .where(and(...conditions)),
+    ]);
+
+    const total = countResult[0]?.total ?? 0;
+
+    // If no tours, return early
+    if (toursResult.length === 0) {
+      return {
+        data: [],
+        ...this.paginationMeta(total, page, limit),
+      };
+    }
+
+    // Get schedule stats for these tours in a separate query
+    const tourIds = toursResult.map(t => t.id);
+    const now = new Date();
+
+    const scheduleStats = await this.db
+      .select({
+        tourId: schedules.tourId,
+        upcomingCount: sql<number>`COUNT(*)::int`,
+        totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)::int`,
+        totalBooked: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)::int`,
+        nextScheduleDate: sql<Date | null>`MIN(${schedules.startsAt})`,
+      })
+      .from(schedules)
+      .where(
+        and(
+          inArray(schedules.tourId, tourIds),
+          eq(schedules.organizationId, this.organizationId),
+          sql`${schedules.startsAt} > ${now}`,
+          sql`${schedules.status} != 'cancelled'`
+        )
+      )
+      .groupBy(schedules.tourId);
+
+    // Create a map for quick lookup
+    const statsMap = new Map(scheduleStats.map(s => [s.tourId, s]));
+
+    // Transform data to include scheduleStats
+    const toursWithStats: TourWithScheduleStats[] = toursResult.map((tour) => {
+      const stats = statsMap.get(tour.id);
+      const upcomingCount = Number(stats?.upcomingCount) || 0;
+      const totalCapacity = Number(stats?.totalCapacity) || 0;
+      const totalBooked = Number(stats?.totalBooked) || 0;
+      const utilizationPercent = totalCapacity > 0
+        ? Math.round((totalBooked / totalCapacity) * 100)
+        : 0;
+
+      return {
+        ...tour,
+        scheduleStats: {
+          upcomingCount,
+          totalCapacity,
+          totalBooked,
+          utilizationPercent,
+          nextScheduleDate: stats?.nextScheduleDate ?? null,
+        },
+      };
+    });
+
+    return {
+      data: toursWithStats,
       ...this.paginationMeta(total, page, limit),
     };
   }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Building2, ArrowRight, Check, Loader2 } from "lucide-react";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Building2, ArrowRight, ArrowLeft, Check, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { BusinessProfileStep } from "@/components/onboarding/business-profile-step";
 
 function generateSlug(name: string): string {
   return name
@@ -41,9 +42,13 @@ const currencies = [
   { value: "SGD", label: "SGD - Singapore Dollar" },
 ];
 
-export default function OnboardingPage() {
+const TOTAL_STEPS = 3;
+
+function OnboardingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
+  const [createdOrgSlug, setCreatedOrgSlug] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -53,6 +58,23 @@ export default function OnboardingPage() {
   });
   const [slugEdited, setSlugEdited] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Check for URL params (returning from Stripe, etc.)
+  useEffect(() => {
+    const urlStep = searchParams.get("step");
+    const urlOrg = searchParams.get("org");
+
+    if (urlStep) {
+      const stepNum = parseInt(urlStep, 10);
+      if (stepNum >= 1 && stepNum <= TOTAL_STEPS) {
+        setStep(stepNum);
+      }
+    }
+
+    if (urlOrg) {
+      setCreatedOrgSlug(urlOrg);
+    }
+  }, [searchParams]);
 
   // Check slug availability
   const slugCheck = trpc.onboarding.checkSlugAvailability.useQuery(
@@ -66,7 +88,8 @@ export default function OnboardingPage() {
   // Create organization mutation
   const createOrg = trpc.onboarding.createOrganization.useMutation({
     onSuccess: (data) => {
-      router.push(`/org/${data.organization.slug}`);
+      setCreatedOrgSlug(data.organization.slug);
+      setStep(3); // Move to Business Profile step
     },
     onError: (error) => {
       setErrors({ submit: error.message });
@@ -93,7 +116,6 @@ export default function OnboardingPage() {
       setSlugEdited(true);
     }
 
-    // Clear errors on change
     if (errors[name]) {
       setErrors((prev) => {
         const { [name]: _, ...rest } = prev;
@@ -131,7 +153,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreateOrg = async (e: React.FormEvent) => {
     e.preventDefault();
 
     createOrg.mutate({
@@ -146,53 +168,84 @@ export default function OnboardingPage() {
     });
   };
 
+  const handleBusinessProfileComplete = () => {
+    if (createdOrgSlug) {
+      router.push(`/org/${createdOrgSlug}`);
+    }
+  };
+
+  const handleBusinessProfileSkip = () => {
+    if (createdOrgSlug) {
+      router.push(`/org/${createdOrgSlug}`);
+    }
+  };
+
+  const stepLabels = [
+    "Business Details",
+    "Preferences",
+    "Profile",
+  ];
+
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen bg-muted flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-primary text-white mb-4">
+          <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4">
             <Building2 className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Your Organization</h1>
-          <p className="text-gray-500 mt-2">
-            Set up your tour business in just a few steps
+          <h1 className="text-2xl font-bold text-foreground">
+            {step <= 2 ? "Create Your Organization" : "Complete Setup"}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {step === 1 && "Tell us about your tour business"}
+            {step === 2 && "Configure your default settings"}
+            {step === 3 && "Add your business details"}
           </p>
         </div>
 
         {/* Progress */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div
-            className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium ${
-              step >= 1
-                ? "bg-primary text-white"
-                : "bg-gray-200 text-gray-500"
-            }`}
-          >
-            {step > 1 ? <Check className="h-4 w-4" /> : "1"}
-          </div>
-          <div className={`h-1 w-12 rounded ${step >= 2 ? "bg-primary" : "bg-gray-200"}`} />
-          <div
-            className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium ${
-              step >= 2
-                ? "bg-primary text-white"
-                : "bg-gray-200 text-gray-500"
-            }`}
-          >
-            2
-          </div>
+        <div className="flex items-center justify-center gap-1 mb-8">
+          {stepLabels.map((label, index) => (
+            <div key={index} className="flex items-center">
+              <div className="flex flex-col items-center">
+                <div
+                  className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium transition-colors ${
+                    step > index + 1
+                      ? "bg-primary text-primary-foreground"
+                      : step === index + 1
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted-foreground/20 text-muted-foreground"
+                  }`}
+                >
+                  {step > index + 1 ? <Check className="h-4 w-4" /> : index + 1}
+                </div>
+                <span className="text-xs text-muted-foreground mt-1 hidden sm:block">
+                  {label}
+                </span>
+              </div>
+              {index < TOTAL_STEPS - 1 && (
+                <div
+                  className={`h-1 w-6 sm:w-8 mx-1 rounded transition-colors ${
+                    step > index + 1 ? "bg-primary" : "bg-muted-foreground/20"
+                  }`}
+                />
+              )}
+            </div>
+          ))}
         </div>
 
         {/* Form Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <form onSubmit={handleSubmit}>
-            {step === 1 && (
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+          {/* Step 1: Business Details */}
+          {step === 1 && (
+            <form onSubmit={(e) => e.preventDefault()}>
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                  <h2 className="text-lg font-semibold text-foreground mb-1">
                     Business Details
                   </h2>
-                  <p className="text-sm text-gray-500 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Tell us about your tour business
                   </p>
                 </div>
@@ -201,7 +254,7 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="name"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     Business Name *
                   </label>
@@ -213,11 +266,11 @@ export default function OnboardingPage() {
                     onChange={handleChange}
                     placeholder="Awesome Tours Inc."
                     className={`w-full px-3 py-2 rounded-lg border ${
-                      errors.name ? "border-red-500" : "border-gray-300"
+                      errors.name ? "border-destructive" : "border-input"
                     } focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary`}
                   />
                   {errors.name && (
-                    <p className="mt-1 text-sm text-red-500">{errors.name}</p>
+                    <p className="mt-1 text-sm text-destructive">{errors.name}</p>
                   )}
                 </div>
 
@@ -225,13 +278,13 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="slug"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     URL Slug *
                   </label>
                   <div className="flex items-center">
-                    <span className="text-sm text-gray-500 bg-gray-100 px-3 py-2 rounded-l-lg border border-r-0 border-gray-300">
-                      app.tourcrm.com/org/
+                    <span className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-l-lg border border-r-0 border-input">
+                      /org/
                     </span>
                     <input
                       type="text"
@@ -241,22 +294,22 @@ export default function OnboardingPage() {
                       onChange={handleChange}
                       placeholder="awesome-tours"
                       className={`flex-1 px-3 py-2 rounded-r-lg border ${
-                        errors.slug ? "border-red-500" : "border-gray-300"
+                        errors.slug ? "border-destructive" : "border-input"
                       } focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary`}
                     />
                   </div>
                   {errors.slug ? (
-                    <p className="mt-1 text-sm text-red-500">{errors.slug}</p>
+                    <p className="mt-1 text-sm text-destructive">{errors.slug}</p>
                   ) : formData.slug.length >= 3 && slugCheck.isLoading ? (
-                    <p className="mt-1 text-sm text-gray-500 flex items-center gap-1">
+                    <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
                       <Loader2 className="h-3 w-3 animate-spin" /> Checking availability...
                     </p>
                   ) : slugCheck.data?.available ? (
-                    <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
+                    <p className="mt-1 text-sm text-success flex items-center gap-1">
                       <Check className="h-3 w-3" /> This slug is available
                     </p>
                   ) : slugCheck.data && !slugCheck.data.available ? (
-                    <p className="mt-1 text-sm text-red-500">This slug is already taken</p>
+                    <p className="mt-1 text-sm text-destructive">This slug is already taken</p>
                   ) : null}
                 </div>
 
@@ -264,7 +317,7 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     Business Email *
                   </label>
@@ -276,32 +329,35 @@ export default function OnboardingPage() {
                     onChange={handleChange}
                     placeholder="contact@awesometours.com"
                     className={`w-full px-3 py-2 rounded-lg border ${
-                      errors.email ? "border-red-500" : "border-gray-300"
+                      errors.email ? "border-destructive" : "border-input"
                     } focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary`}
                   />
                   {errors.email && (
-                    <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+                    <p className="mt-1 text-sm text-destructive">{errors.email}</p>
                   )}
                 </div>
 
                 <button
                   type="button"
                   onClick={handleNextStep}
-                  className="w-full flex items-center justify-center gap-2 bg-primary text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors"
                 >
                   Continue
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
-            )}
+            </form>
+          )}
 
-            {step === 2 && (
+          {/* Step 2: Preferences */}
+          {step === 2 && (
+            <form onSubmit={handleCreateOrg}>
               <div className="space-y-5">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                  <h2 className="text-lg font-semibold text-foreground mb-1">
                     Preferences
                   </h2>
-                  <p className="text-sm text-gray-500 mb-4">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Configure your default settings
                   </p>
                 </div>
@@ -310,7 +366,7 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="timezone"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     Timezone
                   </label>
@@ -319,7 +375,7 @@ export default function OnboardingPage() {
                     name="timezone"
                     value={formData.timezone}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                    className="w-full px-3 py-2 rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-background"
                   >
                     {timezones.map((tz) => (
                       <option key={tz.value} value={tz.value}>
@@ -333,7 +389,7 @@ export default function OnboardingPage() {
                 <div>
                   <label
                     htmlFor="currency"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-foreground mb-1"
                   >
                     Default Currency
                   </label>
@@ -342,7 +398,7 @@ export default function OnboardingPage() {
                     name="currency"
                     value={formData.currency}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                    className="w-full px-3 py-2 rounded-lg border border-input focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-background"
                   >
                     {currencies.map((curr) => (
                       <option key={curr.value} value={curr.value}>
@@ -353,8 +409,8 @@ export default function OnboardingPage() {
                 </div>
 
                 {errors.submit && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-red-600">{errors.submit}</p>
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="text-sm text-destructive">{errors.submit}</p>
                   </div>
                 )}
 
@@ -362,14 +418,15 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     onClick={() => setStep(1)}
-                    className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium border border-input text-foreground hover:bg-accent transition-colors"
                   >
+                    <ArrowLeft className="h-4 w-4" />
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={createOrg.isPending}
-                    className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {createOrg.isPending ? (
                       <>
@@ -379,21 +436,48 @@ export default function OnboardingPage() {
                     ) : (
                       <>
                         Create Organization
-                        <Check className="h-4 w-4" />
+                        <ArrowRight className="h-4 w-4" />
                       </>
                     )}
                   </button>
                 </div>
               </div>
-            )}
-          </form>
+            </form>
+          )}
+
+          {/* Step 3: Business Profile */}
+          {step === 3 && (
+            <BusinessProfileStep
+              onComplete={handleBusinessProfileComplete}
+              onSkip={handleBusinessProfileSkip}
+            />
+          )}
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 mt-6">
-          You can update these settings later in your organization settings.
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          {step <= 2
+            ? "You can update these settings later in your organization settings."
+            : "All optional fields can be updated anytime in settings."}
         </p>
       </div>
     </main>
+  );
+}
+
+// Wrapper with Suspense boundary for useSearchParams (required by Next.js 15)
+export default function OnboardingPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-muted flex flex-col items-center justify-center p-6">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </main>
+      }
+    >
+      <OnboardingContent />
+    </Suspense>
   );
 }

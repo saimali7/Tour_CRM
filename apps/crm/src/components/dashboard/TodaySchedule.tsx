@@ -1,5 +1,9 @@
-import { Users, AlertCircle, CheckCircle2, AlertTriangle, Eye } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Users, CheckCircle2, AlertCircle, Eye, FileText, UserPlus } from "lucide-react";
 import Link from "next/link";
+import { QuickAssignGuideModal } from "./QuickAssignGuideModal";
 
 interface TodayScheduleItem {
   scheduleId: string;
@@ -11,9 +15,12 @@ interface TodayScheduleItem {
   guide: {
     id: string;
     name: string;
+    confirmed?: boolean;
   } | null;
   status: "on_track" | "needs_attention" | "issue";
   statusReason?: string;
+  startsAt?: Date;
+  endsAt?: Date;
 }
 
 interface TodayScheduleProps {
@@ -21,134 +28,167 @@ interface TodayScheduleProps {
   orgSlug: string;
 }
 
-const statusConfig = {
-  on_track: {
-    icon: CheckCircle2,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-    label: "On Track",
-  },
-  needs_attention: {
-    icon: AlertTriangle,
-    color: "text-yellow-600",
-    bgColor: "bg-yellow-50",
-    label: "Needs Attention",
-  },
-  issue: {
-    icon: AlertCircle,
-    color: "text-red-600",
-    bgColor: "bg-red-50",
-    label: "Issue",
-  },
-};
-
 export function TodaySchedule({ schedule, orgSlug }: TodayScheduleProps) {
+  const [assignModalState, setAssignModalState] = useState<{
+    isOpen: boolean;
+    scheduleId: string;
+    tourName: string;
+    startsAt: Date;
+    endsAt: Date;
+  } | null>(null);
+
   if (schedule.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        <p className="text-lg font-medium">No tours scheduled for today</p>
-        <p className="text-sm mt-1">Your schedule will appear here.</p>
+      <div className="text-center py-12">
+        <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+          <Users className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <p className="text-lg font-medium text-foreground">No tours scheduled for today</p>
+        <p className="text-sm text-muted-foreground mt-1">Your schedule will appear here when tours are planned.</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Time
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Tour
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Participants
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Guide
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {schedule.map((item) => {
-            const config = statusConfig[item.status];
-            const StatusIcon = config.icon;
-            const utilization = (item.bookedParticipants / item.capacity) * 100;
+    <>
+      <div className="space-y-3">
+        {schedule.map((item) => {
+          const utilization = item.capacity > 0 ? (item.bookedParticipants / item.capacity) * 100 : 0;
+          const isFull = utilization >= 100;
+          const isLow = utilization < 30;
 
-            return (
-              <tr key={item.scheduleId} className="hover:bg-gray-50">
-                <td className="px-4 py-4 whitespace-nowrap">
-                  <span className="text-sm font-medium text-gray-900">
-                    {item.time}
+          return (
+            <div
+              key={item.scheduleId}
+              className="flex items-center gap-4 p-4 rounded-lg border border-border bg-card hover:border-border/80 transition-colors"
+            >
+              {/* Time */}
+              <div className="w-20 flex-shrink-0">
+                <span className="text-lg font-semibold text-foreground">{item.time}</span>
+              </div>
+
+              {/* Tour Info + Capacity */}
+              <div className="flex-1 min-w-0">
+                <Link
+                  href={`/org/${orgSlug}/availability/${item.scheduleId}`}
+                  className="font-medium text-foreground hover:text-primary transition-colors"
+                >
+                  {item.tourName}
+                </Link>
+
+                {/* Capacity Bar - Larger and more visual */}
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden max-w-[200px]">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        isFull
+                          ? "bg-success"
+                          : utilization >= 70
+                          ? "bg-success/80"
+                          : utilization >= 40
+                          ? "bg-warning"
+                          : "bg-destructive"
+                      }`}
+                      style={{ width: `${Math.min(utilization, 100)}%` }}
+                    />
+                  </div>
+                  <span className={`text-sm font-medium whitespace-nowrap ${
+                    isFull
+                      ? "text-success"
+                      : isLow
+                      ? "text-destructive"
+                      : "text-muted-foreground"
+                  }`}>
+                    {item.bookedParticipants}/{item.capacity} guests
+                    {isFull && " FULL"}
                   </span>
-                </td>
-                <td className="px-4 py-4">
-                  <Link
-                    href={`/org/${orgSlug}/tours/${item.tourId}`}
-                    className="text-sm font-medium text-gray-900 hover:text-primary"
-                  >
-                    {item.tourName}
-                  </Link>
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                </div>
+              </div>
+
+              {/* Guide Status */}
+              <div className="w-40 flex-shrink-0">
+                {item.guide ? (
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-900">
-                      {item.bookedParticipants} / {item.capacity}
-                    </span>
-                    <div className="w-16 bg-gray-200 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full ${
-                          utilization >= 80
-                            ? "bg-green-500"
-                            : utilization >= 50
-                            ? "bg-yellow-500"
-                            : "bg-red-500"
-                        }`}
-                        style={{ width: `${Math.min(utilization, 100)}%` }}
-                      />
-                    </div>
+                    <CheckCircle2 className="h-4 w-4 text-success flex-shrink-0" />
+                    <span className="text-sm text-foreground truncate">{item.guide.name}</span>
                   </div>
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap">
-                  {item.guide ? (
-                    <span className="text-sm text-gray-900">{item.guide.name}</span>
-                  ) : (
-                    <span className="text-sm text-red-600 font-medium">
-                      Not Assigned
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap">
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${config.bgColor}`}>
-                    <StatusIcon className={`h-3.5 w-3.5 ${config.color}`} />
-                    <span className={`text-xs font-medium ${config.color}`}>
-                      {item.statusReason || config.label}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap text-right">
-                  <Link
-                    href={`/org/${orgSlug}/schedules/${item.scheduleId}`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                ) : item.startsAt && item.endsAt ? (
+                  <button
+                    onClick={() => {
+                      setAssignModalState({
+                        isOpen: true,
+                        scheduleId: item.scheduleId,
+                        tourName: item.tourName,
+                        startsAt: item.startsAt!,
+                        endsAt: item.endsAt!,
+                      });
+                    }}
+                    className="flex items-center gap-2 text-destructive hover:text-destructive/90 group"
                   >
-                    <Eye className="h-4 w-4" />
-                    View
-                  </Link>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm font-medium group-hover:underline">No guide</span>
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-2 text-destructive">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm font-medium">No guide</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Link
+                  href={`/org/${orgSlug}/availability/${item.scheduleId}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                  title="View Manifest"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span className="hidden sm:inline">Manifest</span>
+                </Link>
+                <Link
+                  href={`/org/${orgSlug}/availability/${item.scheduleId}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                  title="View Details"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span className="hidden sm:inline">Details</span>
+                </Link>
+                {!item.guide && item.startsAt && item.endsAt && (
+                  <button
+                    onClick={() => {
+                      setAssignModalState({
+                        isOpen: true,
+                        scheduleId: item.scheduleId,
+                        tourName: item.tourName,
+                        startsAt: item.startsAt!,
+                        endsAt: item.endsAt!,
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
+                    title="Assign Guide"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Assign</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Quick Assign Guide Modal */}
+      {assignModalState && (
+        <QuickAssignGuideModal
+          isOpen={assignModalState.isOpen}
+          onClose={() => setAssignModalState(null)}
+          scheduleId={assignModalState.scheduleId}
+          tourName={assignModalState.tourName}
+          startsAt={assignModalState.startsAt}
+          endsAt={assignModalState.endsAt}
+        />
+      )}
+    </>
   );
 }

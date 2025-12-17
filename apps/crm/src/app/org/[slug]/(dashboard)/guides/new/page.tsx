@@ -15,13 +15,13 @@ export default function NewGuidePage() {
       <div className="flex items-center gap-4">
         <Link
           href={`/org/${slug}/guides` as Route}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-accent rounded-lg transition-colors"
         >
-          <ArrowLeft className="h-5 w-5 text-gray-500" />
+          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Add Guide</h1>
-          <p className="text-gray-500 mt-1">Create a new guide profile</p>
+          <h1 className="text-2xl font-bold text-foreground">Add Guide</h1>
+          <p className="text-muted-foreground mt-1">Create a new guide profile</p>
         </div>
       </div>
 

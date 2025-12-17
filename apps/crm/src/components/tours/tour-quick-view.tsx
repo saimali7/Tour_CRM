@@ -32,16 +32,16 @@ export function TourQuickView({
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-6 w-32 bg-gray-200 rounded" />
-        <div className="h-4 w-48 bg-gray-200 rounded" />
-        <div className="h-20 bg-gray-200 rounded" />
+        <div className="h-6 w-32 bg-muted rounded" />
+        <div className="h-4 w-48 bg-muted rounded" />
+        <div className="h-20 bg-muted rounded" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-8 text-red-500">
+      <div className="text-center py-8 text-destructive">
         Error loading tour: {error.message}
       </div>
     );
@@ -56,10 +56,10 @@ export function TourQuickView({
   }
 
   const statusColors: Record<string, string> = {
-    draft: "bg-gray-100 text-gray-800",
-    active: "bg-green-100 text-green-800",
-    archived: "bg-yellow-100 text-yellow-800",
-    deleted: "bg-red-100 text-red-800",
+    draft: "bg-muted text-muted-foreground",
+    active: "status-confirmed",
+    archived: "status-pending",
+    deleted: "status-cancelled",
   };
 
   const basePrice = parseFloat(tour.basePrice || "0");
@@ -80,13 +80,13 @@ export function TourQuickView({
         <div className="flex gap-2">
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              statusColors[tour.status] || "bg-gray-100 text-gray-800"
+              statusColors[tour.status] || "bg-muted text-muted-foreground"
             }`}
           >
             {tour.status}
           </span>
           {tour.isPublic && (
-            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               Public
             </span>
           )}
@@ -157,7 +157,7 @@ export function TourQuickView({
             {tour.tags?.map((tag, index) => (
               <span
                 key={`${tag}-${index}`}
-                className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700"
+                className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground"
               >
                 {tag}
               </span>

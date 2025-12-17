@@ -55,6 +55,12 @@ export const tours = pgTable("tours", {
   cancellationPolicy: text("cancellation_policy"),
   cancellationHours: integer("cancellation_hours").default(24),
 
+  // Deposit settings
+  depositEnabled: boolean("deposit_enabled").default(false),
+  depositType: text("deposit_type").$type<"percentage" | "fixed">().default("percentage"),
+  depositAmount: numeric("deposit_amount", { precision: 10, scale: 2 }), // Percentage (0-100) or fixed amount
+  balanceDueDays: integer("balance_due_days").default(0), // Days before tour when balance is due (0 = at booking)
+
   // Status
   status: text("status").$type<TourStatus>().notNull().default("draft"),
   isPublic: boolean("is_public").default(false), // Visible on booking website

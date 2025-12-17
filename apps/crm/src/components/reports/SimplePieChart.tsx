@@ -30,15 +30,15 @@ export function SimplePieChart({
                   className="h-4 w-4 rounded"
                   style={{ backgroundColor: slice.color }}
                 />
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-foreground">
                   {slice.label}
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-sm font-semibold text-gray-900">
+                <div className="text-sm font-semibold text-foreground">
                   {formatValue(slice.value)}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   {percentage.toFixed(1)}%
                 </div>
               </div>
@@ -49,7 +49,7 @@ export function SimplePieChart({
 
       {/* Visual representation using stacked bars */}
       <div className="w-full md:w-64 space-y-2">
-        <div className="relative h-8 bg-gray-100 rounded overflow-hidden flex">
+        <div className="relative h-8 bg-muted rounded overflow-hidden flex">
           {data.map((slice, index) => {
             const percentage = total > 0 ? (slice.value / total) * 100 : 0;
             return (
@@ -65,7 +65,7 @@ export function SimplePieChart({
             );
           })}
         </div>
-        <div className="text-xs text-gray-500 text-center">
+        <div className="text-xs text-muted-foreground text-center">
           Total: {formatValue(total)}
         </div>
       </div>

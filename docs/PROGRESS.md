@@ -1,8 +1,8 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** December 13, 2025
+**Last Updated:** December 16, 2025
 **Status:** Sequential Phase Development
-**Current Phase:** Phase 7 - Web App Foundation (NEXT)
+**Current Phase:** Phase 7 - Operations Excellence
 **Main Branch:** `main`
 
 > This document is the single source of truth for implementation progress. We follow a **sequential phase-by-phase** development strategy - completing each phase fully before moving to the next.
@@ -13,23 +13,25 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    SEQUENTIAL PHASE DEVELOPMENT                              │
+│                         DEVELOPMENT ROADMAP                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│   Phase 0: Foundation ────► Phase 1: Core Booking ────► Phase 2: Customers  │
-│        ✅ DONE                   ✅ DONE                    ✅ DONE          │
+│   ═══════════════════════ CRM APPLICATION ═══════════════════════           │
 │                                                                              │
-│   ────► Phase 3: Guides ────► Phase 4: Pricing ────► Phase 5: Reporting     │
-│           ✅ DONE               ✅ DONE               ✅ DONE               │
+│   Phase 0-6: Core CRM ──────────────────────────────► ✅ COMPLETE           │
+│   (Foundation, Booking, Customers, Guides, Pricing, Reports, UX)            │
 │                                                                              │
-│   ────► Phase 6: Polish ────► Phase 7-9: Web App ────► Phase 10-11: SaaS    │
-│           ✅ DONE              🔄 NEXT                  ⏳ PENDING          │
+│   Phase 7: Operations Excellence ───────────────────► 🔄 NEXT               │
+│   (Production Wiring, Speed, Intelligence, Waivers, Check-In, Vouchers)     │
 │                                                                              │
-│   Benefits:                                                                  │
-│   • Clean structure - no merge conflicts                                    │
-│   • No branching complexity                                                 │
-│   • Each phase builds on the last                                           │
-│   • Subagents can be used within phases for efficiency                      │
+│   ═══════════════════ WEB APPLICATION ═══════════════════════               │
+│                                                                              │
+│   Phase 8: Web App & Booking ───────────────────────► ⏳ PENDING            │
+│   Phase 9: Web Optimization ────────────────────────► ⏳ PENDING            │
+│                                                                              │
+│   ═══════════════════ PLATFORM (FUTURE) ═══════════════════════             │
+│                                                                              │
+│   Phase 10+: SaaS & Public API ─────────────────────► ⏳ FUTURE             │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -38,22 +40,33 @@
 
 ## Quick Status Dashboard
 
+### CRM Application (Staff Portal)
+
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
 | **0** | Foundation | ✅ COMPLETE | 100% |
-| **1** | Core Booking Engine | ✅ COMPLETE | 97% |
-| **2** | Customer & Communications | ✅ COMPLETE | 95% |
-| **3** | Guide Operations | ✅ COMPLETE | 95% |
-| **4** | Pricing & Promotions | ✅ COMPLETE | 95% |
-| **5** | Reporting & Analytics | ✅ COMPLETE | 95% |
+| **1** | Core Booking Engine | ✅ COMPLETE | 100% |
+| **2** | Customer & Communications | ✅ COMPLETE | 100% |
+| **3** | Guide Operations | ✅ COMPLETE | 100% |
+| **4** | Pricing & Promotions | ✅ COMPLETE | 100% |
+| **5** | Reporting & Analytics | ✅ COMPLETE | 100% |
 | **6** | UX Overhaul | ✅ COMPLETE | 100% |
-| **7** | Web App Foundation | 🔄 NEXT | 0% |
-| **8** | Booking Flow | ⏳ PENDING | 0% |
-| **9** | Web Optimization | ⏳ PENDING | 0% |
-| **10** | SaaS Platform | ⏳ PENDING | 0% |
-| **11** | Public API | ⏳ PENDING | 0% |
+| **7** | **Operations Excellence** | 🔄 IN PROGRESS | 80% |
 
-**Legend:** ✅ Complete | 🔄 In Progress/Next | ⏳ Pending
+### Web Application (Customer Portal)
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| **8** | Web App & Booking Flow | ⏳ PENDING | 0% |
+| **9** | Web Optimization | ⏳ PENDING | 0% |
+
+### Platform (SaaS & API)
+
+| Phase | Name | Status | Completion |
+|-------|------|--------|------------|
+| **10+** | SaaS Platform & Public API | ⏳ FUTURE | 0% |
+
+**Legend:** ✅ Complete | 🔄 In Progress | ⏳ Pending
 
 ---
 
@@ -510,35 +523,166 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 
 ---
 
-## Phase 7-9: Web App ⏳ PENDING (0%)
+## Phase 7: Operations Excellence 🔄 IN PROGRESS
 
-### Phase 7: Foundation
-- Subdomain routing
-- Tour listing/detail pages
-- Availability calendar
+> **Goal:** Transform from feature-complete to operations-first world-class CRM.
+> **Detailed Plan:** See [`docs/PHASE7_OPERATIONS_EXCELLENCE.md`](./PHASE7_OPERATIONS_EXCELLENCE.md)
 
-### Phase 8: Booking Flow
-- Multi-step booking form
-- Stripe checkout
-- Confirmation emails
+### Overview
 
-### Phase 9: Optimization
-- Core Web Vitals
-- Image optimization
+| Sub-Phase | Focus | Duration | Status |
+|-----------|-------|----------|--------|
+| **7.1** | Production Completion | 1 week | ✅ COMPLETE |
+| **7.2** | Operational Speed | 2 weeks | ✅ COMPLETE |
+| **7.3** | Intelligence Surface | 1 week | ✅ COMPLETE |
+| **7.4** | High-Impact Features | 3 weeks | ✅ COMPLETE |
+| **7.5** | Guide Mobile PWA | 1 week | ⬜ TODO |
+
+### 7.1 Production Completion ✅ COMPLETE
+
+Wire existing infrastructure so operators can run end-to-end:
+
+| Task | What Exists | What's Missing | Status |
+|------|-------------|----------------|--------|
+| **Payment Recording UI** | Schema, service, router | UI components | ✅ Already built on booking detail |
+| **Email Automation Wiring** | Templates, handlers | `booking/created` trigger | ✅ Inngest job wired |
+| **Pricing Tier Integration** | Tiers table, service | Booking form fetch | ✅ Integrated |
+| **Refund Flow Completion** | Refund table, service | Balance update, email | ✅ Complete with email |
+
+### 7.2 Operational Speed ✅ COMPLETE
+
+Every common operation under 60 seconds:
+
+| Task | Current State | Target | Status |
+|------|---------------|--------|--------|
+| **Quick Booking Flow** | 12+ clicks, 4-5 min | < 60 seconds | ✅ Phone Booking Sheet (⌘P) |
+| **Customer 360 View** | Navigate 3+ pages | Single page | ✅ Customer 360 Sheet |
+| **Morning Briefing** | Open 5 tabs | One-click view | ✅ Dashboard + Print Manifests |
+| **Batch Operations** | One at a time | Multi-select + bulk | ✅ Bulk reschedule/email |
+
+**Phone Booking Features:**
+- Visual tour card selection
+- Horizontal 14-day date scroller
+- Time slots with capacity indicators (green/orange/red)
+- Inline customer search + quick create
+- Live price calculation
+- ⌘+Enter to submit
+- Accessible via ⌘P or command palette
+
+### 7.3 Intelligence Surface ✅ COMPLETE
+
+Surface existing intelligence proactively:
+
+| Task | What Exists | What's Missing | Status |
+|------|-------------|----------------|--------|
+| **Customer Intelligence UI** | Scoring service | UI display | ✅ Customer 360 Sheet |
+| **Forecasting Dashboard** | Historical data | Projection logic | ✅ Analytics service |
+| **Goal Tracking** | N/A | Schema + UI | ✅ Goals schema, service, UI |
+| **Proactive Alerts** | Some alerts | Alert system | ✅ 9 insight types |
+
+### 7.4 High-Impact Features ✅ COMPLETE
+
+Features operators can't run business without:
+
+| Feature | Why Critical | Status |
+|---------|--------------|--------|
+| **Digital Waivers** | Insurance requires signed waivers | ✅ WaiverService + Settings UI |
+| **Deposits & Payment Plans** | Can't sell $500+ tours without deposits | ✅ DepositService + PaymentService |
+| **Check-In & Attendance** | Verify who showed, track no-shows | ✅ CheckInService + Manifest UI |
+| **Booking Add-Ons** | Direct revenue increase | ✅ AddOnService + schema |
+| **Gift Vouchers** | B2B revenue, pre-paid cash | ✅ VoucherService + Settings UI |
+
+### 7.5 Guide Mobile PWA (Week 8)
+
+Mobile-first experience for guides:
+
+| Feature | Status |
+|---------|--------|
+| PWA install support | ⬜ TODO |
+| Offline manifest caching | ⬜ TODO |
+| Push notifications | ⬜ TODO |
+| Mobile-first UI | ⬜ TODO |
+| Check-in from phone | ⬜ TODO |
+
+### Previously Completed (Review System)
+
+✅ **Review & Feedback System** - Complete
+- Database: `reviews` table with ratings, comments, testimonials
+- Service: Full CRUD, stats, guide/tour ratings
+- API: tRPC router with all endpoints
+- Automation: Inngest jobs for review requests
+- UI: Reviews management page with analytics
+
+### Deferred to Future Phases
+
+| Feature | Reason | Future Phase |
+|---------|--------|--------------|
+| Resource Management | Guide-only sufficient for now | Phase 8+ |
+| Multi-Day Tours | Day tours for launch | Phase 8+ |
+| Dynamic Pricing | Manual pricing sufficient | Phase 8+ |
+| Affiliate Network | No partners yet | Phase 10+ |
 
 ---
 
-## Phase 10-11: SaaS Platform ⏳ PENDING (0%)
+# WEB APPLICATION
 
-### Phase 10: Platform
-- Self-service signup
-- Subscription billing
-- Feature flags
+> **Status:** Not started. Complete CRM Remaining Work first.
 
-### Phase 11: Public API
-- REST API
-- API keys
-- OTA integrations
+---
+
+## Phase 8: Web App & Booking Flow ⏳ PENDING (0%)
+
+> **Goal:** Customer-facing booking website with complete checkout flow
+
+### Foundation
+- Subdomain routing (`{slug}.book.platform.com`)
+- Tour listing page with filters
+- Tour detail page with gallery, map, reviews
+- Availability calendar display
+
+### Booking Flow
+- Multi-step booking form (tickets → details → payment)
+- Guest checkout (no account required)
+- Stripe checkout integration
+- Promo code application
+- Confirmation page & emails
+
+### Customer Features
+- Booking management (view, cancel, reschedule)
+- Magic link authentication for customers
+- Booking history
+
+---
+
+## Phase 9: Web Optimization ⏳ PENDING (0%)
+
+> **Goal:** Performance and conversion optimization
+
+- Core Web Vitals optimization
+- Image optimization (WebP, lazy loading, CDN)
+- SEO (structured data, meta tags, sitemaps)
+- Conversion tracking (analytics events)
+- A/B testing infrastructure
+
+---
+
+## Phase 10+: SaaS Platform & Public API ⏳ FUTURE (0%)
+
+> **Goal:** Enable selling platform to other tour operators
+
+### SaaS Platform
+- Self-service organization signup
+- Subscription billing (Stripe)
+- Feature flags per plan
+- White-label/theming per organization
+- Platform admin dashboard
+
+### Public API
+- REST API for partners
+- API key management
+- Rate limiting
+- OTA integrations (Viator, GetYourGuide)
+- Webhook system for external systems
 
 ---
 
@@ -600,6 +744,108 @@ pnpm build ✅ (both CRM and Web apps)
 ---
 
 ## Changelog
+
+### December 16, 2025 - Phase 7.2 Complete (60-Second Phone Booking)
+
+Completed the remaining 25% of Phase 7.2:
+
+**Quick Booking Enhancements:**
+- Added `⌘+Enter` keyboard shortcut to submit booking form
+- Form targeting via `data-quick-booking-form` attribute
+
+**Command Palette Updates:**
+- Added "Phone Booking" as top quick action (`⌘P`)
+- Phone icon with blue styling
+- Renamed "New Booking" to "New Booking (Full Form)" for clarity
+
+**Bookings Page Integration:**
+- Global `⌘P` shortcut opens phone booking
+- URL query param support (`?phone=1`) for deep linking
+- Auto-opens when accessed from command palette
+
+**Phone Booking Flow (already existed, now fully integrated):**
+- Visual tour cards selection
+- Horizontal 14-day date scroller
+- Time slots with color-coded capacity
+- Inline customer search + quick create
+- Live price calculation
+- `⌘+Enter` to submit
+
+**Phase 7 Status: 80% complete** (only 7.5 Guide Mobile PWA remains)
+
+---
+
+### December 16, 2025 - Phase 7.1 + 7.4 Implementation Complete
+
+Implemented backend services and UI for high-impact features:
+
+**Backend Services (all complete):**
+- `CheckInService`: Participant check-in, no-show, undo, bulk check-in
+- `VoucherService`: Gift vouchers with amounts, codes, expiration, redemption
+- `WaiverService`: Digital waiver templates, signing, PDF generation
+- `DepositService`: Configurable deposits with balance tracking
+- `AddOnService`: Optional extras for tours with inventory
+
+**Database Schema:**
+- `add-ons.ts`: Tour add-ons with pricing and inventory
+- `waivers.ts`: Waiver templates and signed waivers
+
+**tRPC Routers:**
+- `check-in.ts`: Schedule/booking check-in endpoints
+- `voucher.ts`: Voucher CRUD, redemption, balance
+- `waiver.ts`: Template management, signing
+- `deposit.ts`: Deposit collection, balance updates
+- `add-on.ts`: Add-on management for tours
+
+**UI Features:**
+- Voucher management page (`/settings/vouchers`)
+- Waiver management page (`/settings/waivers`)
+- Check-in functionality on schedule manifest with progress bar
+- Customer 360 Sheet integration on customers page
+
+**Sprint 1-2 Features (previously completed):**
+- Goal tracking system (schema, service, UI)
+- Phone booking flow (quick booking modal)
+- Customer 360 View
+- Batch operations (bulk reschedule/email)
+- Morning briefing + print manifests
+
+---
+
+### December 16, 2025 - Phase 7: Operations Excellence Planning
+
+Created comprehensive implementation plan for Phase 7 transformation:
+
+**Strategic Analysis:**
+- Created `docs/STRATEGIC_ANALYSIS.md` with first-principles CRM evaluation
+- Analyzed 4 user personas (Operations Manager, Customer Service, Business Owner, Guide)
+- Mapped daily/weekly/monthly/annual operations gaps
+- Identified transformation path: Work → Fast → Smart → Unique
+
+**Phase 7 Implementation Plan (`docs/PHASE7_OPERATIONS_EXCELLENCE.md`):**
+
+| Sub-Phase | Focus | Key Deliverables |
+|-----------|-------|------------------|
+| 7.1 | Production Completion | Payment UI, email triggers, pricing tiers |
+| 7.2 | Operational Speed | Quick booking (<60s), Customer 360, batch ops |
+| 7.3 | Intelligence Surface | Forecasting, goal tracking, proactive alerts |
+| 7.4 | High-Impact Features | Waivers, deposits, check-in, add-ons, vouchers |
+| 7.5 | Guide Mobile PWA | Offline manifests, push notifications |
+
+**Key Insights:**
+- Architecture is production-grade (multi-tenant, services, schema)
+- Gap is workflow efficiency + proactive intelligence
+- Payment infrastructure exists but no UI
+- Email services work but not all triggers wired
+- Customer intelligence calculated but never displayed
+
+**Phase Renumbering:**
+- Phase 7: Operations Excellence (NEW - 8 weeks)
+- Phase 8: Web App & Booking (was 7)
+- Phase 9: Web Optimization (was 8)
+- Phase 10+: SaaS & API (was 9+)
+
+---
 
 ### December 13, 2025 - Phase 6 UX Overhaul Started
 - Created comprehensive UX Overhaul plan

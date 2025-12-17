@@ -33,8 +33,8 @@ export function BookingQuickView({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-600">
+      <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+        <p className="text-sm text-destructive">
           Failed to load booking: {error.message}
         </p>
       </div>
@@ -44,9 +44,9 @@ export function BookingQuickView({
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-6 w-32 bg-gray-200 rounded" />
-        <div className="h-4 w-48 bg-gray-200 rounded" />
-        <div className="h-20 bg-gray-200 rounded" />
+        <div className="h-6 w-32 bg-muted rounded" />
+        <div className="h-4 w-48 bg-muted rounded" />
+        <div className="h-20 bg-muted rounded" />
       </div>
     );
   }
@@ -60,17 +60,17 @@ export function BookingQuickView({
   }
 
   const statusColors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    confirmed: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
-    completed: "bg-blue-100 text-blue-800",
+    pending: "status-pending",
+    confirmed: "status-confirmed",
+    cancelled: "status-cancelled",
+    completed: "status-completed",
   };
 
   const paymentColors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    paid: "bg-green-100 text-green-800",
-    refunded: "bg-gray-100 text-gray-800",
-    partial_refund: "bg-orange-100 text-orange-800",
+    pending: "status-pending",
+    paid: "status-confirmed",
+    refunded: "bg-muted text-muted-foreground",
+    partial_refund: "status-warning",
   };
 
   const childCount = booking.childCount ?? 0;
@@ -92,14 +92,14 @@ export function BookingQuickView({
         <div className="flex gap-2">
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              statusColors[booking.status] || "bg-gray-100 text-gray-800"
+              statusColors[booking.status] || "bg-muted text-muted-foreground"
             }`}
           >
             {booking.status}
           </span>
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              paymentColors[booking.paymentStatus] || "bg-gray-100 text-gray-800"
+              paymentColors[booking.paymentStatus] || "bg-muted text-muted-foreground"
             }`}
           >
             {booking.paymentStatus}
@@ -220,7 +220,7 @@ export function BookingQuickView({
             <span className="font-medium">${total.toFixed(2)}</span>
           </div>
           {discount > 0 && (
-            <div className="flex justify-between text-green-600">
+            <div className="flex justify-between text-success">
               <span className="text-sm">Discount Applied</span>
               <span>-${discount.toFixed(2)}</span>
             </div>

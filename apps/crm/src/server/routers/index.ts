@@ -29,6 +29,16 @@ import { customerIntelligenceRouter } from "./customer-intelligence";
 import { reportsRouter } from "./reports";
 // Phase 6 routers
 import { searchRouter } from "./search";
+// High-Impact Features
+import { reviewRouter } from "./review";
+import { paymentRouter } from "./payment";
+import { waiverRouter } from "./waiver";
+import { addOnRouter } from "./add-on";
+import { voucherRouter } from "./voucher";
+import { checkInRouter } from "./check-in";
+import { depositRouter } from "./deposit";
+// Phase 7: Operations Excellence
+import { goalRouter } from "./goal";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -62,6 +72,16 @@ export const appRouter = createRouter({
   reports: reportsRouter,
   // Phase 6 routers
   search: searchRouter,
+  // High-Impact Features
+  review: reviewRouter,
+  payment: paymentRouter,
+  waiver: waiverRouter,
+  addOn: addOnRouter,
+  voucher: voucherRouter,
+  checkIn: checkInRouter,
+  deposit: depositRouter,
+  // Phase 7: Operations Excellence
+  goal: goalRouter,
 });
 
 export type AppRouter = typeof appRouter;

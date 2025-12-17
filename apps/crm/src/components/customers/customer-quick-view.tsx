@@ -31,8 +31,8 @@ export function CustomerQuickView({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-600">
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+        <p className="text-sm text-destructive">
           Failed to load customer: {error.message}
         </p>
       </div>
@@ -42,9 +42,9 @@ export function CustomerQuickView({
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-6 w-32 bg-gray-200 rounded" />
-        <div className="h-4 w-48 bg-gray-200 rounded" />
-        <div className="h-20 bg-gray-200 rounded" />
+        <div className="h-6 w-32 bg-muted rounded" />
+        <div className="h-4 w-48 bg-muted rounded" />
+        <div className="h-20 bg-muted rounded" />
       </div>
     );
   }

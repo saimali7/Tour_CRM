@@ -2,282 +2,116 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Edit, Clock, Users, DollarSign, MapPin, Calendar, Check, X, Plus, Trash2, GripVertical, Star, Layers, ExternalLink, Ticket } from "lucide-react";
-import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { Route } from "next";
-import { useParams, useRouter } from "next/navigation";
+import { LayoutDashboard, FileText, Calendar, DollarSign, Users } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { TourPageHeader } from "@/components/tours/tour-page-header";
+import { TourOverviewTab } from "@/components/tours/tour-overview-tab";
+import { TourDetailsTab } from "@/components/tours/tour-details-tab";
+import { TourPricingTab } from "@/components/tours/tour-pricing-tab";
 import { TourGuideQualifications } from "@/components/tours/tour-guide-qualifications";
-import { Button } from "@/components/ui/button";
+import { TourScheduleManager } from "@/components/tours/tour-schedule-manager";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { toast } from "sonner";
 
-interface PricingTierFormData {
-  name: string;
-  label: string;
-  description: string;
-  price: string;
-  minAge: string;
-  maxAge: string;
-  isDefault: boolean;
-  countTowardsCapacity: boolean;
-  minQuantity: string;
-  maxQuantity: string;
-}
-
-const defaultTierForm: PricingTierFormData = {
-  name: "",
-  label: "",
-  description: "",
-  price: "",
-  minAge: "",
-  maxAge: "",
-  isDefault: false,
-  countTowardsCapacity: true,
-  minQuantity: "0",
-  maxQuantity: "",
-};
-
-interface VariantFormData {
-  name: string;
-  label: string;
-  description: string;
-  priceModifierType: "absolute" | "percentage" | "fixed_add";
-  priceModifier: string;
-  durationMinutes: string;
-  maxParticipants: string;
-  minParticipants: string;
-  defaultStartTime: string;
-  availableDays: number[];
-  isDefault: boolean;
-  isActive: boolean;
-}
-
-const defaultVariantForm: VariantFormData = {
-  name: "",
-  label: "",
-  description: "",
-  priceModifierType: "absolute",
-  priceModifier: "",
-  durationMinutes: "",
-  maxParticipants: "",
-  minParticipants: "",
-  defaultStartTime: "",
-  availableDays: [0, 1, 2, 3, 4, 5, 6],
-  isDefault: false,
-  isActive: true,
-};
-
-const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+type TabValue = "overview" | "details" | "schedules" | "pricing" | "guides";
 
 export default function TourDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
   const tourId = params.id as string;
 
-  // Delete confirmation state
-  const [deletingTierId, setDeletingTierId] = useState<string | null>(null);
-  const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
+  // Get initial tab from URL or default to overview
+  const initialTab = (searchParams.get("tab") as TabValue) || "overview";
+  const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
 
-  // Pricing tier modal state
-  const [showTierModal, setShowTierModal] = useState(false);
-  const [editingTierId, setEditingTierId] = useState<string | null>(null);
-  const [tierForm, setTierForm] = useState<PricingTierFormData>(defaultTierForm);
-
-  // Variant modal state
-  const [showVariantModal, setShowVariantModal] = useState(false);
-  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
-  const [variantForm, setVariantForm] = useState<VariantFormData>(defaultVariantForm);
+  // Confirmation modals state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: tour, isLoading, error } = trpc.tour.getById.useQuery({ id: tourId });
-  const { data: pricingTiers = [], isLoading: tiersLoading } = trpc.tour.listPricingTiers.useQuery(
-    { tourId },
-    { enabled: !!tourId }
-  );
-  const { data: variants = [], isLoading: variantsLoading } = trpc.tour.listVariants.useQuery(
-    { tourId },
-    { enabled: !!tourId }
-  );
 
-  // Get upcoming schedules for this tour
-  const { data: schedulesData } = trpc.schedule.list.useQuery(
-    {
-      filters: { tourId },
-      pagination: { limit: 10 },
-      sort: { field: "startsAt", direction: "asc" },
-    },
-    { enabled: !!tourId }
-  );
-
-  const createTierMutation = trpc.tour.createPricingTier.useMutation({
+  // Mutations for tour actions
+  const publishMutation = trpc.tour.publish.useMutation({
     onSuccess: () => {
-      utils.tour.listPricingTiers.invalidate({ tourId });
-      setShowTierModal(false);
-      setTierForm(defaultTierForm);
-    },
-  });
-
-  const updateTierMutation = trpc.tour.updatePricingTier.useMutation({
-    onSuccess: () => {
-      utils.tour.listPricingTiers.invalidate({ tourId });
-      setShowTierModal(false);
-      setEditingTierId(null);
-      setTierForm(defaultTierForm);
-    },
-  });
-
-  const deleteTierMutation = trpc.tour.deletePricingTier.useMutation({
-    onSuccess: () => {
-      utils.tour.listPricingTiers.invalidate({ tourId });
-      setDeletingTierId(null);
-      toast.success("Pricing tier deleted");
+      utils.tour.getById.invalidate({ id: tourId });
+      utils.tour.list.invalidate();
+      toast.success("Tour published");
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to delete pricing tier");
+      toast.error(error.message || "Failed to publish tour");
     },
   });
 
-  const handleOpenTierModal = (tier?: typeof pricingTiers[0]) => {
-    if (tier) {
-      setEditingTierId(tier.id);
-      setTierForm({
-        name: tier.name,
-        label: tier.label,
-        description: tier.description || "",
-        price: tier.price,
-        minAge: tier.minAge?.toString() || "",
-        maxAge: tier.maxAge?.toString() || "",
-        isDefault: tier.isDefault || false,
-        countTowardsCapacity: tier.countTowardsCapacity ?? true,
-        minQuantity: tier.minQuantity?.toString() || "0",
-        maxQuantity: tier.maxQuantity?.toString() || "",
-      });
-    } else {
-      setEditingTierId(null);
-      setTierForm(defaultTierForm);
-    }
-    setShowTierModal(true);
-  };
-
-  const handleSaveTier = () => {
-    const payload = {
-      name: tierForm.name,
-      label: tierForm.label,
-      description: tierForm.description || undefined,
-      price: tierForm.price,
-      minAge: tierForm.minAge ? parseInt(tierForm.minAge) : undefined,
-      maxAge: tierForm.maxAge ? parseInt(tierForm.maxAge) : undefined,
-      isDefault: tierForm.isDefault,
-      countTowardsCapacity: tierForm.countTowardsCapacity,
-      minQuantity: parseInt(tierForm.minQuantity) || 0,
-      maxQuantity: tierForm.maxQuantity ? parseInt(tierForm.maxQuantity) : undefined,
-    };
-
-    if (editingTierId) {
-      updateTierMutation.mutate({ tierId: editingTierId, data: payload });
-    } else {
-      createTierMutation.mutate({ tourId, ...payload });
-    }
-  };
-
-  const handleDeleteTier = () => {
-    if (deletingTierId) {
-      deleteTierMutation.mutate({ tierId: deletingTierId });
-    }
-  };
-
-  // Variant mutations
-  const createVariantMutation = trpc.tour.createVariant.useMutation({
+  const unpublishMutation = trpc.tour.unpublish.useMutation({
     onSuccess: () => {
-      utils.tour.listVariants.invalidate({ tourId });
-      setShowVariantModal(false);
-      setVariantForm(defaultVariantForm);
-    },
-  });
-
-  const updateVariantMutation = trpc.tour.updateVariant.useMutation({
-    onSuccess: () => {
-      utils.tour.listVariants.invalidate({ tourId });
-      setShowVariantModal(false);
-      setEditingVariantId(null);
-      setVariantForm(defaultVariantForm);
-    },
-  });
-
-  const deleteVariantMutation = trpc.tour.deleteVariant.useMutation({
-    onSuccess: () => {
-      utils.tour.listVariants.invalidate({ tourId });
-      setDeletingVariantId(null);
-      toast.success("Variant deleted");
+      utils.tour.getById.invalidate({ id: tourId });
+      utils.tour.list.invalidate();
+      toast.success("Tour paused");
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to delete variant");
+      toast.error(error.message || "Failed to pause tour");
     },
   });
 
-  const handleOpenVariantModal = (variant?: typeof variants[0]) => {
-    if (variant) {
-      setEditingVariantId(variant.id);
-      setVariantForm({
-        name: variant.name,
-        label: variant.label,
-        description: variant.description || "",
-        priceModifierType: variant.priceModifierType || "absolute",
-        priceModifier: variant.priceModifier || "",
-        durationMinutes: variant.durationMinutes?.toString() || "",
-        maxParticipants: variant.maxParticipants?.toString() || "",
-        minParticipants: variant.minParticipants?.toString() || "",
-        defaultStartTime: variant.defaultStartTime || "",
-        availableDays: variant.availableDays || [0, 1, 2, 3, 4, 5, 6],
-        isDefault: variant.isDefault || false,
-        isActive: variant.isActive ?? true,
-      });
+  const archiveMutation = trpc.tour.archive.useMutation({
+    onSuccess: () => {
+      utils.tour.getById.invalidate({ id: tourId });
+      utils.tour.list.invalidate();
+      setShowArchiveModal(false);
+      toast.success("Tour archived");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to archive tour");
+    },
+  });
+
+  const deleteMutation = trpc.tour.delete.useMutation({
+    onSuccess: () => {
+      utils.tour.list.invalidate();
+      toast.success("Tour deleted");
+      router.push(`/org/${slug}/tours`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete tour");
+    },
+  });
+
+  const duplicateMutation = trpc.tour.duplicate.useMutation({
+    onSuccess: (newTour) => {
+      utils.tour.list.invalidate();
+      toast.success("Tour duplicated");
+      router.push(`/org/${slug}/tours/${newTour.id}`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to duplicate tour");
+    },
+  });
+
+  // Update URL when tab changes
+  const handleTabChange = (value: string) => {
+    const newTab = value as TabValue;
+    setActiveTab(newTab);
+    const url = new URL(window.location.href);
+    if (newTab === "overview") {
+      url.searchParams.delete("tab");
     } else {
-      setEditingVariantId(null);
-      setVariantForm(defaultVariantForm);
+      url.searchParams.set("tab", newTab);
     }
-    setShowVariantModal(true);
+    router.replace((url.pathname + url.search) as Route, { scroll: false });
   };
 
-  const handleSaveVariant = () => {
-    const payload = {
-      name: variantForm.name,
-      label: variantForm.label,
-      description: variantForm.description || undefined,
-      priceModifierType: variantForm.priceModifierType,
-      priceModifier: variantForm.priceModifier || undefined,
-      durationMinutes: variantForm.durationMinutes ? parseInt(variantForm.durationMinutes) : undefined,
-      maxParticipants: variantForm.maxParticipants ? parseInt(variantForm.maxParticipants) : undefined,
-      minParticipants: variantForm.minParticipants ? parseInt(variantForm.minParticipants) : undefined,
-      defaultStartTime: variantForm.defaultStartTime || undefined,
-      availableDays: variantForm.availableDays,
-      isDefault: variantForm.isDefault,
-      isActive: variantForm.isActive,
-    };
-
-    if (editingVariantId) {
-      updateVariantMutation.mutate({ variantId: editingVariantId, data: payload });
-    } else {
-      createVariantMutation.mutate({ tourId, ...payload });
-    }
-  };
-
-  const handleDeleteVariant = () => {
-    if (deletingVariantId) {
-      deleteVariantMutation.mutate({ variantId: deletingVariantId });
-    }
-  };
-
-  const handleCreateSchedule = () => {
-    router.push(`/org/${slug}/schedules/new?tourId=${tourId}` as Route);
-  };
-
-  const toggleVariantDay = (day: number) => {
-    const newDays = variantForm.availableDays.includes(day)
-      ? variantForm.availableDays.filter((d) => d !== day)
-      : [...variantForm.availableDays, day].sort();
-    setVariantForm({ ...variantForm, availableDays: newDays });
+  // Handle details tab save
+  const handleDetailsSave = () => {
+    utils.tour.getById.invalidate({ id: tourId });
+    setActiveTab("overview");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("tab");
+    router.replace((url.pathname + url.search) as Route, { scroll: false });
   };
 
   if (isLoading) {
@@ -290,922 +124,147 @@ export default function TourDetailPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-red-600">Error loading tour: {error.message}</p>
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+        <p className="text-destructive">Error loading tour: {error.message}</p>
       </div>
     );
   }
 
   if (!tour) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <p className="text-gray-500">Tour not found</p>
+      <div className="rounded-lg border border-border bg-card p-6">
+        <p className="text-muted-foreground">Tour not found</p>
       </div>
     );
   }
 
+  const isActionLoading =
+    publishMutation.isPending ||
+    unpublishMutation.isPending ||
+    archiveMutation.isPending ||
+    deleteMutation.isPending ||
+    duplicateMutation.isPending;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link
-            href={`/org/${slug}/tours` as Route}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-500" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">{tour.name}</h1>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  tour.status === "active"
-                    ? "bg-green-100 text-green-800"
-                    : tour.status === "draft"
-                    ? "bg-yellow-100 text-yellow-800"
-                    : tour.status === "paused"
-                    ? "bg-orange-100 text-orange-800"
-                    : "bg-gray-100 text-gray-800"
-                }`}
-              >
-                {tour.status}
-              </span>
-            </div>
-            <p className="text-gray-500 mt-1">{tour.slug}</p>
-          </div>
-        </div>
-        <Link
-          href={`/org/${slug}/tours/${tour.id}/edit` as Route}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-        >
-          <Edit className="h-4 w-4" />
-          Edit Tour
-        </Link>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Clock className="h-5 w-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Duration</p>
-              <p className="font-semibold text-gray-900">{tour.durationMinutes} min</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Capacity</p>
-              <p className="font-semibold text-gray-900">
-                {tour.minParticipants ?? 1} - {tour.maxParticipants}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <DollarSign className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Base Price</p>
-              <p className="font-semibold text-gray-900">
-                ${parseFloat(tour.basePrice).toFixed(2)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Calendar className="h-5 w-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Cutoff</p>
-              <p className="font-semibold text-gray-900">{tour.cancellationHours ?? 24}h before</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Description */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Description</h2>
-        {tour.shortDescription && (
-          <p className="text-gray-600 mb-4 font-medium">{tour.shortDescription}</p>
-        )}
-        {tour.description ? (
-          <p className="text-gray-600 whitespace-pre-wrap">{tour.description}</p>
-        ) : (
-          <p className="text-gray-400 italic">No description provided</p>
-        )}
-      </div>
-
-      {/* Inclusions & Exclusions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {tour.includes && tour.includes.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">What&apos;s Included</h2>
-            <ul className="space-y-2">
-              {tour.includes.map((item: string, index: number) => (
-                <li key={index} className="flex items-start gap-2">
-                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {tour.excludes && tour.excludes.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Not Included</h2>
-            <ul className="space-y-2">
-              {tour.excludes.map((item: string, index: number) => (
-                <li key={index} className="flex items-start gap-2">
-                  <X className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-gray-600">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-
-      {/* Meeting Point */}
-      {(tour.meetingPoint || tour.meetingPointDetails) && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Meeting Point</h2>
-          <div className="flex items-start gap-3">
-            <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
-            <div>
-              {tour.meetingPoint && (
-                <p className="font-medium text-gray-900">{tour.meetingPoint}</p>
-              )}
-              {tour.meetingPointDetails && (
-                <p className="text-gray-600 mt-1">{tour.meetingPointDetails}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pricing Tiers */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Pricing Tiers</h2>
-          <button
-            onClick={() => handleOpenTierModal()}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Tier
-          </button>
-        </div>
-
-        {tiersLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        ) : pricingTiers.length === 0 ? (
-          <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-            <DollarSign className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 mb-2">No pricing tiers configured</p>
-            <p className="text-sm text-gray-400 mb-4">
-              Add pricing tiers like Adult, Child, Senior to offer different prices
-            </p>
-            <button
-              onClick={() => handleOpenTierModal()}
-              className="text-primary hover:text-primary/80 font-medium text-sm"
-            >
-              + Add your first pricing tier
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {pricingTiers.map((tier) => (
-              <div
-                key={tier.id}
-                className={`flex items-center justify-between p-4 rounded-lg border ${
-                  tier.isActive ? "border-gray-200 bg-gray-50" : "border-gray-100 bg-gray-50/50 opacity-60"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <GripVertical className="h-5 w-5 text-gray-300" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{tier.label}</span>
-                      {tier.isDefault && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          <Star className="h-3 w-3" />
-                          Default
-                        </span>
-                      )}
-                      {!tier.isActive && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          Inactive
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                      <span className="font-medium text-gray-700">
-                        ${parseFloat(tier.price).toFixed(2)}
-                      </span>
-                      {(tier.minAge !== null || tier.maxAge !== null) && (
-                        <span>
-                          Ages: {tier.minAge ?? 0} - {tier.maxAge ?? "∞"}
-                        </span>
-                      )}
-                      {!tier.countTowardsCapacity && (
-                        <span className="text-orange-600">Doesn&apos;t count to capacity</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleOpenTierModal(tier)}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setDeletingTierId(tier.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    disabled={deleteTierMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Tour Variants */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Tour Variants</h2>
-          <button
-            onClick={() => handleOpenVariantModal()}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Variant
-          </button>
-        </div>
-
-        {variantsLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        ) : variants.length === 0 ? (
-          <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-            <Layers className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 mb-2">No variants configured</p>
-            <p className="text-sm text-gray-400 mb-4">
-              Add variants like Morning/Evening tours, Private/Group options, or language versions
-            </p>
-            <button
-              onClick={() => handleOpenVariantModal()}
-              className="text-primary hover:text-primary/80 font-medium text-sm"
-            >
-              + Add your first variant
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {variants.map((variant) => (
-              <div
-                key={variant.id}
-                className={`flex items-center justify-between p-4 rounded-lg border ${
-                  variant.isActive ? "border-gray-200 bg-gray-50" : "border-gray-100 bg-gray-50/50 opacity-60"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <GripVertical className="h-5 w-5 text-gray-300" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{variant.label}</span>
-                      {variant.isDefault && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          <Star className="h-3 w-3" />
-                          Default
-                        </span>
-                      )}
-                      {!variant.isActive && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          Inactive
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                      {variant.priceModifier && (
-                        <span className="font-medium text-gray-700">
-                          {variant.priceModifierType === "absolute"
-                            ? `$${parseFloat(variant.priceModifier).toFixed(2)}`
-                            : variant.priceModifierType === "percentage"
-                            ? `${variant.priceModifier}%`
-                            : `+$${parseFloat(variant.priceModifier).toFixed(2)}`}
-                        </span>
-                      )}
-                      {variant.durationMinutes && (
-                        <span>{variant.durationMinutes} min</span>
-                      )}
-                      {variant.defaultStartTime && (
-                        <span>{variant.defaultStartTime}</span>
-                      )}
-                      {variant.availableDays && variant.availableDays.length < 7 && (
-                        <span className="text-xs">
-                          {variant.availableDays.map((d) => dayNames[d]).join(", ")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleOpenVariantModal(variant)}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setDeletingVariantId(variant.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    disabled={deleteVariantMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Qualified Guides */}
-      <TourGuideQualifications tourId={tourId} />
-
-      {/* Upcoming Schedules */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Upcoming Schedules</h2>
-            <p className="text-sm text-gray-500">
-              {schedulesData?.data?.length || 0} schedules
-            </p>
-          </div>
-          <Button onClick={handleCreateSchedule} size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create Schedule
-          </Button>
-        </div>
-
-        {schedulesData?.data && schedulesData.data.length > 0 ? (
-          <div className="divide-y divide-gray-200">
-            {schedulesData.data.slice(0, 5).map((schedule) => {
-              const date = new Date(schedule.startsAt);
-              const dateStr = new Intl.DateTimeFormat("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              }).format(date);
-              const available = (schedule.maxParticipants || 0) - (schedule.bookedCount || 0);
-
-              return (
-                <div
-                  key={schedule.id}
-                  className="p-4 flex items-center justify-between hover:bg-gray-50"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{dateStr}</span>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          schedule.status === "scheduled"
-                            ? "bg-blue-100 text-blue-800"
-                            : schedule.status === "completed"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {schedule.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      {schedule.bookedCount || 0}/{schedule.maxParticipants} booked • {available} spots available
-                      {schedule.guide && ` • ${schedule.guide.firstName} ${schedule.guide.lastName}`}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/org/${slug}/schedules/${schedule.id}` as Route}
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    View
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="p-8 text-center">
-            <Ticket className="mx-auto h-12 w-12 text-gray-300" />
-            <p className="mt-4 text-gray-500">No schedules yet</p>
-            <Button onClick={handleCreateSchedule} variant="outline" className="mt-4 gap-2">
-              <Plus className="h-4 w-4" />
-              Create First Schedule
-            </Button>
-          </div>
-        )}
-
-        {schedulesData?.data && schedulesData.data.length > 5 && (
-          <div className="p-4 border-t border-gray-200 text-center">
-            <Link
-              href={`/org/${slug}/schedules?tourId=${tourId}` as Route}
-              className="text-sm text-primary hover:underline"
-            >
-              View all {schedulesData.data.length} schedules
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Cancellation Policy */}
-      {tour.cancellationPolicy && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Cancellation Policy</h2>
-          <p className="text-gray-600 whitespace-pre-wrap">{tour.cancellationPolicy}</p>
-        </div>
-      )}
-
-      {/* Pricing Tier Modal */}
-      {showTierModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setShowTierModal(false)}
-          />
-          <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {editingTierId ? "Edit Pricing Tier" : "Add Pricing Tier"}
-              </h3>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name (internal) *
-                    </label>
-                    <input
-                      type="text"
-                      value={tierForm.name}
-                      onChange={(e) => setTierForm({ ...tierForm, name: e.target.value })}
-                      placeholder="e.g., adult, child"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Label (display) *
-                    </label>
-                    <input
-                      type="text"
-                      value={tierForm.label}
-                      onChange={(e) => setTierForm({ ...tierForm, label: e.target.value })}
-                      placeholder="e.g., Adult (13+)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={tierForm.price}
-                      onChange={(e) => setTierForm({ ...tierForm, price: e.target.value })}
-                      placeholder="0.00"
-                      className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={tierForm.description}
-                    onChange={(e) => setTierForm({ ...tierForm, description: e.target.value })}
-                    placeholder="Optional description"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Min Age
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={tierForm.minAge}
-                      onChange={(e) => setTierForm({ ...tierForm, minAge: e.target.value })}
-                      placeholder="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Max Age
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={tierForm.maxAge}
-                      onChange={(e) => setTierForm({ ...tierForm, maxAge: e.target.value })}
-                      placeholder="No limit"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Min Quantity
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={tierForm.minQuantity}
-                      onChange={(e) => setTierForm({ ...tierForm, minQuantity: e.target.value })}
-                      placeholder="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Max Quantity
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={tierForm.maxQuantity}
-                      onChange={(e) => setTierForm({ ...tierForm, maxQuantity: e.target.value })}
-                      placeholder="No limit"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={tierForm.isDefault}
-                      onChange={(e) => setTierForm({ ...tierForm, isDefault: e.target.checked })}
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Set as default tier (shown as primary price)
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={tierForm.countTowardsCapacity}
-                      onChange={(e) =>
-                        setTierForm({ ...tierForm, countTowardsCapacity: e.target.checked })
-                      }
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Counts towards tour capacity (uncheck for infants/free additions)
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                <button
-                  onClick={() => {
-                    setShowTierModal(false);
-                    setEditingTierId(null);
-                    setTierForm(defaultTierForm);
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveTier}
-                  disabled={
-                    !tierForm.name ||
-                    !tierForm.label ||
-                    !tierForm.price ||
-                    createTierMutation.isPending ||
-                    updateTierMutation.isPending
-                  }
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {createTierMutation.isPending || updateTierMutation.isPending
-                    ? "Saving..."
-                    : editingTierId
-                    ? "Update Tier"
-                    : "Add Tier"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Variant Modal */}
-      {showVariantModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setShowVariantModal(false)}
-          />
-          <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {editingVariantId ? "Edit Variant" : "Add Variant"}
-              </h3>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name (internal) *
-                    </label>
-                    <input
-                      type="text"
-                      value={variantForm.name}
-                      onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
-                      placeholder="e.g., morning, private"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Label (display) *
-                    </label>
-                    <input
-                      type="text"
-                      value={variantForm.label}
-                      onChange={(e) => setVariantForm({ ...variantForm, label: e.target.value })}
-                      placeholder="e.g., Morning Tour"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={variantForm.description}
-                    onChange={(e) => setVariantForm({ ...variantForm, description: e.target.value })}
-                    placeholder="Optional description"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price Type
-                    </label>
-                    <select
-                      value={variantForm.priceModifierType}
-                      onChange={(e) =>
-                        setVariantForm({
-                          ...variantForm,
-                          priceModifierType: e.target.value as "absolute" | "percentage" | "fixed_add",
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    >
-                      <option value="absolute">Absolute Price</option>
-                      <option value="percentage">Percentage of Base</option>
-                      <option value="fixed_add">Add to Base Price</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price Value
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-gray-500">
-                        {variantForm.priceModifierType === "percentage" ? "%" : "$"}
-                      </span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={variantForm.priceModifier}
-                        onChange={(e) =>
-                          setVariantForm({ ...variantForm, priceModifier: e.target.value })
-                        }
-                        placeholder={variantForm.priceModifierType === "percentage" ? "0" : "0.00"}
-                        className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Duration (min)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={variantForm.durationMinutes}
-                      onChange={(e) =>
-                        setVariantForm({ ...variantForm, durationMinutes: e.target.value })
-                      }
-                      placeholder="Use default"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Min Participants
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={variantForm.minParticipants}
-                      onChange={(e) =>
-                        setVariantForm({ ...variantForm, minParticipants: e.target.value })
-                      }
-                      placeholder="Use default"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Max Participants
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={variantForm.maxParticipants}
-                      onChange={(e) =>
-                        setVariantForm({ ...variantForm, maxParticipants: e.target.value })
-                      }
-                      placeholder="Use default"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Default Start Time
-                  </label>
-                  <input
-                    type="time"
-                    value={variantForm.defaultStartTime}
-                    onChange={(e) =>
-                      setVariantForm({ ...variantForm, defaultStartTime: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Available Days
-                  </label>
-                  <div className="flex gap-2">
-                    {dayNames.map((day, index) => (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => toggleVariantDay(index)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                          variantForm.availableDays.includes(index)
-                            ? "bg-primary text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={variantForm.isDefault}
-                      onChange={(e) =>
-                        setVariantForm({ ...variantForm, isDefault: e.target.checked })
-                      }
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                    />
-                    <span className="text-sm text-gray-700">Set as default variant</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={variantForm.isActive}
-                      onChange={(e) =>
-                        setVariantForm({ ...variantForm, isActive: e.target.checked })
-                      }
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                    />
-                    <span className="text-sm text-gray-700">Active (visible for booking)</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                <button
-                  onClick={() => {
-                    setShowVariantModal(false);
-                    setEditingVariantId(null);
-                    setVariantForm(defaultVariantForm);
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveVariant}
-                  disabled={
-                    !variantForm.name ||
-                    !variantForm.label ||
-                    createVariantMutation.isPending ||
-                    updateVariantMutation.isPending
-                  }
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {createVariantMutation.isPending || updateVariantMutation.isPending
-                    ? "Saving..."
-                    : editingVariantId
-                    ? "Update Variant"
-                    : "Add Variant"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Tier Confirmation Modal */}
-      <ConfirmModal
-        open={!!deletingTierId}
-        onOpenChange={(open) => !open && setDeletingTierId(null)}
-        title="Delete Pricing Tier"
-        description="Are you sure you want to delete this pricing tier? This action cannot be undone."
-        confirmLabel="Delete"
-        variant="destructive"
-        onConfirm={handleDeleteTier}
-        isLoading={deleteTierMutation.isPending}
+      {/* Header */}
+      <TourPageHeader
+        tour={{
+          id: tour.id,
+          name: tour.name,
+          slug: tour.slug,
+          status: tour.status,
+        }}
+        orgSlug={slug}
+        onPublish={() => publishMutation.mutate({ id: tourId })}
+        onUnpublish={() => unpublishMutation.mutate({ id: tourId })}
+        onArchive={() => setShowArchiveModal(true)}
+        onDuplicate={() => duplicateMutation.mutate({ id: tourId })}
+        onDelete={() => setShowDeleteModal(true)}
+        isLoading={isActionLoading}
       />
 
-      {/* Delete Variant Confirmation Modal */}
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+        <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+          <TabsTrigger
+            value="overview"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="details"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <FileText className="h-4 w-4" />
+            Details
+          </TabsTrigger>
+          <TabsTrigger
+            value="schedules"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Calendar className="h-4 w-4" />
+            Schedules
+          </TabsTrigger>
+          <TabsTrigger
+            value="pricing"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <DollarSign className="h-4 w-4" />
+            Pricing
+          </TabsTrigger>
+          <TabsTrigger
+            value="guides"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Users className="h-4 w-4" />
+            Guides
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview">
+          <TourOverviewTab tour={tour} />
+        </TabsContent>
+
+        {/* Details Tab */}
+        <TabsContent value="details">
+          <TourDetailsTab
+            tourId={tourId}
+            tour={tour}
+            onSuccess={handleDetailsSave}
+          />
+        </TabsContent>
+
+        {/* Schedules Tab */}
+        <TabsContent value="schedules">
+          <TourScheduleManager
+            tourId={tourId}
+            orgSlug={slug}
+            tourDefaults={{
+              durationMinutes: tour.durationMinutes,
+              maxParticipants: tour.maxParticipants,
+              meetingPoint: tour.meetingPoint,
+              meetingPointDetails: tour.meetingPointDetails,
+            }}
+          />
+        </TabsContent>
+
+        {/* Pricing Tab */}
+        <TabsContent value="pricing">
+          <TourPricingTab tourId={tourId} />
+        </TabsContent>
+
+        {/* Guides Tab */}
+        <TabsContent value="guides">
+          <TourGuideQualifications tourId={tourId} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Archive Confirmation Modal */}
       <ConfirmModal
-        open={!!deletingVariantId}
-        onOpenChange={(open) => !open && setDeletingVariantId(null)}
-        title="Delete Variant"
-        description="Are you sure you want to delete this variant? This action cannot be undone."
+        open={showArchiveModal}
+        onOpenChange={setShowArchiveModal}
+        title="Archive Tour"
+        description="Are you sure you want to archive this tour? Archived tours are hidden from the tour list but can be restored later."
+        confirmLabel="Archive"
+        variant="default"
+        onConfirm={() => archiveMutation.mutate({ id: tourId })}
+        isLoading={archiveMutation.isPending}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={showDeleteModal}
+        onOpenChange={setShowDeleteModal}
+        title="Delete Tour"
+        description="Are you sure you want to delete this tour? This action cannot be undone. All associated schedules and bookings will also be affected."
         confirmLabel="Delete"
         variant="destructive"
-        onConfirm={handleDeleteVariant}
-        isLoading={deleteVariantMutation.isPending}
+        onConfirm={() => deleteMutation.mutate({ id: tourId })}
+        isLoading={deleteMutation.isPending}
       />
     </div>
   );

@@ -1,8 +1,8 @@
 import type { Config } from "tailwindcss";
-import sharedConfig from "@tour/config/tailwind";
 
+// Tailwind v4 uses CSS-first configuration via @theme in globals.css
+// This config file is minimal - mainly for content paths
 const config: Config = {
-  ...sharedConfig,
   content: [
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
     "../../packages/ui/src/**/*.{js,ts,jsx,tsx}",

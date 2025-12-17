@@ -16,6 +16,11 @@ export type ActivityAction =
   | "booking.participant_added"
   | "booking.participant_removed"
   | "booking.email_sent"
+  | "booking.payment_recorded"
+  | "booking.payment_deleted"
+  | "booking.payment_link_sent"
+  | "booking.payment_email_sent"
+  | "booking.payment_failed_email_sent"
   // Schedule actions
   | "schedule.created"
   | "schedule.updated"
@@ -51,7 +56,12 @@ export type ActivityAction =
   // Payment actions
   | "payment.received"
   | "payment.refunded"
-  | "payment.failed";
+  | "payment.failed"
+  // Review actions
+  | "review.created"
+  | "review.request_sent"
+  | "review.reminder_sent"
+  | "review.responded";
 
 // Activity log entity types
 export type ActivityEntity =
@@ -62,7 +72,8 @@ export type ActivityEntity =
   | "guide"
   | "guide_assignment"
   | "organization"
-  | "payment";
+  | "payment"
+  | "review";
 
 // Activity Logs - Immutable audit trail (org-scoped)
 export const activityLogs = pgTable("activity_logs", {

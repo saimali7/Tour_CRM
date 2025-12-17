@@ -2,6 +2,24 @@ import { Inngest, EventSchemas } from "inngest";
 
 // Define event types for type safety
 type BookingEvents = {
+  "booking/created": {
+    data: {
+      organizationId: string;
+      bookingId: string;
+      customerId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      tourName: string;
+      tourDate: string;
+      tourTime: string;
+      participants: number;
+      totalAmount: string;
+      currency: string;
+      meetingPoint?: string;
+      meetingPointDetails?: string;
+    };
+  };
   "booking/confirmed": {
     data: {
       organizationId: string;
@@ -16,6 +34,24 @@ type BookingEvents = {
       participants: number;
       totalAmount: string;
       currency: string;
+      meetingPoint?: string;
+      meetingPointDetails?: string;
+    };
+  };
+  "booking/rescheduled": {
+    data: {
+      organizationId: string;
+      bookingId: string;
+      customerId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      tourName: string;
+      oldTourDate: string;
+      oldTourTime: string;
+      newTourDate: string;
+      newTourTime: string;
+      participants: number;
       meetingPoint?: string;
       meetingPointDetails?: string;
     };
@@ -51,6 +87,21 @@ type BookingEvents = {
       meetingPoint?: string;
       meetingPointDetails?: string;
       hoursUntilTour: number;
+    };
+  };
+  "booking/completed": {
+    data: {
+      organizationId: string;
+      bookingId: string;
+      customerId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      tourName: string;
+      tourDate: string;
+      tourTime: string;
+      guideId?: string;
+      guideName?: string;
     };
   };
   "schedule/reminder-check": {
@@ -146,6 +197,48 @@ type BookingEvents = {
   "guide/daily-manifest": {
     data: {
       organizationId: string;
+    };
+  };
+  // Refund events
+  "refund/processed": {
+    data: {
+      organizationId: string;
+      refundId: string;
+      bookingId: string;
+      customerId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      tourName: string;
+      refundAmount: string;
+      currency: string;
+      reason?: string;
+    };
+  };
+  // Payment events
+  "payment/succeeded": {
+    data: {
+      organizationId: string;
+      bookingId: string;
+      customerId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      tourName: string;
+      tourDate: string;
+      amount: string;
+      currency: string;
+      stripeReceiptUrl?: string;
+    };
+  };
+  "payment/failed": {
+    data: {
+      organizationId: string;
+      bookingId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      errorMessage: string;
     };
   };
 };

@@ -26,16 +26,16 @@ export default function EditCustomerPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-red-600">Error loading customer: {error.message}</p>
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+        <p className="text-destructive">Error loading customer: {error.message}</p>
       </div>
     );
   }
 
   if (!customer) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <p className="text-gray-500">Customer not found</p>
+      <div className="rounded-lg border border-border bg-card p-6">
+        <p className="text-muted-foreground">Customer not found</p>
       </div>
     );
   }
@@ -45,13 +45,13 @@ export default function EditCustomerPage() {
       <div className="flex items-center gap-4">
         <Link
           href={`/org/${slug}/customers/${customer.id}` as Route}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-accent rounded-lg transition-colors"
         >
-          <ArrowLeft className="h-5 w-5 text-gray-500" />
+          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Edit Customer</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Edit Customer</h1>
+          <p className="text-muted-foreground mt-1">
             {customer.firstName} {customer.lastName}
           </p>
         </div>

@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, count, ilike, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, ilike, or, gte } from "drizzle-orm";
 import {
   customers,
   bookings,
@@ -34,10 +34,11 @@ export interface CustomerWithStats extends Customer {
 }
 
 export interface CreateCustomerInput {
-  email: string;
+  email?: string;
   firstName: string;
   lastName: string;
   phone?: string;
+  contactPreference?: "email" | "phone" | "both";
   address?: string;
   city?: string;
   state?: string;
@@ -208,6 +209,8 @@ export class CustomerService extends BaseService {
   }
 
   async getByEmail(email: string): Promise<Customer | null> {
+    if (!email) return null;
+
     const customer = await this.db.query.customers.findFirst({
       where: and(
         eq(customers.email, email.toLowerCase()),
@@ -219,21 +222,29 @@ export class CustomerService extends BaseService {
   }
 
   async create(input: CreateCustomerInput): Promise<Customer> {
-    const email = input.email.toLowerCase();
+    // Validation: Must have email OR phone
+    if (!input.email && !input.phone) {
+      throw new Error("Customer must have either email or phone number");
+    }
 
-    const existing = await this.getByEmail(email);
-    if (existing) {
-      throw new ConflictError(`Customer with email "${email}" already exists`);
+    // Check for duplicate email if email is provided
+    if (input.email) {
+      const email = input.email.toLowerCase();
+      const existing = await this.getByEmail(email);
+      if (existing) {
+        throw new ConflictError(`Customer with email "${email}" already exists`);
+      }
     }
 
     const [customer] = await this.db
       .insert(customers)
       .values({
         organizationId: this.organizationId,
-        email,
+        email: input.email ? input.email.toLowerCase() : null,
         firstName: input.firstName,
         lastName: input.lastName,
         phone: input.phone,
+        contactPreference: input.contactPreference || "email",
         address: input.address,
         city: input.city,
         state: input.state,
@@ -257,15 +268,25 @@ export class CustomerService extends BaseService {
   }
 
   async getOrCreate(input: CreateCustomerInput): Promise<Customer> {
-    const existing = await this.getByEmail(input.email);
-    if (existing) {
-      return existing;
+    if (input.email) {
+      const existing = await this.getByEmail(input.email);
+      if (existing) {
+        return existing;
+      }
     }
     return this.create(input);
   }
 
   async update(id: string, input: UpdateCustomerInput): Promise<Customer> {
-    await this.getById(id);
+    const existingCustomer = await this.getById(id);
+
+    // If updating contact info, ensure at least one remains
+    const updatedEmail = input.email !== undefined ? input.email : existingCustomer.email;
+    const updatedPhone = input.phone !== undefined ? input.phone : existingCustomer.phone;
+
+    if (!updatedEmail && !updatedPhone) {
+      throw new Error("Customer must have either email or phone number");
+    }
 
     if (input.email) {
       const email = input.email.toLowerCase();
@@ -380,7 +401,7 @@ export class CustomerService extends BaseService {
           .where(
             and(
               eq(customers.organizationId, this.organizationId),
-              sql`${customers.createdAt} >= ${startOfMonth}`
+              gte(customers.createdAt, startOfMonth)
             )
           ),
 

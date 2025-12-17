@@ -4,7 +4,7 @@ import { createServices } from "@tour/services";
 import { TRPCError } from "@trpc/server";
 import { getGuideContext } from "../../lib/guide-auth";
 import { db, eq, and, gte, lte } from "@tour/database";
-import { schedules, bookings, guideAssignments, tours } from "@tour/database/schema";
+import { schedules, bookings, guideAssignments } from "@tour/database/schema";
 
 /**
  * Guide-authenticated procedure
@@ -115,7 +115,7 @@ export const guidePortalRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const { guideId, organizationId } = ctx.guideContext;
 
-      let whereConditions = [
+      const whereConditions = [
         eq(guideAssignments.organizationId, organizationId),
         eq(guideAssignments.guideId, guideId),
       ];

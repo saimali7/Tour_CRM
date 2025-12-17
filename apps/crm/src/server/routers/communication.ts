@@ -134,11 +134,11 @@ export const communicationRouter = createRouter({
       z.object({
         name: z.string().min(1).max(100),
         type: emailTemplateTypeSchema,
-        description: z.string().optional(),
-        subject: z.string().min(1),
-        contentHtml: z.string().min(1),
-        contentPlain: z.string().optional(),
-        availableVariables: z.array(z.string()).optional(),
+        description: z.string().max(500).optional(),
+        subject: z.string().min(1).max(200),
+        contentHtml: z.string().min(1).max(100000), // 100KB max for HTML template
+        contentPlain: z.string().max(50000).optional(),
+        availableVariables: z.array(z.string().max(100)).max(50).optional(),
         isActive: z.boolean().optional(),
       })
     )
@@ -150,14 +150,14 @@ export const communicationRouter = createRouter({
   updateEmailTemplate: adminProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().max(100),
         data: z.object({
           name: z.string().min(1).max(100).optional(),
-          description: z.string().optional(),
-          subject: z.string().min(1).optional(),
-          contentHtml: z.string().min(1).optional(),
-          contentPlain: z.string().optional(),
-          availableVariables: z.array(z.string()).optional(),
+          description: z.string().max(500).optional(),
+          subject: z.string().min(1).max(200).optional(),
+          contentHtml: z.string().min(1).max(100000).optional(),
+          contentPlain: z.string().max(50000).optional(),
+          availableVariables: z.array(z.string().max(100)).max(50).optional(),
           isActive: z.boolean().optional(),
         }),
       })
@@ -267,14 +267,14 @@ export const communicationRouter = createRouter({
         automationType: automationTypeSchema,
         channel: z.enum(["email", "sms", "both"]).optional(),
         isActive: z.boolean().optional(),
-        delayMinutes: z.number().min(0).optional(),
-        delayHours: z.number().min(0).optional(),
-        delayDays: z.number().min(0).optional(),
+        delayMinutes: z.number().min(0).max(60).optional(),
+        delayHours: z.number().min(0).max(168).optional(), // Max 1 week
+        delayDays: z.number().min(0).max(30).optional(), // Max 30 days
         timingType: z.enum(["before", "after", "immediate"]).optional(),
-        emailTemplateId: z.string().optional(),
-        smsTemplateId: z.string().optional(),
+        emailTemplateId: z.string().max(100).optional(),
+        smsTemplateId: z.string().max(100).optional(),
         includeDiscount: z.boolean().optional(),
-        discountCode: z.string().optional(),
+        discountCode: z.string().max(50).optional(),
         discountPercentage: z.number().min(0).max(100).optional(),
       })
     )
@@ -347,5 +347,60 @@ export const communicationRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.communication.unsubscribeSms(input.customerId);
+    }),
+
+  // ============================================
+  // Bulk Email Operations
+  // ============================================
+
+  sendBulkEmail: adminProcedure
+    .input(
+      z.object({
+        bookingIds: z.array(z.string().max(100)).min(1).max(100),
+        templateType: emailTemplateTypeSchema,
+        customSubject: z.string().max(200).optional(),
+        customMessage: z.string().max(50000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+
+      const sent: string[] = [];
+      const errors: Array<{ id: string; error: string }> = [];
+
+      // Get template
+      const template = await services.communication.getEmailTemplateByType(input.templateType);
+      if (!template) {
+        throw new Error(`Email template "${input.templateType}" not found`);
+      }
+
+      for (const bookingId of input.bookingIds) {
+        try {
+          const booking = await services.booking.getById(bookingId);
+          if (!booking.customer?.email) {
+            errors.push({ id: bookingId, error: "Customer has no email address" });
+            continue;
+          }
+
+          // Log the communication
+          await services.communication.createLog({
+            customerId: booking.customerId,
+            bookingId: booking.id,
+            type: "email",
+            subject: input.customSubject || template.subject,
+            content: input.customMessage || template.contentHtml,
+            status: "sent",
+          });
+
+          sent.push(bookingId);
+        } catch (error) {
+          errors.push({
+            id: bookingId,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      return { sent, errors, totalSent: sent.length, totalErrors: errors.length };
     }),
 });

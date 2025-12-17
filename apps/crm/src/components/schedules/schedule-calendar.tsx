@@ -96,7 +96,7 @@ export function ScheduleCalendar({
 
   const handleSelectEvent = useCallback(
     (event: ScheduleEvent) => {
-      router.push(`/org/${slug}/schedules/${event.id}` as Route);
+      router.push(`/org/${slug}/availability/${event.id}` as Route);
     },
     [router, slug]
   );
@@ -104,7 +104,7 @@ export function ScheduleCalendar({
   const handleSelectSlot = useCallback(
     ({ start }: { start: Date }) => {
       const dateStr = format(start, "yyyy-MM-dd");
-      router.push(`/org/${slug}/schedules/new?date=${dateStr}` as Route);
+      router.push(`/org/${slug}/availability/new?date=${dateStr}` as Route);
     },
     [router, slug]
   );
@@ -152,12 +152,12 @@ export function ScheduleCalendar({
             <span className="text-xs opacity-80">
               {availabilityText}
             </span>
-            <div className="flex-1 min-w-[30px] bg-white/40 rounded-full h-1">
+            <div className="flex-1 min-w-[30px] bg-background/40 rounded-full h-1">
               <div
                 className={`h-1 rounded-full ${
-                  isFull ? 'bg-red-600' :
-                  isAlmostFull ? 'bg-yellow-600' :
-                  'bg-green-600'
+                  isFull ? 'bg-destructive' :
+                  isAlmostFull ? 'bg-warning' :
+                  'bg-success'
                 }`}
                 style={{ width: `${Math.min(100, capacityPercent)}%` }}
               />
@@ -181,26 +181,26 @@ export function ScheduleCalendar({
           <div className="flex-1">
             <div className="font-medium">{event.title}</div>
             {event.guideName && (
-              <div className="text-xs text-gray-500">Guide: {event.guideName}</div>
+              <div className="text-xs text-muted-foreground">Guide: {event.guideName}</div>
             )}
           </div>
           <div className="w-32">
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-gray-600">{event.bookedCount}/{event.maxParticipants}</span>
+              <span className="text-muted-foreground">{event.bookedCount}/{event.maxParticipants}</span>
               <span className={`font-medium ${
-                capacityPercent >= 100 ? 'text-red-600' :
-                capacityPercent >= 80 ? 'text-yellow-600' :
-                'text-green-600'
+                capacityPercent >= 100 ? 'text-destructive' :
+                capacityPercent >= 80 ? 'text-warning' :
+                'text-success'
               }`}>
                 {Math.round(capacityPercent)}%
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div className="w-full bg-muted rounded-full h-1.5">
               <div
                 className={`h-1.5 rounded-full ${
-                  capacityPercent >= 100 ? 'bg-red-500' :
-                  capacityPercent >= 80 ? 'bg-yellow-500' :
-                  'bg-green-500'
+                  capacityPercent >= 100 ? 'bg-destructive' :
+                  capacityPercent >= 80 ? 'bg-warning' :
+                  'bg-success'
                 }`}
                 style={{ width: `${Math.min(100, capacityPercent)}%` }}
               />

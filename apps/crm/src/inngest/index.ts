@@ -4,9 +4,13 @@ export type { BookingEvents } from "./client";
 
 // Export all functions
 export {
+  sendBookingCreatedEmail,
   sendBookingConfirmationEmail,
   sendBookingCancellationEmail,
+  sendBookingRescheduleEmail,
   sendBookingReminderEmail,
+  sendRefundProcessedEmail,
+  dailyBookingReminderCheck,
 } from "./functions/booking-emails";
 
 export {
@@ -26,12 +30,27 @@ export {
   sendGuideScheduleReminder,
   sendGuideDailyManifest,
 } from "./functions/guide-notifications";
+
+export {
+  sendReviewRequestEmail,
+  sendReviewReminderEmail,
+  dailyReviewRequestCheck,
+} from "./functions/review-requests";
+
+export {
+  sendPaymentSucceededEmail,
+  sendPaymentFailedEmail,
+} from "./functions/payment-emails";
 
 // Aggregate all functions for the serve handler
 import {
+  sendBookingCreatedEmail,
   sendBookingConfirmationEmail,
   sendBookingCancellationEmail,
+  sendBookingRescheduleEmail,
   sendBookingReminderEmail,
+  sendRefundProcessedEmail,
+  dailyBookingReminderCheck,
 } from "./functions/booking-emails";
 
 import {
@@ -52,11 +71,26 @@ import {
   sendGuideDailyManifest,
 } from "./functions/guide-notifications";
 
+import {
+  sendReviewRequestEmail,
+  sendReviewReminderEmail,
+  dailyReviewRequestCheck,
+} from "./functions/review-requests";
+
+import {
+  sendPaymentSucceededEmail,
+  sendPaymentFailedEmail,
+} from "./functions/payment-emails";
+
 export const inngestFunctions = [
   // Booking emails
+  sendBookingCreatedEmail,
   sendBookingConfirmationEmail,
   sendBookingCancellationEmail,
+  sendBookingRescheduleEmail,
   sendBookingReminderEmail,
+  sendRefundProcessedEmail,
+  dailyBookingReminderCheck,
   // Cart recovery (Phase 2)
   processAbandonedCarts,
   handleCartAbandoned,
@@ -69,4 +103,11 @@ export const inngestFunctions = [
   sendPendingAssignmentReminder,
   sendGuideScheduleReminder,
   sendGuideDailyManifest,
+  // Review requests
+  sendReviewRequestEmail,
+  sendReviewReminderEmail,
+  dailyReviewRequestCheck,
+  // Payment emails
+  sendPaymentSucceededEmail,
+  sendPaymentFailedEmail,
 ];

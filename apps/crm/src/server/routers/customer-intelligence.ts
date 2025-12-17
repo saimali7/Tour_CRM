@@ -2,12 +2,14 @@ import { z } from "zod";
 import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 
-const paginationSchema = z.object({
+// Pagination schema for future use
+const _paginationSchema = z.object({
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(20),
 });
 
-const sortSchema = z.object({
+// Sort schema for future use
+const _sortSchema = z.object({
   field: z.enum(["score", "clv", "lastBookingDate", "createdAt"]).default("score"),
   direction: z.enum(["asc", "desc"]).default("desc"),
 });

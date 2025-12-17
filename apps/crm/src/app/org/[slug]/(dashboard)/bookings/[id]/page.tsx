@@ -17,6 +17,11 @@ import {
   UserMinus,
   CalendarClock,
   RotateCcw,
+  Plus,
+  Trash2,
+  Copy,
+  Send,
+  Link2,
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -32,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@tour/ui";
 import { toast } from "sonner";
 
 export default function BookingDetailPage() {
@@ -43,11 +49,18 @@ export default function BookingDetailPage() {
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState<"customer_request" | "booking_cancelled" | "other">("customer_request");
   const [refundNotes, setRefundNotes] = useState("");
   const [cancelReason, setCancelReason] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "bank_transfer" | "check" | "other">("cash");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [paymentNotes, setPaymentNotes] = useState("");
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState("");
   const confirmModal = useConfirmModal();
 
   const { data: booking, isLoading, error } = trpc.booking.getById.useQuery({ id: bookingId });
@@ -124,6 +137,82 @@ export default function BookingDetailPage() {
       setShowRefundModal(false);
       setRefundAmount("");
       setRefundNotes("");
+      toast.success("Refund record created successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to create refund: ${error.message}`);
+    },
+  });
+
+  const processRefundMutation = trpc.refund.process.useMutation({
+    onSuccess: () => {
+      utils.booking.getById.invalidate({ id: bookingId });
+      utils.refund.getForBooking.invalidate({ bookingId });
+      toast.success("Refund processed via Stripe successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to process refund: ${error.message}`);
+    },
+  });
+
+  const processManualRefundMutation = trpc.refund.processManual.useMutation({
+    onSuccess: () => {
+      utils.booking.getById.invalidate({ id: bookingId });
+      utils.refund.getForBooking.invalidate({ bookingId });
+      toast.success("Refund marked as processed");
+    },
+    onError: (error) => {
+      toast.error(`Failed to process refund: ${error.message}`);
+    },
+  });
+
+  const createPaymentMutation = trpc.payment.create.useMutation({
+    onSuccess: () => {
+      utils.booking.getById.invalidate({ id: bookingId });
+      utils.payment.listByBooking.invalidate({ bookingId });
+      utils.payment.getBookingBalance.invalidate({ bookingId });
+      setShowPaymentModal(false);
+      setPaymentAmount("");
+      setPaymentReference("");
+      setPaymentNotes("");
+      toast.success("Payment recorded successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to record payment: ${error.message}`);
+    },
+  });
+
+  const deletePaymentMutation = trpc.payment.delete.useMutation({
+    onSuccess: () => {
+      utils.booking.getById.invalidate({ id: bookingId });
+      utils.payment.listByBooking.invalidate({ bookingId });
+      utils.payment.getBookingBalance.invalidate({ bookingId });
+      toast.success("Payment deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete payment: ${error.message}`);
+    },
+  });
+
+  const createPaymentLinkMutation = trpc.booking.createPaymentLink.useMutation({
+    onSuccess: (data) => {
+      setPaymentLinkUrl(data.url || "");
+      setShowPaymentLinkModal(true);
+      toast.success("Payment link created successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to create payment link: ${error.message}`);
+    },
+  });
+
+  const sendPaymentLinkEmailMutation = trpc.booking.sendPaymentLinkEmail.useMutation({
+    onSuccess: (data) => {
+      setPaymentLinkUrl(data.url || "");
+      setShowPaymentLinkModal(false);
+      toast.success(`Payment link sent to ${booking?.customer?.email}`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to send payment link: ${error.message}`);
     },
   });
 
@@ -145,8 +234,39 @@ export default function BookingDetailPage() {
   // Query for existing refunds
   const { data: refunds } = trpc.refund.getForBooking.useQuery(
     { bookingId },
-    { enabled: !!booking && booking.status === "cancelled" }
+    { enabled: !!booking }
   );
+
+  // Query for payments
+  const { data: payments } = trpc.payment.listByBooking.useQuery(
+    { bookingId },
+    { enabled: !!booking }
+  );
+
+  // Query for booking balance
+  const { data: balanceInfo } = trpc.payment.getBookingBalance.useQuery(
+    { bookingId },
+    { enabled: !!booking }
+  );
+
+  const handleProcessRefund = async (refundId: string, viaStripe: boolean) => {
+    const confirmed = await confirmModal.confirm({
+      title: viaStripe ? "Process Refund via Stripe" : "Mark Refund as Processed",
+      description: viaStripe
+        ? "This will process the refund through Stripe. The customer will receive their money back within 5-10 business days."
+        : "This will mark the refund as processed manually. Use this for cash refunds or refunds processed outside of Stripe.",
+      confirmLabel: viaStripe ? "Process via Stripe" : "Mark as Processed",
+      variant: "default",
+    });
+
+    if (confirmed) {
+      if (viaStripe) {
+        processRefundMutation.mutate({ id: refundId });
+      } else {
+        processManualRefundMutation.mutate({ id: refundId });
+      }
+    }
+  };
 
   const handleConfirm = async () => {
     const confirmed = await confirmModal.confirm({
@@ -237,6 +357,54 @@ export default function BookingDetailPage() {
     }
   };
 
+  const handleRecordPayment = () => {
+    if (paymentAmount && parseFloat(paymentAmount) > 0) {
+      createPaymentMutation.mutate({
+        bookingId,
+        amount: paymentAmount,
+        method: paymentMethod,
+        reference: paymentReference || undefined,
+        notes: paymentNotes || undefined,
+      });
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    const confirmed = await confirmModal.confirm({
+      title: "Delete Payment",
+      description: "Are you sure you want to delete this payment record? This will recalculate the booking balance.",
+      confirmLabel: "Delete Payment",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
+      deletePaymentMutation.mutate({ id: paymentId });
+    }
+  };
+
+  const handleOpenPaymentModal = () => {
+    // Set default amount to remaining balance
+    if (balanceInfo) {
+      setPaymentAmount(balanceInfo.balance);
+    }
+    setShowPaymentModal(true);
+  };
+
+  const handleCreatePaymentLink = () => {
+    createPaymentLinkMutation.mutate({ bookingId });
+  };
+
+  const handleCopyPaymentLink = async () => {
+    if (paymentLinkUrl) {
+      await navigator.clipboard.writeText(paymentLinkUrl);
+      toast.success("Payment link copied to clipboard");
+    }
+  };
+
+  const handleSendPaymentLink = () => {
+    sendPaymentLinkEmailMutation.mutate({ bookingId });
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -247,16 +415,16 @@ export default function BookingDetailPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-red-600">Error loading booking: {error.message}</p>
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+        <p className="text-destructive">Error loading booking: {error.message}</p>
       </div>
     );
   }
 
   if (!booking) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <p className="text-gray-500">Booking not found</p>
+      <div className="rounded-lg border border-border bg-card p-6">
+        <p className="text-muted-foreground">Booking not found</p>
       </div>
     );
   }
@@ -281,34 +449,34 @@ export default function BookingDetailPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-warning/10 text-warning-foreground border border-warning/20";
       case "confirmed":
-        return "bg-green-100 text-green-800";
+        return "bg-success/10 text-success-foreground border border-success/20";
       case "completed":
-        return "bg-blue-100 text-blue-800";
+        return "bg-info/10 text-info-foreground border border-info/20";
       case "cancelled":
-        return "bg-red-100 text-red-800";
+        return "bg-destructive/10 text-destructive-foreground border border-destructive/20";
       case "no_show":
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-muted-foreground border border-border";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-muted-foreground border border-border";
     }
   };
 
   const getPaymentColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-warning/10 text-warning-foreground border border-warning/20";
       case "partial":
-        return "bg-orange-100 text-orange-800";
+        return "bg-warning/10 text-warning border border-warning/20";
       case "paid":
-        return "bg-green-100 text-green-800";
+        return "bg-success/10 text-success-foreground border border-success/20";
       case "refunded":
-        return "bg-purple-100 text-purple-800";
+        return "bg-primary/10 text-primary border border-primary/20";
       case "failed":
-        return "bg-red-100 text-red-800";
+        return "bg-destructive/10 text-destructive-foreground border border-destructive/20";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-muted-foreground border border-border";
     }
   };
 
@@ -319,13 +487,13 @@ export default function BookingDetailPage() {
         <div className="flex items-center gap-4">
           <Link
             href={`/org/${slug}/bookings` as Route}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-accent rounded-lg transition-colors"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-500" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900 font-mono">
+              <h1 className="text-2xl font-bold text-foreground font-mono">
                 {booking.referenceNumber}
               </h1>
               <span
@@ -345,7 +513,7 @@ export default function BookingDetailPage() {
                 {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
               </span>
             </div>
-            <p className="text-gray-500 mt-1">
+            <p className="text-muted-foreground mt-1">
               {booking.tour?.name} • {booking.schedule && formatDate(booking.schedule.startsAt)}
             </p>
           </div>
@@ -356,7 +524,7 @@ export default function BookingDetailPage() {
             <button
               onClick={handleConfirm}
               disabled={confirmMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-success px-4 py-2 text-sm font-medium text-success-foreground hover:bg-success/90 transition-colors disabled:opacity-50"
             >
               <CheckCircle className="h-4 w-4" />
               Confirm
@@ -367,7 +535,7 @@ export default function BookingDetailPage() {
               <button
                 onClick={handleComplete}
                 disabled={completeMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm font-medium text-info-foreground hover:bg-info/90 transition-colors disabled:opacity-50"
               >
                 <CheckCircle className="h-4 w-4" />
                 Complete
@@ -375,7 +543,7 @@ export default function BookingDetailPage() {
               <button
                 onClick={handleNoShow}
                 disabled={noShowMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors disabled:opacity-50"
               >
                 <UserMinus className="h-4 w-4" />
                 No Show
@@ -386,7 +554,7 @@ export default function BookingDetailPage() {
             <>
               <button
                 onClick={() => setShowRescheduleModal(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 <CalendarClock className="h-4 w-4" />
                 Reschedule
@@ -394,7 +562,7 @@ export default function BookingDetailPage() {
               <button
                 onClick={handleCancel}
                 disabled={cancelMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
               >
                 <X className="h-4 w-4" />
                 Cancel
@@ -407,7 +575,7 @@ export default function BookingDetailPage() {
                 setRefundAmount(booking.total);
                 setShowRefundModal(true);
               }}
-              className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <RotateCcw className="h-4 w-4" />
               Issue Refund
@@ -415,7 +583,7 @@ export default function BookingDetailPage() {
           )}
           <Link
             href={`/org/${slug}/bookings/${booking.id}/edit` as Route}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Edit className="h-4 w-4" />
             Edit
@@ -425,54 +593,54 @@ export default function BookingDetailPage() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Calendar className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-info/10 rounded-lg">
+              <Calendar className="h-5 w-5 text-info" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Date</p>
-              <p className="font-semibold text-gray-900">
+              <p className="text-sm text-muted-foreground">Date</p>
+              <p className="font-semibold text-foreground">
                 {booking.schedule && formatDate(booking.schedule.startsAt)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Clock className="h-5 w-5 text-purple-600" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Clock className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Time</p>
-              <p className="font-semibold text-gray-900">
+              <p className="text-sm text-muted-foreground">Time</p>
+              <p className="font-semibold text-foreground">
                 {booking.schedule && formatTime(booking.schedule.startsAt)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="h-5 w-5 text-green-600" />
+            <div className="p-2 bg-success/10 rounded-lg">
+              <Users className="h-5 w-5 text-success" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Guests</p>
-              <p className="font-semibold text-gray-900">{booking.totalParticipants}</p>
+              <p className="text-sm text-muted-foreground">Guests</p>
+              <p className="font-semibold text-foreground">{booking.totalParticipants}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <DollarSign className="h-5 w-5 text-orange-600" />
+            <div className="p-2 bg-warning/10 rounded-lg">
+              <DollarSign className="h-5 w-5 text-warning" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Total</p>
-              <p className="font-semibold text-gray-900">${parseFloat(booking.total).toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground">Total</p>
+              <p className="font-semibold text-foreground">${parseFloat(booking.total).toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -480,19 +648,19 @@ export default function BookingDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Customer Info */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Customer</h2>
+        <div className="bg-card rounded-lg border border-border p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Customer</h2>
           {booking.customer ? (
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-primary font-medium">
-                    {booking.customer.firstName[0]}
-                    {booking.customer.lastName[0]}
+                    {booking.customer.firstName?.charAt(0) ?? ""}
+                    {booking.customer.lastName?.charAt(0) ?? ""}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-foreground">
                     {booking.customer.firstName} {booking.customer.lastName}
                   </p>
                   <Link
@@ -503,14 +671,14 @@ export default function BookingDetailPage() {
                   </Link>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4" />
                 <a href={`mailto:${booking.customer.email}`} className="hover:text-primary">
                   {booking.customer.email}
                 </a>
               </div>
               {booking.customer.phone && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="h-4 w-4" />
                   <a href={`tel:${booking.customer.phone}`} className="hover:text-primary">
                     {booking.customer.phone}
@@ -519,111 +687,110 @@ export default function BookingDetailPage() {
               )}
             </div>
           ) : (
-            <p className="text-gray-500">Customer information not available</p>
+            <p className="text-muted-foreground">Customer information not available</p>
           )}
         </div>
 
         {/* Payment Info */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-card rounded-lg border border-border p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Payment</h2>
-            {booking.paymentStatus !== "paid" && booking.status !== "cancelled" && (
-              <button
-                onClick={handleMarkPaid}
-                disabled={updatePaymentMutation.isPending}
-                className="text-sm text-primary hover:underline disabled:opacity-50"
-              >
-                Mark as Paid
-              </button>
-            )}
+            <h2 className="text-lg font-semibold text-foreground">Payment Details</h2>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-gray-500">Subtotal</span>
-              <span className="text-gray-900">${parseFloat(booking.subtotal).toFixed(2)}</span>
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-foreground">${parseFloat(booking.subtotal).toFixed(2)}</span>
             </div>
             {booking.discount && parseFloat(booking.discount) > 0 && (
               <div className="flex justify-between">
-                <span className="text-gray-500">Discount</span>
-                <span className="text-green-600">
+                <span className="text-muted-foreground">Discount</span>
+                <span className="text-success">
                   -${parseFloat(booking.discount).toFixed(2)}
                 </span>
               </div>
             )}
             {booking.tax && parseFloat(booking.tax) > 0 && (
               <div className="flex justify-between">
-                <span className="text-gray-500">Tax</span>
-                <span className="text-gray-900">${parseFloat(booking.tax).toFixed(2)}</span>
+                <span className="text-muted-foreground">Tax</span>
+                <span className="text-foreground">${parseFloat(booking.tax).toFixed(2)}</span>
               </div>
             )}
             <hr />
             <div className="flex justify-between font-semibold">
-              <span className="text-gray-900">Total</span>
-              <span className="text-gray-900">${parseFloat(booking.total).toFixed(2)}</span>
+              <span className="text-foreground">Total</span>
+              <span className="text-foreground">${parseFloat(booking.total).toFixed(2)}</span>
             </div>
-            {booking.paidAmount && parseFloat(booking.paidAmount) > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Paid</span>
-                <span className="text-green-600">
-                  ${parseFloat(booking.paidAmount).toFixed(2)}
-                </span>
-              </div>
+            {balanceInfo && (
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Paid</span>
+                  <span className="text-success">
+                    ${parseFloat(balanceInfo.totalPaid).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between font-medium pt-2 border-t">
+                  <span className="text-foreground">Balance Due</span>
+                  <span className={parseFloat(balanceInfo.balance) > 0 ? "text-warning" : "text-success"}>
+                    ${parseFloat(balanceInfo.balance).toFixed(2)}
+                  </span>
+                </div>
+              </>
             )}
             <div className="flex items-center gap-2 pt-2">
-              <CreditCard className="h-4 w-4 text-gray-400" />
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentColor(
-                  booking.paymentStatus
-                )}`}
-              >
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <Badge variant={
+                booking.paymentStatus === "paid" ? "success" :
+                booking.paymentStatus === "partial" ? "warning" :
+                booking.paymentStatus === "pending" ? "pending" : "muted"
+              }>
                 {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
-              </span>
+              </Badge>
             </div>
           </div>
         </div>
       </div>
 
       {/* Guest Breakdown */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Guest Breakdown</h2>
+      <div className="bg-card rounded-lg border border-border p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">Guest Breakdown</h2>
         <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <p className="text-2xl font-semibold text-gray-900">{booking.adultCount}</p>
-            <p className="text-sm text-gray-500">Adults</p>
+          <div className="text-center p-4 bg-muted rounded-lg">
+            <p className="text-2xl font-semibold text-foreground">{booking.adultCount}</p>
+            <p className="text-sm text-muted-foreground">Adults</p>
           </div>
-          <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <p className="text-2xl font-semibold text-gray-900">{booking.childCount ?? 0}</p>
-            <p className="text-sm text-gray-500">Children</p>
+          <div className="text-center p-4 bg-muted rounded-lg">
+            <p className="text-2xl font-semibold text-foreground">{booking.childCount ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Children</p>
           </div>
-          <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <p className="text-2xl font-semibold text-gray-900">{booking.infantCount ?? 0}</p>
-            <p className="text-sm text-gray-500">Infants</p>
+          <div className="text-center p-4 bg-muted rounded-lg">
+            <p className="text-2xl font-semibold text-foreground">{booking.infantCount ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Infants</p>
           </div>
         </div>
       </div>
 
       {/* Participants */}
       {booking.participants && booking.participants.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-card rounded-lg border border-border p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Participants ({booking.participants.length})
           </h2>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-border">
             {booking.participants.map((participant) => (
               <div key={participant.id} className="py-3 flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-foreground">
                     {participant.firstName} {participant.lastName}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {participant.type.charAt(0).toUpperCase() + participant.type.slice(1)}
                     {participant.email && ` • ${participant.email}`}
                   </p>
                 </div>
                 {(participant.dietaryRequirements || participant.accessibilityNeeds) && (
                   <div className="flex items-center gap-1">
-                    <AlertCircle className="h-4 w-4 text-yellow-500" />
-                    <span className="text-xs text-yellow-600">Special requirements</span>
+                    <AlertCircle className="h-4 w-4 text-warning" />
+                    <span className="text-xs text-warning-foreground">Special requirements</span>
                   </div>
                 )}
               </div>
@@ -639,45 +806,45 @@ export default function BookingDetailPage() {
         booking.internalNotes) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {booking.specialRequests && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Special Requests</h2>
-              <p className="text-gray-600 whitespace-pre-wrap">{booking.specialRequests}</p>
+            <div className="bg-card rounded-lg border border-border p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Special Requests</h2>
+              <p className="text-muted-foreground whitespace-pre-wrap">{booking.specialRequests}</p>
             </div>
           )}
           {booking.dietaryRequirements && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Dietary Requirements</h2>
-              <p className="text-gray-600 whitespace-pre-wrap">{booking.dietaryRequirements}</p>
+            <div className="bg-card rounded-lg border border-border p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Dietary Requirements</h2>
+              <p className="text-muted-foreground whitespace-pre-wrap">{booking.dietaryRequirements}</p>
             </div>
           )}
           {booking.accessibilityNeeds && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Accessibility Needs</h2>
-              <p className="text-gray-600 whitespace-pre-wrap">{booking.accessibilityNeeds}</p>
+            <div className="bg-card rounded-lg border border-border p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Accessibility Needs</h2>
+              <p className="text-muted-foreground whitespace-pre-wrap">{booking.accessibilityNeeds}</p>
             </div>
           )}
           {booking.internalNotes && (
-            <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Internal Notes</h2>
-              <p className="text-gray-600 whitespace-pre-wrap">{booking.internalNotes}</p>
+            <div className="bg-warning/5 rounded-lg border border-warning/20 p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Internal Notes</h2>
+              <p className="text-muted-foreground whitespace-pre-wrap">{booking.internalNotes}</p>
             </div>
           )}
         </div>
       )}
 
       {/* Booking Info */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Booking Information</h2>
+      <div className="bg-card rounded-lg border border-border p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">Booking Information</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
-            <p className="text-gray-500">Source</p>
-            <p className="font-medium text-gray-900">
+            <p className="text-muted-foreground">Source</p>
+            <p className="font-medium text-foreground">
               {booking.source.charAt(0).toUpperCase() + booking.source.slice(1).replace("_", " ")}
             </p>
           </div>
           <div>
-            <p className="text-gray-500">Created</p>
-            <p className="font-medium text-gray-900">
+            <p className="text-muted-foreground">Created</p>
+            <p className="font-medium text-foreground">
               {new Intl.DateTimeFormat("en-US", {
                 dateStyle: "medium",
                 timeStyle: "short",
@@ -686,8 +853,8 @@ export default function BookingDetailPage() {
           </div>
           {booking.confirmedAt && (
             <div>
-              <p className="text-gray-500">Confirmed</p>
-              <p className="font-medium text-gray-900">
+              <p className="text-muted-foreground">Confirmed</p>
+              <p className="font-medium text-foreground">
                 {new Intl.DateTimeFormat("en-US", {
                   dateStyle: "medium",
                   timeStyle: "short",
@@ -697,8 +864,8 @@ export default function BookingDetailPage() {
           )}
           {booking.cancelledAt && (
             <div>
-              <p className="text-gray-500">Cancelled</p>
-              <p className="font-medium text-gray-900">
+              <p className="text-muted-foreground">Cancelled</p>
+              <p className="font-medium text-foreground">
                 {new Intl.DateTimeFormat("en-US", {
                   dateStyle: "medium",
                   timeStyle: "short",
@@ -708,9 +875,125 @@ export default function BookingDetailPage() {
           )}
         </div>
         {booking.cancellationReason && (
-          <div className="mt-4 p-3 bg-red-50 rounded-lg">
-            <p className="text-sm text-gray-500">Cancellation Reason</p>
-            <p className="text-red-700">{booking.cancellationReason}</p>
+          <div className="mt-4 p-3 bg-destructive/5 rounded-lg">
+            <p className="text-sm text-muted-foreground">Cancellation Reason</p>
+            <p className="text-destructive">{booking.cancellationReason}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Payment History & Management */}
+      <div className="bg-card rounded-lg border border-border p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-foreground">Payment Management</h2>
+          <div className="flex items-center gap-2">
+            {booking.status !== "cancelled" && balanceInfo && parseFloat(balanceInfo.balance) > 0 && (
+              <>
+                <button
+                  onClick={handleCreatePaymentLink}
+                  disabled={createPaymentLinkMutation.isPending}
+                  className="inline-flex items-center gap-2 rounded-lg bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors disabled:opacity-50"
+                >
+                  <Link2 className="h-4 w-4" />
+                  Generate Link
+                </button>
+                <button
+                  onClick={handleOpenPaymentModal}
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Record Payment
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Balance Summary */}
+        {balanceInfo && (
+          <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted rounded-lg">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-1">Total</p>
+              <p className="text-xl font-semibold text-foreground">
+                ${parseFloat(balanceInfo.bookingTotal).toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center border-l border-r border-border">
+              <p className="text-sm text-muted-foreground mb-1">Paid</p>
+              <p className="text-xl font-semibold text-success">
+                ${parseFloat(balanceInfo.totalPaid).toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-1">Balance Due</p>
+              <p className={`text-xl font-semibold ${parseFloat(balanceInfo.balance) > 0 ? "text-warning" : "text-success"}`}>
+                ${parseFloat(balanceInfo.balance).toFixed(2)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Payment History */}
+        {payments && payments.length > 0 ? (
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Payment History</h3>
+            <div className="border border-border rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Date</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Amount</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Method</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Reference</th>
+                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Recorded By</th>
+                    <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {payments.map((payment) => (
+                    <tr key={payment.id} className="hover:bg-muted/50">
+                      <td className="px-4 py-3 text-sm text-foreground">
+                        {new Intl.DateTimeFormat("en-US", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(payment.recordedAt))}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-foreground">
+                        ${parseFloat(payment.amount).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-foreground">
+                        <Badge variant="outline">
+                          {payment.method.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
+                        {payment.reference || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {payment.recordedByName || "System"}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => handleDeletePayment(payment.id)}
+                          disabled={deletePaymentMutation.isPending}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>No payment records yet</p>
+            {booking.status !== "cancelled" && (
+              <p className="text-sm mt-1">Record manual payments or generate a payment link for the customer</p>
+            )}
           </div>
         )}
       </div>
@@ -723,40 +1006,83 @@ export default function BookingDetailPage() {
         limit={15}
       />
 
-      {/* Refunds Section (for cancelled bookings) */}
-      {booking.status === "cancelled" && refunds && refunds.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Refunds</h2>
+      {/* Refunds Section */}
+      {refunds && refunds.length > 0 && (
+        <div className="bg-card rounded-lg border border-border p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Refunds</h2>
           <div className="space-y-3">
             {refunds.map((refund) => (
               <div
                 key={refund.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                className="flex items-center justify-between p-4 bg-muted rounded-lg"
               >
-                <div>
-                  <p className="font-medium text-gray-900">
-                    ${parseFloat(refund.amount).toFixed(2)}
+                <div className="flex-1">
+                  <p className="font-medium text-foreground">
+                    ${parseFloat(refund.amount).toFixed(2)} {refund.currency}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    {refund.reason.replace("_", " ")} •{" "}
+                  <p className="text-sm text-muted-foreground">
+                    {refund.reason.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())} •{" "}
                     {new Intl.DateTimeFormat("en-US", {
                       dateStyle: "medium",
+                      timeStyle: "short",
                     }).format(new Date(refund.createdAt))}
                   </p>
+                  {refund.reasonDetails && (
+                    <p className="text-sm text-muted-foreground mt-1 italic">
+                      {refund.reasonDetails}
+                    </p>
+                  )}
+                  {refund.processedAt && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Processed: {new Intl.DateTimeFormat("en-US", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }).format(new Date(refund.processedAt))}
+                    </p>
+                  )}
+                  {refund.stripeRefundId && (
+                    <p className="text-xs text-muted-foreground mt-1 font-mono">
+                      Stripe ID: {refund.stripeRefundId}
+                    </p>
+                  )}
                 </div>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    refund.status === "succeeded"
-                      ? "bg-green-100 text-green-800"
-                      : refund.status === "pending"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : refund.status === "processing"
-                      ? "bg-blue-100 text-blue-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {refund.status.charAt(0).toUpperCase() + refund.status.slice(1)}
-                </span>
+                <div className="flex items-center gap-2">
+                  {refund.status === "pending" && (
+                    <>
+                      {booking.stripePaymentIntentId && (
+                        <button
+                          onClick={() => handleProcessRefund(refund.id, true)}
+                          disabled={processRefundMutation.isPending}
+                          className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                          Process via Stripe
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleProcessRefund(refund.id, false)}
+                        disabled={processManualRefundMutation.isPending}
+                        className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors disabled:opacity-50"
+                      >
+                        Mark as Processed
+                      </button>
+                    </>
+                  )}
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                      refund.status === "succeeded"
+                        ? "bg-success/10 text-success-foreground border-success/20"
+                        : refund.status === "pending"
+                        ? "bg-warning/10 text-warning-foreground border-warning/20"
+                        : refund.status === "processing"
+                        ? "bg-info/10 text-info-foreground border-info/20"
+                        : refund.status === "failed"
+                        ? "bg-destructive/10 text-destructive-foreground border-destructive/20"
+                        : "bg-muted text-muted-foreground border-border"
+                    }`}
+                  >
+                    {refund.status.charAt(0).toUpperCase() + refund.status.slice(1)}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -766,21 +1092,21 @@ export default function BookingDetailPage() {
       {/* Reschedule Modal */}
       {showRescheduleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">Reschedule Booking</h2>
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground">Reschedule Booking</h2>
               <button
                 onClick={() => {
                   setShowRescheduleModal(false);
                   setSelectedScheduleId(null);
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-accent rounded-lg"
               >
-                <X className="h-5 w-5 text-gray-500" />
+                <X className="h-5 w-5 text-muted-foreground" />
               </button>
             </div>
             <div className="p-4">
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Select a new date and time for this booking. The booking will be moved
                 to the selected schedule.
               </p>
@@ -799,8 +1125,8 @@ export default function BookingDetailPage() {
                             selectedScheduleId === schedule.id
                               ? "border-primary bg-primary/5"
                               : hasCapacity
-                              ? "border-gray-200 hover:border-gray-300"
-                              : "border-gray-200 opacity-50 cursor-not-allowed"
+                              ? "border-border hover:border-input"
+                              : "border-border opacity-50 cursor-not-allowed"
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -814,14 +1140,14 @@ export default function BookingDetailPage() {
                               className="text-primary focus:ring-primary"
                             />
                             <div>
-                              <p className="font-medium text-gray-900">
+                              <p className="font-medium text-foreground">
                                 {new Intl.DateTimeFormat("en-US", {
                                   weekday: "short",
                                   month: "short",
                                   day: "numeric",
                                 }).format(new Date(schedule.startsAt))}
                               </p>
-                              <p className="text-sm text-gray-500">
+                              <p className="text-sm text-muted-foreground">
                                 {new Intl.DateTimeFormat("en-US", {
                                   hour: "numeric",
                                   minute: "2-digit",
@@ -832,7 +1158,7 @@ export default function BookingDetailPage() {
                           </div>
                           <span
                             className={`text-sm ${
-                              hasCapacity ? "text-gray-500" : "text-red-500"
+                              hasCapacity ? "text-muted-foreground" : "text-destructive"
                             }`}
                           >
                             {hasCapacity
@@ -844,31 +1170,31 @@ export default function BookingDetailPage() {
                     })}
                 </div>
               ) : (
-                <p className="text-center text-gray-500 py-8">
+                <p className="text-center text-muted-foreground py-8">
                   No other available schedules for this tour
                 </p>
               )}
 
               {rescheduleMutation.error && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{rescheduleMutation.error.message}</p>
+                <div className="mt-4 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                  <p className="text-sm text-destructive">{rescheduleMutation.error.message}</p>
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t">
+            <div className="flex justify-end gap-3 p-4 border-t border-border">
               <button
                 onClick={() => {
                   setShowRescheduleModal(false);
                   setSelectedScheduleId(null);
                 }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReschedule}
                 disabled={!selectedScheduleId || rescheduleMutation.isPending}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
               >
                 {rescheduleMutation.isPending ? "Rescheduling..." : "Confirm Reschedule"}
               </button>
@@ -880,40 +1206,40 @@ export default function BookingDetailPage() {
       {/* Refund Modal */}
       {showRefundModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">Issue Refund</h2>
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground">Issue Refund</h2>
               <button
                 onClick={() => setShowRefundModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-accent rounded-lg"
               >
-                <X className="h-5 w-5 text-gray-500" />
+                <X className="h-5 w-5 text-muted-foreground" />
               </button>
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Refund Amount
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                     $
                   </span>
                   <input
                     type="text"
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full pl-8 pr-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
                     placeholder="0.00"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Max refund: ${parseFloat(booking.total).toFixed(2)}
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Reason
                 </label>
                 <select
@@ -923,7 +1249,7 @@ export default function BookingDetailPage() {
                       e.target.value as "customer_request" | "booking_cancelled" | "other"
                     )
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
                 >
                   <option value="customer_request">Customer Request</option>
                   <option value="booking_cancelled">Booking Cancelled</option>
@@ -932,28 +1258,28 @@ export default function BookingDetailPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Notes (optional)
                 </label>
                 <textarea
                   value={refundNotes}
                   onChange={(e) => setRefundNotes(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
                   placeholder="Additional details about this refund..."
                 />
               </div>
 
               {createRefundMutation.error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{createRefundMutation.error.message}</p>
+                <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                  <p className="text-sm text-destructive">{createRefundMutation.error.message}</p>
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t">
+            <div className="flex justify-end gap-3 p-4 border-t border-border">
               <button
                 onClick={() => setShowRefundModal(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
               >
                 Cancel
               </button>
@@ -965,7 +1291,7 @@ export default function BookingDetailPage() {
                   parseFloat(refundAmount) > parseFloat(booking.total) ||
                   createRefundMutation.isPending
                 }
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
               >
                 {createRefundMutation.isPending ? "Processing..." : "Issue Refund"}
               </button>
@@ -984,11 +1310,11 @@ export default function BookingDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <label className="text-sm font-medium text-gray-700">Cancellation Reason (optional)</label>
+            <label className="text-sm font-medium text-foreground">Cancellation Reason (optional)</label>
             <textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              className="w-full mt-2 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              className="w-full mt-2 p-3 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
               placeholder="Enter cancellation reason..."
               rows={3}
             />
@@ -999,20 +1325,204 @@ export default function BookingDetailPage() {
                 setShowCancelDialog(false);
                 setCancelReason("");
               }}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-foreground hover:bg-accent rounded-lg transition-colors"
             >
               Keep Booking
             </button>
             <button
               onClick={handleCancelSubmit}
               disabled={cancelMutation.isPending}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors disabled:opacity-50"
             >
               {cancelMutation.isPending ? "Cancelling..." : "Cancel Booking"}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Record Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground">Record Payment</h2>
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setPaymentAmount("");
+                  setPaymentReference("");
+                  setPaymentNotes("");
+                }}
+                className="p-2 hover:bg-accent rounded-lg"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Amount <span className="text-destructive">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                    placeholder="0.00"
+                  />
+                </div>
+                {balanceInfo && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Balance due: ${parseFloat(balanceInfo.balance).toFixed(2)}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Payment Method <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card" | "bank_transfer" | "check" | "other")}
+                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="check">Check</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Reference (optional)
+                </label>
+                <input
+                  type="text"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                  placeholder="Transaction ID, check number, etc."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  For tracking purposes (e.g., transaction ID, check number)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Notes (optional)
+                </label>
+                <textarea
+                  value={paymentNotes}
+                  onChange={(e) => setPaymentNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                  placeholder="Additional details about this payment..."
+                />
+              </div>
+
+              {createPaymentMutation.error && (
+                <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                  <p className="text-sm text-destructive">{createPaymentMutation.error.message}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-border">
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setPaymentAmount("");
+                  setPaymentReference("");
+                  setPaymentNotes("");
+                }}
+                className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRecordPayment}
+                disabled={
+                  !paymentAmount ||
+                  parseFloat(paymentAmount) <= 0 ||
+                  createPaymentMutation.isPending
+                }
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              >
+                {createPaymentMutation.isPending ? "Recording..." : "Record Payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Link Modal */}
+      {showPaymentLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground">Payment Link Generated</h2>
+              <button
+                onClick={() => {
+                  setShowPaymentLinkModal(false);
+                  setPaymentLinkUrl("");
+                }}
+                className="p-2 hover:bg-accent rounded-lg"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Share this payment link with the customer. They can use it to pay online via Stripe.
+              </p>
+
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Payment Link</p>
+                <p className="text-sm text-foreground font-mono break-all">
+                  {paymentLinkUrl}
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCopyPaymentLink}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy Link
+                </button>
+                <button
+                  onClick={handleSendPaymentLink}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  <Send className="h-4 w-4" />
+                  Email Customer
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-border">
+              <button
+                onClick={() => {
+                  setShowPaymentLinkModal(false);
+                  setPaymentLinkUrl("");
+                }}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm Modal */}
       {confirmModal.ConfirmModal}

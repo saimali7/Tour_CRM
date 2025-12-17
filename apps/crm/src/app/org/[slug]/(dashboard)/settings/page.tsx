@@ -27,23 +27,24 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Activity,
 } from "lucide-react";
 import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
-
-type SettingsTab = "business" | "booking" | "notifications" | "branding" | "team" | "payments";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ServiceHealthPanel } from "@/components/settings/service-health";
 
 export default function SettingsPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const [activeTab, setActiveTab] = useState<SettingsTab>("business");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState("business");
   const { confirm, ConfirmModal } = useConfirmModal();
 
   const { data: organization, isLoading } = trpc.organization.get.useQuery();
   const { data: settings } = trpc.organization.getSettings.useQuery();
   const { data: teamMembers, isLoading: teamLoading } = trpc.team.list.useQuery();
-  const { data: stripeStatus, isLoading: stripeLoading, refetch: refetchStripe } =
-    trpc.organization.getStripeConnectStatus.useQuery();
+  const { data: stripeStatus, isLoading: stripeLoading } =
+    trpc.organization.getStripeStatus.useQuery();
 
   // Team management state
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -112,42 +113,6 @@ export default function SettingsPage() {
     },
   });
 
-  // Stripe Connect mutations
-  const startStripeOnboardingMutation = trpc.organization.startStripeConnectOnboarding.useMutation({
-    onSuccess: (data) => {
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    },
-  });
-
-  const refreshStripeOnboardingMutation = trpc.organization.refreshStripeConnectOnboarding.useMutation({
-    onSuccess: (data) => {
-      if (data.alreadyOnboarded) {
-        refetchStripe();
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-      } else if (data.url) {
-        window.location.href = data.url;
-      }
-    },
-  });
-
-  const getStripeDashboardMutation = trpc.organization.getStripeDashboardLink.useMutation({
-    onSuccess: (data) => {
-      if (data.url) {
-        window.open(data.url, "_blank");
-      }
-    },
-  });
-
-  const disconnectStripeMutation = trpc.organization.disconnectStripeConnect.useMutation({
-    onSuccess: () => {
-      refetchStripe();
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    },
-  });
 
   const [businessForm, setBusinessForm] = useState({
     name: "",
@@ -194,6 +159,21 @@ export default function SettingsPage() {
     taxId: "",
     includeInPrice: false,
     applyToFees: true,
+  });
+
+  const [paymentForm, setPaymentForm] = useState({
+    paymentLinkExpirationHours: 24,
+    autoSendPaymentReminders: true,
+    paymentReminderHours: 6,
+    depositEnabled: false,
+    depositType: "percentage" as "percentage" | "fixed",
+    depositAmount: 25,
+    depositDueDays: 7,
+    acceptedPaymentMethods: ["card", "cash", "bank_transfer"] as Array<"card" | "cash" | "bank_transfer" | "check" | "other">,
+    allowOnlinePayments: true,
+    allowPartialPayments: false,
+    autoRefundOnCancellation: false,
+    refundDeadlineHours: 48,
   });
 
   // Initialize forms when data loads
@@ -248,6 +228,22 @@ export default function SettingsPage() {
           applyToFees: settings.tax.applyToFees ?? true,
         });
       }
+      if (settings.payment) {
+        setPaymentForm({
+          paymentLinkExpirationHours: settings.payment.paymentLinkExpirationHours ?? 24,
+          autoSendPaymentReminders: settings.payment.autoSendPaymentReminders ?? true,
+          paymentReminderHours: settings.payment.paymentReminderHours ?? 6,
+          depositEnabled: settings.payment.depositEnabled ?? false,
+          depositType: settings.payment.depositType ?? "percentage",
+          depositAmount: settings.payment.depositAmount ?? 25,
+          depositDueDays: settings.payment.depositDueDays ?? 7,
+          acceptedPaymentMethods: settings.payment.acceptedPaymentMethods ?? ["card", "cash", "bank_transfer"],
+          allowOnlinePayments: settings.payment.allowOnlinePayments ?? true,
+          allowPartialPayments: settings.payment.allowPartialPayments ?? false,
+          autoRefundOnCancellation: settings.payment.autoRefundOnCancellation ?? false,
+          refundDeadlineHours: settings.payment.refundDeadlineHours ?? 48,
+        });
+      }
     }
   }, [settings]);
 
@@ -276,6 +272,11 @@ export default function SettingsPage() {
     updateSettingsMutation.mutate({ tax: taxForm });
   };
 
+  const handleSavePaymentSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettingsMutation.mutate({ payment: paymentForm });
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -283,15 +284,6 @@ export default function SettingsPage() {
       </div>
     );
   }
-
-  const tabs = [
-    { id: "business" as const, label: "Business Profile", icon: Building2 },
-    { id: "booking" as const, label: "Booking Settings", icon: Settings },
-    { id: "payments" as const, label: "Payments", icon: CreditCard },
-    { id: "notifications" as const, label: "Notifications", icon: Bell },
-    { id: "branding" as const, label: "Branding", icon: Palette },
-    { id: "team" as const, label: "Team", icon: Users },
-  ];
 
   const isSubmitting =
     updateOrgMutation.isPending ||
@@ -302,46 +294,79 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-500 mt-1">Manage your organization settings</p>
+          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+          <p className="text-muted-foreground mt-1">Manage your organization settings</p>
         </div>
         {saveSuccess && (
-          <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-lg">
+          <div className="flex items-center gap-2 text-success bg-success/10 px-4 py-2 rounded-lg">
             <CheckCircle className="h-4 w-4" />
             <span className="text-sm">Settings saved successfully</span>
           </div>
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+          <TabsTrigger
+            value="business"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Building2 className="h-4 w-4" />
+            Business Profile
+          </TabsTrigger>
+          <TabsTrigger
+            value="booking"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Settings className="h-4 w-4" />
+            Booking Settings
+          </TabsTrigger>
+          <TabsTrigger
+            value="payments"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <CreditCard className="h-4 w-4" />
+            Payments
+          </TabsTrigger>
+          <TabsTrigger
+            value="notifications"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Bell className="h-4 w-4" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger
+            value="branding"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Palette className="h-4 w-4" />
+            Branding
+          </TabsTrigger>
+          <TabsTrigger
+            value="team"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Users className="h-4 w-4" />
+            Team
+          </TabsTrigger>
+          <TabsTrigger
+            value="system"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Activity className="h-4 w-4" />
+            System
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Business Profile Tab */}
-      {activeTab === "business" && (
-        <form onSubmit={handleSaveBusinessProfile} className="space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">Business Information</h2>
+        {/* Business Profile Tab */}
+        <TabsContent value="business">
+          <form onSubmit={handleSaveBusinessProfile} className="space-y-6">
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Business Information</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Business Name
                 </label>
                 <input
@@ -350,12 +375,12 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setBusinessForm((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   <Mail className="h-4 w-4 inline mr-1" />
                   Email
                 </label>
@@ -365,12 +390,12 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setBusinessForm((prev) => ({ ...prev, email: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   <Phone className="h-4 w-4 inline mr-1" />
                   Phone
                 </label>
@@ -380,12 +405,12 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setBusinessForm((prev) => ({ ...prev, phone: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   <Globe className="h-4 w-4 inline mr-1" />
                   Website
                 </label>
@@ -396,12 +421,12 @@ export default function SettingsPage() {
                     setBusinessForm((prev) => ({ ...prev, website: e.target.value }))
                   }
                   placeholder="https://"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Timezone
                 </label>
                 <select
@@ -409,7 +434,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setBusinessForm((prev) => ({ ...prev, timezone: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="">Select timezone</option>
                   <option value="America/New_York">Eastern Time (US)</option>
@@ -426,15 +451,15 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">
               <MapPin className="h-5 w-5 inline mr-2" />
               Address
             </h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Street Address
                 </label>
                 <input
@@ -443,13 +468,13 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setBusinessForm((prev) => ({ ...prev, address: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     City
                   </label>
                   <input
@@ -458,11 +483,11 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setBusinessForm((prev) => ({ ...prev, city: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     State
                   </label>
                   <input
@@ -471,11 +496,11 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setBusinessForm((prev) => ({ ...prev, state: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Postal Code
                   </label>
                   <input
@@ -484,11 +509,11 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setBusinessForm((prev) => ({ ...prev, postalCode: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Country
                   </label>
                   <input
@@ -497,7 +522,7 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setBusinessForm((prev) => ({ ...prev, country: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
@@ -508,7 +533,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -518,18 +543,18 @@ export default function SettingsPage() {
               Save Changes
             </button>
           </div>
-        </form>
-      )}
+          </form>
+        </TabsContent>
 
-      {/* Booking Settings Tab */}
-      {activeTab === "booking" && (
-        <form onSubmit={handleSaveBookingSettings} className="space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">Defaults</h2>
+        {/* Booking Settings Tab */}
+        <TabsContent value="booking">
+          <form onSubmit={handleSaveBookingSettings} className="space-y-6">
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Defaults</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Default Currency
                 </label>
                 <select
@@ -537,7 +562,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setBookingForm((prev) => ({ ...prev, defaultCurrency: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="USD">USD - US Dollar</option>
                   <option value="EUR">EUR - Euro</option>
@@ -548,7 +573,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Default Language
                 </label>
                 <select
@@ -556,7 +581,7 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setBookingForm((prev) => ({ ...prev, defaultLanguage: e.target.value }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="en">English</option>
                   <option value="es">Spanish</option>
@@ -567,20 +592,20 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                 <Clock className="h-5 w-5" />
                 Booking Window
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Control when customers can make bookings
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Minimum Notice Hours
                 </label>
                 <input
@@ -597,15 +622,15 @@ export default function SettingsPage() {
                       },
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   How many hours before a tour can customers book
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Maximum Advance Days
                 </label>
                 <input
@@ -622,9 +647,9 @@ export default function SettingsPage() {
                       },
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   How far in advance can customers book
                 </p>
               </div>
@@ -644,16 +669,16 @@ export default function SettingsPage() {
                       },
                     }))
                   }
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-foreground">
                   Allow same-day booking
                 </span>
               </label>
 
               {bookingForm.bookingWindow.allowSameDayBooking && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Same-Day Cutoff Time
                   </label>
                   <input
@@ -668,9 +693,9 @@ export default function SettingsPage() {
                         },
                       }))
                     }
-                    className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full md:w-64 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Latest time customers can book for same-day tours
                   </p>
                 </div>
@@ -678,8 +703,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">Customer Requirements</h2>
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Customer Requirements</h2>
 
             <div className="space-y-4">
               <label className="flex items-center gap-3 cursor-pointer">
@@ -692,9 +717,9 @@ export default function SettingsPage() {
                       requirePhoneNumber: e.target.checked,
                     }))
                   }
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-foreground">
                   Require phone number for bookings
                 </span>
               </label>
@@ -709,21 +734,21 @@ export default function SettingsPage() {
                       requireAddress: e.target.checked,
                     }))
                   }
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                 />
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-foreground">
                   Require address for bookings
                 </span>
               </label>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">Policies</h2>
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Policies</h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Cancellation Policy
                 </label>
                 <textarea
@@ -735,13 +760,13 @@ export default function SettingsPage() {
                     }))
                   }
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Describe your cancellation policy..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Refund Policy
                 </label>
                 <textarea
@@ -753,7 +778,7 @@ export default function SettingsPage() {
                     }))
                   }
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Describe your refund policy..."
                 />
               </div>
@@ -764,7 +789,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -774,20 +799,20 @@ export default function SettingsPage() {
               Save Changes
             </button>
           </div>
-        </form>
-      )}
+          </form>
+        </TabsContent>
 
-      {/* Notifications Tab */}
-      {activeTab === "notifications" && (
-        <form onSubmit={handleSaveNotifications} className="space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">Notification Preferences</h2>
+        {/* Notifications Tab */}
+        <TabsContent value="notifications">
+          <form onSubmit={handleSaveNotifications} className="space-y-6">
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Notification Preferences</h2>
 
             <div className="space-y-4">
-              <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer">
+              <label className="flex items-center justify-between p-4 bg-muted rounded-lg cursor-pointer">
                 <div>
-                  <p className="font-medium text-gray-900">Email Notifications</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="font-medium text-foreground">Email Notifications</p>
+                  <p className="text-sm text-muted-foreground">
                     Send booking confirmations and reminders via email
                   </p>
                 </div>
@@ -800,14 +825,14 @@ export default function SettingsPage() {
                       emailNotifications: e.target.checked,
                     }))
                   }
-                  className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-5 w-5 rounded border-input text-primary focus:ring-primary"
                 />
               </label>
 
-              <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer">
+              <label className="flex items-center justify-between p-4 bg-muted rounded-lg cursor-pointer">
                 <div>
-                  <p className="font-medium text-gray-900">SMS Notifications</p>
-                  <p className="text-sm text-gray-500">
+                  <p className="font-medium text-foreground">SMS Notifications</p>
+                  <p className="text-sm text-muted-foreground">
                     Send booking confirmations and reminders via SMS
                   </p>
                 </div>
@@ -820,7 +845,7 @@ export default function SettingsPage() {
                       smsNotifications: e.target.checked,
                     }))
                   }
-                  className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-5 w-5 rounded border-input text-primary focus:ring-primary"
                 />
               </label>
             </div>
@@ -830,7 +855,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -840,18 +865,18 @@ export default function SettingsPage() {
               Save Changes
             </button>
           </div>
-        </form>
-      )}
+          </form>
+        </TabsContent>
 
-      {/* Branding Tab */}
-      {activeTab === "branding" && (
-        <form onSubmit={handleSaveBranding} className="space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">Brand Customization</h2>
+        {/* Branding Tab */}
+        <TabsContent value="branding">
+          <form onSubmit={handleSaveBranding} className="space-y-6">
+          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Brand Customization</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Logo URL
                 </label>
                 <input
@@ -861,15 +886,15 @@ export default function SettingsPage() {
                     setBrandingForm((prev) => ({ ...prev, logoUrl: e.target.value }))
                   }
                   placeholder="https://example.com/logo.png"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Used on customer-facing booking pages
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Primary Color
                 </label>
                 <div className="flex gap-2">
@@ -879,7 +904,7 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setBrandingForm((prev) => ({ ...prev, primaryColor: e.target.value }))
                     }
-                    className="h-10 w-20 rounded border border-gray-300 cursor-pointer"
+                    className="h-10 w-20 rounded border border-input cursor-pointer"
                   />
                   <input
                     type="text"
@@ -887,7 +912,7 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setBrandingForm((prev) => ({ ...prev, primaryColor: e.target.value }))
                     }
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono"
+                    className="flex-1 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary font-mono"
                   />
                 </div>
               </div>
@@ -895,8 +920,8 @@ export default function SettingsPage() {
 
             {brandingForm.logoUrl && (
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Logo Preview</p>
-                <div className="w-48 h-24 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                <p className="text-sm font-medium text-foreground mb-2">Logo Preview</p>
+                <div className="w-48 h-24 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
                   <img
                     src={brandingForm.logoUrl}
                     alt="Logo preview"
@@ -910,7 +935,7 @@ export default function SettingsPage() {
             )}
 
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Color Preview</p>
+              <p className="text-sm font-medium text-foreground mb-2">Color Preview</p>
               <div className="flex gap-4">
                 <div
                   className="w-24 h-10 rounded-lg"
@@ -932,7 +957,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -942,23 +967,23 @@ export default function SettingsPage() {
               Save Changes
             </button>
           </div>
-        </form>
-      )}
+          </form>
+        </TabsContent>
 
-      {/* Team Tab */}
-      {activeTab === "team" && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+        {/* Team Tab */}
+        <TabsContent value="team">
+          <div className="space-y-6">
+          <div className="bg-card rounded-lg border border-border p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Team Members</h2>
-                <p className="text-sm text-gray-500">
+                <h2 className="text-lg font-semibold text-foreground">Team Members</h2>
+                <p className="text-sm text-muted-foreground">
                   Manage who has access to this organization
                 </p>
               </div>
               <button
                 onClick={() => setShowInviteModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
               >
                 <UserPlus className="h-4 w-4" />
                 Invite Member
@@ -967,14 +992,14 @@ export default function SettingsPage() {
 
             {teamLoading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
               <div className="space-y-3">
                 {teamMembers?.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-4 bg-muted rounded-lg"
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -991,12 +1016,12 @@ export default function SettingsPage() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-foreground">
                           {member.user.firstName && member.user.lastName
                             ? `${member.user.firstName} ${member.user.lastName}`
                             : member.user.email}
                         </p>
-                        <p className="text-sm text-gray-500">{member.user.email}</p>
+                        <p className="text-sm text-muted-foreground">{member.user.email}</p>
                       </div>
                     </div>
 
@@ -1004,17 +1029,17 @@ export default function SettingsPage() {
                       <span
                         className={`px-2 py-1 text-xs rounded-full ${
                           member.status === "active"
-                            ? "bg-green-100 text-green-700"
+                            ? "bg-success/20 text-success"
                             : member.status === "invited"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-gray-100 text-gray-700"
+                            ? "bg-warning/20 text-warning"
+                            : "bg-muted text-foreground"
                         }`}
                       >
                         {member.status}
                       </span>
 
                       {member.role === "owner" ? (
-                        <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full flex items-center gap-1">
+                        <span className="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full flex items-center gap-1">
                           <Shield className="h-3 w-3" />
                           Owner
                         </span>
@@ -1028,7 +1053,7 @@ export default function SettingsPage() {
                             })
                           }
                           disabled={updateRoleMutation.isPending}
-                          className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary focus:border-primary"
+                          className="text-sm border border-input rounded-lg px-2 py-1 focus:ring-2 focus:ring-primary focus:border-primary"
                         >
                           <option value="admin">Admin</option>
                           <option value="manager">Manager</option>
@@ -1052,7 +1077,7 @@ export default function SettingsPage() {
                             }
                           }}
                           disabled={removeMemberMutation.isPending}
-                          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                          className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                           title="Remove member"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1063,288 +1088,183 @@ export default function SettingsPage() {
                 ))}
 
                 {(!teamMembers || teamMembers.length === 0) && (
-                  <p className="text-center text-gray-500 py-8">No team members yet</p>
+                  <p className="text-center text-muted-foreground py-8">No team members yet</p>
                 )}
               </div>
             )}
           </div>
 
           {/* Role Descriptions */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Role Permissions</h3>
+          <div className="bg-card rounded-lg border border-border p-6">
+            <h3 className="text-sm font-semibold text-foreground mb-4">Role Permissions</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-900">Owner</p>
-                <p className="text-gray-500">Full access including billing and deletion</p>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium text-foreground">Owner</p>
+                <p className="text-muted-foreground">Full access including billing and deletion</p>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-900">Admin</p>
-                <p className="text-gray-500">Full access except billing and org deletion</p>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium text-foreground">Admin</p>
+                <p className="text-muted-foreground">Full access except billing and org deletion</p>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-900">Manager</p>
-                <p className="text-gray-500">Manage bookings, schedules, and guides</p>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium text-foreground">Manager</p>
+                <p className="text-muted-foreground">Manage bookings, schedules, and guides</p>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-900">Support</p>
-                <p className="text-gray-500">View and update bookings and customers</p>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium text-foreground">Support</p>
+                <p className="text-muted-foreground">View and update bookings and customers</p>
               </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-900">Guide</p>
-                <p className="text-gray-500">View assigned schedules and bookings only</p>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium text-foreground">Guide</p>
+                <p className="text-muted-foreground">View assigned schedules and bookings only</p>
               </div>
             </div>
           </div>
-        </div>
-      )}
+          </div>
+        </TabsContent>
 
-      {/* Payments Tab */}
-      {activeTab === "payments" && (
-        <div className="space-y-6">
-          {/* Stripe Connect Status Card */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+        {/* Payments Tab */}
+        <TabsContent value="payments">
+          <div className="space-y-6">
+          {/* Stripe Status Card */}
+          <div className="bg-card rounded-lg border border-border p-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <CreditCard className="h-6 w-6 text-purple-600" />
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <CreditCard className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Stripe Connect</h2>
-                  <p className="text-sm text-gray-500">
-                    Accept payments directly to your bank account
+                  <h2 className="text-lg font-semibold text-foreground">Stripe Payments</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Accept payments using your Stripe account
                   </p>
                 </div>
               </div>
-              {stripeStatus?.onboarded && (
-                <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+              {stripeStatus?.configured && (
+                <span className="flex items-center gap-1 px-3 py-1 bg-success/20 text-success rounded-full text-sm font-medium">
                   <CheckCircle2 className="h-4 w-4" />
-                  Connected
+                  {stripeStatus.testMode ? "Test Mode" : "Live"}
                 </span>
               )}
             </div>
 
             {stripeLoading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : stripeStatus?.onboarded ? (
-              // Connected state
+            ) : stripeStatus?.configured ? (
               <div className="space-y-4">
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 text-success mt-0.5" />
                     <div>
-                      <p className="font-medium text-green-800">
-                        Your Stripe account is connected
+                      <p className="font-medium text-success">
+                        Stripe is configured and ready
                       </p>
-                      <p className="text-sm text-green-700 mt-1">
-                        You can accept payments and they will be deposited directly to your
-                        linked bank account.
+                      <p className="text-sm text-success/80 mt-1">
+                        {stripeStatus.message}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {stripeStatus.details && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Country</p>
-                      <p className="font-medium text-gray-900 mt-1">
-                        {stripeStatus.details.country || "N/A"}
-                      </p>
+                {stripeStatus.testMode && (
+                  <div className="p-4 bg-muted border border-border rounded-lg">
+                    <h4 className="font-medium text-foreground mb-2">Test Card Numbers</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Successful payment:</span>
+                        <code className="bg-background px-2 py-0.5 rounded">4242 4242 4242 4242</code>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Declined:</span>
+                        <code className="bg-background px-2 py-0.5 rounded">4000 0000 0000 0002</code>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">3D Secure:</span>
+                        <code className="bg-background px-2 py-0.5 rounded">4000 0000 0000 3220</code>
+                      </div>
                     </div>
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Email</p>
-                      <p className="font-medium text-gray-900 mt-1 truncate">
-                        {stripeStatus.details.email || "N/A"}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">
-                        Charges Enabled
-                      </p>
-                      <p className="font-medium mt-1">
-                        {stripeStatus.details.chargesEnabled ? (
-                          <span className="text-green-600 flex items-center gap-1">
-                            <CheckCircle2 className="h-4 w-4" /> Yes
-                          </span>
-                        ) : (
-                          <span className="text-red-600 flex items-center gap-1">
-                            <XCircle className="h-4 w-4" /> No
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">
-                        Payouts Enabled
-                      </p>
-                      <p className="font-medium mt-1">
-                        {stripeStatus.details.payoutsEnabled ? (
-                          <span className="text-green-600 flex items-center gap-1">
-                            <CheckCircle2 className="h-4 w-4" /> Yes
-                          </span>
-                        ) : (
-                          <span className="text-red-600 flex items-center gap-1">
-                            <XCircle className="h-4 w-4" /> No
-                          </span>
-                        )}
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Use any future expiry date and any 3-digit CVC
+                    </p>
                   </div>
                 )}
 
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => getStripeDashboardMutation.mutate()}
-                    disabled={getStripeDashboardMutation.isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    {getStripeDashboardMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <ExternalLink className="h-4 w-4" />
-                    )}
-                    Open Stripe Dashboard
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const confirmed = await confirm({
-                        title: "Disconnect Stripe Account",
-                        description: "Are you sure you want to disconnect your Stripe account? You will not be able to accept payments until you reconnect. This will not affect existing transactions or payouts.",
-                        confirmLabel: "Disconnect Stripe",
-                        variant: "destructive",
-                      });
-
-                      if (confirmed) {
-                        disconnectStripeMutation.mutate();
-                      }
-                    }}
-                    disabled={disconnectStripeMutation.isPending}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
-                  >
-                    {disconnectStripeMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                    Disconnect
-                  </button>
-                </div>
-              </div>
-            ) : stripeStatus?.connected && !stripeStatus?.onboarded ? (
-              // Partially connected - needs to complete onboarding
-              <div className="space-y-4">
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-yellow-800">
-                        Complete your Stripe setup
-                      </p>
-                      <p className="text-sm text-yellow-700 mt-1">
-                        You have started the Stripe Connect setup but haven&apos;t completed
-                        all the required steps.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => refreshStripeOnboardingMutation.mutate({ orgSlug: slug })}
-                  disabled={refreshStripeOnboardingMutation.isPending}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                <a
+                  href={stripeStatus.testMode ? "https://dashboard.stripe.com/test/payments" : "https://dashboard.stripe.com/payments"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
                 >
-                  {refreshStripeOnboardingMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ExternalLink className="h-4 w-4" />
-                  )}
-                  Continue Stripe Setup
-                </button>
+                  <ExternalLink className="h-4 w-4" />
+                  Open Stripe Dashboard
+                </a>
               </div>
             ) : (
-              // Not connected
               <div className="space-y-4">
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-gray-500 mt-0.5" />
+                    <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
                     <div>
-                      <p className="font-medium text-gray-800">
-                        Connect your Stripe account to accept payments
+                      <p className="font-medium text-warning">
+                        Stripe not configured
                       </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        When customers book tours, payments will be processed through Stripe
-                        and deposited directly into your connected bank account.
+                      <p className="text-sm text-warning/80 mt-1">
+                        Add your Stripe API keys to .env.local to enable payments.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <h3 className="font-medium text-gray-900">What you&apos;ll need:</h3>
-                  <ul className="space-y-2 text-sm text-gray-600">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      Business information (name, address)
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      Bank account details for payouts
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      Tax information (SSN/EIN for US businesses)
-                    </li>
-                  </ul>
+                <div className="p-4 bg-muted border border-border rounded-lg">
+                  <h4 className="font-medium text-foreground mb-2">Setup Instructions</h4>
+                  <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                    <li>Go to <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">dashboard.stripe.com/test/apikeys</a></li>
+                    <li>Copy your Secret key (starts with <code className="bg-background px-1 rounded">sk_test_</code>)</li>
+                    <li>Add to your <code className="bg-background px-1 rounded">.env.local</code> file:</li>
+                  </ol>
+                  <pre className="mt-2 p-2 bg-background rounded text-xs overflow-x-auto">
+                    STRIPE_SECRET_KEY=&quot;sk_test_...&quot;
+                  </pre>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Then restart your dev server with <code className="bg-background px-1 rounded">pnpm dev</code>
+                  </p>
                 </div>
-
-                <button
-                  onClick={() => startStripeOnboardingMutation.mutate({ orgSlug: slug })}
-                  disabled={startStripeOnboardingMutation.isPending}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#635bff] text-white rounded-lg hover:bg-[#5851e5] font-medium disabled:opacity-50"
-                >
-                  {startStripeOnboardingMutation.isPending ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <CreditCard className="h-5 w-5" />
-                  )}
-                  Connect with Stripe
-                </button>
               </div>
             )}
           </div>
 
           {/* Payment Info */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-card rounded-lg border border-border p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
               How Payments Work
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-blue-600 font-bold">1</span>
+                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-primary font-bold">1</span>
                 </div>
-                <h4 className="font-medium text-gray-900 mb-1">Customer Books</h4>
-                <p className="text-sm text-gray-500">
+                <h4 className="font-medium text-foreground mb-1">Customer Books</h4>
+                <p className="text-sm text-muted-foreground">
                   Customers pay securely through your booking page
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-blue-600 font-bold">2</span>
+                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-primary font-bold">2</span>
                 </div>
-                <h4 className="font-medium text-gray-900 mb-1">Stripe Processes</h4>
-                <p className="text-sm text-gray-500">
+                <h4 className="font-medium text-foreground mb-1">Stripe Processes</h4>
+                <p className="text-sm text-muted-foreground">
                   Payment is processed securely by Stripe
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-blue-600 font-bold">3</span>
+                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-primary font-bold">3</span>
                 </div>
-                <h4 className="font-medium text-gray-900 mb-1">You Get Paid</h4>
-                <p className="text-sm text-gray-500">
+                <h4 className="font-medium text-foreground mb-1">You Get Paid</h4>
+                <p className="text-sm text-muted-foreground">
                   Funds are deposited to your bank account
                 </p>
               </div>
@@ -1352,11 +1272,11 @@ export default function SettingsPage() {
           </div>
 
           {/* Tax Configuration */}
-          <form onSubmit={handleSaveTaxSettings} className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+          <form onSubmit={handleSaveTaxSettings} className="bg-card rounded-lg border border-border p-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Tax Configuration</h3>
-                <p className="text-sm text-gray-500 mt-1">
+                <h3 className="text-lg font-semibold text-foreground">Tax Configuration</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   Configure tax settings for your bookings
                 </p>
               </div>
@@ -1367,17 +1287,17 @@ export default function SettingsPage() {
                   onChange={(e) =>
                     setTaxForm((prev) => ({ ...prev, enabled: e.target.checked }))
                   }
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                 />
-                <span className="text-sm font-medium text-gray-700">Enable tax</span>
+                <span className="text-sm font-medium text-foreground">Enable tax</span>
               </label>
             </div>
 
             {taxForm.enabled && (
-              <div className="space-y-4 pt-4 border-t border-gray-200">
+              <div className="space-y-4 pt-4 border-t border-border">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Tax Name
                     </label>
                     <select
@@ -1385,7 +1305,7 @@ export default function SettingsPage() {
                       onChange={(e) =>
                         setTaxForm((prev) => ({ ...prev, name: e.target.value }))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                     >
                       <option value="VAT">VAT (Value Added Tax)</option>
                       <option value="Sales Tax">Sales Tax</option>
@@ -1398,7 +1318,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Tax Rate (%)
                     </label>
                     <div className="relative">
@@ -1414,9 +1334,9 @@ export default function SettingsPage() {
                             rate: parseFloat(e.target.value) || 0,
                           }))
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
+                        className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                         %
                       </span>
                     </div>
@@ -1424,7 +1344,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Tax ID / Registration Number (optional)
                   </label>
                   <input
@@ -1434,15 +1354,15 @@ export default function SettingsPage() {
                       setTaxForm((prev) => ({ ...prev, taxId: e.target.value }))
                     }
                     placeholder="e.g., GB123456789"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     This will be displayed on invoices and receipts
                   </p>
                 </div>
 
                 <div className="space-y-3">
-                  <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+                  <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
                     <input
                       type="checkbox"
                       checked={taxForm.includeInPrice}
@@ -1452,20 +1372,20 @@ export default function SettingsPage() {
                           includeInPrice: e.target.checked,
                         }))
                       }
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-700">
+                      <p className="text-sm font-medium text-foreground">
                         Prices include tax
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         If enabled, your displayed prices already include tax. If
                         disabled, tax will be added at checkout.
                       </p>
                     </div>
                   </label>
 
-                  <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+                  <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
                     <input
                       type="checkbox"
                       checked={taxForm.applyToFees}
@@ -1475,13 +1395,13 @@ export default function SettingsPage() {
                           applyToFees: e.target.checked,
                         }))
                       }
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-700">
+                      <p className="text-sm font-medium text-foreground">
                         Apply tax to booking fees
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         Apply tax to any additional booking or service fees
                       </p>
                     </div>
@@ -1489,11 +1409,11 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Tax Preview */}
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="text-sm font-medium text-blue-800 mb-2">
+                <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                  <h4 className="text-sm font-medium text-primary mb-2">
                     Tax Calculation Preview
                   </h4>
-                  <div className="text-sm text-blue-700 space-y-1">
+                  <div className="text-sm text-primary/80 space-y-1">
                     <p>
                       For a $100 booking with {taxForm.rate}% {taxForm.name}:
                     </p>
@@ -1529,7 +1449,7 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1540,21 +1460,369 @@ export default function SettingsPage() {
               </button>
             </div>
           </form>
-        </div>
-      )}
+
+          {/* Payment Settings */}
+          <form onSubmit={handleSavePaymentSettings} className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Payment Settings</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Configure payment options, deposits, and refund policies
+              </p>
+            </div>
+
+            {/* Payment Link Settings */}
+            <div className="space-y-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Payment Link Settings
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Link Expiration (hours)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="168"
+                    value={paymentForm.paymentLinkExpirationHours}
+                    onChange={(e) =>
+                      setPaymentForm((prev) => ({
+                        ...prev,
+                        paymentLinkExpirationHours: parseInt(e.target.value) || 24,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Payment links expire after this many hours (1-168)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Reminder Hours Before Expiry
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="24"
+                    value={paymentForm.paymentReminderHours}
+                    onChange={(e) =>
+                      setPaymentForm((prev) => ({
+                        ...prev,
+                        paymentReminderHours: parseInt(e.target.value) || 6,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Send reminder this many hours before link expires
+                  </p>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.autoSendPaymentReminders}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      autoSendPaymentReminders: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Auto-send payment reminders
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically send a reminder email before payment links expire
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Deposit Settings */}
+            <div className="space-y-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-foreground">Deposit Settings</h4>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={paymentForm.depositEnabled}
+                    onChange={(e) =>
+                      setPaymentForm((prev) => ({
+                        ...prev,
+                        depositEnabled: e.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-medium text-foreground">Enable deposits</span>
+                </label>
+              </div>
+
+              {paymentForm.depositEnabled && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Deposit Type
+                      </label>
+                      <select
+                        value={paymentForm.depositType}
+                        onChange={(e) =>
+                          setPaymentForm((prev) => ({
+                            ...prev,
+                            depositType: e.target.value as "percentage" | "fixed",
+                          }))
+                        }
+                        className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      >
+                        <option value="percentage">Percentage</option>
+                        <option value="fixed">Fixed Amount</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        {paymentForm.depositType === "percentage" ? "Deposit %" : "Deposit Amount"}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          max={paymentForm.depositType === "percentage" ? 100 : 10000}
+                          step={paymentForm.depositType === "percentage" ? 5 : 10}
+                          value={paymentForm.depositAmount}
+                          onChange={(e) =>
+                            setPaymentForm((prev) => ({
+                              ...prev,
+                              depositAmount: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          {paymentForm.depositType === "percentage" ? "%" : bookingForm.defaultCurrency}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Balance Due (days before)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="90"
+                        value={paymentForm.depositDueDays}
+                        onChange={(e) =>
+                          setPaymentForm((prev) => ({
+                            ...prev,
+                            depositDueDays: parseInt(e.target.value) || 7,
+                          }))
+                        }
+                        className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Days before tour when balance is due
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                    <h5 className="text-sm font-medium text-primary mb-1">Deposit Preview</h5>
+                    <p className="text-sm text-primary/80">
+                      For a {bookingForm.defaultCurrency} 100 booking:{" "}
+                      {paymentForm.depositType === "percentage"
+                        ? `${bookingForm.defaultCurrency} ${(100 * paymentForm.depositAmount / 100).toFixed(2)} deposit, ${bookingForm.defaultCurrency} ${(100 - 100 * paymentForm.depositAmount / 100).toFixed(2)} balance`
+                        : `${bookingForm.defaultCurrency} ${Math.min(paymentForm.depositAmount, 100).toFixed(2)} deposit, ${bookingForm.defaultCurrency} ${Math.max(100 - paymentForm.depositAmount, 0).toFixed(2)} balance`}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Methods */}
+            <div className="space-y-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium text-foreground">Accepted Payment Methods</h4>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {[
+                  { value: "card", label: "Card" },
+                  { value: "cash", label: "Cash" },
+                  { value: "bank_transfer", label: "Bank Transfer" },
+                  { value: "check", label: "Check" },
+                  { value: "other", label: "Other" },
+                ].map((method) => (
+                  <label
+                    key={method.value}
+                    className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      paymentForm.acceptedPaymentMethods.includes(method.value as typeof paymentForm.acceptedPaymentMethods[number])
+                        ? "bg-primary/10 border-primary"
+                        : "bg-muted border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={paymentForm.acceptedPaymentMethods.includes(method.value as typeof paymentForm.acceptedPaymentMethods[number])}
+                      onChange={(e) => {
+                        const newMethods = e.target.checked
+                          ? [...paymentForm.acceptedPaymentMethods, method.value as typeof paymentForm.acceptedPaymentMethods[number]]
+                          : paymentForm.acceptedPaymentMethods.filter((m) => m !== method.value);
+                        setPaymentForm((prev) => ({
+                          ...prev,
+                          acceptedPaymentMethods: newMethods,
+                        }));
+                      }}
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm font-medium text-foreground">{method.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Online Payment Options */}
+            <div className="space-y-3 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium text-foreground">Online Payment Options</h4>
+
+              <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.allowOnlinePayments}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      allowOnlinePayments: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Allow online payments
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Accept card payments through Stripe Checkout
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.allowPartialPayments}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      allowPartialPayments: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Allow partial payments
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Let customers pay in installments (requires manual tracking)
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Refund Settings */}
+            <div className="space-y-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium text-foreground">Refund Settings</h4>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Refund Deadline (hours before tour)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="720"
+                  value={paymentForm.refundDeadlineHours}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      refundDeadlineHours: parseInt(e.target.value) || 48,
+                    }))
+                  }
+                  className="w-full md:w-1/3 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Customers can request refunds up to this many hours before the tour starts (0 = no refunds)
+                </p>
+              </div>
+
+              <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.autoRefundOnCancellation}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      autoRefundOnCancellation: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Auto-refund on cancellation
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically process refunds when bookings are cancelled within the deadline
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Save Payment Settings
+              </button>
+            </div>
+          </form>
+          </div>
+        </TabsContent>
+
+        {/* System Tab */}
+        <TabsContent value="system">
+          <ServiceHealthPanel orgSlug={slug} isActive={activeTab === "system"} />
+        </TabsContent>
+      </Tabs>
 
       {/* Invite Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 m-4">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-md p-6 m-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Invite Team Member</h3>
+              <h3 className="text-lg font-semibold text-foreground">Invite Team Member</h3>
               <button
                 onClick={() => {
                   setShowInviteModal(false);
                   setInviteError("");
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground hover:text-muted-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1568,7 +1836,7 @@ export default function SettingsPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Email Address *
                 </label>
                 <input
@@ -1578,14 +1846,14 @@ export default function SettingsPage() {
                     setInviteForm((prev) => ({ ...prev, email: e.target.value }))
                   }
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="colleague@example.com"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     First Name
                   </label>
                   <input
@@ -1594,11 +1862,11 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setInviteForm((prev) => ({ ...prev, firstName: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Last Name
                   </label>
                   <input
@@ -1607,13 +1875,13 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setInviteForm((prev) => ({ ...prev, lastName: e.target.value }))
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Role
                 </label>
                 <select
@@ -1624,7 +1892,7 @@ export default function SettingsPage() {
                       role: e.target.value as "admin" | "manager" | "support" | "guide",
                     }))
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                 >
                   <option value="admin">Admin</option>
                   <option value="manager">Manager</option>
@@ -1634,8 +1902,8 @@ export default function SettingsPage() {
               </div>
 
               {inviteError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{inviteError}</p>
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-sm text-destructive">{inviteError}</p>
                 </div>
               )}
 
@@ -1646,14 +1914,14 @@ export default function SettingsPage() {
                     setShowInviteModal(false);
                     setInviteError("");
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-input rounded-lg text-foreground hover:bg-muted"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={inviteMemberMutation.isPending}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                 >
                   {inviteMemberMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

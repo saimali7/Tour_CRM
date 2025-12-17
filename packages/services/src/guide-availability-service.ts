@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, asc, gte, lte, sql } from "drizzle-orm";
 import {
   guideAvailability,
   guideAvailabilityOverrides,

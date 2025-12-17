@@ -129,45 +129,45 @@ export function ScheduleGuideAssignment({
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-          <span className="text-gray-500">Loading guide assignment...</span>
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="text-muted-foreground">Loading guide assignment...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Guide Assignment</h2>
+    <div className="bg-card rounded-lg border border-border p-6">
+      <h2 className="text-lg font-semibold text-foreground mb-4">Guide Assignment</h2>
 
       {/* Current Assignment Display */}
       {confirmedAssignment?.guide ? (
         <div className="mb-4">
-          <div className="flex items-start justify-between gap-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-start justify-between gap-4 p-4 bg-success/10 border border-success rounded-lg">
             <div className="flex items-start gap-3 flex-1">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <UserCheck className="h-5 w-5 text-green-600" />
+              <div className="p-2 bg-success/20 rounded-lg">
+                <UserCheck className="h-5 w-5 text-success" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-foreground">
                     {confirmedAssignment.guide.firstName} {confirmedAssignment.guide.lastName}
                   </p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium status-confirmed">
                     Confirmed
                   </span>
                 </div>
-                <p className="text-sm text-gray-600">{confirmedAssignment.guide.email}</p>
+                <p className="text-sm text-muted-foreground">{confirmedAssignment.guide.email}</p>
                 {confirmedAssignment.notes && (
-                  <p className="text-sm text-gray-600 mt-2 italic">{confirmedAssignment.notes}</p>
+                  <p className="text-sm text-muted-foreground mt-2 italic">{confirmedAssignment.notes}</p>
                 )}
               </div>
             </div>
             <button
               onClick={() => setIsAssigning(!isAssigning)}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-primary hover:text-primary/80 font-medium"
               disabled={isMutating}
             >
               {isAssigning ? "Cancel" : "Reassign"}
@@ -176,39 +176,39 @@ export function ScheduleGuideAssignment({
         </div>
       ) : pendingAssignment?.guide ? (
         <div className="mb-4">
-          <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <User className="h-5 w-5 text-yellow-600" />
+          <div className="flex items-start gap-3 p-4 bg-warning/10 border border-warning rounded-lg">
+            <div className="p-2 bg-warning/20 rounded-lg">
+              <User className="h-5 w-5 text-warning" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <p className="font-medium text-gray-900">
+                <p className="font-medium text-foreground">
                   {pendingAssignment.guide.firstName} {pendingAssignment.guide.lastName}
                 </p>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium status-pending">
                   Pending
                 </span>
               </div>
-              <p className="text-sm text-gray-600">{pendingAssignment.guide.email}</p>
+              <p className="text-sm text-muted-foreground">{pendingAssignment.guide.email}</p>
               {pendingAssignment.notes && (
-                <p className="text-sm text-gray-600 mt-2 italic">{pendingAssignment.notes}</p>
+                <p className="text-sm text-muted-foreground mt-2 italic">{pendingAssignment.notes}</p>
               )}
             </div>
           </div>
         </div>
       ) : (
         <div className="mb-4">
-          <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <User className="h-5 w-5 text-gray-400" />
+          <div className="flex items-center gap-3 p-4 bg-muted border border-border rounded-lg">
+            <div className="p-2 bg-accent rounded-lg">
+              <User className="h-5 w-5 text-muted-foreground" />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-gray-900">No guide assigned</p>
-              <p className="text-sm text-gray-600">Assign a qualified guide to this schedule</p>
+              <p className="font-medium text-foreground">No guide assigned</p>
+              <p className="text-sm text-muted-foreground">Assign a qualified guide to this schedule</p>
             </div>
             <button
               onClick={() => setIsAssigning(true)}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-primary hover:text-primary/80 font-medium"
               disabled={isMutating}
             >
               Assign Guide
@@ -220,26 +220,26 @@ export function ScheduleGuideAssignment({
       {/* Declined Assignments */}
       {declinedAssignments && declinedAssignments.length > 0 && (
         <div className="mb-4 space-y-2">
-          <p className="text-sm font-medium text-gray-700">Previously Declined:</p>
+          <p className="text-sm font-medium text-foreground">Previously Declined:</p>
           {declinedAssignments.map((assignment) => (
             <div
               key={assignment.id}
-              className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg"
+              className="flex items-start gap-3 p-3 bg-destructive/10 border border-destructive rounded-lg"
             >
-              <div className="p-1.5 bg-red-100 rounded">
-                <UserX className="h-4 w-4 text-red-600" />
+              <div className="p-1.5 bg-destructive/20 rounded">
+                <UserX className="h-4 w-4 text-destructive" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-foreground">
                   {assignment.guide?.firstName} {assignment.guide?.lastName}
                 </p>
                 {assignment.declineReason && (
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     Reason: {assignment.declineReason}
                   </p>
                 )}
               </div>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium status-cancelled">
                 Declined
               </span>
             </div>
@@ -249,16 +249,16 @@ export function ScheduleGuideAssignment({
 
       {/* Assignment Form */}
       {isAssigning && (
-        <div className="space-y-4 pt-4 border-t border-gray-200">
+        <div className="space-y-4 pt-4 border-t border-border">
           <div>
-            <label htmlFor="guide-select" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="guide-select" className="block text-sm font-medium text-foreground mb-2">
               Select Guide
             </label>
             <select
               id="guide-select"
               value={selectedGuideId}
               onChange={(e) => setSelectedGuideId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               disabled={isMutating}
             >
               <option value="">Choose a guide...</option>
@@ -267,7 +267,7 @@ export function ScheduleGuideAssignment({
                   key={guide.id}
                   value={guide.id}
                   disabled={!guide.isAvailable}
-                  className={!guide.isAvailable ? "text-gray-400" : ""}
+                  className={!guide.isAvailable ? "text-muted-foreground" : ""}
                 >
                   {guide.firstName} {guide.lastName}
                   {guide.isPrimary ? " (Primary)" : ""}
@@ -276,7 +276,7 @@ export function ScheduleGuideAssignment({
               ))}
             </select>
             {qualifiedGuides && qualifiedGuides.length === 0 && (
-              <p className="text-sm text-amber-600 mt-2 flex items-center gap-2">
+              <p className="text-sm text-warning mt-2 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
                 No qualified guides available for this tour
               </p>
@@ -292,13 +292,13 @@ export function ScheduleGuideAssignment({
 
                 if (!selectedGuide.isAvailable) {
                   return (
-                    <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning rounded-lg">
+                      <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-amber-900">
+                        <p className="text-sm font-medium text-foreground">
                           Schedule Conflict Warning
                         </p>
-                        <p className="text-sm text-amber-700 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           This guide has a conflicting schedule during this time. Proceeding will
                           create a double booking.
                         </p>
@@ -308,11 +308,11 @@ export function ScheduleGuideAssignment({
                 }
 
                 return (
-                  <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2 p-3 bg-success/10 border border-success rounded-lg">
+                    <Check className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-green-900">Available</p>
-                      <p className="text-sm text-green-700 mt-1">
+                      <p className="text-sm font-medium text-foreground">Available</p>
+                      <p className="text-sm text-muted-foreground mt-1">
                         This guide is available for the selected time slot.
                       </p>
                     </div>
@@ -324,8 +324,8 @@ export function ScheduleGuideAssignment({
 
           {/* Error Display */}
           {(assignMutation.error || reassignMutation.error) && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">
+            <div className="p-3 bg-destructive/10 border border-destructive rounded-lg">
+              <p className="text-sm text-destructive">
                 {assignMutation.error?.message || reassignMutation.error?.message}
               </p>
             </div>
@@ -336,7 +336,7 @@ export function ScheduleGuideAssignment({
             <button
               onClick={handleAssign}
               disabled={!selectedGuideId || isMutating}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isMutating && <Loader2 className="h-4 w-4 animate-spin" />}
               {confirmedAssignment ? "Reassign Guide" : "Assign Guide"}
@@ -347,7 +347,7 @@ export function ScheduleGuideAssignment({
                 setSelectedGuideId("");
               }}
               disabled={isMutating}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Cancel
             </button>
@@ -355,7 +355,7 @@ export function ScheduleGuideAssignment({
               <button
                 onClick={handleCancel}
                 disabled={isMutating}
-                className="ml-auto px-4 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="ml-auto px-4 py-2 text-destructive border border-destructive rounded-lg hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Remove Assignment
               </button>

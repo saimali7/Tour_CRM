@@ -30,16 +30,16 @@ export function GuideQuickView({
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-6 w-32 bg-gray-200 rounded" />
-        <div className="h-4 w-48 bg-gray-200 rounded" />
-        <div className="h-20 bg-gray-200 rounded" />
+        <div className="h-6 w-32 bg-muted rounded" />
+        <div className="h-4 w-48 bg-muted rounded" />
+        <div className="h-20 bg-muted rounded" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-8 text-red-500">
+      <div className="text-center py-8 text-destructive">
         Error loading guide: {error.message}
       </div>
     );
@@ -54,9 +54,9 @@ export function GuideQuickView({
   }
 
   const statusColors: Record<string, string> = {
-    active: "bg-green-100 text-green-800",
-    inactive: "bg-gray-100 text-gray-800",
-    suspended: "bg-red-100 text-red-800",
+    active: "status-confirmed",
+    inactive: "bg-muted text-muted-foreground",
+    suspended: "status-cancelled",
   };
 
   return (
@@ -86,7 +86,7 @@ export function GuideQuickView({
         </div>
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            statusColors[guide.status] || "bg-gray-100 text-gray-800"
+            statusColors[guide.status] || "bg-muted text-muted-foreground"
           }`}
         >
           {guide.status}
@@ -95,12 +95,12 @@ export function GuideQuickView({
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="border rounded-lg p-3 text-center">
+        <div className="border border-border rounded-lg p-3 text-center">
           <Calendar className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
           <p className="text-2xl font-bold">{guide.upcomingSchedules || 0}</p>
           <p className="text-xs text-muted-foreground">upcoming tours</p>
         </div>
-        <div className="border rounded-lg p-3 text-center">
+        <div className="border border-border rounded-lg p-3 text-center">
           <Clock className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
           <p className="text-2xl font-bold">{guide.totalSchedules || 0}</p>
           <p className="text-xs text-muted-foreground">total assigned</p>
@@ -108,7 +108,7 @@ export function GuideQuickView({
       </div>
 
       {/* Contact Info */}
-      <div className="border rounded-lg p-4 space-y-3">
+      <div className="border border-border rounded-lg p-4 space-y-3">
         <h4 className="text-sm font-medium flex items-center gap-2">
           <User className="h-4 w-4 text-muted-foreground" />
           Contact Information
@@ -137,7 +137,7 @@ export function GuideQuickView({
 
       {/* Emergency Contact */}
       {guide.emergencyContactName && (
-        <div className="border rounded-lg p-4 space-y-2">
+        <div className="border border-border rounded-lg p-4 space-y-2">
           <h4 className="text-sm font-medium">Emergency Contact</h4>
           <p className="text-sm">{guide.emergencyContactName}</p>
           {guide.emergencyContactPhone && (
@@ -154,13 +154,13 @@ export function GuideQuickView({
 
       {/* Languages */}
       {guide.languages && guide.languages.length > 0 && (
-        <div className="border rounded-lg p-4 space-y-2">
+        <div className="border border-border rounded-lg p-4 space-y-2">
           <h4 className="text-sm font-medium">Languages</h4>
           <div className="flex flex-wrap gap-2">
             {guide.languages.map((language, index) => (
               <span
                 key={`${language}-${index}`}
-                className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700"
+                className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground"
               >
                 {language}
               </span>
@@ -171,7 +171,7 @@ export function GuideQuickView({
 
       {/* Certifications */}
       {guide.certifications && guide.certifications.length > 0 && (
-        <div className="border rounded-lg p-4 space-y-2">
+        <div className="border border-border rounded-lg p-4 space-y-2">
           <h4 className="text-sm font-medium">Certifications</h4>
           <div className="flex flex-wrap gap-2">
             {guide.certifications.slice(0, 4).map((cert, index) => (
@@ -193,7 +193,7 @@ export function GuideQuickView({
 
       {/* Bio */}
       {guide.bio && (
-        <div className="border rounded-lg p-4 space-y-2">
+        <div className="border border-border rounded-lg p-4 space-y-2">
           <h4 className="text-sm font-medium">Bio</h4>
           <p className="text-sm text-muted-foreground line-clamp-3">
             {guide.bio}
@@ -203,9 +203,9 @@ export function GuideQuickView({
 
       {/* Notes (internal) */}
       {guide.notes && (
-        <div className="border rounded-lg p-4 space-y-2 border-yellow-200 bg-yellow-50">
-          <h4 className="text-sm font-medium text-yellow-800">Internal Notes</h4>
-          <p className="text-sm text-yellow-700">{guide.notes}</p>
+        <div className="border rounded-lg p-4 space-y-2 status-pending">
+          <h4 className="text-sm font-medium">Internal Notes</h4>
+          <p className="text-sm">{guide.notes}</p>
         </div>
       )}
 

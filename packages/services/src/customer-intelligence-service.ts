@@ -57,7 +57,7 @@ export interface CustomerLifetimeValue {
 
 export interface ReengagementCandidate {
   customerId: string;
-  email: string;
+  email: string | null;
   firstName: string;
   lastName: string;
   triggerType: ReengagementTriggerType;
