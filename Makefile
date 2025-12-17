@@ -5,7 +5,7 @@
 .PHONY: help install dev build lint typecheck format clean
 .PHONY: docker-up docker-down docker-logs docker-ps docker-clean
 .PHONY: db-generate db-push db-studio db-seed
-.PHONY: setup check deploy-staging deploy-prod pre-deploy
+.PHONY: setup check deploy pre-deploy
 
 # Default target
 .DEFAULT_GOAL := help
@@ -38,7 +38,7 @@ help: ## Show this help message
 	@grep -E '^db-.*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(GREEN)Deployment:$(RESET)"
-	@grep -E '^(deploy-|pre-deploy).*:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
+	@grep -E '^(deploy|pre-deploy):.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
 
 # =============================================================================
@@ -192,13 +192,7 @@ prod-build: ## Build for production
 	@echo "$(CYAN)Building for production...$(RESET)"
 	NODE_ENV=production pnpm build
 
-deploy-staging: ## Deploy to staging (push to dev branch)
-	@echo "$(CYAN)Deploying to staging...$(RESET)"
-	git push origin dev
-	@echo "$(GREEN)Staging deployment triggered!$(RESET)"
-	@echo "Monitor at: https://github.com/$(shell git remote get-url origin | sed 's/.*github.com[:/]//' | sed 's/.git$$//')/actions"
-
-deploy-prod: ## Deploy to production (merge dev to main)
+deploy: ## Deploy to production (merge dev to main, triggers auto-deploy)
 	@echo "$(YELLOW)Deploying to production...$(RESET)"
 	@read -p "Are you sure you want to deploy to production? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	git checkout main

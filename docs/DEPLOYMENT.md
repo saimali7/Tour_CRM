@@ -42,28 +42,28 @@ This guide establishes a world-class development workflow with automated CI/CD, 
 │                           DEVELOPMENT PIPELINE                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│   LOCAL DEV          GITHUB              STAGING            PRODUCTION       │
-│   ─────────          ──────              ───────            ──────────       │
+│   LOCAL DEV              GITHUB                          PRODUCTION          │
+│   ─────────              ──────                          ──────────          │
 │                                                                              │
-│   ┌─────────┐       ┌─────────┐        ┌─────────┐        ┌─────────┐       │
-│   │  Code   │──────▶│   PR    │───────▶│   Dev   │───────▶│  Main   │       │
-│   │ Change  │       │ Created │        │ Branch  │        │ Branch  │       │
-│   └─────────┘       └────┬────┘        └────┬────┘        └────┬────┘       │
-│        │                 │                  │                   │            │
-│        ▼                 ▼                  ▼                   ▼            │
-│   ┌─────────┐       ┌─────────┐        ┌─────────┐        ┌─────────┐       │
-│   │Pre-commit│      │CI Checks│        │ Auto    │        │ Auto    │       │
-│   │  Hooks  │       │ ✓ Lint  │        │ Deploy  │        │ Deploy  │       │
-│   │ ✓ Lint  │       │ ✓ Types │        │   to    │        │   to    │       │
-│   │ ✓ Types │       │ ✓ Tests │        │ Staging │        │  Prod   │       │
-│   │ ✓ Format│       │ ✓ Build │        └────┬────┘        └────┬────┘       │
-│   └─────────┘       └─────────┘             │                   │            │
-│                                              ▼                   ▼            │
-│                                         ┌─────────┐        ┌─────────┐       │
-│                                         │ E2E     │        │ Smoke   │       │
-│                                         │ Tests   │        │ Tests   │       │
-│                                         │ + QA    │        │ + Alert │       │
-│                                         └─────────┘        └─────────┘       │
+│   ┌─────────┐       ┌─────────┐        ┌─────────┐      ┌─────────┐         │
+│   │  Code   │──────▶│   PR    │───────▶│   Dev   │─────▶│  Main   │         │
+│   │ Change  │       │ Created │        │ Branch  │      │ Branch  │         │
+│   └─────────┘       └────┬────┘        └────┬────┘      └────┬────┘         │
+│        │                 │                  │                 │              │
+│        ▼                 ▼                  │                 ▼              │
+│   ┌─────────┐       ┌─────────┐             │           ┌─────────┐         │
+│   │Pre-commit│      │CI Checks│             │           │ Auto    │         │
+│   │  Hooks  │       │ ✓ Lint  │        Local Dev        │ Deploy  │         │
+│   │ ✓ Lint  │       │ ✓ Types │        & Testing        │   to    │         │
+│   │ ✓ Types │       │ ✓ Build │             │           │  Prod   │         │
+│   │ ✓ Format│       └─────────┘             │           └────┬────┘         │
+│   └─────────┘                               │                │              │
+│                                             │                ▼              │
+│                                             │           ┌─────────┐         │
+│                                             │           │ Health  │         │
+│                                             │           │ Check   │         │
+│                                             │           │ + Alert │         │
+│                                             │           └─────────┘         │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -92,15 +92,13 @@ This guide establishes a world-class development workflow with automated CI/CD, 
 │                    │  • Rate Limiting           │                            │
 │                    └──────┬──────────────┬─────┘                            │
 │                           │              │                                   │
-│            ┌──────────────┴──┐    ┌──────┴──────────────┐                   │
-│            │                 │    │                     │                   │
-│      ┌─────▼─────┐    ┌──────▼────▼─┐    ┌────────────┐                    │
-│      │ STAGING   │    │ PRODUCTION   │    │   REDIS    │                    │
-│      │ (dev)     │    │ (main)       │    │  Cache +   │                    │
-│      │           │    │              │    │  Sessions  │                    │
-│      │ CRM:3000  │    │ CRM:3000     │    └────────────┘                    │
-│      │ Web:3001  │    │ Web:3001     │                                      │
-│      └───────────┘    └──────────────┘                                      │
+│                    ┌──────▼──────┐  ┌────▼─────┐                            │
+│                    │ PRODUCTION  │  │  REDIS   │                            │
+│                    │   (main)    │  │ Cache +  │                            │
+│                    │             │  │ Sessions │                            │
+│                    │  CRM:3000   │  └──────────┘                            │
+│                    │  Web:3001   │                                           │
+│                    └─────────────┘                                           │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                   │
@@ -121,8 +119,7 @@ This guide establishes a world-class development workflow with automated CI/CD, 
 
 | Environment | Branch | URL | Purpose |
 |-------------|--------|-----|---------|
-| **Local** | Any | `localhost:3000` | Development |
-| **Staging** | `dev` | `staging.yourdomain.com` | QA & Testing |
+| **Local** | `dev` | `localhost:3000` | Development & Testing |
 | **Production** | `main` | `app.yourdomain.com` | Live Users |
 
 ---
@@ -300,9 +297,9 @@ volumes:
 ### Branch Structure
 
 ```
-main (production)
+main (production) ← auto-deploys to Coolify
  │
- └── dev (staging)
+ └── dev (development) ← work happens here
       │
       ├── feature/add-booking-export
       ├── fix/payment-webhook-retry
@@ -314,8 +311,8 @@ main (production)
 | Branch | Protection | Deploy To | Merge Strategy |
 |--------|------------|-----------|----------------|
 | `main` | Protected, requires PR + approval | Production | Squash & Merge |
-| `dev` | Protected, requires CI pass | Staging | Squash & Merge |
-| `feature/*` | None | Preview (optional) | — |
+| `dev` | Protected, requires CI pass | Local only | Squash & Merge |
+| `feature/*` | None | — | — |
 | `fix/*` | None | — | — |
 | `hotfix/*` | Can merge direct to main | Production | — |
 
@@ -875,19 +872,15 @@ curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
 Tour CRM (Project)
 ├── Resources
-│   ├── tour-crm-staging (Application)
-│   │   └── Source: GitHub → dev branch
-│   ├── tour-crm-production (Application)
+│   ├── tour-crm (Application)
 │   │   └── Source: GitHub → main branch
 │   ├── tour-redis (Service)
 │   │   └── Redis 7 Alpine
-│   └── tour-web-production (Application) [optional]
+│   └── tour-web (Application) [optional]
 │       └── Source: GitHub → main branch
 ```
 
 ### 8.3 Application Configuration
-
-**For each application (staging & production):**
 
 **General Settings:**
 ```
@@ -909,18 +902,19 @@ pnpm start --filter @tour/crm
 ```
 
 **Domain Configuration:**
-- Staging: `staging.yourdomain.com`
-- Production: `app.yourdomain.com`
+- CRM: `app.yourdomain.com`
+- Web (optional): `book.yourdomain.com`
 - Enable HTTPS (automatic via Traefik)
 
 ### 8.4 Webhook Configuration
 
-1. In Coolify, go to each application → **Webhooks**
+1. In Coolify, go to the application → **Webhooks**
 2. Enable webhook and copy the URL
-3. Add to GitHub repository **Settings → Secrets → Actions**:
-   - `COOLIFY_WEBHOOK_STAGING`: Staging webhook URL
+3. Add to GitHub repository **Settings → Variables → Actions**:
    - `COOLIFY_WEBHOOK_PROD`: Production webhook URL
-   - `COOLIFY_API_TOKEN`: Your Coolify API token
+   - `PRODUCTION_URL`: `https://app.yourdomain.com`
+4. Add to GitHub repository **Settings → Secrets → Actions**:
+   - `COOLIFY_API_TOKEN`: Your Coolify API token (if using bearer auth)
 
 ### 8.5 Health Check Configuration
 
@@ -934,12 +928,6 @@ Health Check Retries: 3
 ```
 
 ### 8.6 Resource Limits
-
-**Staging:**
-```
-CPU Limit: 1 core
-Memory Limit: 1GB
-```
 
 **Production:**
 ```
@@ -994,30 +982,6 @@ NEXT_PUBLIC_WEB_URL="http://localhost:3001"
 # RESEND_API_KEY="re_..."
 ```
 
-#### Staging (Coolify Environment Variables)
-
-```bash
-# Database - Separate Supabase project for staging
-DATABASE_URL="postgresql://postgres.[ref]:[password]@...staging..."
-DIRECT_URL="postgresql://postgres.[ref]:[password]@...staging..."
-
-# Auth - Clerk development instance
-ENABLE_CLERK="true"
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_..."
-CLERK_SECRET_KEY="sk_test_..."
-
-# Payments - Stripe test mode
-STRIPE_SECRET_KEY="sk_test_..."
-
-# Feature flags
-ENABLE_DEBUG_MODE="true"
-LOG_LEVEL="debug"
-
-# URLs
-NODE_ENV="production"
-NEXT_PUBLIC_APP_URL="https://staging.yourdomain.com"
-```
-
 #### Production (Coolify Environment Variables)
 
 ```bash
@@ -1059,7 +1023,7 @@ NEXT_PUBLIC_WEB_URL="https://book.yourdomain.com"
 
 1. **Never commit secrets** - Use `.env.local` (gitignored)
 2. **Rotate secrets regularly** - Especially after team changes
-3. **Use different secrets per environment** - Never share between staging/prod
+3. **Use different secrets per environment** - Never share between local/prod
 4. **Audit access** - Track who has access to production secrets
 
 ---
@@ -1081,7 +1045,7 @@ pnpm db:migrate       # Apply migrations
 
 1. **Always backwards compatible** - Old code should work with new schema
 2. **Small, incremental changes** - One logical change per migration
-3. **Test migrations on staging first** - Never run untested migrations on prod
+3. **Test migrations locally first** - Never run untested migrations on prod
 4. **Have a rollback plan** - Know how to undo each migration
 
 ### Backup Strategy
@@ -1285,18 +1249,17 @@ module.exports = {
 ### Runbook: Deploy to Production
 
 ```bash
-# 1. Ensure all tests pass on dev
+# 1. Ensure all checks pass on dev
 git checkout dev
-pnpm test && pnpm build
+make pre-deploy  # or: pnpm lint && pnpm typecheck && pnpm build
 
-# 2. Create release PR
-git checkout main
-git pull origin main
-git merge dev
-git push origin main
+# 2. Deploy (merge dev to main)
+make deploy
+# or manually:
+# git checkout main && git merge dev && git push origin main && git checkout dev
 
 # 3. Monitor deployment
-# → Watch GitHub Actions
+# → Watch GitHub Actions: https://github.com/your-repo/actions
 # → Check Coolify deployment logs
 # → Verify health check: https://app.yourdomain.com/api/health
 
@@ -1317,13 +1280,12 @@ pnpm db:generate
 # 2. Review generated SQL
 cat packages/database/drizzle/*.sql
 
-# 3. Test on staging
-# → Merge to dev
-# → Verify staging works
+# 3. Test locally
+pnpm db:push  # Apply to local database
+pnpm dev      # Test the app
 
 # 4. Deploy to production
-# → Merge to main
-# → Monitor for errors
+make deploy   # Merge to main, triggers auto-deploy with db:push
 
 # 5. Verify migration
 pnpm db:studio  # Check schema
@@ -1345,8 +1307,9 @@ curl -s https://app.yourdomain.com/api/health | jq .
 
 # 4. Investigate and fix
 git log --oneline -10  # Find bad commit
-# → Fix issue in new PR
-# → Test on staging first
+# → Fix issue on dev branch
+# → Test locally first
+# → Then deploy again
 ```
 
 ### Runbook: Respond to P1 Incident
@@ -1396,7 +1359,6 @@ git log --oneline -10  # Find bad commit
 |-------------|-----|-----|
 | Local | CRM | http://localhost:3000 |
 | Local | Web | http://localhost:3001 |
-| Staging | CRM | https://staging.yourdomain.com |
 | Production | CRM | https://app.yourdomain.com |
 | Production | Web | https://book.yourdomain.com |
 
