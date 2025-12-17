@@ -7,6 +7,8 @@ import { BookingRefundEmail } from "./templates/booking-refund";
 import { GuideAssignmentEmail } from "./templates/guide-assignment";
 import { GuideReminderEmail } from "./templates/guide-reminder";
 import { GuideDailyManifestEmail } from "./templates/guide-daily-manifest";
+import { PaymentConfirmationEmail } from "./templates/payment-confirmation";
+import { PaymentLinkEmail } from "./templates/payment-link";
 import * as React from "react";
 
 // Lazy initialize Resend client
@@ -154,6 +156,32 @@ export interface ReviewRequestEmailData {
   tourDate: string;
   reviewUrl: string;
   isReminder?: boolean;
+}
+
+export interface PaymentConfirmationEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingReference: string;
+  tourName: string;
+  tourDate: string;
+  amount: string;
+  currency: string;
+  viewBookingUrl?: string;
+  receiptUrl?: string;
+}
+
+export interface PaymentLinkEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingReference: string;
+  tourName: string;
+  tourDate: string;
+  tourTime: string;
+  participants: number;
+  amount: string;
+  currency: string;
+  paymentUrl: string;
+  expiresAt?: string;
 }
 
 export class EmailService {
@@ -474,6 +502,86 @@ export class EmailService {
           organizationEmail: this.org.email,
           organizationPhone: this.org.phone,
           rebookUrl: data.rebookUrl,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send payment confirmation email
+   */
+  async sendPaymentConfirmation(data: PaymentConfirmationEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject: `Payment Received - ${data.tourName} (${data.bookingReference})`,
+        react: React.createElement(PaymentConfirmationEmail, {
+          customerName: data.customerName,
+          bookingReference: data.bookingReference,
+          tourName: data.tourName,
+          tourDate: data.tourDate,
+          amount: data.amount,
+          currency: data.currency,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
+          viewBookingUrl: data.viewBookingUrl,
+          receiptUrl: data.receiptUrl,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send payment link email to customer
+   */
+  async sendPaymentLinkEmail(data: PaymentLinkEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.customerEmail,
+        replyTo: this.replyTo,
+        subject: `Complete Your Payment - ${data.tourName} (${data.bookingReference})`,
+        react: React.createElement(PaymentLinkEmail, {
+          customerName: data.customerName,
+          bookingReference: data.bookingReference,
+          tourName: data.tourName,
+          tourDate: data.tourDate,
+          tourTime: data.tourTime,
+          participants: data.participants,
+          amount: data.amount,
+          currency: data.currency,
+          paymentUrl: data.paymentUrl,
+          expiresAt: data.expiresAt,
+          organizationName: this.org.name,
+          organizationEmail: this.org.email,
+          organizationPhone: this.org.phone,
           logoUrl: this.org.logoUrl,
         }),
       });

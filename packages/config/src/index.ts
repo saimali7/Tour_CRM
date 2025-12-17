@@ -1,3 +1,7 @@
+// Environment utilities
+export { env, validateServerEnv, validateClientEnv, logEnvValidation } from "./env";
+export type { ServerEnv, ClientEnv, ValidationResult } from "./env";
+
 // Shared configuration
 export const APP_NAME = "Tour Platform";
 

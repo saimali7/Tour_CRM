@@ -26,6 +26,7 @@ import { IntelligenceSurface } from "@/components/dashboard/intelligence-surface
 import { CustomerIntelligenceCard } from "@/components/dashboard/customer-intelligence-card";
 import { GoalCard } from "@/components/goals/goal-card";
 import { GoalModal } from "@/components/goals/goal-modal";
+import { SetupChecklist } from "@/components/dashboard/setup-checklist";
 
 type TabType = "operations" | "business";
 
@@ -221,6 +222,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Setup Checklist - Shows for new organizations */}
+      <SetupChecklist orgSlug={slug} />
+
       {/* Tabs */}
       <div className="border-b border-border">
         <nav className="-mb-px flex gap-8">

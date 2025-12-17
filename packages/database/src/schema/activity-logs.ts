@@ -18,6 +18,9 @@ export type ActivityAction =
   | "booking.email_sent"
   | "booking.payment_recorded"
   | "booking.payment_deleted"
+  | "booking.payment_link_sent"
+  | "booking.payment_email_sent"
+  | "booking.payment_failed_email_sent"
   // Schedule actions
   | "schedule.created"
   | "schedule.updated"

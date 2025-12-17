@@ -215,6 +215,32 @@ type BookingEvents = {
       reason?: string;
     };
   };
+  // Payment events
+  "payment/succeeded": {
+    data: {
+      organizationId: string;
+      bookingId: string;
+      customerId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      tourName: string;
+      tourDate: string;
+      amount: string;
+      currency: string;
+      stripeReceiptUrl?: string;
+    };
+  };
+  "payment/failed": {
+    data: {
+      organizationId: string;
+      bookingId: string;
+      customerEmail: string;
+      customerName: string;
+      bookingReference: string;
+      errorMessage: string;
+    };
+  };
 };
 
 // Create the Inngest client

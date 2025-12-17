@@ -70,6 +70,50 @@ export interface BookingWindowSettings {
   sameDayCutoffTime?: string;
 }
 
+export interface PaymentSettings {
+  // Payment link settings
+  paymentLinkExpirationHours: number; // How long payment links are valid (default: 24)
+  autoSendPaymentReminders: boolean; // Auto-send reminder before expiry
+  paymentReminderHours: number; // Hours before expiry to send reminder (default: 6)
+
+  // Deposit settings
+  depositEnabled: boolean; // Require deposits for bookings
+  depositType: "percentage" | "fixed"; // How deposit is calculated
+  depositAmount: number; // Percentage (e.g., 25) or fixed amount (e.g., 50.00)
+  depositDueDays: number; // Days before tour when full payment is due (default: 7)
+
+  // Accepted payment methods
+  acceptedPaymentMethods: Array<"card" | "cash" | "bank_transfer" | "check" | "other">;
+
+  // Online payment settings
+  allowOnlinePayments: boolean; // Whether to accept online card payments
+  allowPartialPayments: boolean; // Allow customers to pay in installments
+
+  // Refund settings
+  autoRefundOnCancellation: boolean; // Automatically process refunds
+  refundDeadlineHours: number; // Hours before tour when refunds are no longer available
+}
+
+export interface SetupProgress {
+  // Core setup steps
+  basicInfo: boolean; // Name, slug, email, timezone, currency set
+  businessProfile: boolean; // Address, phone, website filled
+  stripeConnect: boolean; // Stripe Connect onboarded
+
+  // First usage milestones
+  firstTour: boolean; // Created at least one tour
+  firstBooking: boolean; // Received at least one booking
+
+  // Timestamps for when each step was completed
+  completedAt?: {
+    basicInfo?: string;
+    businessProfile?: string;
+    stripeConnect?: string;
+    firstTour?: string;
+    firstBooking?: string;
+  };
+}
+
 export interface OrganizationSettings {
   // Booking settings
   defaultCurrency?: string;
@@ -90,6 +134,12 @@ export interface OrganizationSettings {
 
   // Tax settings
   tax?: TaxSettings;
+
+  // Payment settings
+  payment?: PaymentSettings;
+
+  // Setup progress tracking
+  setupProgress?: SetupProgress;
 
   // Custom fields (org can add their own)
   customFields?: Record<string, unknown>;

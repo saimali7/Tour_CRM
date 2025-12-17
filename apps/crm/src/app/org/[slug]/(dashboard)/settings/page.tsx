@@ -27,14 +27,17 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Activity,
 } from "lucide-react";
 import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ServiceHealthPanel } from "@/components/settings/service-health";
 
 export default function SettingsPage() {
   const params = useParams();
   const slug = params.slug as string;
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState("business");
   const { confirm, ConfirmModal } = useConfirmModal();
 
   const { data: organization, isLoading } = trpc.organization.get.useQuery();
@@ -194,6 +197,21 @@ export default function SettingsPage() {
     applyToFees: true,
   });
 
+  const [paymentForm, setPaymentForm] = useState({
+    paymentLinkExpirationHours: 24,
+    autoSendPaymentReminders: true,
+    paymentReminderHours: 6,
+    depositEnabled: false,
+    depositType: "percentage" as "percentage" | "fixed",
+    depositAmount: 25,
+    depositDueDays: 7,
+    acceptedPaymentMethods: ["card", "cash", "bank_transfer"] as Array<"card" | "cash" | "bank_transfer" | "check" | "other">,
+    allowOnlinePayments: true,
+    allowPartialPayments: false,
+    autoRefundOnCancellation: false,
+    refundDeadlineHours: 48,
+  });
+
   // Initialize forms when data loads
   useEffect(() => {
     if (organization) {
@@ -246,6 +264,22 @@ export default function SettingsPage() {
           applyToFees: settings.tax.applyToFees ?? true,
         });
       }
+      if (settings.payment) {
+        setPaymentForm({
+          paymentLinkExpirationHours: settings.payment.paymentLinkExpirationHours ?? 24,
+          autoSendPaymentReminders: settings.payment.autoSendPaymentReminders ?? true,
+          paymentReminderHours: settings.payment.paymentReminderHours ?? 6,
+          depositEnabled: settings.payment.depositEnabled ?? false,
+          depositType: settings.payment.depositType ?? "percentage",
+          depositAmount: settings.payment.depositAmount ?? 25,
+          depositDueDays: settings.payment.depositDueDays ?? 7,
+          acceptedPaymentMethods: settings.payment.acceptedPaymentMethods ?? ["card", "cash", "bank_transfer"],
+          allowOnlinePayments: settings.payment.allowOnlinePayments ?? true,
+          allowPartialPayments: settings.payment.allowPartialPayments ?? false,
+          autoRefundOnCancellation: settings.payment.autoRefundOnCancellation ?? false,
+          refundDeadlineHours: settings.payment.refundDeadlineHours ?? 48,
+        });
+      }
     }
   }, [settings]);
 
@@ -272,6 +306,11 @@ export default function SettingsPage() {
   const handleSaveTaxSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettingsMutation.mutate({ tax: taxForm });
+  };
+
+  const handleSavePaymentSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettingsMutation.mutate({ payment: paymentForm });
   };
 
   if (isLoading) {
@@ -302,7 +341,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      <Tabs defaultValue="business" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
           <TabsTrigger
             value="business"
@@ -345,6 +384,13 @@ export default function SettingsPage() {
           >
             <Users className="h-4 w-4" />
             Team
+          </TabsTrigger>
+          <TabsTrigger
+            value="system"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Activity className="h-4 w-4" />
+            System
           </TabsTrigger>
         </TabsList>
 
@@ -1555,7 +1601,354 @@ export default function SettingsPage() {
               </button>
             </div>
           </form>
+
+          {/* Payment Settings */}
+          <form onSubmit={handleSavePaymentSettings} className="bg-card rounded-lg border border-border p-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Payment Settings</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Configure payment options, deposits, and refund policies
+              </p>
+            </div>
+
+            {/* Payment Link Settings */}
+            <div className="space-y-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Payment Link Settings
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Link Expiration (hours)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="168"
+                    value={paymentForm.paymentLinkExpirationHours}
+                    onChange={(e) =>
+                      setPaymentForm((prev) => ({
+                        ...prev,
+                        paymentLinkExpirationHours: parseInt(e.target.value) || 24,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Payment links expire after this many hours (1-168)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Reminder Hours Before Expiry
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="24"
+                    value={paymentForm.paymentReminderHours}
+                    onChange={(e) =>
+                      setPaymentForm((prev) => ({
+                        ...prev,
+                        paymentReminderHours: parseInt(e.target.value) || 6,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Send reminder this many hours before link expires
+                  </p>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.autoSendPaymentReminders}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      autoSendPaymentReminders: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Auto-send payment reminders
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically send a reminder email before payment links expire
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Deposit Settings */}
+            <div className="space-y-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-foreground">Deposit Settings</h4>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={paymentForm.depositEnabled}
+                    onChange={(e) =>
+                      setPaymentForm((prev) => ({
+                        ...prev,
+                        depositEnabled: e.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-medium text-foreground">Enable deposits</span>
+                </label>
+              </div>
+
+              {paymentForm.depositEnabled && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Deposit Type
+                      </label>
+                      <select
+                        value={paymentForm.depositType}
+                        onChange={(e) =>
+                          setPaymentForm((prev) => ({
+                            ...prev,
+                            depositType: e.target.value as "percentage" | "fixed",
+                          }))
+                        }
+                        className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      >
+                        <option value="percentage">Percentage</option>
+                        <option value="fixed">Fixed Amount</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        {paymentForm.depositType === "percentage" ? "Deposit %" : "Deposit Amount"}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          max={paymentForm.depositType === "percentage" ? 100 : 10000}
+                          step={paymentForm.depositType === "percentage" ? 5 : 10}
+                          value={paymentForm.depositAmount}
+                          onChange={(e) =>
+                            setPaymentForm((prev) => ({
+                              ...prev,
+                              depositAmount: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-8"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          {paymentForm.depositType === "percentage" ? "%" : bookingForm.defaultCurrency}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Balance Due (days before)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="90"
+                        value={paymentForm.depositDueDays}
+                        onChange={(e) =>
+                          setPaymentForm((prev) => ({
+                            ...prev,
+                            depositDueDays: parseInt(e.target.value) || 7,
+                          }))
+                        }
+                        className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Days before tour when balance is due
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                    <h5 className="text-sm font-medium text-primary mb-1">Deposit Preview</h5>
+                    <p className="text-sm text-primary/80">
+                      For a {bookingForm.defaultCurrency} 100 booking:{" "}
+                      {paymentForm.depositType === "percentage"
+                        ? `${bookingForm.defaultCurrency} ${(100 * paymentForm.depositAmount / 100).toFixed(2)} deposit, ${bookingForm.defaultCurrency} ${(100 - 100 * paymentForm.depositAmount / 100).toFixed(2)} balance`
+                        : `${bookingForm.defaultCurrency} ${Math.min(paymentForm.depositAmount, 100).toFixed(2)} deposit, ${bookingForm.defaultCurrency} ${Math.max(100 - paymentForm.depositAmount, 0).toFixed(2)} balance`}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Methods */}
+            <div className="space-y-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium text-foreground">Accepted Payment Methods</h4>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {[
+                  { value: "card", label: "Card" },
+                  { value: "cash", label: "Cash" },
+                  { value: "bank_transfer", label: "Bank Transfer" },
+                  { value: "check", label: "Check" },
+                  { value: "other", label: "Other" },
+                ].map((method) => (
+                  <label
+                    key={method.value}
+                    className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      paymentForm.acceptedPaymentMethods.includes(method.value as typeof paymentForm.acceptedPaymentMethods[number])
+                        ? "bg-primary/10 border-primary"
+                        : "bg-muted border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={paymentForm.acceptedPaymentMethods.includes(method.value as typeof paymentForm.acceptedPaymentMethods[number])}
+                      onChange={(e) => {
+                        const newMethods = e.target.checked
+                          ? [...paymentForm.acceptedPaymentMethods, method.value as typeof paymentForm.acceptedPaymentMethods[number]]
+                          : paymentForm.acceptedPaymentMethods.filter((m) => m !== method.value);
+                        setPaymentForm((prev) => ({
+                          ...prev,
+                          acceptedPaymentMethods: newMethods,
+                        }));
+                      }}
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm font-medium text-foreground">{method.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Online Payment Options */}
+            <div className="space-y-3 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium text-foreground">Online Payment Options</h4>
+
+              <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.allowOnlinePayments}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      allowOnlinePayments: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Allow online payments
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Accept card payments through Stripe Checkout
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.allowPartialPayments}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      allowPartialPayments: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Allow partial payments
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Let customers pay in installments (requires manual tracking)
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Refund Settings */}
+            <div className="space-y-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium text-foreground">Refund Settings</h4>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  Refund Deadline (hours before tour)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="720"
+                  value={paymentForm.refundDeadlineHours}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      refundDeadlineHours: parseInt(e.target.value) || 48,
+                    }))
+                  }
+                  className="w-full md:w-1/3 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Customers can request refunds up to this many hours before the tour starts (0 = no refunds)
+                </p>
+              </div>
+
+              <label className="flex items-center gap-3 p-3 bg-muted rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paymentForm.autoRefundOnCancellation}
+                  onChange={(e) =>
+                    setPaymentForm((prev) => ({
+                      ...prev,
+                      autoRefundOnCancellation: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Auto-refund on cancellation
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Automatically process refunds when bookings are cancelled within the deadline
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Save Payment Settings
+              </button>
+            </div>
+          </form>
           </div>
+        </TabsContent>
+
+        {/* System Tab */}
+        <TabsContent value="system">
+          <ServiceHealthPanel orgSlug={slug} isActive={activeTab === "system"} />
         </TabsContent>
       </Tabs>
 

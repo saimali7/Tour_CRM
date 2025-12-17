@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Building2, ArrowRight, Check, Loader2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Building2, ArrowRight, ArrowLeft, Check, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { StripeConnectStep } from "@/components/onboarding/stripe-connect-step";
+import { BusinessProfileStep } from "@/components/onboarding/business-profile-step";
 
 function generateSlug(name: string): string {
   return name
@@ -41,9 +43,13 @@ const currencies = [
   { value: "SGD", label: "SGD - Singapore Dollar" },
 ];
 
+const TOTAL_STEPS = 4;
+
 export default function OnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
+  const [createdOrgSlug, setCreatedOrgSlug] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -53,6 +59,23 @@ export default function OnboardingPage() {
   });
   const [slugEdited, setSlugEdited] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Check for URL params (returning from Stripe, etc.)
+  useEffect(() => {
+    const urlStep = searchParams.get("step");
+    const urlOrg = searchParams.get("org");
+
+    if (urlStep) {
+      const stepNum = parseInt(urlStep, 10);
+      if (stepNum >= 1 && stepNum <= TOTAL_STEPS) {
+        setStep(stepNum);
+      }
+    }
+
+    if (urlOrg) {
+      setCreatedOrgSlug(urlOrg);
+    }
+  }, [searchParams]);
 
   // Check slug availability
   const slugCheck = trpc.onboarding.checkSlugAvailability.useQuery(
@@ -66,7 +89,8 @@ export default function OnboardingPage() {
   // Create organization mutation
   const createOrg = trpc.onboarding.createOrganization.useMutation({
     onSuccess: (data) => {
-      router.push(`/org/${data.organization.slug}`);
+      setCreatedOrgSlug(data.organization.slug);
+      setStep(3); // Move to Stripe Connect step
     },
     onError: (error) => {
       setErrors({ submit: error.message });
@@ -93,7 +117,6 @@ export default function OnboardingPage() {
       setSlugEdited(true);
     }
 
-    // Clear errors on change
     if (errors[name]) {
       setErrors((prev) => {
         const { [name]: _, ...rest } = prev;
@@ -131,7 +154,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreateOrg = async (e: React.FormEvent) => {
     e.preventDefault();
 
     createOrg.mutate({
@@ -146,6 +169,33 @@ export default function OnboardingPage() {
     });
   };
 
+  const handleStripeComplete = () => {
+    setStep(4);
+  };
+
+  const handleStripeSkip = () => {
+    setStep(4);
+  };
+
+  const handleBusinessProfileComplete = () => {
+    if (createdOrgSlug) {
+      router.push(`/org/${createdOrgSlug}`);
+    }
+  };
+
+  const handleBusinessProfileSkip = () => {
+    if (createdOrgSlug) {
+      router.push(`/org/${createdOrgSlug}`);
+    }
+  };
+
+  const stepLabels = [
+    "Business Details",
+    "Preferences",
+    "Payments",
+    "Profile",
+  ];
+
   return (
     <main className="min-h-screen bg-muted flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md">
@@ -154,39 +204,53 @@ export default function OnboardingPage() {
           <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4">
             <Building2 className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Create Your Organization</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {step <= 2 ? "Create Your Organization" : "Complete Setup"}
+          </h1>
           <p className="text-muted-foreground mt-2">
-            Set up your tour business in just a few steps
+            {step === 1 && "Tell us about your tour business"}
+            {step === 2 && "Configure your default settings"}
+            {step === 3 && "Set up payment processing"}
+            {step === 4 && "Add your business details"}
           </p>
         </div>
 
         {/* Progress */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div
-            className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium ${
-              step >= 1
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {step > 1 ? <Check className="h-4 w-4" /> : "1"}
-          </div>
-          <div className={`h-1 w-12 rounded ${step >= 2 ? "bg-primary" : "bg-muted"}`} />
-          <div
-            className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium ${
-              step >= 2
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            2
-          </div>
+        <div className="flex items-center justify-center gap-1 mb-8">
+          {stepLabels.map((label, index) => (
+            <div key={index} className="flex items-center">
+              <div className="flex flex-col items-center">
+                <div
+                  className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium transition-colors ${
+                    step > index + 1
+                      ? "bg-primary text-primary-foreground"
+                      : step === index + 1
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted-foreground/20 text-muted-foreground"
+                  }`}
+                >
+                  {step > index + 1 ? <Check className="h-4 w-4" /> : index + 1}
+                </div>
+                <span className="text-xs text-muted-foreground mt-1 hidden sm:block">
+                  {label}
+                </span>
+              </div>
+              {index < TOTAL_STEPS - 1 && (
+                <div
+                  className={`h-1 w-6 sm:w-8 mx-1 rounded transition-colors ${
+                    step > index + 1 ? "bg-primary" : "bg-muted-foreground/20"
+                  }`}
+                />
+              )}
+            </div>
+          ))}
         </div>
 
         {/* Form Card */}
         <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-          <form onSubmit={handleSubmit}>
-            {step === 1 && (
+          {/* Step 1: Business Details */}
+          {step === 1 && (
+            <form onSubmit={(e) => e.preventDefault()}>
               <div className="space-y-5">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground mb-1">
@@ -231,7 +295,7 @@ export default function OnboardingPage() {
                   </label>
                   <div className="flex items-center">
                     <span className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-l-lg border border-r-0 border-input">
-                      app.tourcrm.com/org/
+                      /org/
                     </span>
                     <input
                       type="text"
@@ -293,9 +357,12 @@ export default function OnboardingPage() {
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
-            )}
+            </form>
+          )}
 
-            {step === 2 && (
+          {/* Step 2: Preferences */}
+          {step === 2 && (
+            <form onSubmit={handleCreateOrg}>
               <div className="space-y-5">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground mb-1">
@@ -362,8 +429,9 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     onClick={() => setStep(1)}
-                    className="flex-1 py-2.5 px-4 rounded-lg font-medium border border-input text-foreground hover:bg-accent transition-colors"
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium border border-input text-foreground hover:bg-accent transition-colors"
                   >
+                    <ArrowLeft className="h-4 w-4" />
                     Back
                   </button>
                   <button
@@ -379,19 +447,38 @@ export default function OnboardingPage() {
                     ) : (
                       <>
                         Create Organization
-                        <Check className="h-4 w-4" />
+                        <ArrowRight className="h-4 w-4" />
                       </>
                     )}
                   </button>
                 </div>
               </div>
-            )}
-          </form>
+            </form>
+          )}
+
+          {/* Step 3: Stripe Connect */}
+          {step === 3 && createdOrgSlug && (
+            <StripeConnectStep
+              orgSlug={createdOrgSlug}
+              onComplete={handleStripeComplete}
+              onSkip={handleStripeSkip}
+            />
+          )}
+
+          {/* Step 4: Business Profile */}
+          {step === 4 && (
+            <BusinessProfileStep
+              onComplete={handleBusinessProfileComplete}
+              onSkip={handleBusinessProfileSkip}
+            />
+          )}
         </div>
 
         {/* Footer */}
         <p className="text-center text-sm text-muted-foreground mt-6">
-          You can update these settings later in your organization settings.
+          {step <= 2
+            ? "You can update these settings later in your organization settings."
+            : "All optional fields can be updated anytime in settings."}
         </p>
       </div>
     </main>

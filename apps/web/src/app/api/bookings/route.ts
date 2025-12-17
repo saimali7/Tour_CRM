@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { db, organizations, eq } from "@tour/database";
+import { db, organizations, eq, schedules } from "@tour/database";
 import { createServices } from "@tour/services";
+import Stripe from "stripe";
 
 interface BookingRequestBody {
   scheduleId: string;
@@ -134,15 +135,96 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // For paid bookings, return booking ID for payment flow
-    // In production, this would create a Stripe checkout session
-    // and return the checkout URL
+    // For paid bookings, create Stripe Checkout session if org has Stripe Connect
+    if (org.stripeConnectAccountId && org.stripeConnectOnboarded) {
+      try {
+        // Get schedule details for the checkout description
+        const schedule = await db.query.schedules.findFirst({
+          where: eq(schedules.id, body.scheduleId),
+          with: {
+            tour: true,
+          },
+        });
+
+        const tourName = schedule?.tour?.name || "Tour";
+        const tourDate = schedule?.startsAt
+          ? new Date(schedule.startsAt).toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
+          : "Scheduled Date";
+
+        // Lazy initialize Stripe
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+          apiVersion: "2025-11-17.clover",
+        });
+
+        // Get base URL for success/cancel URLs
+        const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || `https://${orgSlug}.book.example.com`;
+
+        // Create Stripe Checkout session
+        const session = await stripe.checkout.sessions.create(
+          {
+            mode: "payment",
+            line_items: [
+              {
+                price_data: {
+                  currency: (org.settings?.defaultCurrency || "USD").toLowerCase(),
+                  product_data: {
+                    name: tourName,
+                    description: `${tourDate} - ${body.participants.length} ${body.participants.length === 1 ? "participant" : "participants"}`,
+                  },
+                  unit_amount: Math.round(total * 100), // Convert to cents
+                },
+                quantity: 1,
+              },
+            ],
+            payment_intent_data: {
+              metadata: {
+                organizationId: org.id,
+                bookingId: booking.id,
+                customerId: customer.id,
+                bookingReference: booking.referenceNumber,
+              },
+            },
+            customer_email: body.customer.email,
+            success_url: `${baseUrl}/booking/success?ref=${booking.referenceNumber}`,
+            cancel_url: `${baseUrl}/booking/cancelled?ref=${booking.referenceNumber}`,
+            metadata: {
+              organizationId: org.id,
+              bookingId: booking.id,
+              customerId: customer.id,
+              bookingReference: booking.referenceNumber,
+            },
+          },
+          {
+            stripeAccount: org.stripeConnectAccountId,
+          }
+        );
+
+        return NextResponse.json({
+          booking: {
+            id: booking.id,
+            referenceNumber: booking.referenceNumber,
+          },
+          paymentUrl: session.url,
+          message: "Booking created, redirecting to payment",
+        });
+      } catch (stripeError) {
+        console.error("Stripe checkout session error:", stripeError);
+        // Fall through to return booking without payment URL
+      }
+    }
+
+    // Fallback: Org doesn't have Stripe Connect or error occurred
+    // Return booking for manual payment handling
     return NextResponse.json({
       booking: {
         id: booking.id,
         referenceNumber: booking.referenceNumber,
       },
-      // paymentUrl would be the Stripe checkout URL
       message: "Booking created, awaiting payment",
     });
   } catch (error) {

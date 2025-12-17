@@ -496,6 +496,145 @@ export const bookingRouter = createRouter({
       };
     }),
 
+  // Send payment link via email
+  sendPaymentLinkEmail: adminProcedure
+    .input(z.object({ bookingId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+
+      // Get booking with all details
+      const booking = await services.booking.getById(input.bookingId);
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+
+      // Check if customer has email
+      if (!booking.customer?.email) {
+        throw new Error("Customer does not have an email address");
+      }
+
+      // Get organization and settings
+      const organization = await services.organization.get();
+      if (!organization) {
+        throw new Error("Organization not found");
+      }
+
+      const orgSettings = await services.organization.getSettings();
+
+      if (!organization.stripeConnectAccountId) {
+        throw new Error("Stripe Connect account not configured");
+      }
+
+      if (!organization.stripeConnectOnboarded) {
+        throw new Error("Stripe Connect account not fully onboarded");
+      }
+
+      // Get payment settings with defaults
+      const paymentLinkExpirationHours = orgSettings?.payment?.paymentLinkExpirationHours ?? 24;
+
+      // Check if already paid
+      if (booking.paymentStatus === "paid") {
+        throw new Error("This booking has already been paid");
+      }
+
+      // Calculate amount due
+      const totalAmount = parseFloat(booking.total);
+      const paidAmount = parseFloat(booking.paidAmount || "0");
+      const amountDue = totalAmount - paidAmount;
+
+      if (amountDue <= 0) {
+        throw new Error("No payment due for this booking");
+      }
+
+      // Import stripe functions
+      const { createPaymentLink } = await import("@/lib/stripe");
+
+      // Create Stripe Checkout session
+      const session = await createPaymentLink({
+        amount: Math.round(amountDue * 100),
+        currency: booking.currency,
+        metadata: {
+          organizationId: ctx.orgContext.organizationId,
+          bookingId: booking.id,
+          customerId: booking.customerId,
+          bookingReference: booking.referenceNumber,
+        },
+        successUrl: `${process.env.NEXT_PUBLIC_APP_URL}/org/${organization.slug}/bookings/${booking.id}?payment=success`,
+        cancelUrl: `${process.env.NEXT_PUBLIC_APP_URL}/org/${organization.slug}/bookings/${booking.id}?payment=cancelled`,
+        customerEmail: booking.customer.email,
+        stripeAccountId: organization.stripeConnectAccountId,
+        expiresInHours: paymentLinkExpirationHours,
+      });
+
+      if (!session.url) {
+        throw new Error("Failed to create payment link");
+      }
+
+      // Send email with payment link
+      const { createEmailService } = await import("@tour/emails");
+      const emailService = createEmailService({
+        name: organization.name,
+        email: organization.email,
+        phone: organization.phone ?? undefined,
+        logoUrl: organization.logoUrl ?? undefined,
+      });
+
+      const tourDate = booking.schedule
+        ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy")
+        : "Scheduled Date";
+      const tourTime = booking.schedule
+        ? format(new Date(booking.schedule.startsAt), "h:mm a")
+        : "Scheduled Time";
+
+      const emailResult = await emailService.sendPaymentLinkEmail({
+        customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+        customerEmail: booking.customer.email,
+        bookingReference: booking.referenceNumber,
+        tourName: booking.tour?.name || "Tour",
+        tourDate,
+        tourTime,
+        participants: booking.totalParticipants,
+        amount: amountDue.toFixed(2),
+        currency: booking.currency,
+        paymentUrl: session.url,
+        expiresAt: new Date(Date.now() + paymentLinkExpirationHours * 60 * 60 * 1000).toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+      });
+
+      // Log activity
+      const userName = ctx.user
+        ? [ctx.user.firstName, ctx.user.lastName].filter(Boolean).join(" ") || ctx.user.email
+        : "Unknown User";
+      await services.activityLog.log({
+        entityType: "booking",
+        entityId: booking.id,
+        action: "booking.payment_link_sent",
+        description: `Payment link sent to ${booking.customer.email} for ${booking.currency} ${amountDue.toFixed(2)}`,
+        actorType: "user",
+        actorId: ctx.user?.id,
+        actorName: userName,
+        metadata: {
+          emailSent: emailResult.success,
+          amount: amountDue.toFixed(2),
+          currency: booking.currency,
+        },
+      });
+
+      return {
+        success: true,
+        url: session.url,
+        emailSent: emailResult.success,
+        amount: amountDue.toFixed(2),
+        currency: booking.currency,
+      };
+    }),
+
   // ============================================
   // Bulk Operations
   // ============================================

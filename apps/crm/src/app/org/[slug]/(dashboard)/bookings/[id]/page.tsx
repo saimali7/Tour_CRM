@@ -205,6 +205,17 @@ export default function BookingDetailPage() {
     },
   });
 
+  const sendPaymentLinkEmailMutation = trpc.booking.sendPaymentLinkEmail.useMutation({
+    onSuccess: (data) => {
+      setPaymentLinkUrl(data.url || "");
+      setShowPaymentLinkModal(false);
+      toast.success(`Payment link sent to ${booking?.customer?.email}`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to send payment link: ${error.message}`);
+    },
+  });
+
   // Query for available schedules (same tour)
   const { data: availableSchedules } = trpc.schedule.list.useQuery(
     {
@@ -391,10 +402,7 @@ export default function BookingDetailPage() {
   };
 
   const handleSendPaymentLink = () => {
-    // In a real implementation, this would send an email
-    // For now, we'll just show a toast
-    toast.success("Payment link email sent to customer");
-    setShowPaymentLinkModal(false);
+    sendPaymentLinkEmailMutation.mutate({ bookingId });
   };
 
   if (isLoading) {

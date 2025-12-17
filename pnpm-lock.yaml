@@ -231,6 +231,9 @@ importers:
       react-dom:
         specifier: ^19.2.3
         version: 19.2.3(react@19.2.3)
+      stripe:
+        specifier: ^20.0.0
+        version: 20.0.0(@types/node@22.19.2)
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.1.18
@@ -264,6 +267,10 @@ importers:
         version: 5.9.3
 
   packages/config:
+    dependencies:
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
     devDependencies:
       '@tour/eslint-config':
         specifier: workspace:*

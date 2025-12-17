@@ -37,6 +37,11 @@ export {
   dailyReviewRequestCheck,
 } from "./functions/review-requests";
 
+export {
+  sendPaymentSucceededEmail,
+  sendPaymentFailedEmail,
+} from "./functions/payment-emails";
+
 // Aggregate all functions for the serve handler
 import {
   sendBookingCreatedEmail,
@@ -72,6 +77,11 @@ import {
   dailyReviewRequestCheck,
 } from "./functions/review-requests";
 
+import {
+  sendPaymentSucceededEmail,
+  sendPaymentFailedEmail,
+} from "./functions/payment-emails";
+
 export const inngestFunctions = [
   // Booking emails
   sendBookingCreatedEmail,
@@ -97,4 +107,7 @@ export const inngestFunctions = [
   sendReviewRequestEmail,
   sendReviewReminderEmail,
   dailyReviewRequestCheck,
+  // Payment emails
+  sendPaymentSucceededEmail,
+  sendPaymentFailedEmail,
 ];

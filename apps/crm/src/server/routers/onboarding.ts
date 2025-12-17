@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createRouter, authenticatedProcedure } from "../trpc";
+import { createRouter, authenticatedProcedure, protectedProcedure } from "../trpc";
 import { db, eq, and } from "@tour/database";
-import { organizations, organizationMembers } from "@tour/database/schema";
+import { organizations, organizationMembers, type SetupProgress } from "@tour/database/schema";
 import { slugSchema } from "@tour/validators";
+import { createServices } from "@tour/services";
 
 const createOrganizationSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -53,7 +54,18 @@ export const onboardingRouter = createRouter({
         });
       }
 
-      // Create the organization
+      // Create the organization with basicInfo setup marked as complete
+      const initialSetupProgress: SetupProgress = {
+        basicInfo: true,
+        businessProfile: false,
+        stripeConnect: false,
+        firstTour: false,
+        firstBooking: false,
+        completedAt: {
+          basicInfo: new Date().toISOString(),
+        },
+      };
+
       const [newOrg] = await db
         .insert(organizations)
         .values({
@@ -64,6 +76,7 @@ export const onboardingRouter = createRouter({
           settings: {
             defaultCurrency: input.settings?.defaultCurrency || "USD",
             defaultLanguage: input.settings?.defaultLanguage || "en",
+            setupProgress: initialSetupProgress,
           },
           plan: "free",
           status: "active",
@@ -152,4 +165,33 @@ export const onboardingRouter = createRouter({
       organizationCount: memberships.length,
     };
   }),
+
+  /**
+   * Get setup progress for the current organization
+   */
+  getSetupProgress: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.organization.getSetupCompletion();
+  }),
+
+  /**
+   * Mark a setup step as complete
+   */
+  markSetupComplete: protectedProcedure
+    .input(
+      z.object({
+        step: z.enum([
+          "basicInfo",
+          "businessProfile",
+          "stripeConnect",
+          "firstTour",
+          "firstBooking",
+        ]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      await services.organization.markSetupComplete(input.step);
+      return { success: true };
+    }),
 });

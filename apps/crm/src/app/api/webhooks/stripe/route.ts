@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@tour/database";
-import { bookings, organizations } from "@tour/database";
+import { bookings, organizations, customers, schedules, tours } from "@tour/database";
 import { eq, and } from "drizzle-orm";
-// import { inngest } from "@/inngest"; // TODO: Add inngest events later
+import { inngest } from "@/inngest";
+import { format } from "date-fns";
 
 /**
  * Stripe Webhook Handler
@@ -166,17 +167,49 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
 
   console.log(`Updated booking ${bookingId} to paid status`);
 
-  // TODO: Send payment confirmation email via Inngest
-  // await inngest.send({
-  //   name: "booking/payment.succeeded",
-  //   data: {
-  //     organizationId,
-  //     bookingId,
-  //     paymentIntentId: paymentIntent.id,
-  //     amount: amountInDollars,
-  //     currency: paymentIntent.currency,
-  //   },
-  // });
+  // Get customer details for the email
+  const customer = await db.query.customers.findFirst({
+    where: and(
+      eq(customers.id, booking.customerId),
+      eq(customers.organizationId, organizationId)
+    ),
+  });
+
+  // Get schedule and tour details
+  const schedule = await db.query.schedules.findFirst({
+    where: eq(schedules.id, booking.scheduleId),
+    with: {
+      tour: true,
+    },
+  });
+
+  // Send payment confirmation email via Inngest
+  if (customer?.email) {
+    await inngest.send({
+      name: "payment/succeeded",
+      data: {
+        organizationId,
+        bookingId,
+        customerId: booking.customerId,
+        customerEmail: customer.email,
+        customerName: `${customer.firstName} ${customer.lastName}`,
+        bookingReference: booking.referenceNumber,
+        tourName: schedule?.tour?.name || "Tour",
+        tourDate: schedule?.startsAt
+          ? format(new Date(schedule.startsAt), "MMMM d, yyyy")
+          : "Scheduled Date",
+        amount: amountInDollars,
+        currency: paymentIntent.currency.toUpperCase(),
+        stripeReceiptUrl: paymentIntent.latest_charge
+          ? typeof paymentIntent.latest_charge === "string"
+            ? undefined
+            : (paymentIntent.latest_charge as Stripe.Charge).receipt_url || undefined
+          : undefined,
+      },
+    });
+
+    console.log(`Sent payment/succeeded event for booking ${bookingId}`);
+  }
 }
 
 /**
@@ -199,6 +232,19 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
     return;
   }
 
+  // Get the booking first
+  const booking = await db.query.bookings.findFirst({
+    where: and(
+      eq(bookings.id, bookingId),
+      eq(bookings.organizationId, organizationId)
+    ),
+  });
+
+  if (!booking) {
+    console.error(`Booking not found: ${bookingId} for org: ${organizationId}`);
+    return;
+  }
+
   // Update booking payment status to failed
   await db
     .update(bookings)
@@ -213,16 +259,30 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
 
   console.log(`Updated booking ${bookingId} to failed payment status`);
 
-  // TODO: Send payment failed notification via Inngest
-  // await inngest.send({
-  //   name: "booking/payment.failed",
-  //   data: {
-  //     organizationId,
-  //     bookingId,
-  //     paymentIntentId: paymentIntent.id,
-  //     errorMessage: paymentIntent.last_payment_error?.message || "Unknown error",
-  //   },
-  // });
+  // Get customer details for the email
+  const customer = await db.query.customers.findFirst({
+    where: and(
+      eq(customers.id, booking.customerId),
+      eq(customers.organizationId, organizationId)
+    ),
+  });
+
+  // Send payment failed notification via Inngest
+  if (customer?.email) {
+    await inngest.send({
+      name: "payment/failed",
+      data: {
+        organizationId,
+        bookingId,
+        customerEmail: customer.email,
+        customerName: `${customer.firstName} ${customer.lastName}`,
+        bookingReference: booking.referenceNumber,
+        errorMessage: paymentIntent.last_payment_error?.message || "Payment could not be processed",
+      },
+    });
+
+    console.log(`Sent payment/failed event for booking ${bookingId}`);
+  }
 }
 
 /**

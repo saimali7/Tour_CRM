@@ -147,6 +147,7 @@ export async function createPaymentLink(params: {
   customerEmail?: string;
   stripeAccountId: string; // Organization's Stripe Connect account
   applicationFeeAmount?: number; // Platform fee in cents (optional)
+  expiresInHours?: number; // Link expiration in hours (optional, default 24)
 }) {
   const {
     amount,
@@ -157,11 +158,17 @@ export async function createPaymentLink(params: {
     customerEmail,
     stripeAccountId,
     applicationFeeAmount,
+    expiresInHours = 24,
   } = params;
+
+  // Calculate expiration time (Stripe uses Unix timestamp in seconds)
+  // Minimum is 30 minutes from now, maximum is 24 hours
+  const expiresAt = Math.floor(Date.now() / 1000) + Math.min(expiresInHours, 24) * 60 * 60;
 
   const session = await stripe.checkout.sessions.create(
     {
       mode: "payment",
+      expires_at: expiresAt,
       line_items: [
         {
           price_data: {
