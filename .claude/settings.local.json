@@ -103,7 +103,8 @@
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_snapshot",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(pnpm --filter @tour/config typecheck:*)"
     ]
   }
 }
