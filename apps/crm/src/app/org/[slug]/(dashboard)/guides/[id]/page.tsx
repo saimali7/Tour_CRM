@@ -20,12 +20,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { GuideAvailability } from "@/components/guides/guide-availability";
 
 export default function GuideDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const guideId = params.id as string;
   const [activeTab, setActiveTab] = useState<"schedules" | "notes" | "availability">("schedules");
@@ -125,12 +126,12 @@ export default function GuideDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href={`/org/${slug}/guides` as Route}
+          <button
+            onClick={() => router.back()}
             className="p-2 hover:bg-accent rounded-lg transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Link>
+          </button>
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
               {guide.avatarUrl ? (

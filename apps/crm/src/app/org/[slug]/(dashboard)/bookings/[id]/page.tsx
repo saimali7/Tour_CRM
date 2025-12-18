@@ -485,12 +485,12 @@ export default function BookingDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href={`/org/${slug}/bookings` as Route}
+          <button
+            onClick={() => router.back()}
             className="p-2 hover:bg-accent rounded-lg transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Link>
+          </button>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-foreground font-mono">

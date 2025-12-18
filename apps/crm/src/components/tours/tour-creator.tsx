@@ -435,12 +435,12 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
       <div className="flex-shrink-0 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
-            <Link
-              href={`/org/${slug}/tours` as Route}
+            <button
+              onClick={() => router.back()}
               className="p-2 -ml-2 hover:bg-accent rounded-lg transition-colors"
             >
               <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-            </Link>
+            </button>
             <div>
               <h1 className="text-xl font-semibold text-foreground">
                 {mode === "edit" ? "Edit Tour" : "Create Tour"}

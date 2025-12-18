@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, MoreVertical, Archive, Pause, Play, Trash2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,15 +44,17 @@ export function TourPageHeader({
   onDelete,
   isLoading,
 }: TourPageHeaderProps) {
+  const router = useRouter();
+
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <Link
-          href={`/org/${orgSlug}/tours` as Route}
+        <button
+          onClick={() => router.back()}
           className="p-2 hover:bg-accent rounded-lg transition-colors"
         >
           <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-        </Link>
+        </button>
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-foreground">{tour.name}</h1>
