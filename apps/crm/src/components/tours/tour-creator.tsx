@@ -1,0 +1,603 @@
+"use client";
+
+import { useState, useCallback, useMemo } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import {
+  Sparkles,
+  FileText,
+  Calendar,
+  Settings,
+  Check,
+  ChevronRight,
+  ChevronLeft,
+  Loader2,
+  ArrowLeft,
+  Save,
+  Send,
+} from "lucide-react";
+import Link from "next/link";
+import type { Route } from "next";
+
+// Tab Components
+import { EssentialsTab } from "./tour-creator/essentials-tab";
+import { ContentTab } from "./tour-creator/content-tab";
+import { ScheduleTab } from "./tour-creator/schedule-tab";
+import { SettingsTab } from "./tour-creator/settings-tab";
+
+// Types
+export interface TourFormState {
+  // Essentials
+  name: string;
+  category: string;
+  basePrice: string;
+  durationMinutes: number;
+  maxParticipants: number;
+  minParticipants: number;
+  shortDescription: string;
+
+  // Content
+  description: string;
+  includes: string[];
+  excludes: string[];
+  requirements: string[];
+  coverImageUrl: string | null;
+  images: string[];
+  tags: string[];
+
+  // Schedule
+  scheduleEnabled: boolean;
+  scheduleStartDate: string;
+  scheduleEndDate: string;
+  scheduleDays: number[];
+  scheduleTimes: string[];
+
+  // Settings
+  slug: string;
+  meetingPoint: string;
+  meetingPointDetails: string;
+  cancellationHours: number;
+  cancellationPolicy: string;
+  metaTitle: string;
+  metaDescription: string;
+}
+
+interface TourCreatorProps {
+  mode?: "create" | "edit";
+  tourId?: string;
+  initialData?: Partial<TourFormState>;
+}
+
+type TabId = "essentials" | "content" | "schedule" | "settings";
+
+interface Tab {
+  id: TabId;
+  label: string;
+  icon: React.ElementType;
+  description: string;
+}
+
+const TABS: Tab[] = [
+  { id: "essentials", label: "Essentials", icon: Sparkles, description: "Name, price & capacity" },
+  { id: "content", label: "Content", icon: FileText, description: "Description & images" },
+  { id: "schedule", label: "Schedule", icon: Calendar, description: "When it runs" },
+  { id: "settings", label: "Settings", icon: Settings, description: "Policies & SEO" },
+];
+
+const DEFAULT_FORM_STATE: TourFormState = {
+  // Essentials
+  name: "",
+  category: "",
+  basePrice: "",
+  durationMinutes: 120,
+  maxParticipants: 15,
+  minParticipants: 1,
+  shortDescription: "",
+
+  // Content
+  description: "",
+  includes: [],
+  excludes: [],
+  requirements: [],
+  coverImageUrl: null,
+  images: [],
+  tags: [],
+
+  // Schedule
+  scheduleEnabled: true,
+  scheduleStartDate: new Date().toISOString().split("T")[0] || "",
+  scheduleEndDate: (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 3);
+    return d.toISOString().split("T")[0] || "";
+  })(),
+  scheduleDays: [1, 2, 3, 4, 5],
+  scheduleTimes: ["09:00"],
+
+  // Settings
+  slug: "",
+  meetingPoint: "",
+  meetingPointDetails: "",
+  cancellationHours: 24,
+  cancellationPolicy: "",
+  metaTitle: "",
+  metaDescription: "",
+};
+
+// Smart defaults based on category
+const CATEGORY_DEFAULTS: Record<string, Partial<TourFormState>> = {
+  "Walking Tours": {
+    durationMinutes: 120,
+    maxParticipants: 15,
+    includes: ["Professional guide", "Bottled water"],
+    requirements: ["Comfortable walking shoes", "Weather-appropriate clothing"],
+  },
+  "Food & Wine": {
+    durationMinutes: 180,
+    maxParticipants: 12,
+    includes: ["Food tastings", "Local guide", "All food samples"],
+    excludes: ["Alcoholic beverages", "Transportation"],
+    requirements: ["Please advise of dietary restrictions"],
+  },
+  "Adventure": {
+    durationMinutes: 240,
+    maxParticipants: 10,
+    includes: ["Safety equipment", "Professional instructor", "Insurance"],
+    requirements: ["Good physical condition", "Signed waiver"],
+  },
+  "Cultural": {
+    durationMinutes: 150,
+    maxParticipants: 20,
+    includes: ["Expert guide", "Entrance fees", "Headsets for large groups"],
+  },
+  "Historical": {
+    durationMinutes: 120,
+    maxParticipants: 20,
+    includes: ["Historian guide", "Historical maps/materials"],
+  },
+  "Nature": {
+    durationMinutes: 180,
+    maxParticipants: 12,
+    includes: ["Nature guide", "Binoculars (upon request)"],
+    requirements: ["Hiking boots recommended", "Bring sunscreen"],
+  },
+  "City Tours": {
+    durationMinutes: 180,
+    maxParticipants: 15,
+    includes: ["Local guide", "City map"],
+  },
+  "Day Trips": {
+    durationMinutes: 480,
+    maxParticipants: 20,
+    includes: ["Transportation", "Professional guide", "Lunch"],
+  },
+  "Water Activities": {
+    durationMinutes: 180,
+    maxParticipants: 8,
+    includes: ["Equipment rental", "Safety briefing", "Instructor"],
+    requirements: ["Swimming ability required", "Towel and sunscreen"],
+  },
+  "Photography": {
+    durationMinutes: 180,
+    maxParticipants: 8,
+    includes: ["Professional photographer guide", "Photo tips and tricks"],
+    requirements: ["Bring your own camera"],
+  },
+  "Private Tours": {
+    durationMinutes: 180,
+    maxParticipants: 6,
+    includes: ["Private guide", "Customized itinerary", "Flexible schedule"],
+  },
+  "Group Tours": {
+    durationMinutes: 180,
+    maxParticipants: 25,
+    includes: ["Group guide", "Audio headsets"],
+  },
+};
+
+export function TourCreator({ mode = "create", tourId, initialData }: TourCreatorProps) {
+  const router = useRouter();
+  const params = useParams();
+  const slug = params.slug as string;
+
+  const [activeTab, setActiveTab] = useState<TabId>("essentials");
+  const [formState, setFormState] = useState<TourFormState>({
+    ...DEFAULT_FORM_STATE,
+    ...initialData,
+  });
+  const [touchedTabs, setTouchedTabs] = useState<Set<TabId>>(new Set(["essentials"]));
+
+  const utils = trpc.useUtils();
+
+  // Mutations
+  const createMutation = trpc.tour.create.useMutation();
+  const updateMutation = trpc.tour.update.useMutation();
+  const autoGenerateMutation = trpc.schedule.autoGenerate.useMutation();
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  // Update form state
+  const updateForm = useCallback((updates: Partial<TourFormState>) => {
+    setFormState((prev) => ({ ...prev, ...updates }));
+  }, []);
+
+  // Handle category change with smart defaults
+  const handleCategoryChange = useCallback((category: string) => {
+    const defaults = CATEGORY_DEFAULTS[category];
+    if (defaults && !formState.name) {
+      // Only apply defaults if form is mostly empty
+      setFormState((prev) => ({
+        ...prev,
+        category,
+        ...defaults,
+        // Don't override if already set
+        durationMinutes: prev.durationMinutes !== 120 ? prev.durationMinutes : (defaults.durationMinutes ?? 120),
+        maxParticipants: prev.maxParticipants !== 15 ? prev.maxParticipants : (defaults.maxParticipants ?? 15),
+        includes: prev.includes.length > 0 ? prev.includes : (defaults.includes ?? []),
+        excludes: prev.excludes.length > 0 ? prev.excludes : (defaults.excludes ?? []),
+        requirements: prev.requirements.length > 0 ? prev.requirements : (defaults.requirements ?? []),
+      }));
+    } else {
+      updateForm({ category });
+    }
+  }, [formState.name, updateForm]);
+
+  // Tab completion status
+  const tabCompletion = useMemo(() => {
+    const essentialsComplete = !!(
+      formState.name &&
+      formState.category &&
+      formState.basePrice &&
+      parseFloat(formState.basePrice) > 0 &&
+      formState.durationMinutes > 0 &&
+      formState.maxParticipants > 0
+    );
+
+    const contentComplete = !!(
+      formState.description ||
+      formState.includes.length > 0 ||
+      formState.images.length > 0 ||
+      formState.coverImageUrl
+    );
+
+    const scheduleComplete = !!(
+      !formState.scheduleEnabled ||
+      (formState.scheduleDays.length > 0 && formState.scheduleTimes.length > 0)
+    );
+
+    const settingsComplete = !!formState.meetingPoint;
+
+    return {
+      essentials: { complete: essentialsComplete, required: true },
+      content: { complete: contentComplete, required: false },
+      schedule: { complete: scheduleComplete, required: false },
+      settings: { complete: settingsComplete, required: false },
+    };
+  }, [formState]);
+
+  // Can navigate to tab?
+  const canNavigateToTab = useCallback(
+    (tabId: TabId): boolean => {
+      // Can always go back or to essentials
+      if (tabId === "essentials") return true;
+
+      // Must complete essentials to proceed
+      if (!tabCompletion.essentials.complete) return false;
+
+      return true;
+    },
+    [tabCompletion]
+  );
+
+  // Navigate tabs
+  const goToTab = useCallback(
+    (tabId: TabId) => {
+      if (canNavigateToTab(tabId)) {
+        setActiveTab(tabId);
+        setTouchedTabs((prev) => new Set([...prev, tabId]));
+      }
+    },
+    [canNavigateToTab]
+  );
+
+  const goNext = useCallback(() => {
+    const currentIndex = TABS.findIndex((t) => t.id === activeTab);
+    if (currentIndex < TABS.length - 1) {
+      const nextTab = TABS[currentIndex + 1];
+      if (nextTab) goToTab(nextTab.id);
+    }
+  }, [activeTab, goToTab]);
+
+  const goPrevious = useCallback(() => {
+    const currentIndex = TABS.findIndex((t) => t.id === activeTab);
+    if (currentIndex > 0) {
+      const prevTab = TABS[currentIndex - 1];
+      if (prevTab) goToTab(prevTab.id);
+    }
+  }, [activeTab, goToTab]);
+
+  // Generate slug from name
+  const generateSlug = useCallback((name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  }, []);
+
+  // Handle name change with auto-slug
+  const handleNameChange = useCallback(
+    (name: string) => {
+      updateForm({
+        name,
+        slug: !formState.slug ? generateSlug(name) : formState.slug,
+      });
+    },
+    [formState.slug, generateSlug, updateForm]
+  );
+
+  // Save tour
+  const handleSave = useCallback(
+    async (publish: boolean = false) => {
+      if (!tabCompletion.essentials.complete) {
+        toast.error("Please complete all required fields in Essentials");
+        setActiveTab("essentials");
+        return;
+      }
+
+      try {
+        const payload = {
+          name: formState.name,
+          slug: formState.slug || generateSlug(formState.name),
+          description: formState.description || undefined,
+          shortDescription: formState.shortDescription || undefined,
+          durationMinutes: formState.durationMinutes,
+          minParticipants: formState.minParticipants,
+          maxParticipants: formState.maxParticipants,
+          basePrice: formState.basePrice,
+          category: formState.category || undefined,
+          tags: formState.tags.length > 0 ? formState.tags : undefined,
+          coverImageUrl: formState.coverImageUrl || undefined,
+          images: formState.images.length > 0 ? formState.images : undefined,
+          includes: formState.includes.length > 0 ? formState.includes : undefined,
+          excludes: formState.excludes.length > 0 ? formState.excludes : undefined,
+          requirements: formState.requirements.length > 0 ? formState.requirements : undefined,
+          meetingPoint: formState.meetingPoint || undefined,
+          meetingPointDetails: formState.meetingPointDetails || undefined,
+          cancellationPolicy: formState.cancellationPolicy || undefined,
+          cancellationHours: formState.cancellationHours,
+          metaTitle: formState.metaTitle || undefined,
+          metaDescription: formState.metaDescription || undefined,
+          status: publish ? "active" as const : "draft" as const,
+        };
+
+        let savedTourId: string;
+
+        if (mode === "edit" && tourId) {
+          await updateMutation.mutateAsync({ id: tourId, data: payload });
+          savedTourId = tourId;
+          toast.success("Tour updated successfully");
+        } else {
+          const result = await createMutation.mutateAsync(payload);
+          savedTourId = result.id;
+          toast.success("Tour created successfully");
+        }
+
+        // Generate schedules if enabled
+        if (formState.scheduleEnabled && formState.scheduleDays.length > 0 && formState.scheduleTimes.length > 0) {
+          try {
+            const scheduleResult = await autoGenerateMutation.mutateAsync({
+              tourId: savedTourId,
+              startDate: new Date(formState.scheduleStartDate),
+              endDate: new Date(formState.scheduleEndDate),
+              daysOfWeek: formState.scheduleDays,
+              times: formState.scheduleTimes,
+              maxParticipants: formState.maxParticipants,
+              skipExisting: true,
+            });
+            if (scheduleResult.created.length > 0) {
+              toast.success(`Created ${scheduleResult.created.length} schedules`);
+            }
+          } catch {
+            toast.error("Tour saved but failed to create schedules");
+          }
+        }
+
+        utils.tour.list.invalidate();
+        router.push(`/org/${slug}/tours/${savedTourId}`);
+      } catch (error) {
+        toast.error(mode === "edit" ? "Failed to update tour" : "Failed to create tour");
+      }
+    },
+    [
+      tabCompletion,
+      formState,
+      generateSlug,
+      mode,
+      tourId,
+      createMutation,
+      updateMutation,
+      autoGenerateMutation,
+      utils,
+      router,
+      slug,
+    ]
+  );
+
+  const currentTabIndex = TABS.findIndex((t) => t.id === activeTab);
+  const isFirstTab = currentTabIndex === 0;
+  const isLastTab = currentTabIndex === TABS.length - 1;
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href={`/org/${slug}/tours` as Route}
+              className="p-2 -ml-2 hover:bg-accent rounded-lg transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-semibold text-foreground">
+                {mode === "edit" ? "Edit Tour" : "Create Tour"}
+              </h1>
+              {formState.name && (
+                <p className="text-sm text-muted-foreground">{formState.name}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleSave(false)}
+              disabled={isSubmitting || !tabCompletion.essentials.complete}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="h-4 w-4" />
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSave(true)}
+              disabled={isSubmitting || !tabCompletion.essentials.complete}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {mode === "edit" ? "Save & Publish" : "Create & Publish"}
+            </button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="px-6 pb-0">
+          <nav className="flex gap-1" role="tablist">
+            {TABS.map((tab, index) => {
+              const isActive = activeTab === tab.id;
+              const isCompleted = tabCompletion[tab.id].complete;
+              const canNavigate = canNavigateToTab(tab.id);
+              const Icon = tab.icon;
+
+              return (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => goToTab(tab.id)}
+                  disabled={!canNavigate}
+                  className={cn(
+                    "relative flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg transition-all",
+                    isActive
+                      ? "bg-card text-foreground border-t border-l border-r border-border -mb-px"
+                      : canNavigate
+                        ? "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        : "text-muted-foreground/50 cursor-not-allowed"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors",
+                      isCompleted
+                        ? "bg-emerald-500/15 text-emerald-600"
+                        : isActive
+                          ? "bg-primary/15 text-primary"
+                          : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {isCompleted ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
+                  </span>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  {index < TABS.length - 1 && (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 ml-2 hidden lg:block" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="flex-1 bg-card border-t border-border">
+        <div className="max-w-4xl mx-auto p-6">
+          {activeTab === "essentials" && (
+            <EssentialsTab
+              formState={formState}
+              updateForm={updateForm}
+              onNameChange={handleNameChange}
+              onCategoryChange={handleCategoryChange}
+            />
+          )}
+          {activeTab === "content" && (
+            <ContentTab formState={formState} updateForm={updateForm} />
+          )}
+          {activeTab === "schedule" && (
+            <ScheduleTab formState={formState} updateForm={updateForm} />
+          )}
+          {activeTab === "settings" && (
+            <SettingsTab formState={formState} updateForm={updateForm} />
+          )}
+        </div>
+      </div>
+
+      {/* Footer Navigation */}
+      <div className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur sticky bottom-0">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={goPrevious}
+            disabled={isFirstTab}
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+              isFirstTab
+                ? "text-muted-foreground/50 cursor-not-allowed"
+                : "text-foreground hover:bg-accent"
+            )}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </button>
+
+          <div className="flex items-center gap-2">
+            {TABS.map((tab) => (
+              <div
+                key={tab.id}
+                className={cn(
+                  "w-2 h-2 rounded-full transition-colors",
+                  activeTab === tab.id
+                    ? "bg-primary"
+                    : tabCompletion[tab.id].complete
+                      ? "bg-emerald-500"
+                      : "bg-muted-foreground/30"
+                )}
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={isLastTab || !canNavigateToTab(TABS[currentTabIndex + 1]?.id ?? "essentials")}
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+              isLastTab || !canNavigateToTab(TABS[currentTabIndex + 1]?.id ?? "essentials")
+                ? "text-muted-foreground/50 cursor-not-allowed"
+                : "bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
