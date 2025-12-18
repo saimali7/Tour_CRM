@@ -156,18 +156,10 @@ export default function ToursPage() {
           <h1 className="text-lg font-semibold text-foreground">Tours</h1>
           {/* Inline Stats */}
           {stats && (
-            <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
-              <span>
-                <span className="font-medium text-foreground">{stats.active}</span> active
-              </span>
-              <span className="text-border">·</span>
-              <span>
-                <span className="font-medium text-yellow-600">{stats.draft}</span> draft
-              </span>
-              <span className="text-border">·</span>
-              <span>
-                <span className="font-medium text-foreground">{stats.total}</span> total
-              </span>
+            <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
+              <span><span className="font-medium text-foreground">{stats.active}</span> active</span>
+              <span><span className="font-medium text-amber-600">{stats.draft}</span> draft</span>
+              <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
             </div>
           )}
         </div>

@@ -118,14 +118,9 @@ export default function CustomersPage() {
           <h1 className="text-lg font-semibold text-foreground">Customers</h1>
           {/* Inline Stats */}
           {stats && (
-            <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
-              <span>
-                <span className="font-medium text-foreground">{stats.total}</span> total
-              </span>
-              <span className="text-border">·</span>
-              <span>
-                <span className="font-medium text-emerald-600">+{stats.thisMonth}</span> this month
-              </span>
+            <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
+              <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
+              <span><span className="font-medium text-emerald-600">+{stats.thisMonth}</span> this month</span>
             </div>
           )}
         </div>

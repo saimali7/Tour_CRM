@@ -21,6 +21,13 @@ if (!databaseUrl) {
 const client = postgres(databaseUrl);
 const db = drizzle(client, { schema });
 
+// Generate a unique reference number (same logic as base-service.ts)
+function generateReferenceNumber(prefix: string): string {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${prefix}-${timestamp}${random}`;
+}
+
 async function seed() {
   console.log("🌱 Starting database seed...\n");
 
@@ -269,11 +276,208 @@ async function seedOrgData(orgId: string) {
 
   console.log(`  ✓ Created ${customers.length} customers\n`);
 
-  console.log("✅ Seed completed successfully!\n");
-  console.log("Test organization credentials:");
-  console.log("  Slug: demo-tours");
-  console.log("  URL: http://localhost:3000/org/demo-tours");
-  console.log("\nNote: You'll need to create a user and add them to this organization to access it.");
+  // Get all tours for scheduling
+  const allTours = await db.query.tours.findMany({
+    where: (tours, { eq }) => eq(tours.organizationId, orgId),
+  });
+
+  const allGuides = await db.query.guides.findMany({
+    where: (guides, { eq }) => eq(guides.organizationId, orgId),
+  });
+
+  const allCustomers = await db.query.customers.findMany({
+    where: (customers, { eq }) => eq(customers.organizationId, orgId),
+  });
+
+  // Create schedules for the next 14 days
+  console.log("Creating schedules...");
+  const schedulesToCreate = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + dayOffset);
+
+    for (const tour of allTours) {
+      // Create 2-3 time slots per tour per day
+      const timeSlots = [
+        { hour: 9, minute: 0 },
+        { hour: 14, minute: 0 },
+        ...(dayOffset % 2 === 0 ? [{ hour: 18, minute: 30 }] : []),
+      ];
+
+      for (const slot of timeSlots) {
+        const startsAt = new Date(date);
+        startsAt.setHours(slot.hour, slot.minute, 0, 0);
+
+        const endsAt = new Date(startsAt);
+        endsAt.setMinutes(endsAt.getMinutes() + tour.durationMinutes);
+
+        // Randomly assign a guide
+        const guide = allGuides[Math.floor(Math.random() * allGuides.length)];
+
+        schedulesToCreate.push({
+          id: createId(),
+          organizationId: orgId,
+          tourId: tour.id,
+          startsAt,
+          endsAt,
+          maxParticipants: tour.maxParticipants,
+          bookedCount: 0,
+          guideId: guide?.id,
+          guideConfirmed: guide ? Math.random() > 0.2 : false,
+          status: "scheduled" as const,
+          price: tour.basePrice,
+        });
+      }
+    }
+  }
+
+  const createdSchedules = await db
+    .insert(schema.schedules)
+    .values(schedulesToCreate)
+    .onConflictDoNothing()
+    .returning();
+
+  console.log(`  ✓ Created ${createdSchedules.length} schedules\n`);
+
+  // Create bookings for some schedules
+  console.log("Creating bookings...");
+  const bookingsToCreate = [];
+  const paymentsToCreate = [];
+  const participantsToCreate = [];
+
+  // Get tomorrow's schedules for bookings
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  const schedulesForBookings = createdSchedules.filter((s) => {
+    const scheduleDate = new Date(s.startsAt);
+    return scheduleDate.getDate() === tomorrow.getDate();
+  });
+
+  // Create 3-8 bookings per schedule
+  for (const schedule of schedulesForBookings.slice(0, 3)) {
+    const numBookings = Math.floor(Math.random() * 5) + 3;
+
+    for (let i = 0; i < numBookings; i++) {
+      const customer = allCustomers[i % allCustomers.length];
+      if (!customer) continue;
+
+      const numAdults = Math.floor(Math.random() * 3) + 1;
+      const numChildren = Math.random() > 0.7 ? Math.floor(Math.random() * 2) + 1 : 0;
+      const totalParticipants = numAdults + numChildren;
+
+      const basePrice = parseFloat(schedule.price || "49.00");
+      const subtotal = numAdults * basePrice + numChildren * (basePrice * 0.5);
+      const total = subtotal;
+
+      const bookingId = createId();
+      const statuses = ["confirmed", "pending", "confirmed", "confirmed"] as const;
+      const paymentStatuses = ["paid", "pending", "partial", "paid"] as const;
+      const status = statuses[i % statuses.length];
+      const paymentStatus = paymentStatuses[i % paymentStatuses.length];
+
+      bookingsToCreate.push({
+        id: bookingId,
+        organizationId: orgId,
+        referenceNumber: generateReferenceNumber("BK"),
+        customerId: customer.id,
+        scheduleId: schedule.id,
+        status,
+        paymentStatus,
+        adultCount: numAdults,
+        childCount: numChildren,
+        infantCount: 0,
+        totalParticipants,
+        subtotal: subtotal.toFixed(2),
+        total: total.toFixed(2),
+        currency: "USD",
+        source: ["website", "phone", "walk_in"][Math.floor(Math.random() * 3)] as "website" | "phone" | "walk_in",
+      });
+
+      // Create payment if paid or partial
+      if (paymentStatus === "paid" || paymentStatus === "partial") {
+        const paidAmount = paymentStatus === "paid" ? total : total * 0.5;
+        paymentsToCreate.push({
+          id: createId(),
+          organizationId: orgId,
+          bookingId,
+          amount: paidAmount.toFixed(2),
+          currency: "USD",
+          method: ["card", "cash", "bank_transfer"][Math.floor(Math.random() * 3)] as "card" | "cash" | "bank_transfer",
+          recordedBy: "seed-script",
+          recordedByName: "Seed Script",
+        });
+      }
+
+      // Create participants
+      for (let p = 0; p < numAdults; p++) {
+        participantsToCreate.push({
+          id: createId(),
+          organizationId: orgId,
+          bookingId,
+          type: "adult" as const,
+          firstName: p === 0 ? customer.firstName : `Guest`,
+          lastName: p === 0 ? customer.lastName : `${p + 1}`,
+          email: p === 0 ? customer.email : null,
+        });
+      }
+      for (let p = 0; p < numChildren; p++) {
+        participantsToCreate.push({
+          id: createId(),
+          organizationId: orgId,
+          bookingId,
+          type: "child" as const,
+          firstName: `Child`,
+          lastName: `${p + 1}`,
+        });
+      }
+    }
+  }
+
+  if (bookingsToCreate.length > 0) {
+    await db.insert(schema.bookings).values(bookingsToCreate).onConflictDoNothing();
+    console.log(`  ✓ Created ${bookingsToCreate.length} bookings`);
+  }
+
+  if (paymentsToCreate.length > 0) {
+    await db.insert(schema.payments).values(paymentsToCreate).onConflictDoNothing();
+    console.log(`  ✓ Created ${paymentsToCreate.length} payments`);
+  }
+
+  if (participantsToCreate.length > 0) {
+    await db.insert(schema.bookingParticipants).values(participantsToCreate).onConflictDoNothing();
+    console.log(`  ✓ Created ${participantsToCreate.length} participants`);
+  }
+
+  // Update booked counts on schedules
+  const scheduleBookedCounts = new Map<string, number>();
+  for (const booking of bookingsToCreate) {
+    if (booking.status === "confirmed") {
+      const current = scheduleBookedCounts.get(booking.scheduleId) || 0;
+      scheduleBookedCounts.set(booking.scheduleId, current + booking.totalParticipants);
+    }
+  }
+
+  const { eq } = await import("drizzle-orm");
+  for (const [scheduleId, bookedCount] of scheduleBookedCounts) {
+    await db
+      .update(schema.schedules)
+      .set({ bookedCount })
+      .where(eq(schema.schedules.id, scheduleId));
+  }
+
+  console.log("\n✅ Seed completed successfully!\n");
+  console.log("Demo data created:");
+  console.log("  Organization: Demo Tours (demo-tours)");
+  console.log("  Tours: 3");
+  console.log("  Guides: 2");
+  console.log("  Customers: 3");
+  console.log(`  Schedules: ${createdSchedules.length}`);
+  console.log(`  Bookings: ${bookingsToCreate.length}`);
+  console.log("\nURL: http://localhost:3000/org/demo-tours");
 }
 
 seed()

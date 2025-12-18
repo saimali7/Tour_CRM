@@ -100,21 +100,11 @@ export default function CalendarPage() {
         <div className="flex items-center gap-6">
           <h1 className="text-lg font-semibold text-foreground">Calendar</h1>
           {/* Inline Stats */}
-          <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
-            <span>
-              <span className="font-medium text-foreground">{stats.totalSchedules}</span> schedules
-            </span>
-            <span className="text-border">·</span>
-            <span>
-              <span className="font-medium text-foreground">{stats.totalBooked}</span>/{stats.totalCapacity} booked
-            </span>
+          <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
+            <span><span className="font-medium text-foreground">{stats.totalSchedules}</span> schedules</span>
+            <span><span className="font-medium text-foreground">{stats.totalBooked}</span>/{stats.totalCapacity} booked</span>
             {stats.needsGuide > 0 && (
-              <>
-                <span className="text-border">·</span>
-                <span>
-                  <span className="font-medium text-yellow-600">{stats.needsGuide}</span> need guide
-                </span>
-              </>
+              <span><span className="font-medium text-amber-600">{stats.needsGuide}</span> need guide</span>
             )}
           </div>
         </div>

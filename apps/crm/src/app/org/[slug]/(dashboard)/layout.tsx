@@ -66,7 +66,7 @@ export default async function DashboardLayout({
           <MobileHeader organization={organization} slug={slug} />
 
           {/* Page content */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto p-6">
             {children}
           </main>
         </div>

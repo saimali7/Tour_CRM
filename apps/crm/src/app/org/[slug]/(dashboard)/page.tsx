@@ -133,18 +133,16 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
-          <p className="text-sm text-destructive">
-            Error loading dashboard: {error.message}
-          </p>
-        </div>
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+        <p className="text-sm text-destructive">
+          Error loading dashboard: {error.message}
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
           {/* Header */}
           <header className="flex items-center justify-between">
             <div>
@@ -155,13 +153,11 @@ export default function DashboardPage() {
                 <div className="h-4 w-48 skeleton rounded mt-1" />
               ) : (
                 stats && (
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    <span className="text-foreground font-medium">{stats.tours}</span> tours
-                    <span className="mx-1.5 opacity-30">·</span>
-                    <span className="text-foreground font-medium">{stats.guests}</span> guests
-                    <span className="mx-1.5 opacity-30">·</span>
-                    <span className="text-foreground font-medium">{stats.guides}</span> guides
-                  </p>
+                  <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                    <span><span className="text-foreground font-medium">{stats.tours}</span> tours</span>
+                    <span><span className="text-foreground font-medium">{stats.guests}</span> guests</span>
+                    <span><span className="text-foreground font-medium">{stats.guides}</span> guides</span>
+                  </div>
                 )
               )}
             </div>

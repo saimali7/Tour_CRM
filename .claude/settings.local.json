@@ -109,7 +109,8 @@
       "mcp__playwright__browser_take_screenshot",
       "mcp__playwright__browser_close",
       "mcp__playwright__browser_evaluate",
-      "mcp__playwright__browser_resize"
+      "mcp__playwright__browser_resize",
+      "Bash(done)"
     ]
   }
 }
