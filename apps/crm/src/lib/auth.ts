@@ -3,8 +3,29 @@ import { users, organizationMembers, organizations } from "@tour/database/schema
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 
-// Check if Clerk is enabled
-const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
+/**
+ * Authentication configuration
+ *
+ * SECURITY: Dev mode bypass is ONLY enabled when:
+ * 1. NODE_ENV is explicitly "development"
+ * 2. DEV_AUTH_BYPASS is explicitly set to "true"
+ *
+ * In production, Clerk is always required regardless of env vars.
+ */
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const DEV_AUTH_BYPASS_ENABLED =
+  !IS_PRODUCTION &&
+  process.env.NODE_ENV === "development" &&
+  process.env.DEV_AUTH_BYPASS === "true";
+
+// Log warning if dev auth bypass is enabled
+if (DEV_AUTH_BYPASS_ENABLED) {
+  console.warn(
+    "\n⚠️  WARNING: Dev auth bypass is enabled. All authentication is being bypassed.\n" +
+    "   This should NEVER be used in production.\n" +
+    "   Set DEV_AUTH_BYPASS=false or remove it to enable proper authentication.\n"
+  );
+}
 
 export interface OrgContext {
   organizationId: string;
@@ -21,13 +42,16 @@ export interface OrgContext {
  * Wrapped with React cache() for request-level deduplication
  */
 export const getCurrentUser = cache(async () => {
-  // If Clerk is disabled, return the first user (dev mode)
-  if (!ENABLE_CLERK) {
+  // Dev mode bypass - ONLY in development with explicit flag
+  if (DEV_AUTH_BYPASS_ENABLED) {
     const devUser = await db.query.users.findFirst();
+    if (!devUser) {
+      console.warn("DEV AUTH BYPASS: No users found in database. Please seed the database.");
+    }
     return devUser || null;
   }
 
-  // Dynamic import Clerk only when enabled
+  // Production path - always use Clerk
   const { auth, currentUser } = await import("@clerk/nextjs/server");
   const { userId } = await auth();
 
@@ -126,8 +150,8 @@ export const getOrgContext = cache(async (orgSlug: string): Promise<OrgContext> 
     throw new Error("Organization not found");
   }
 
-  // If Clerk is disabled, skip membership check (dev mode)
-  if (!ENABLE_CLERK) {
+  // Dev mode bypass - skip membership check ONLY in development with explicit flag
+  if (DEV_AUTH_BYPASS_ENABLED) {
     // Create a mock membership for dev mode
     const mockMembership = {
       id: "dev-membership",

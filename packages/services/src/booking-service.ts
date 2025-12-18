@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, count, gte, lte, ilike, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, gte, lte, ilike, or, inArray } from "drizzle-orm";
 import {
   bookings,
   bookingParticipants,
@@ -20,6 +20,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "./types";
+import { bookingLogger } from "./lib/logger";
 
 export interface BookingFilters {
   status?: BookingStatus;
@@ -376,82 +377,102 @@ export class BookingService extends BaseService {
 
     const referenceNumber = this.generateReferenceNumber("BK");
 
-    const [booking] = await this.db
-      .insert(bookings)
-      .values({
-        organizationId: this.organizationId,
-        referenceNumber,
-        customerId: input.customerId,
-        scheduleId: input.scheduleId,
-        adultCount: input.adultCount,
-        childCount: input.childCount || 0,
-        infantCount: input.infantCount || 0,
-        totalParticipants,
-        subtotal,
-        discount,
-        tax,
-        total,
-        currency: sched.currency || tour?.currency || "USD",
-        status: "pending",
-        paymentStatus: "pending",
-        source: input.source || "manual",
-        sourceDetails: input.sourceDetails,
-        specialRequests: input.specialRequests,
-        dietaryRequirements: input.dietaryRequirements,
-        accessibilityNeeds: input.accessibilityNeeds,
-        internalNotes: input.internalNotes,
-      })
-      .returning();
-
-    if (!booking) {
-      throw new Error("Failed to create booking");
-    }
-
-    if (input.participants && input.participants.length > 0) {
-      await this.db.insert(bookingParticipants).values(
-        input.participants.map((p) => ({
+    // Use a transaction to ensure all-or-nothing semantics
+    // This prevents orphaned records if any operation fails
+    const bookingId = await this.db.transaction(async (tx) => {
+      // 1. Insert the booking
+      const [booking] = await tx
+        .insert(bookings)
+        .values({
           organizationId: this.organizationId,
-          bookingId: booking.id,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          email: p.email,
-          phone: p.phone,
-          type: p.type,
-          dietaryRequirements: p.dietaryRequirements,
-          accessibilityNeeds: p.accessibilityNeeds,
-          notes: p.notes,
-        }))
-      );
-    }
+          referenceNumber,
+          customerId: input.customerId,
+          scheduleId: input.scheduleId,
+          adultCount: input.adultCount,
+          childCount: input.childCount || 0,
+          infantCount: input.infantCount || 0,
+          totalParticipants,
+          subtotal,
+          discount,
+          tax,
+          total,
+          currency: sched.currency || tour?.currency || "USD",
+          status: "pending",
+          paymentStatus: "pending",
+          source: input.source || "manual",
+          sourceDetails: input.sourceDetails,
+          specialRequests: input.specialRequests,
+          dietaryRequirements: input.dietaryRequirements,
+          accessibilityNeeds: input.accessibilityNeeds,
+          internalNotes: input.internalNotes,
+        })
+        .returning();
 
-    // Atomic update with capacity check to prevent race conditions
-    const updateResult = await this.db
-      .update(schedules)
-      .set({
-        bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants}`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(schedules.id, input.scheduleId),
-          eq(schedules.organizationId, this.organizationId),
-          // Atomic capacity check - only update if there's room
-          sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants} <= ${schedules.maxParticipants}`
-        )
-      )
-      .returning();
-
-    // If no rows updated, capacity was exceeded (race condition caught)
-    if (updateResult.length === 0) {
-      // Rollback the booking
-      await this.db.delete(bookings).where(eq(bookings.id, booking.id));
-      if (input.participants && input.participants.length > 0) {
-        await this.db.delete(bookingParticipants).where(eq(bookingParticipants.bookingId, booking.id));
+      if (!booking) {
+        throw new Error("Failed to create booking");
       }
-      throw new ValidationError("Schedule capacity exceeded. Please try again with fewer participants.");
-    }
 
-    return this.getById(booking.id);
+      // 2. Insert participants if provided
+      if (input.participants && input.participants.length > 0) {
+        await tx.insert(bookingParticipants).values(
+          input.participants.map((p) => ({
+            organizationId: this.organizationId,
+            bookingId: booking.id,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            email: p.email,
+            phone: p.phone,
+            type: p.type,
+            dietaryRequirements: p.dietaryRequirements,
+            accessibilityNeeds: p.accessibilityNeeds,
+            notes: p.notes,
+          }))
+        );
+      }
+
+      // 3. Atomic update with capacity check to prevent race conditions
+      const updateResult = await tx
+        .update(schedules)
+        .set({
+          bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants}`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schedules.id, input.scheduleId),
+            eq(schedules.organizationId, this.organizationId),
+            // Atomic capacity check - only update if there's room
+            sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants} <= ${schedules.maxParticipants}`
+          )
+        )
+        .returning();
+
+      // If no rows updated, capacity was exceeded (race condition caught)
+      // The transaction will automatically rollback all previous operations
+      if (updateResult.length === 0) {
+        bookingLogger.warn({
+          organizationId: this.organizationId,
+          scheduleId: input.scheduleId,
+          requestedParticipants: totalParticipants,
+        }, "Booking failed: capacity exceeded during transaction");
+        throw new ValidationError("Schedule capacity exceeded. Please try again with fewer participants.");
+      }
+
+      return booking.id;
+    });
+
+    bookingLogger.info({
+      organizationId: this.organizationId,
+      bookingId,
+      referenceNumber,
+      customerId: input.customerId,
+      scheduleId: input.scheduleId,
+      totalParticipants,
+      total,
+      source: input.source || "manual",
+    }, "Booking created successfully");
+
+    return this.getById(bookingId);
   }
 
   async update(id: string, input: UpdateBookingInput): Promise<BookingWithRelations> {
@@ -958,32 +979,78 @@ export class BookingService extends BaseService {
   /**
    * Bulk confirm multiple bookings
    * @returns Array of successfully confirmed booking IDs and any errors
+   * Optimized to use batch queries instead of N+1
    */
   async bulkConfirm(ids: string[]): Promise<{
     confirmed: string[];
     errors: Array<{ id: string; error: string }>;
   }> {
-    const confirmed: string[] = [];
-    const errors: Array<{ id: string; error: string }> = [];
-
-    for (const id of ids) {
-      try {
-        await this.confirm(id);
-        confirmed.push(id);
-      } catch (error) {
-        errors.push({
-          id,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
+    if (ids.length === 0) {
+      return { confirmed: [], errors: [] };
     }
 
-    return { confirmed, errors };
+    const errors: Array<{ id: string; error: string }> = [];
+
+    // Batch fetch all bookings in one query
+    const allBookings = await this.db
+      .select({ id: bookings.id, status: bookings.status })
+      .from(bookings)
+      .where(
+        and(
+          inArray(bookings.id, ids),
+          eq(bookings.organizationId, this.organizationId)
+        )
+      );
+
+    const foundIds = new Set(allBookings.map(b => b.id));
+    const confirmableIds: string[] = [];
+
+    // Check each ID for errors
+    for (const id of ids) {
+      if (!foundIds.has(id)) {
+        errors.push({ id, error: "Booking not found" });
+        continue;
+      }
+
+      const booking = allBookings.find(b => b.id === id);
+      if (booking?.status !== "pending") {
+        errors.push({ id, error: `Cannot confirm booking with status "${booking?.status}"` });
+        continue;
+      }
+
+      confirmableIds.push(id);
+    }
+
+    // Batch update all confirmable bookings in one query
+    if (confirmableIds.length > 0) {
+      await this.db
+        .update(bookings)
+        .set({
+          status: "confirmed",
+          confirmedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            inArray(bookings.id, confirmableIds),
+            eq(bookings.organizationId, this.organizationId)
+          )
+        );
+
+      bookingLogger.info({
+        organizationId: this.organizationId,
+        confirmedCount: confirmableIds.length,
+        ids: confirmableIds,
+      }, "Bulk confirmed bookings");
+    }
+
+    return { confirmed: confirmableIds, errors };
   }
 
   /**
    * Bulk cancel multiple bookings
    * @returns Array of successfully cancelled booking IDs and any errors
+   * Optimized to use batch queries instead of N+1
    */
   async bulkCancel(
     ids: string[],
@@ -992,27 +1059,114 @@ export class BookingService extends BaseService {
     cancelled: string[];
     errors: Array<{ id: string; error: string }>;
   }> {
-    const cancelled: string[] = [];
-    const errors: Array<{ id: string; error: string }> = [];
-
-    for (const id of ids) {
-      try {
-        await this.cancel(id, reason);
-        cancelled.push(id);
-      } catch (error) {
-        errors.push({
-          id,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
+    if (ids.length === 0) {
+      return { cancelled: [], errors: [] };
     }
 
-    return { cancelled, errors };
+    const errors: Array<{ id: string; error: string }> = [];
+
+    // Batch fetch all bookings in one query
+    const allBookings = await this.db
+      .select({
+        id: bookings.id,
+        status: bookings.status,
+        scheduleId: bookings.scheduleId,
+        totalParticipants: bookings.totalParticipants,
+      })
+      .from(bookings)
+      .where(
+        and(
+          inArray(bookings.id, ids),
+          eq(bookings.organizationId, this.organizationId)
+        )
+      );
+
+    const foundIds = new Set(allBookings.map(b => b.id));
+    const cancellableBookings: Array<{ id: string; scheduleId: string; totalParticipants: number }> = [];
+
+    // Check each ID for errors
+    for (const id of ids) {
+      if (!foundIds.has(id)) {
+        errors.push({ id, error: "Booking not found" });
+        continue;
+      }
+
+      const booking = allBookings.find(b => b.id === id);
+      if (booking?.status === "cancelled") {
+        errors.push({ id, error: "Booking is already cancelled" });
+        continue;
+      }
+      if (booking?.status === "completed") {
+        errors.push({ id, error: "Cannot cancel a completed booking" });
+        continue;
+      }
+
+      cancellableBookings.push({
+        id: booking!.id,
+        scheduleId: booking!.scheduleId,
+        totalParticipants: booking!.totalParticipants,
+      });
+    }
+
+    if (cancellableBookings.length > 0) {
+      const cancellableIds = cancellableBookings.map(b => b.id);
+
+      // Group by schedule to update booked counts efficiently
+      const scheduleUpdates = new Map<string, number>();
+      for (const booking of cancellableBookings) {
+        const current = scheduleUpdates.get(booking.scheduleId) || 0;
+        scheduleUpdates.set(booking.scheduleId, current + booking.totalParticipants);
+      }
+
+      // Update each schedule's booked count (can't batch different decrements easily)
+      for (const [scheduleId, totalToDecrement] of scheduleUpdates) {
+        await this.db
+          .update(schedules)
+          .set({
+            bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${totalToDecrement})`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schedules.id, scheduleId),
+              eq(schedules.organizationId, this.organizationId)
+            )
+          );
+      }
+
+      // Batch cancel all bookings in one query
+      await this.db
+        .update(bookings)
+        .set({
+          status: "cancelled",
+          cancelledAt: new Date(),
+          cancellationReason: reason,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            inArray(bookings.id, cancellableIds),
+            eq(bookings.organizationId, this.organizationId)
+          )
+        );
+
+      bookingLogger.info({
+        organizationId: this.organizationId,
+        cancelledCount: cancellableIds.length,
+        ids: cancellableIds,
+        reason,
+      }, "Bulk cancelled bookings");
+
+      return { cancelled: cancellableIds, errors };
+    }
+
+    return { cancelled: [], errors };
   }
 
   /**
    * Bulk update payment status for multiple bookings
    * @returns Array of successfully updated booking IDs and any errors
+   * Optimized to use batch queries instead of N+1
    */
   async bulkUpdatePaymentStatus(
     ids: string[],
@@ -1021,37 +1175,59 @@ export class BookingService extends BaseService {
     updated: string[];
     errors: Array<{ id: string; error: string }>;
   }> {
-    const updated: string[] = [];
-    const errors: Array<{ id: string; error: string }> = [];
-
-    for (const id of ids) {
-      try {
-        // Verify booking exists and belongs to org
-        await this.getById(id);
-
-        await this.db
-          .update(bookings)
-          .set({
-            paymentStatus,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(bookings.id, id),
-              eq(bookings.organizationId, this.organizationId)
-            )
-          );
-
-        updated.push(id);
-      } catch (error) {
-        errors.push({
-          id,
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
+    if (ids.length === 0) {
+      return { updated: [], errors: [] };
     }
 
-    return { updated, errors };
+    const errors: Array<{ id: string; error: string }> = [];
+
+    // Batch fetch all booking IDs in one query to verify they exist
+    const existingBookings = await this.db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(
+        and(
+          inArray(bookings.id, ids),
+          eq(bookings.organizationId, this.organizationId)
+        )
+      );
+
+    const foundIds = new Set(existingBookings.map(b => b.id));
+    const updatableIds: string[] = [];
+
+    // Check each ID for errors
+    for (const id of ids) {
+      if (!foundIds.has(id)) {
+        errors.push({ id, error: "Booking not found" });
+        continue;
+      }
+      updatableIds.push(id);
+    }
+
+    // Batch update all valid bookings in one query
+    if (updatableIds.length > 0) {
+      await this.db
+        .update(bookings)
+        .set({
+          paymentStatus,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            inArray(bookings.id, updatableIds),
+            eq(bookings.organizationId, this.organizationId)
+          )
+        );
+
+      bookingLogger.info({
+        organizationId: this.organizationId,
+        updatedCount: updatableIds.length,
+        ids: updatableIds,
+        paymentStatus,
+      }, "Bulk updated payment status");
+    }
+
+    return { updated: updatableIds, errors };
   }
 
   /**

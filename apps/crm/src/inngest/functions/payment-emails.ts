@@ -1,7 +1,12 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
-import { createServices } from "@tour/services";
+import { createServices, logger } from "@tour/services";
 import { format } from "date-fns";
+import {
+  validateEventData,
+  paymentSucceededSchema,
+  paymentFailedSchema,
+} from "../schemas";
 
 /**
  * Send payment succeeded email when a payment is completed
@@ -14,7 +19,10 @@ export const sendPaymentSucceededEmail = inngest.createFunction(
   },
   { event: "payment/succeeded" },
   async ({ event, step }) => {
-    const { data } = event;
+    // Validate event data
+    const data = validateEventData(paymentSucceededSchema, event.data, "payment/succeeded");
+
+    logger.info({ eventId: event.id, bookingId: data.bookingId }, "Processing payment/succeeded email");
 
     // Get organization details for email branding
     const org = await step.run("get-organization", async () => {
@@ -40,7 +48,7 @@ export const sendPaymentSucceededEmail = inngest.createFunction(
         tourName: data.tourName,
         tourDate: data.tourDate,
         amount: data.amount,
-        currency: data.currency,
+        currency: data.currency ?? "USD",
         receiptUrl: data.stripeReceiptUrl,
       });
     });
@@ -58,7 +66,7 @@ export const sendPaymentSucceededEmail = inngest.createFunction(
           emailType: "payment_succeeded",
           messageId: result.messageId,
           amount: data.amount,
-          currency: data.currency,
+          currency: data.currency ?? "USD",
         },
       });
     });
@@ -82,7 +90,10 @@ export const sendPaymentFailedEmail = inngest.createFunction(
   },
   { event: "payment/failed" },
   async ({ event, step }) => {
-    const { data } = event;
+    // Validate event data
+    const data = validateEventData(paymentFailedSchema, event.data, "payment/failed");
+
+    logger.info({ eventId: event.id, bookingId: data.bookingId }, "Processing payment/failed email");
 
     // Get organization details for email branding
     const org = await step.run("get-organization", async () => {

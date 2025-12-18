@@ -135,17 +135,18 @@ export default function CustomersPage() {
       </header>
 
       {/* Compact Filter Bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" role="search" aria-label="Filter customers">
         {/* Search */}
         <div className="relative flex-1 max-w-sm">
           <input
-            type="text"
+            type="search"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setPage(1);
             }}
             placeholder="Search by name, phone, or email..."
+            aria-label="Search customers by name, phone, or email"
             className="w-full h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           {search && (
@@ -166,6 +167,7 @@ export default function CustomersPage() {
             setSourceFilter(e.target.value as SourceFilter);
             setPage(1);
           }}
+          aria-label="Filter by customer source"
           className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
         >
           {SOURCE_OPTIONS.map((opt) => (

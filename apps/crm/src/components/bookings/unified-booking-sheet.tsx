@@ -717,7 +717,8 @@ export function UnifiedBookingSheet({
                     )}
                   >
                     {tour.coverImageUrl ? (
-                      <img src={tour.coverImageUrl} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={tour.coverImageUrl} alt={tour.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
                     ) : (
                       <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                         <MapPin className="h-5 w-5 text-muted-foreground" />

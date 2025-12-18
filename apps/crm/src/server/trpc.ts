@@ -3,6 +3,11 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { getOrgContext, getCurrentUser, type OrgContext } from "../lib/auth";
 import type { User } from "@tour/database";
+import {
+  checkRateLimit,
+  createRateLimitKey,
+  RATE_LIMITS,
+} from "../lib/rate-limit";
 
 /**
  * tRPC context type
@@ -122,4 +127,49 @@ export const authenticatedProcedure = t.procedure.use(async ({ ctx, next }) => {
       user: ctx.user,
     },
   });
+});
+
+/**
+ * Rate-limited procedures for different operation types
+ * Use these for sensitive operations that need throttling
+ */
+
+// For bulk operations (5 req/min) - extends adminProcedure
+export const bulkProcedure = adminProcedure.use(async ({ ctx, next }) => {
+  const key = createRateLimitKey(
+    ctx.user?.id,
+    ctx.orgContext.organizationId,
+    "bulk"
+  );
+
+  const result = checkRateLimit(key, RATE_LIMITS.bulk);
+
+  if (!result.allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Rate limit exceeded. Try again in ${Math.ceil(result.resetIn / 1000)} seconds.`,
+    });
+  }
+
+  return next({ ctx });
+});
+
+// For sensitive operations like payment processing (10 req/min) - extends adminProcedure
+export const sensitiveProcedure = adminProcedure.use(async ({ ctx, next }) => {
+  const key = createRateLimitKey(
+    ctx.user?.id,
+    ctx.orgContext.organizationId,
+    "sensitive"
+  );
+
+  const result = checkRateLimit(key, RATE_LIMITS.sensitive);
+
+  if (!result.allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Rate limit exceeded. Try again in ${Math.ceil(result.resetIn / 1000)} seconds.`,
+    });
+  }
+
+  return next({ ctx });
 });

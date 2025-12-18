@@ -357,25 +357,27 @@ export default function BookingsPage() {
       </header>
 
       {/* Compact Filter Bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" role="search" aria-label="Filter bookings">
         {/* Search */}
         <div className="relative flex-1 max-w-sm">
           <input
-            type="text"
+            type="search"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setPage(1);
             }}
             placeholder="Search bookings..."
+            aria-label="Search bookings by reference number, customer name, or email"
             className="w-full h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -387,6 +389,7 @@ export default function BookingsPage() {
             setStatusFilter(e.target.value as StatusFilter);
             setPage(1);
           }}
+          aria-label="Filter by booking status"
           className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
         >
           {STATUS_OPTIONS.map((opt) => (
@@ -403,6 +406,7 @@ export default function BookingsPage() {
             setPaymentFilter(e.target.value as PaymentFilter);
             setPage(1);
           }}
+          aria-label="Filter by payment status"
           className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
         >
           {PAYMENT_OPTIONS.map((opt) => (
@@ -422,6 +426,7 @@ export default function BookingsPage() {
               setPage(1);
             }}
             className="h-9 px-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Clear all filters"
           >
             Clear
           </button>

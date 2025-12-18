@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { format } from "date-fns";
-import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
+import { createRouter, protectedProcedure, adminProcedure, bulkProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 import { inngest } from "@/inngest";
 
@@ -628,7 +628,7 @@ export const bookingRouter = createRouter({
   // Bulk Operations
   // ============================================
 
-  bulkConfirm: adminProcedure
+  bulkConfirm: bulkProcedure
     .input(z.object({
       ids: z.array(z.string()).min(1).max(100),
       sendConfirmationEmails: z.boolean().default(true),
@@ -669,7 +669,7 @@ export const bookingRouter = createRouter({
       return result;
     }),
 
-  bulkCancel: adminProcedure
+  bulkCancel: bulkProcedure
     .input(z.object({
       ids: z.array(z.string().max(100)).min(1).max(100),
       reason: z.string().max(1000).optional(),
@@ -707,7 +707,7 @@ export const bookingRouter = createRouter({
       return result;
     }),
 
-  bulkUpdatePaymentStatus: adminProcedure
+  bulkUpdatePaymentStatus: bulkProcedure
     .input(z.object({
       ids: z.array(z.string()).min(1).max(100),
       paymentStatus: z.enum(["pending", "partial", "paid", "refunded", "failed"]),
@@ -717,7 +717,7 @@ export const bookingRouter = createRouter({
       return services.booking.bulkUpdatePaymentStatus(input.ids, input.paymentStatus);
     }),
 
-  bulkReschedule: adminProcedure
+  bulkReschedule: bulkProcedure
     .input(z.object({
       ids: z.array(z.string()).min(1).max(100),
       newScheduleId: z.string(),

@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { createStorageService } from "@tour/services";
 import { config } from "@tour/config";
+
+/**
+ * Allowed upload folders - whitelist to prevent path traversal attacks
+ * SECURITY: Only these folder paths are allowed for uploads
+ */
+const ALLOWED_FOLDERS = [
+  "images",
+  "tours",
+  "tours/covers",
+  "avatars",
+  "documents",
+  "waivers",
+] as const;
+
+type AllowedFolder = (typeof ALLOWED_FOLDERS)[number];
+
+function isAllowedFolder(folder: string): folder is AllowedFolder {
+  // Normalize the folder path and check against whitelist
+  const normalized = folder.replace(/^\/+|\/+$/g, "").toLowerCase();
+  return ALLOWED_FOLDERS.includes(normalized as AllowedFolder);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +38,21 @@ export async function POST(request: NextRequest) {
     // Get form data
     const formData = await request.formData();
     const files = formData.getAll("files") as File[];
-    const folder = (formData.get("folder") as string) || "images";
+    const rawFolder = (formData.get("folder") as string) || "images";
+
+    // SECURITY: Validate folder against whitelist to prevent path traversal
+    if (!isAllowedFolder(rawFolder)) {
+      console.warn(`Upload rejected: Invalid folder "${rawFolder}" from org ${orgId}`);
+      return NextResponse.json(
+        {
+          error: "Invalid upload folder",
+          details: [`Folder must be one of: ${ALLOWED_FOLDERS.join(", ")}`],
+        },
+        { status: 400 }
+      );
+    }
+
+    const folder = rawFolder;
 
     if (!files || files.length === 0) {
       return NextResponse.json(

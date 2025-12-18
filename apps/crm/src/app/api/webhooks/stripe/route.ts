@@ -7,6 +7,7 @@ import { bookings, customers, schedules } from "@tour/database";
 import { eq, and } from "drizzle-orm";
 import { inngest } from "@/inngest";
 import { format } from "date-fns";
+import { webhookLogger } from "@tour/services";
 
 /**
  * Stripe Webhook Handler
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
   }
 
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    console.error("Missing STRIPE_WEBHOOK_SECRET environment variable");
+    webhookLogger.error("Missing STRIPE_WEBHOOK_SECRET environment variable");
     return NextResponse.json(
       { error: "Webhook secret not configured" },
       { status: 500 }
@@ -49,16 +50,20 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("Webhook signature verification failed:", err);
+    webhookLogger.error({ err }, "Webhook signature verification failed");
     return NextResponse.json(
       { error: "Webhook signature verification failed" },
       { status: 400 }
     );
   }
 
-  console.log(`Received Stripe webhook: ${event.type}`, {
+  // Log webhook receipt with structured data for debugging
+  webhookLogger.info({
+    eventType: event.type,
     eventId: event.id,
-  });
+    created: new Date(event.created * 1000).toISOString(),
+    livemode: event.livemode,
+  }, "Stripe webhook received");
 
   try {
     switch (event.type) {
@@ -79,14 +84,33 @@ export async function POST(req: Request) {
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        webhookLogger.info({
+          eventType: event.type,
+          eventId: event.id,
+        }, "Unhandled Stripe webhook event type");
     }
 
-    return NextResponse.json({ received: true });
+    // Always return 200 to acknowledge receipt - Stripe will retry on non-2xx
+    return NextResponse.json({
+      received: true,
+      eventId: event.id,
+    });
   } catch (error) {
-    console.error("Error processing webhook:", error);
+    // Log detailed error for debugging but don't expose to client
+    webhookLogger.error({
+      eventType: event.type,
+      eventId: event.id,
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+    }, "Error processing Stripe webhook event");
+
+    // Return 500 to trigger Stripe retry - include event ID for correlation
+    // Don't expose internal error details to the webhook caller
     return NextResponse.json(
-      { error: "Webhook processing failed" },
+      {
+        error: "Webhook processing failed",
+        eventId: event.id,
+      },
       { status: 500 }
     );
   }
@@ -98,16 +122,22 @@ export async function POST(req: Request) {
 async function handlePaymentIntentSucceeded(event: Stripe.Event) {
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
-  console.log("Payment succeeded:", {
-    id: paymentIntent.id,
+  webhookLogger.info({
+    paymentIntentId: paymentIntent.id,
     amount: paymentIntent.amount,
-    metadata: paymentIntent.metadata,
-  });
+    currency: paymentIntent.currency,
+    organizationId: paymentIntent.metadata.organizationId,
+    bookingId: paymentIntent.metadata.bookingId,
+  }, "Payment succeeded");
 
   const { organizationId, bookingId } = paymentIntent.metadata;
 
   if (!organizationId || !bookingId) {
-    console.error("Missing organizationId or bookingId in payment intent metadata");
+    webhookLogger.error({
+      paymentIntentId: paymentIntent.id,
+      hasOrganizationId: !!organizationId,
+      hasBookingId: !!bookingId,
+    }, "Missing metadata in payment intent");
     return;
   }
 
@@ -120,13 +150,20 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
   });
 
   if (!booking) {
-    console.error(`Booking not found: ${bookingId} for org: ${organizationId}`);
+    webhookLogger.error({
+      bookingId,
+      organizationId,
+      paymentIntentId: paymentIntent.id,
+    }, "Booking not found for payment intent");
     return;
   }
 
   // Check if we've already processed this payment intent (idempotency)
   if (booking.stripePaymentIntentId === paymentIntent.id && booking.paymentStatus === "paid") {
-    console.log(`Payment intent ${paymentIntent.id} already processed for booking ${bookingId}`);
+    webhookLogger.info({
+      paymentIntentId: paymentIntent.id,
+      bookingId,
+    }, "Idempotent: Payment already processed");
     return;
   }
 
@@ -145,7 +182,12 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
       and(eq(bookings.id, bookingId), eq(bookings.organizationId, organizationId))
     );
 
-  console.log(`Updated booking ${bookingId} to paid status`);
+  webhookLogger.info({
+    bookingId,
+    paymentIntentId: paymentIntent.id,
+    amount: amountInDollars,
+    status: "paid",
+  }, "Booking payment status updated");
 
   // Get customer details for the email
   const customer = await db.query.customers.findFirst({
@@ -188,7 +230,10 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
       },
     });
 
-    console.log(`Sent payment/succeeded event for booking ${bookingId}`);
+    webhookLogger.info({
+      bookingId,
+      customerEmail: customer.email,
+    }, "Sent payment confirmation event");
   }
 }
 
@@ -198,17 +243,17 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
 async function handlePaymentIntentFailed(event: Stripe.Event) {
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
-  console.log("Payment failed:", {
-    id: paymentIntent.id,
+  webhookLogger.warn({
+    paymentIntentId: paymentIntent.id,
     amount: paymentIntent.amount,
     metadata: paymentIntent.metadata,
     lastPaymentError: paymentIntent.last_payment_error,
-  });
+  }, "Payment failed");
 
   const { organizationId, bookingId } = paymentIntent.metadata;
 
   if (!organizationId || !bookingId) {
-    console.error("Missing organizationId or bookingId in payment intent metadata");
+    webhookLogger.error({ paymentIntentId: paymentIntent.id }, "Missing organizationId or bookingId in payment intent metadata");
     return;
   }
 
@@ -221,7 +266,7 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
   });
 
   if (!booking) {
-    console.error(`Booking not found: ${bookingId} for org: ${organizationId}`);
+    webhookLogger.error({ bookingId, organizationId }, "Booking not found for failed payment");
     return;
   }
 
@@ -237,7 +282,7 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
       and(eq(bookings.id, bookingId), eq(bookings.organizationId, organizationId))
     );
 
-  console.log(`Updated booking ${bookingId} to failed payment status`);
+  webhookLogger.info({ bookingId }, "Updated booking to failed payment status");
 
   // Get customer details for the email
   const customer = await db.query.customers.findFirst({
@@ -261,7 +306,7 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
       },
     });
 
-    console.log(`Sent payment/failed event for booking ${bookingId}`);
+    webhookLogger.info({ bookingId, customerEmail: customer.email }, "Sent payment/failed event");
   }
 }
 
@@ -271,15 +316,15 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
 async function handleChargeRefunded(event: Stripe.Event) {
   const charge = event.data.object as Stripe.Charge;
 
-  console.log("Charge refunded:", {
-    id: charge.id,
+  webhookLogger.info({
+    chargeId: charge.id,
     amount: charge.amount,
     amountRefunded: charge.amount_refunded,
     refunded: charge.refunded,
-  });
+  }, "Charge refunded");
 
   if (!charge.payment_intent) {
-    console.log("No payment intent associated with charge");
+    webhookLogger.info({ chargeId: charge.id }, "No payment intent associated with charge");
     return;
   }
 
@@ -294,7 +339,7 @@ async function handleChargeRefunded(event: Stripe.Event) {
   });
 
   if (!booking) {
-    console.error(`Booking not found for payment intent: ${paymentIntentId}`);
+    webhookLogger.error({ paymentIntentId }, "Booking not found for refund");
     return;
   }
 
@@ -314,7 +359,7 @@ async function handleChargeRefunded(event: Stripe.Event) {
         )
       );
 
-    console.log(`Updated booking ${booking.id} to refunded status`);
+    webhookLogger.info({ bookingId: booking.id }, "Updated booking to refunded status");
   } else {
     // Partial refund
     const remainingAmount = ((charge.amount - charge.amount_refunded) / 100).toFixed(2);
@@ -333,7 +378,7 @@ async function handleChargeRefunded(event: Stripe.Event) {
         )
       );
 
-    console.log(`Updated booking ${booking.id} with partial refund`);
+    webhookLogger.info({ bookingId: booking.id, remainingAmount }, "Updated booking with partial refund");
   }
 }
 
@@ -343,15 +388,15 @@ async function handleChargeRefunded(event: Stripe.Event) {
 async function handleCheckoutSessionCompleted(event: Stripe.Event) {
   const session = event.data.object as Stripe.Checkout.Session;
 
-  console.log("Checkout session completed:", {
-    id: session.id,
+  webhookLogger.info({
+    sessionId: session.id,
     paymentStatus: session.payment_status,
     metadata: session.metadata,
-  });
+  }, "Checkout session completed");
 
   // Payment intent succeeded event will handle the actual booking update
   // This event is just for logging/tracking
   if (session.payment_status === "paid") {
-    console.log(`Checkout session ${session.id} paid successfully`);
+    webhookLogger.info({ sessionId: session.id }, "Checkout session paid successfully");
   }
 }

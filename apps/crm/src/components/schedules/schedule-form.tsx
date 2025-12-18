@@ -238,7 +238,8 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
             <div className="p-4 rounded-xl border-2 border-primary bg-primary/5">
               <div className="flex gap-4">
                 {selectedTour.coverImageUrl ? (
-                  <img src={selectedTour.coverImageUrl} alt="" className="w-20 h-20 rounded-lg object-cover" />
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={selectedTour.coverImageUrl} alt={selectedTour.name} className="w-20 h-20 rounded-lg object-cover" />
                 ) : (
                   <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
                     <MapPin className="h-8 w-8 text-muted-foreground" />
@@ -281,7 +282,8 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
               >
                 <div className="flex gap-4">
                   {tour.coverImageUrl ? (
-                    <img src={tour.coverImageUrl} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={tour.coverImageUrl} alt={tour.name} className="w-16 h-16 rounded-lg object-cover" />
                   ) : (
                     <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
                       <MapPin className="h-6 w-6 text-muted-foreground" />

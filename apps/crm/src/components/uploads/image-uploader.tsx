@@ -119,17 +119,20 @@ export function ImageUploader({
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-4">
           {value.map((url, index) => (
             <div key={url} className="relative group aspect-square">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
-                alt={`Upload ${index + 1}`}
+                alt={`Uploaded image ${index + 1} of ${value.length}`}
                 className="w-full h-full object-cover rounded-lg border border-border"
+                loading="lazy"
               />
               <button
                 type="button"
                 onClick={() => removeImage(index)}
                 className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label={`Remove image ${index + 1}`}
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
               {index === 0 && (
                 <span className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-primary-foreground text-xs rounded">
@@ -148,10 +151,19 @@ export function ImageUploader({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onClick={() => inputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label={value.length === 0 ? "Upload tour images" : `Add more images. ${value.length} of ${maxFiles} uploaded`}
           className={`
             relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
             ${dragOver ? "border-primary bg-primary/10" : "border-border hover:border-input"}
-            ${uploading ? "pointer-events-none opacity-60" : ""}
+            ${uploading ? "pointer-events-none opacity-60" : "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"}
           `}
         >
           <input
@@ -161,19 +173,20 @@ export function ImageUploader({
             multiple
             onChange={handleFileSelect}
             className="hidden"
+            aria-label="Upload images"
           />
 
           {uploading ? (
-            <div className="flex flex-col items-center">
-              <Loader2 className="h-10 w-10 text-primary animate-spin mb-2" />
+            <div className="flex flex-col items-center" role="status" aria-label="Uploading images">
+              <Loader2 className="h-10 w-10 text-primary animate-spin mb-2" aria-hidden="true" />
               <p className="text-sm text-muted-foreground">Uploading...</p>
             </div>
           ) : (
             <div className="flex flex-col items-center">
               {value.length === 0 ? (
-                <ImageIcon className="h-10 w-10 text-muted-foreground mb-2" />
+                <ImageIcon className="h-10 w-10 text-muted-foreground mb-2" aria-hidden="true" />
               ) : (
-                <Upload className="h-10 w-10 text-muted-foreground mb-2" />
+                <Upload className="h-10 w-10 text-muted-foreground mb-2" aria-hidden="true" />
               )}
               <p className="text-sm font-medium text-foreground">
                 {value.length === 0 ? "Upload tour images" : "Add more images"}
@@ -268,25 +281,37 @@ export function SingleImageUploader({
 
       {value ? (
         <div className="relative inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={value}
-            alt="Cover"
+            alt={`${label} preview`}
             className="w-48 h-32 object-cover rounded-lg border border-border"
+            loading="lazy"
           />
           <button
             type="button"
             onClick={() => onChange(null)}
             className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full"
+            aria-label={`Remove ${label.toLowerCase()}`}
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       ) : (
         <div
           onClick={() => inputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label={`Upload ${label.toLowerCase()}`}
           className={`
             w-48 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors
-            ${uploading ? "pointer-events-none opacity-60" : "border-border hover:border-input"}
+            ${uploading ? "pointer-events-none opacity-60" : "border-border hover:border-input focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"}
           `}
         >
           <input
@@ -295,13 +320,14 @@ export function SingleImageUploader({
             accept="image/jpeg,image/png,image/webp"
             onChange={handleFileSelect}
             className="hidden"
+            aria-label={`Upload ${label.toLowerCase()}`}
           />
 
           {uploading ? (
-            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+            <Loader2 className="h-6 w-6 text-primary animate-spin" aria-hidden="true" />
           ) : (
             <>
-              <ImageIcon className="h-6 w-6 text-muted-foreground mb-1" />
+              <ImageIcon className="h-6 w-6 text-muted-foreground mb-1" aria-hidden="true" />
               <span className="text-xs text-muted-foreground">Click to upload</span>
             </>
           )}

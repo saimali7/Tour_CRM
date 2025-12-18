@@ -358,3 +358,14 @@ export type {
 
 // Storage service (separate from org-scoped services, created with createStorageService)
 export { StorageService, createStorageService, type UploadResult } from "./storage-service";
+
+// Logger utilities
+export {
+  logger,
+  createOrgLogger,
+  createServiceLogger,
+  paymentLogger,
+  bookingLogger,
+  webhookLogger,
+  authLogger,
+} from "./lib/logger";

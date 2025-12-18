@@ -185,6 +185,7 @@ export default function GuidesPage() {
                 setLanguageFilter(e.target.value);
                 setPage(1);
               }}
+              aria-label="Filter by language"
               className="px-3 py-1.5 text-sm rounded-lg border border-input bg-background text-foreground hover:bg-accent focus:ring-2 focus:ring-ring focus:border-ring"
             >
               <option value="all">All Languages</option>
@@ -228,6 +229,7 @@ export default function GuidesPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       {guide.avatarUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={guide.avatarUrl}
                           alt={`${guide.firstName} ${guide.lastName}`}

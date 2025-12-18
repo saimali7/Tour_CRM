@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@tour/ui";
 import { toast } from "sonner";
+import { PageSpinner, ButtonSpinner } from "@/components/ui/spinner";
 
 export default function BookingDetailPage() {
   const params = useParams();
@@ -406,11 +407,7 @@ export default function BookingDetailPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (error) {
@@ -488,8 +485,9 @@ export default function BookingDetailPage() {
           <button
             onClick={() => router.back()}
             className="p-2 hover:bg-accent rounded-lg transition-colors"
+            aria-label="Go back to bookings list"
           >
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           </button>
           <div>
             <div className="flex items-center gap-3">
@@ -1090,215 +1088,219 @@ export default function BookingDetailPage() {
       )}
 
       {/* Reschedule Modal */}
-      {showRescheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-lg mx-4">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">Reschedule Booking</h2>
-              <button
-                onClick={() => {
-                  setShowRescheduleModal(false);
-                  setSelectedScheduleId(null);
-                }}
-                className="p-2 hover:bg-accent rounded-lg"
-              >
-                <X className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="p-4">
-              <p className="text-sm text-muted-foreground mb-4">
-                Select a new date and time for this booking. The booking will be moved
-                to the selected schedule.
-              </p>
+      <Dialog
+        open={showRescheduleModal}
+        onOpenChange={(open) => {
+          setShowRescheduleModal(open);
+          if (!open) setSelectedScheduleId(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reschedule Booking</DialogTitle>
+            <DialogDescription>
+              Select a new date and time for this booking. The booking will be moved
+              to the selected schedule.
+            </DialogDescription>
+          </DialogHeader>
 
-              {availableSchedules?.data && availableSchedules.data.length > 0 ? (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {availableSchedules.data
-                    .filter((schedule) => schedule.id !== booking.scheduleId)
-                    .map((schedule) => {
-                      const available = schedule.maxParticipants - (schedule.bookedCount || 0);
-                      const hasCapacity = available >= booking.totalParticipants;
-                      return (
-                        <label
-                          key={schedule.id}
-                          className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-                            selectedScheduleId === schedule.id
-                              ? "border-primary bg-primary/5"
-                              : hasCapacity
-                              ? "border-border hover:border-input"
-                              : "border-border opacity-50 cursor-not-allowed"
+          <div className="py-4">
+            {rescheduleMutation.error && (
+              <div className="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive">{rescheduleMutation.error.message}</p>
+              </div>
+            )}
+
+            {availableSchedules?.data && availableSchedules.data.length > 0 ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto" role="radiogroup" aria-label="Available schedules">
+                {availableSchedules.data
+                  .filter((schedule) => schedule.id !== booking.scheduleId)
+                  .map((schedule) => {
+                    const available = schedule.maxParticipants - (schedule.bookedCount || 0);
+                    const hasCapacity = available >= booking.totalParticipants;
+                    return (
+                      <label
+                        key={schedule.id}
+                        className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedScheduleId === schedule.id
+                            ? "border-primary bg-primary/5"
+                            : hasCapacity
+                            ? "border-border hover:border-input"
+                            : "border-border opacity-50 cursor-not-allowed"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="schedule"
+                            value={schedule.id}
+                            checked={selectedScheduleId === schedule.id}
+                            onChange={(e) => setSelectedScheduleId(e.target.value)}
+                            disabled={!hasCapacity}
+                            className="text-primary focus:ring-primary"
+                            aria-label={`${new Intl.DateTimeFormat("en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            }).format(new Date(schedule.startsAt))} - ${available} spots left`}
+                          />
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {new Intl.DateTimeFormat("en-US", {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                              }).format(new Date(schedule.startsAt))}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Intl.DateTimeFormat("en-US", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true,
+                              }).format(new Date(schedule.startsAt))}
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={`text-sm ${
+                            hasCapacity ? "text-muted-foreground" : "text-destructive"
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="schedule"
-                              value={schedule.id}
-                              checked={selectedScheduleId === schedule.id}
-                              onChange={(e) => setSelectedScheduleId(e.target.value)}
-                              disabled={!hasCapacity}
-                              className="text-primary focus:ring-primary"
-                            />
-                            <div>
-                              <p className="font-medium text-foreground">
-                                {new Intl.DateTimeFormat("en-US", {
-                                  weekday: "short",
-                                  month: "short",
-                                  day: "numeric",
-                                }).format(new Date(schedule.startsAt))}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Intl.DateTimeFormat("en-US", {
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                  hour12: true,
-                                }).format(new Date(schedule.startsAt))}
-                              </p>
-                            </div>
-                          </div>
-                          <span
-                            className={`text-sm ${
-                              hasCapacity ? "text-muted-foreground" : "text-destructive"
-                            }`}
-                          >
-                            {hasCapacity
-                              ? `${available} spots left`
-                              : "Not enough spots"}
-                          </span>
-                        </label>
-                      );
-                    })}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">
-                  No other available schedules for this tour
-                </p>
-              )}
-
-              {rescheduleMutation.error && (
-                <div className="mt-4 p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
-                  <p className="text-sm text-destructive">{rescheduleMutation.error.message}</p>
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-border">
-              <button
-                onClick={() => {
-                  setShowRescheduleModal(false);
-                  setSelectedScheduleId(null);
-                }}
-                className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReschedule}
-                disabled={!selectedScheduleId || rescheduleMutation.isPending}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-              >
-                {rescheduleMutation.isPending ? "Rescheduling..." : "Confirm Reschedule"}
-              </button>
-            </div>
+                          {hasCapacity
+                            ? `${available} spots left`
+                            : "Not enough spots"}
+                        </span>
+                      </label>
+                    );
+                  })}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">
+                No other available schedules for this tour
+              </p>
+            )}
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setShowRescheduleModal(false);
+                setSelectedScheduleId(null);
+              }}
+              className="px-4 py-2 text-foreground hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReschedule}
+              disabled={!selectedScheduleId || rescheduleMutation.isPending}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 inline-flex items-center"
+            >
+              {rescheduleMutation.isPending && <ButtonSpinner />}
+              {rescheduleMutation.isPending ? "Rescheduling..." : "Confirm Reschedule"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Refund Modal */}
-      {showRefundModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">Issue Refund</h2>
-              <button
-                onClick={() => setShowRefundModal(false)}
-                className="p-2 hover:bg-accent rounded-lg"
-              >
-                <X className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Refund Amount
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    $
-                  </span>
-                  <input
-                    type="text"
-                    value={refundAmount}
-                    onChange={(e) => setRefundAmount(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                    placeholder="0.00"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Max refund: ${parseFloat(booking.total).toFixed(2)}
-                </p>
-              </div>
+      <Dialog open={showRefundModal} onOpenChange={setShowRefundModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Issue Refund</DialogTitle>
+            <DialogDescription>
+              Process a refund for this booking. The customer will be notified once processed.
+            </DialogDescription>
+          </DialogHeader>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Reason
-                </label>
-                <select
-                  value={refundReason}
-                  onChange={(e) =>
-                    setRefundReason(
-                      e.target.value as "customer_request" | "booking_cancelled" | "other"
-                    )
-                  }
-                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option value="customer_request">Customer Request</option>
-                  <option value="booking_cancelled">Booking Cancelled</option>
-                  <option value="other">Other</option>
-                </select>
+          <div className="py-4 space-y-4">
+            {createRefundMutation.error && (
+              <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive">{createRefundMutation.error.message}</p>
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Notes (optional)
-                </label>
-                <textarea
-                  value={refundNotes}
-                  onChange={(e) => setRefundNotes(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                  placeholder="Additional details about this refund..."
+            <div>
+              <label htmlFor="refund-amount" className="block text-sm font-medium text-foreground mb-1">
+                Refund Amount
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
+                <input
+                  id="refund-amount"
+                  type="text"
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                  placeholder="0.00"
+                  aria-describedby="refund-amount-help"
                 />
               </div>
-
-              {createRefundMutation.error && (
-                <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
-                  <p className="text-sm text-destructive">{createRefundMutation.error.message}</p>
-                </div>
-              )}
+              <p id="refund-amount-help" className="text-xs text-muted-foreground mt-1">
+                Max refund: ${parseFloat(booking.total).toFixed(2)}
+              </p>
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-border">
-              <button
-                onClick={() => setShowRefundModal(false)}
-                className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateRefund}
-                disabled={
-                  !refundAmount ||
-                  parseFloat(refundAmount) <= 0 ||
-                  parseFloat(refundAmount) > parseFloat(booking.total) ||
-                  createRefundMutation.isPending
+
+            <div>
+              <label htmlFor="refund-reason" className="block text-sm font-medium text-foreground mb-1">
+                Reason
+              </label>
+              <select
+                id="refund-reason"
+                value={refundReason}
+                onChange={(e) =>
+                  setRefundReason(
+                    e.target.value as "customer_request" | "booking_cancelled" | "other"
+                  )
                 }
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
               >
-                {createRefundMutation.isPending ? "Processing..." : "Issue Refund"}
-              </button>
+                <option value="customer_request">Customer Request</option>
+                <option value="booking_cancelled">Booking Cancelled</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="refund-notes" className="block text-sm font-medium text-foreground mb-1">
+                Notes (optional)
+              </label>
+              <textarea
+                id="refund-notes"
+                value={refundNotes}
+                onChange={(e) => setRefundNotes(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                placeholder="Additional details about this refund..."
+              />
             </div>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <button
+              onClick={() => setShowRefundModal(false)}
+              className="px-4 py-2 text-foreground hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateRefund}
+              disabled={
+                !refundAmount ||
+                parseFloat(refundAmount) <= 0 ||
+                parseFloat(refundAmount) > parseFloat(booking.total) ||
+                createRefundMutation.isPending
+              }
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 inline-flex items-center"
+            >
+              {createRefundMutation.isPending && <ButtonSpinner />}
+              {createRefundMutation.isPending ? "Processing..." : "Issue Refund"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel Booking Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
@@ -1341,188 +1343,200 @@ export default function BookingDetailPage() {
       </Dialog>
 
       {/* Record Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">Record Payment</h2>
-              <button
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setPaymentAmount("");
-                  setPaymentReference("");
-                  setPaymentNotes("");
-                }}
-                className="p-2 hover:bg-accent rounded-lg"
-              >
-                <X className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Amount <span className="text-destructive">*</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                    placeholder="0.00"
-                  />
-                </div>
-                {balanceInfo && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Balance due: ${parseFloat(balanceInfo.balance).toFixed(2)}
-                  </p>
-                )}
-              </div>
+      <Dialog
+        open={showPaymentModal}
+        onOpenChange={(open) => {
+          setShowPaymentModal(open);
+          if (!open) {
+            setPaymentAmount("");
+            setPaymentReference("");
+            setPaymentNotes("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              Record a manual payment for this booking. Use this for cash, check, or bank transfers.
+            </DialogDescription>
+          </DialogHeader>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Payment Method <span className="text-destructive">*</span>
-                </label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card" | "bank_transfer" | "check" | "other")}
-                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="check">Check</option>
-                  <option value="other">Other</option>
-                </select>
+          <div className="py-4 space-y-4">
+            {createPaymentMutation.error && (
+              <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive">{createPaymentMutation.error.message}</p>
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Reference (optional)
-                </label>
+            <div>
+              <label htmlFor="payment-amount" className="block text-sm font-medium text-foreground mb-1">
+                Amount <span className="text-destructive">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  $
+                </span>
                 <input
-                  type="text"
-                  value={paymentReference}
-                  onChange={(e) => setPaymentReference(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                  placeholder="Transaction ID, check number, etc."
+                  id="payment-amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                  placeholder="0.00"
+                  aria-describedby="payment-amount-help"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  For tracking purposes (e.g., transaction ID, check number)
+              </div>
+              {balanceInfo && (
+                <p id="payment-amount-help" className="text-xs text-muted-foreground mt-1">
+                  Balance due: ${parseFloat(balanceInfo.balance).toFixed(2)}
                 </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                  Notes (optional)
-                </label>
-                <textarea
-                  value={paymentNotes}
-                  onChange={(e) => setPaymentNotes(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                  placeholder="Additional details about this payment..."
-                />
-              </div>
-
-              {createPaymentMutation.error && (
-                <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
-                  <p className="text-sm text-destructive">{createPaymentMutation.error.message}</p>
-                </div>
               )}
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-border">
-              <button
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setPaymentAmount("");
-                  setPaymentReference("");
-                  setPaymentNotes("");
-                }}
-                className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
+
+            <div>
+              <label htmlFor="payment-method" className="block text-sm font-medium text-foreground mb-1">
+                Payment Method <span className="text-destructive">*</span>
+              </label>
+              <select
+                id="payment-method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card" | "bank_transfer" | "check" | "other")}
+                className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleRecordPayment}
-                disabled={
-                  !paymentAmount ||
-                  parseFloat(paymentAmount) <= 0 ||
-                  createPaymentMutation.isPending
-                }
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-              >
-                {createPaymentMutation.isPending ? "Recording..." : "Record Payment"}
-              </button>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="check">Check</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="payment-reference" className="block text-sm font-medium text-foreground mb-1">
+                Reference (optional)
+              </label>
+              <input
+                id="payment-reference"
+                type="text"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                placeholder="Transaction ID, check number, etc."
+                aria-describedby="payment-reference-help"
+              />
+              <p id="payment-reference-help" className="text-xs text-muted-foreground mt-1">
+                For tracking purposes (e.g., transaction ID, check number)
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="payment-notes" className="block text-sm font-medium text-foreground mb-1">
+                Notes (optional)
+              </label>
+              <textarea
+                id="payment-notes"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                placeholder="Additional details about this payment..."
+              />
             </div>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setShowPaymentModal(false);
+                setPaymentAmount("");
+                setPaymentReference("");
+                setPaymentNotes("");
+              }}
+              className="px-4 py-2 text-foreground hover:bg-accent rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleRecordPayment}
+              disabled={
+                !paymentAmount ||
+                parseFloat(paymentAmount) <= 0 ||
+                createPaymentMutation.isPending
+              }
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 inline-flex items-center"
+            >
+              {createPaymentMutation.isPending && <ButtonSpinner />}
+              {createPaymentMutation.isPending ? "Recording..." : "Record Payment"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Link Modal */}
-      {showPaymentLinkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">Payment Link Generated</h2>
-              <button
-                onClick={() => {
-                  setShowPaymentLinkModal(false);
-                  setPaymentLinkUrl("");
-                }}
-                className="p-2 hover:bg-accent rounded-lg"
-              >
-                <X className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Share this payment link with the customer. They can use it to pay online via Stripe.
+      <Dialog
+        open={showPaymentLinkModal}
+        onOpenChange={(open) => {
+          setShowPaymentLinkModal(open);
+          if (!open) setPaymentLinkUrl("");
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Payment Link Generated</DialogTitle>
+            <DialogDescription>
+              Share this payment link with the customer. They can use it to pay online via Stripe.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Payment Link</p>
+              <p className="text-sm text-foreground font-mono break-all" aria-label="Payment link URL">
+                {paymentLinkUrl}
               </p>
-
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Payment Link</p>
-                <p className="text-sm text-foreground font-mono break-all">
-                  {paymentLinkUrl}
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCopyPaymentLink}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy Link
-                </button>
-                <button
-                  onClick={handleSendPaymentLink}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  <Send className="h-4 w-4" />
-                  Email Customer
-                </button>
-              </div>
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-border">
+
+            <div className="flex gap-2">
               <button
-                onClick={() => {
-                  setShowPaymentLinkModal(false);
-                  setPaymentLinkUrl("");
-                }}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                onClick={handleCopyPaymentLink}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors"
+                aria-label="Copy payment link to clipboard"
               >
-                Done
+                <Copy className="h-4 w-4" aria-hidden="true" />
+                Copy Link
+              </button>
+              <button
+                onClick={handleSendPaymentLink}
+                disabled={sendPaymentLinkEmailMutation.isPending}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                aria-label="Send payment link via email"
+              >
+                {sendPaymentLinkEmailMutation.isPending ? (
+                  <ButtonSpinner />
+                ) : (
+                  <Send className="h-4 w-4" aria-hidden="true" />
+                )}
+                Email Customer
               </button>
             </div>
           </div>
-        </div>
-      )}
+
+          <DialogFooter>
+            <button
+              onClick={() => {
+                setShowPaymentLinkModal(false);
+                setPaymentLinkUrl("");
+              }}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Done
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm Modal */}
       {confirmModal.ConfirmModal}

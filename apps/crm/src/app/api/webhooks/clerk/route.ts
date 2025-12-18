@@ -3,13 +3,14 @@ import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
 import { db, eq } from "@tour/database";
 import { users } from "@tour/database/schema";
+import { webhookLogger } from "@tour/services";
 
 export async function POST(req: Request) {
   // Get the webhook secret from environment variables
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
-    console.error("[Clerk Webhook] Missing CLERK_WEBHOOK_SECRET environment variable");
+    webhookLogger.error("Missing CLERK_WEBHOOK_SECRET environment variable");
     return new Response("Webhook secret not configured", { status: 500 });
   }
 
@@ -41,14 +42,14 @@ export async function POST(req: Request) {
       "svix-signature": svix_signature,
     }) as WebhookEvent;
   } catch (err) {
-    console.error("[Clerk Webhook] Error verifying webhook:", err);
+    webhookLogger.error({ err }, "Error verifying Clerk webhook");
     return new Response("Error verifying webhook", { status: 400 });
   }
 
   // Handle the webhook
   const eventType = evt.type;
 
-  console.log(`[Clerk Webhook] Event received: ${eventType}`);
+  webhookLogger.info({ eventType }, "Clerk webhook event received");
 
   try {
     switch (eventType) {
@@ -65,12 +66,12 @@ export async function POST(req: Request) {
         break;
 
       default:
-        console.log(`[Clerk Webhook] Unhandled event type: ${eventType}`);
+        webhookLogger.info({ eventType }, "Unhandled Clerk webhook event type");
     }
 
     return new Response("Webhook processed successfully", { status: 200 });
   } catch (error) {
-    console.error(`[Clerk Webhook] Error processing ${eventType}:`, error);
+    webhookLogger.error({ eventType, error }, "Error processing Clerk webhook");
     return new Response("Error processing webhook", { status: 500 });
   }
 }
@@ -94,7 +95,7 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
   const primaryEmail = email_addresses?.[0]?.email_address;
 
   if (!primaryEmail) {
-    console.error("[Clerk Webhook] User created without email address:", id);
+    webhookLogger.error({ clerkUserId: id }, "User created without email address");
     return;
   }
 
@@ -104,7 +105,7 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
   });
 
   if (existingUser) {
-    console.log(`[Clerk Webhook] User ${id} already exists in database`);
+    webhookLogger.info({ clerkUserId: id }, "User already exists in database (idempotent)");
     return;
   }
 
@@ -123,7 +124,7 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
 
   const newUser = result[0];
   if (newUser) {
-    console.log(`[Clerk Webhook] Created user ${newUser.id} from Clerk user ${id}`);
+    webhookLogger.info({ userId: newUser.id, clerkUserId: id }, "Created user from Clerk");
   }
 }
 
@@ -174,7 +175,7 @@ async function handleUserUpdated(data: WebhookEvent["data"]) {
 
   const updatedUser = updateResult[0];
   if (updatedUser) {
-    console.log(`[Clerk Webhook] Updated user ${updatedUser.id} from Clerk user ${id}`);
+    webhookLogger.info({ userId: updatedUser.id, clerkUserId: id }, "Updated user from Clerk");
   }
 }
 
@@ -193,12 +194,12 @@ async function handleUserDeleted(data: WebhookEvent["data"]) {
   });
 
   if (!existingUser) {
-    console.log(`[Clerk Webhook] User ${id} not found in database (already deleted?)`);
+    webhookLogger.info({ clerkUserId: id }, "User not found in database (already deleted?)");
     return;
   }
 
   // Delete the user (cascade will handle organization memberships)
   await db.delete(users).where(eq(users.clerkId, id));
 
-  console.log(`[Clerk Webhook] Deleted user with Clerk ID ${id}`);
+  webhookLogger.info({ clerkUserId: id }, "Deleted user from Clerk");
 }

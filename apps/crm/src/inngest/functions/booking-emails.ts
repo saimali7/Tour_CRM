@@ -1,10 +1,19 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
-import { createServices } from "@tour/services";
+import { createServices, logger } from "@tour/services";
 import { db, bookings, organizations, type Booking } from "@tour/database";
 import { eq, and } from "drizzle-orm";
 import { format } from "date-fns";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
+import {
+  validateEventData,
+  bookingCreatedSchema,
+  bookingConfirmedSchema,
+  bookingCancelledSchema,
+  bookingRescheduledSchema,
+  bookingReminderSchema,
+  refundProcessedSchema,
+} from "../schemas";
 
 // Type for booking with relations for daily reminder query
 interface BookingWithRelations extends Booking {
@@ -39,7 +48,10 @@ export const sendBookingCreatedEmail = inngest.createFunction(
   },
   { event: "booking/created" },
   async ({ event, step }) => {
-    const { data } = event;
+    // Validate event data
+    const data = validateEventData(bookingCreatedSchema, event.data, "booking/created");
+
+    logger.info({ eventId: event.id, bookingId: data.bookingId }, "Processing booking/created email");
 
     // Get organization details for email branding
     const org = await step.run("get-organization", async () => {
@@ -67,7 +79,7 @@ export const sendBookingCreatedEmail = inngest.createFunction(
         tourTime: data.tourTime,
         participants: data.participants,
         totalAmount: data.totalAmount,
-        currency: data.currency,
+        currency: data.currency ?? "USD",
         meetingPoint: data.meetingPoint,
         meetingPointDetails: data.meetingPointDetails,
       });
@@ -105,7 +117,10 @@ export const sendBookingConfirmationEmail = inngest.createFunction(
   },
   { event: "booking/confirmed" },
   async ({ event, step }) => {
-    const { data } = event;
+    // Validate event data
+    const data = validateEventData(bookingConfirmedSchema, event.data, "booking/confirmed");
+
+    logger.info({ eventId: event.id, bookingId: data.bookingId }, "Processing booking/confirmed email");
 
     // Get organization details for email branding
     const org = await step.run("get-organization", async () => {
@@ -133,7 +148,7 @@ export const sendBookingConfirmationEmail = inngest.createFunction(
         tourTime: data.tourTime,
         participants: data.participants,
         totalAmount: data.totalAmount,
-        currency: data.currency,
+        currency: data.currency ?? "USD",
         meetingPoint: data.meetingPoint,
         meetingPointDetails: data.meetingPointDetails,
       });
@@ -171,7 +186,10 @@ export const sendBookingCancellationEmail = inngest.createFunction(
   },
   { event: "booking/cancelled" },
   async ({ event, step }) => {
-    const { data } = event;
+    // Validate event data
+    const data = validateEventData(bookingCancelledSchema, event.data, "booking/cancelled");
+
+    logger.info({ eventId: event.id, bookingId: data.bookingId }, "Processing booking/cancelled email");
 
     // Get organization details
     const org = await step.run("get-organization", async () => {
@@ -197,7 +215,7 @@ export const sendBookingCancellationEmail = inngest.createFunction(
         tourDate: data.tourDate,
         tourTime: data.tourTime,
         refundAmount: data.refundAmount,
-        currency: data.currency,
+        currency: data.currency ?? "USD",
         cancellationReason: data.cancellationReason,
       });
     });
@@ -234,7 +252,10 @@ export const sendBookingRescheduleEmail = inngest.createFunction(
   },
   { event: "booking/rescheduled" },
   async ({ event, step }) => {
-    const { data } = event;
+    // Validate event data
+    const data = validateEventData(bookingRescheduledSchema, event.data, "booking/rescheduled");
+
+    logger.info({ eventId: event.id, bookingId: data.bookingId }, "Processing booking/rescheduled email");
 
     // Get organization details
     const org = await step.run("get-organization", async () => {
@@ -304,7 +325,10 @@ export const sendBookingReminderEmail = inngest.createFunction(
   },
   { event: "booking/reminder" },
   async ({ event, step }) => {
-    const { data } = event;
+    // Validate event data
+    const data = validateEventData(bookingReminderSchema, event.data, "booking/reminder");
+
+    logger.info({ eventId: event.id, bookingId: data.bookingId }, "Processing booking/reminder email");
 
     // Get organization details
     const org = await step.run("get-organization", async () => {
@@ -372,7 +396,10 @@ export const sendRefundProcessedEmail = inngest.createFunction(
   },
   { event: "refund/processed" },
   async ({ event, step }) => {
-    const { data } = event;
+    // Validate event data
+    const data = validateEventData(refundProcessedSchema, event.data, "refund/processed");
+
+    logger.info({ eventId: event.id, bookingId: data.bookingId }, "Processing refund/processed email");
 
     // Get organization details
     const org = await step.run("get-organization", async () => {
@@ -410,7 +437,7 @@ export const sendRefundProcessedEmail = inngest.createFunction(
         tourDate,
         tourTime,
         refundAmount: data.refundAmount,
-        currency: data.currency,
+        currency: data.currency ?? "USD",
         refundReason: data.reason || "Customer request",
       });
     });

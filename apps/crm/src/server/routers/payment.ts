@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
+import { createRouter, protectedProcedure, adminProcedure, sensitiveProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 
 const dateRangeSchema = z.object({
@@ -92,9 +92,9 @@ export const paymentRouter = createRouter({
     }),
 
   /**
-   * Create a new payment (admin only)
+   * Create a new payment (admin only, rate limited)
    */
-  create: adminProcedure
+  create: sensitiveProcedure
     .input(createPaymentSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -139,9 +139,9 @@ export const paymentRouter = createRouter({
     }),
 
   /**
-   * Delete a payment (admin only)
+   * Delete a payment (admin only, rate limited)
    */
-  delete: adminProcedure
+  delete: sensitiveProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });

@@ -15,6 +15,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "./types";
+import { paymentLogger } from "./lib/logger";
 
 export interface PaymentFilters {
   bookingId?: string;
@@ -211,10 +212,19 @@ export class PaymentService extends BaseService {
     const balanceInfo = await this.getBookingBalance(input.bookingId);
     const currentBalance = parseFloat(balanceInfo.balance);
 
-    // Warn if overpayment (but allow it)
-    if (amount > currentBalance) {
-      console.warn(
-        `Payment of ${input.amount} exceeds remaining balance of ${currentBalance} for booking ${input.bookingId}`
+    // Prevent overpayment - this is a business logic error
+    // If you need to allow overpayments (e.g., for credits), use a different method
+    if (amount > currentBalance && currentBalance > 0) {
+      throw new ValidationError(
+        `Payment amount ($${amount.toFixed(2)}) exceeds remaining balance ($${currentBalance.toFixed(2)}). ` +
+        `Please enter an amount of $${currentBalance.toFixed(2)} or less.`
+      );
+    }
+
+    // Prevent payment when already fully paid
+    if (currentBalance <= 0) {
+      throw new ValidationError(
+        "This booking is already fully paid. No additional payment is needed."
       );
     }
 
@@ -235,6 +245,11 @@ export class PaymentService extends BaseService {
       .returning();
 
     if (!payment) {
+      paymentLogger.error({
+        organizationId: this.organizationId,
+        bookingId: input.bookingId,
+        amount: input.amount,
+      }, "Failed to create payment record");
       throw new Error("Failed to create payment");
     }
 
@@ -264,6 +279,18 @@ export class PaymentService extends BaseService {
           eq(bookings.organizationId, this.organizationId)
         )
       );
+
+    paymentLogger.info({
+      organizationId: this.organizationId,
+      paymentId: payment.id,
+      bookingId: input.bookingId,
+      amount: input.amount,
+      method: input.method,
+      previousStatus: booking.paymentStatus,
+      newStatus: newPaymentStatus,
+      totalPaid: newBalanceInfo.totalPaid,
+      balance: newBalanceInfo.balance,
+    }, "Payment recorded successfully");
 
     return payment;
   }
