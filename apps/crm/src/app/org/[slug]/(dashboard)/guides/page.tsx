@@ -123,7 +123,7 @@ export default function GuidesPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-6xl">
       {/* Header: Title + Inline Stats + Add Guide */}
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-6">

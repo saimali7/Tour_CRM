@@ -181,7 +181,7 @@ export class TourService extends BaseService {
 
     // Get schedule stats for these tours in a separate query
     const tourIds = toursResult.map(t => t.id);
-    const now = new Date();
+    const now = new Date().toISOString();
 
     const scheduleStats = await this.db
       .select({

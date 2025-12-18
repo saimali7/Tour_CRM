@@ -152,52 +152,53 @@
 
 /* =============================================================================
    CSS VARIABLES - Dark Theme
+   Inspired by Linear, Vercel, and Raycast - deep blacks with subtle elevation
    =============================================================================*/
 
 .dark {
-  /* Near-black background */
-  --background: 0 0% 4%;               /* #0a0a0a - near black */
-  --foreground: 0 0% 95%;              /* #f2f2f2 - bright text */
+  /* True black background - Linear/Vercel style */
+  --background: 0 0% 3.5%;             /* #090909 - true dark */
+  --foreground: 0 0% 93%;              /* #ededed - slightly softer white */
 
-  /* Elevated surfaces */
-  --card: 0 0% 7%;                     /* #121212 - slightly elevated */
-  --card-foreground: 0 0% 95%;
+  /* Elevated surfaces - subtle layering system */
+  --card: 0 0% 5.5%;                   /* #0e0e0e - cards lift off background */
+  --card-foreground: 0 0% 93%;
 
-  --popover: 0 0% 9%;                  /* #171717 - popover elevation */
+  --popover: 0 0% 7%;                  /* #121212 - popovers above cards */
   --popover-foreground: 0 0% 95%;
 
-  /* Primary - brighter blue for contrast */
-  --primary: 217 91% 60%;              /* #3b82f6 */
+  /* Primary - vibrant but not harsh */
+  --primary: 217 91% 60%;              /* #3b82f6 - blue */
   --primary-foreground: 0 0% 100%;
 
-  /* Secondary surfaces */
-  --secondary: 0 0% 12%;               /* #1f1f1f */
-  --secondary-foreground: 0 0% 95%;
+  /* Secondary surfaces - subtle distinction */
+  --secondary: 0 0% 9%;                /* #171717 */
+  --secondary-foreground: 0 0% 90%;
 
-  /* Muted for disabled/secondary text */
-  --muted: 0 0% 12%;                   /* #1f1f1f */
-  --muted-foreground: 0 0% 60%;        /* #999999 */
+  /* Muted - refined hierarchy */
+  --muted: 0 0% 9%;                    /* #171717 */
+  --muted-foreground: 0 0% 55%;        /* #8c8c8c - softer secondary text */
 
-  /* Accent for hover states */
-  --accent: 0 0% 15%;                  /* #262626 */
-  --accent-foreground: 0 0% 95%;
+  /* Accent for hover states - visible but subtle */
+  --accent: 0 0% 12%;                  /* #1f1f1f */
+  --accent-foreground: 0 0% 93%;
 
-  /* Semantic colors - adjusted for dark bg */
-  --destructive: 0 72% 51%;            /* #dc2626 - same red, full saturation */
+  /* Semantic colors - desaturated for dark mode comfort */
+  --destructive: 0 62% 50%;            /* Slightly muted red */
   --destructive-foreground: 0 0% 100%;
 
-  --success: 160 84% 39%;              /* #059669 - full green */
+  --success: 160 60% 40%;              /* Muted green - easier on eyes */
   --success-foreground: 0 0% 100%;
 
-  --warning: 38 92% 50%;               /* #f59e0b - full amber */
+  --warning: 38 75% 50%;               /* Muted amber */
   --warning-foreground: 0 0% 0%;
 
-  --info: 217 91% 60%;                 /* #3b82f6 */
+  --info: 217 80% 58%;                 /* Slightly muted blue */
   --info-foreground: 0 0% 100%;
 
-  /* Borders - subtle but visible */
-  --border: 0 0% 18%;                  /* #2e2e2e */
-  --input: 0 0% 15%;                   /* #262626 */
+  /* Borders - visible but not harsh */
+  --border: 0 0% 14%;                  /* #242424 - clear separation */
+  --input: 0 0% 12%;                   /* #1f1f1f */
   --ring: 217 91% 60%;                 /* matches primary */
 }
 
@@ -338,6 +339,154 @@ body {
 .payment-failed {
   background-color: hsl(0 72% 95%);
   color: hsl(0 72% 30%);
+}
+
+/* =============================================================================
+   DARK MODE STATUS COLORS
+   Muted, comfortable colors that don't clash with dark backgrounds
+   Inspired by Linear and GitHub dark mode
+   =============================================================================*/
+
+/* Dark mode booking status - muted backgrounds with softer text */
+.dark .status-pending {
+  background-color: hsl(38 50% 12%);
+  color: hsl(38 70% 65%);
+  border-color: hsl(38 40% 25%);
+}
+
+.dark .status-confirmed {
+  background-color: hsl(160 45% 12%);
+  color: hsl(160 55% 55%);
+  border-color: hsl(160 35% 25%);
+}
+
+.dark .status-completed {
+  background-color: hsl(217 50% 14%);
+  color: hsl(217 70% 65%);
+  border-color: hsl(217 40% 28%);
+}
+
+.dark .status-cancelled {
+  background-color: hsl(0 45% 14%);
+  color: hsl(0 60% 60%);
+  border-color: hsl(0 35% 25%);
+}
+
+.dark .status-no-show {
+  background-color: hsl(0 0% 14%);
+  color: hsl(0 0% 60%);
+  border-color: hsl(0 0% 22%);
+}
+
+/* Dark mode payment status */
+.dark .payment-pending {
+  background-color: hsl(38 50% 12%);
+  color: hsl(38 70% 65%);
+}
+
+.dark .payment-partial {
+  background-color: hsl(24 55% 13%);
+  color: hsl(24 70% 60%);
+}
+
+.dark .payment-paid {
+  background-color: hsl(160 45% 12%);
+  color: hsl(160 55% 55%);
+}
+
+.dark .payment-refunded {
+  background-color: hsl(270 40% 15%);
+  color: hsl(270 55% 65%);
+}
+
+.dark .payment-failed {
+  background-color: hsl(0 45% 14%);
+  color: hsl(0 60% 60%);
+}
+
+/* Dark mode schedule status for calendar */
+.dark .schedule-status-scheduled {
+  background-color: hsl(217 50% 14%);
+  color: hsl(217 70% 70%);
+  border-left-color: hsl(217 80% 55%);
+}
+
+.dark .schedule-status-in_progress {
+  background-color: hsl(38 50% 12%);
+  color: hsl(38 70% 65%);
+  border-left-color: hsl(38 70% 50%);
+}
+
+.dark .schedule-status-completed {
+  background-color: hsl(160 45% 12%);
+  color: hsl(160 55% 55%);
+  border-left-color: hsl(160 55% 45%);
+}
+
+.dark .schedule-status-cancelled {
+  background-color: hsl(0 45% 14%);
+  color: hsl(0 60% 60%);
+  border-left-color: hsl(0 55% 50%);
+}
+
+/* =============================================================================
+   DARK MODE ENHANCEMENTS
+   Additional refinements for premium dark mode experience
+   =============================================================================*/
+
+/* Cards get subtle glow/ring in dark mode for depth */
+.dark .card,
+.dark [class*="rounded-lg"][class*="border"][class*="bg-card"] {
+  box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.03);
+}
+
+/* Tables - softer row borders */
+.dark table tbody tr {
+  border-color: hsl(0 0% 12%);
+}
+
+/* Input fields - subtle inset feel */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: hsl(0 0% 5%);
+  box-shadow: inset 0 1px 2px hsl(0 0% 0% / 0.3);
+}
+
+/* Buttons - subtle depth */
+.dark button[class*="bg-primary"] {
+  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.4), inset 0 1px 0 hsl(0 0% 100% / 0.1);
+}
+
+/* Focus states - more visible in dark */
+.dark *:focus-visible {
+  outline-color: hsl(217 91% 65%);
+  outline-offset: 2px;
+}
+
+/* Selection - tinted with primary */
+.dark ::selection {
+  background-color: hsl(217 91% 60% / 0.35);
+  color: hsl(0 0% 100%);
+}
+
+/* Scrollbars - dark mode friendly */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: hsl(0 0% 6%);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 20%);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: hsl(0 0% 28%);
 }
 
 /* =============================================================================

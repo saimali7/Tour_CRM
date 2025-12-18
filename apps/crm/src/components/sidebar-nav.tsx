@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  CalendarDays,
-  Users,
-  Map,
   Calendar,
-  UserCircle,
-  Settings,
+  ClipboardList,
+  Map,
+  Users,
+  Flag,
   BarChart3,
+  Settings,
   LucideIcon,
   ChevronsLeft,
   ChevronsRight,
@@ -22,6 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Kbd } from "@/components/ui/kbd";
 import { useSidebar } from "@/components/sidebar-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useEffect } from "react";
@@ -35,15 +36,15 @@ interface NavItem {
   badge?: number;
 }
 
-// Flat navigation with keyboard shortcuts - no section headers
-// Linear/Vercel-style: clean, keyboard-first
+// Flat navigation with keyboard shortcuts
+// Icons chosen for instant recognition
 const navItems: NavItem[] = [
-  { name: "Today", href: "", icon: LayoutDashboard, shortcut: "1" },
+  { name: "Dashboard", href: "", icon: LayoutDashboard, shortcut: "1" },
   { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "2" },
-  { name: "Bookings", href: "/bookings", icon: CalendarDays, shortcut: "3" },
+  { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "3" },
   { name: "Tours", href: "/tours", icon: Map, shortcut: "4" },
   { name: "Customers", href: "/customers", icon: Users, shortcut: "5" },
-  { name: "Guides", href: "/guides", icon: UserCircle, shortcut: "6" },
+  { name: "Guides", href: "/guides", icon: Flag, shortcut: "6" },
   { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "7" },
 ];
 
@@ -111,7 +112,7 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
               >
                 {/* Left active indicator - Linear style */}
                 {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary-foreground/80 rounded-r-full" />
+                  <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-foreground rounded-full" />
                 )}
 
                 <item.icon
@@ -126,14 +127,16 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
                     <span className="flex-1">{item.name}</span>
                     {/* Keyboard shortcut */}
                     {item.shortcut && (
-                      <kbd className={cn(
-                        "hidden lg:inline-flex h-5 min-w-5 items-center justify-center rounded px-1 font-mono text-[10px] transition-colors",
-                        isActive
-                          ? "bg-primary-foreground/20 text-primary-foreground/70"
-                          : "bg-muted text-muted-foreground/60 group-hover:bg-accent-foreground/10"
-                      )}>
-                        ⌘{item.shortcut}
-                      </kbd>
+                      <Kbd
+                        className={cn(
+                          "hidden lg:inline-flex h-5 rounded px-1.5 transition-colors",
+                          isActive
+                            ? "bg-primary-foreground/20 text-primary-foreground/70"
+                            : "bg-muted text-muted-foreground/60 group-hover:bg-accent-foreground/10"
+                        )}
+                      >
+                        {item.shortcut}
+                      </Kbd>
                     )}
                     {/* Badge */}
                     {item.badge && item.badge > 0 && (
@@ -157,7 +160,7 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
                     <TooltipContent side="right" className="flex items-center gap-2">
                       <span className="font-medium">{item.name}</span>
                       {item.shortcut && (
-                        <kbd className="text-[10px] text-muted-foreground">⌘{item.shortcut}</kbd>
+                        <Kbd className="text-muted-foreground">{item.shortcut}</Kbd>
                       )}
                     </TooltipContent>
                   </Tooltip>
@@ -194,7 +197,7 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
             </TooltipTrigger>
             <TooltipContent side="right" className="flex items-center gap-2">
               <span className="font-medium">Settings</span>
-              <kbd className="text-[10px] text-muted-foreground">⌘0</kbd>
+              <Kbd className="text-muted-foreground">0</Kbd>
             </TooltipContent>
           </Tooltip>
         ) : (
@@ -209,9 +212,9 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
           >
             <Settings className="h-[18px] w-[18px]" />
             <span className="flex-1">Settings</span>
-            <kbd className="hidden lg:inline-flex h-5 min-w-5 items-center justify-center rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground/60 group-hover:bg-accent-foreground/10">
-              ⌘0
-            </kbd>
+            <Kbd className="hidden lg:inline-flex h-5 rounded bg-muted px-1.5 text-muted-foreground/60 group-hover:bg-accent-foreground/10">
+              0
+            </Kbd>
           </Link>
         )}
 
@@ -240,7 +243,7 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
             </TooltipTrigger>
             <TooltipContent side={isCollapsed ? "right" : "top"}>
               {isCollapsed ? "Expand" : "Collapse"}
-              <span className="ml-2 text-[10px] text-muted-foreground">⌘\</span>
+              <Kbd className="ml-2 text-muted-foreground">\</Kbd>
             </TooltipContent>
           </Tooltip>
         </div>

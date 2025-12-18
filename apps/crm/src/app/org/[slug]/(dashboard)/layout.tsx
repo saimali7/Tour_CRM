@@ -63,12 +63,12 @@ export default async function DashboardLayout({
         />
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-background">
           {/* Mobile header */}
           <MobileHeader organization={organization} slug={slug} />
 
-          {/* Page content */}
-          <div className="p-6">
+          {/* Page content - responsive padding, constrained max-width for readability */}
+          <div className="px-4 py-6 sm:px-6 lg:px-8">
             <DashboardProviders orgSlug={slug}>{children}</DashboardProviders>
           </div>
         </main>

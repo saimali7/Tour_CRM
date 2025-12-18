@@ -88,8 +88,15 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
         setOpen((prev) => !prev);
       }
     };
+    // Listen for custom event to open command palette
+    const handleOpenCommand = () => setOpen(true);
+
     document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+    document.addEventListener("open-command-palette", handleOpenCommand);
+    return () => {
+      document.removeEventListener("keydown", down);
+      document.removeEventListener("open-command-palette", handleOpenCommand);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -144,9 +151,12 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
         <span className="flex-1 text-left text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
           Search...
         </span>
-        <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded-md border border-border/50 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground/50">
-          ⌘K
-        </kbd>
+        <span className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded-md border border-border/50 bg-background/50 px-1.5 text-[10px] font-medium text-muted-foreground/50">
+          <svg className="h-2.5 w-2.5 opacity-60" viewBox="0 0 16 16" fill="currentColor">
+            <path fillRule="evenodd" clipRule="evenodd" d="M3.5 2C2.67157 2 2 2.67157 2 3.5C2 4.32843 2.67157 5 3.5 5H5V3.5C5 2.67157 4.32843 2 3.5 2ZM6 5V3.5C6 2.11929 4.88071 1 3.5 1C2.11929 1 1 2.11929 1 3.5C1 4.88071 2.11929 6 3.5 6H5V10H3.5C2.11929 10 1 11.1193 1 12.5C1 13.8807 2.11929 15 3.5 15C4.88071 15 6 13.8807 6 12.5V11H10V12.5C10 13.8807 11.1193 15 12.5 15C13.8807 15 15 13.8807 15 12.5C15 11.1193 13.8807 10 12.5 10H11V6H12.5C13.8807 6 15 4.88071 15 3.5C15 2.11929 13.8807 1 12.5 1C11.1193 1 10 2.11929 10 3.5V5H6ZM10 6V10H6V6H10ZM11 5V3.5C11 2.67157 11.6716 2 12.5 2C13.3284 2 14 2.67157 14 3.5C14 4.32843 13.3284 5 12.5 5H11ZM5 11H3.5C2.67157 11 2 11.6716 2 12.5C2 13.3284 2.67157 14 3.5 14C4.32843 14 5 13.3284 5 12.5V11ZM11 12.5V11H12.5C13.3284 11 14 11.6716 14 12.5C14 13.3284 13.3284 14 12.5 14C11.6716 14 11 13.3284 11 12.5Z"/>
+          </svg>
+          K
+        </span>
       </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
