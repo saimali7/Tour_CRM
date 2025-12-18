@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { ScheduleGuideAssignment } from "@/components/schedules/schedule-guide-assignment";
 import { ScheduleManifest } from "@/components/schedules/schedule-manifest";
@@ -28,6 +28,7 @@ type Tab = "details" | "bookings" | "manifest";
 
 export default function ScheduleDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const scheduleId = params.id as string;
   const [activeTab, setActiveTab] = useState<Tab>("details");
@@ -120,12 +121,12 @@ export default function ScheduleDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href={`/org/${slug}/availability` as Route}
+          <button
+            onClick={() => router.back()}
             className="p-2 hover:bg-accent rounded-lg transition-colors"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Link>
+          </button>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-foreground">
