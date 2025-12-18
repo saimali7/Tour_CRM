@@ -702,3 +702,263 @@ body {
   color: hsl(0 72% 30%);
   border-left-color: hsl(var(--destructive));
 }
+
+/* =============================================================================
+   ADDITIONAL TYPOGRAPHY UTILITIES
+   Extended type scale from DESIGN_SYSTEM_V2.md
+   =============================================================================*/
+
+.text-2xs {
+  font-size: 0.625rem;   /* 10px */
+  line-height: 0.875rem; /* 14px */
+}
+
+/* =============================================================================
+   LAYOUT UTILITIES
+   Three-column adaptive layout system from DESIGN_SYSTEM_V2.md
+   =============================================================================*/
+
+/* Navigation Rail */
+.nav-rail {
+  width: 60px;
+  flex-shrink: 0;
+  border-right: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  display: flex;
+  flex-direction: column;
+}
+
+/* Context Panel */
+.context-panel {
+  width: 280px;
+  flex-shrink: 0;
+  border-left: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  overflow-y: auto;
+}
+
+/* Main Content Area */
+.main-content {
+  flex: 1;
+  overflow: auto;
+  background-color: hsl(var(--background));
+}
+
+/* Full-height flex container */
+.layout-root {
+  display: flex;
+  height: 100vh;
+  background-color: hsl(var(--background));
+}
+
+/* Page container with consistent padding */
+.page-container {
+  padding: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .page-container {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-container {
+    padding: 2rem;
+  }
+}
+
+/* =============================================================================
+   ANIMATION UTILITIES
+   Standard timing and easing from DESIGN_SYSTEM_V2.md
+   =============================================================================*/
+
+/* Easing curves */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Duration utilities */
+.duration-75 { transition-duration: 75ms; }
+.duration-150 { transition-duration: 150ms; }
+.duration-200 { transition-duration: 200ms; }
+.duration-300 { transition-duration: 300ms; }
+
+/* Hover scale animation */
+.hover-scale {
+  transition: transform 150ms var(--ease-out);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.hover-scale:active {
+  transform: scale(0.98);
+}
+
+/* Focus animation */
+.focus-ring {
+  transition: box-shadow 150ms var(--ease-out);
+}
+
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring));
+}
+
+/* =============================================================================
+   DATA TABLE UTILITIES
+   Enhanced table styles for data-dense views
+   =============================================================================*/
+
+/* Row status tinting */
+.row-confirmed {
+  background-color: hsl(160 84% 98%);
+}
+
+.row-pending {
+  background-color: hsl(38 92% 98%);
+}
+
+.row-cancelled {
+  opacity: 0.6;
+}
+
+.dark .row-confirmed {
+  background-color: hsl(160 45% 8%);
+}
+
+.dark .row-pending {
+  background-color: hsl(38 50% 8%);
+}
+
+/* Sticky table header */
+.table-sticky-header thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: hsl(var(--card));
+}
+
+/* Compact table rows */
+.table-compact tbody tr td {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* =============================================================================
+   EMPTY STATE UTILITIES
+   Consistent empty state styling
+   =============================================================================*/
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.empty-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background-color: hsl(var(--muted));
+  margin-bottom: 1rem;
+}
+
+.empty-state-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.empty-state-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  margin-bottom: 0.25rem;
+}
+
+.empty-state-description {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  max-width: 24rem;
+}
+
+/* =============================================================================
+   LOADING SKELETON UTILITIES
+   Skeleton loading patterns
+   =============================================================================*/
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted) / 0.5) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: calc(var(--radius) - 4px);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-text {
+  height: 1rem;
+  width: 100%;
+}
+
+.skeleton-text-sm {
+  height: 0.875rem;
+  width: 75%;
+}
+
+.skeleton-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+}
+
+.skeleton-button {
+  height: 2.25rem;
+  width: 6rem;
+}
+
+/* =============================================================================
+   PRINT STYLES
+   Clean print output for manifests and reports
+   =============================================================================*/
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  .print-break-before {
+    page-break-before: always;
+  }
+
+  .print-break-after {
+    page-break-after: always;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid;
+  }
+}

@@ -4,8 +4,7 @@ import { NavigationProgress } from "@/components/navigation-progress";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { Suspense } from "react";
 import { User } from "lucide-react";
-import { SidebarProvider } from "@/components/sidebar-context";
-import { SidebarContentClient } from "./sidebar-content";
+import { NavRail } from "@/components/layout/nav-rail";
 import { MobileHeader } from "./mobile-header";
 
 // Check if Clerk is enabled
@@ -19,7 +18,7 @@ async function UserAccountButton() {
       <UserButton
         appearance={{
           elements: {
-            avatarBox: "h-8 w-8",
+            avatarBox: "h-7 w-7",
           },
         }}
       />
@@ -28,8 +27,8 @@ async function UserAccountButton() {
 
   // Fallback avatar when Clerk is disabled
   return (
-    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-      <User className="h-4 w-4 text-muted-foreground" />
+    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted">
+      <User className="h-3.5 w-3.5 text-muted-foreground" />
     </div>
   );
 }
@@ -47,35 +46,32 @@ export default async function DashboardLayout({
   const { organization, role } = await getOrgContext(slug);
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-background">
-        {/* Navigation Progress Bar */}
-        <Suspense fallback={null}>
-          <NavigationProgress />
-        </Suspense>
+    <div className="flex h-screen bg-background">
+      {/* Navigation Progress Bar */}
+      <Suspense fallback={null}>
+        <NavigationProgress />
+      </Suspense>
 
-        {/* Desktop Sidebar */}
-        <SidebarContentClient
-          organization={organization}
-          role={role}
-          slug={slug}
-          userButton={<UserAccountButton />}
-        />
+      {/* Desktop Navigation Rail (60px) */}
+      <NavRail
+        orgSlug={slug}
+        orgName={organization.name}
+        userButton={<UserAccountButton />}
+      />
 
-        {/* Main content */}
-        <main className="flex-1 overflow-auto bg-background">
-          {/* Mobile header */}
-          <MobileHeader organization={organization} slug={slug} />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile header */}
+        <MobileHeader organization={organization} slug={slug} />
 
-          {/* Page content - responsive padding, constrained max-width for readability */}
-          <div className="px-4 py-6 sm:px-6 lg:px-8">
-            <DashboardProviders orgSlug={slug}>{children}</DashboardProviders>
-          </div>
+        {/* Page content */}
+        <main className="flex-1 overflow-auto">
+          <DashboardProviders orgSlug={slug}>{children}</DashboardProviders>
         </main>
-
-        {/* Global keyboard shortcuts modal */}
-        <KeyboardShortcutsModal />
       </div>
-    </SidebarProvider>
+
+      {/* Global keyboard shortcuts modal */}
+      <KeyboardShortcutsModal />
+    </div>
   );
 }

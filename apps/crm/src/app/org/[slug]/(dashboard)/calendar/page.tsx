@@ -94,7 +94,7 @@ export default function CalendarPage() {
   }, [schedules, selectedDate]);
 
   return (
-    <div className="space-y-4 max-w-7xl">
+    <div className="space-y-4">
       {/* Header: Title + Inline Stats + Actions */}
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-6">

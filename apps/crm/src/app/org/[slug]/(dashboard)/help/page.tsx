@@ -25,7 +25,7 @@ const helpResources = [
 
 export default function HelpPage() {
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Help & Support</h1>
