@@ -3,9 +3,8 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { Search, Calendar, Users, Clock, User, Ticket } from "lucide-react";
-import Link from "next/link";
-import type { Route } from "next";
 import { cn } from "@/lib/utils";
+import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 
 interface BookingPlannerProps {
   orgSlug: string;
@@ -36,6 +35,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
   const [selectedTourId, setSelectedTourId] = useState<string>("");
   const [flexDays, setFlexDays] = useState<number>(0);
   const [hasSearched, setHasSearched] = useState(false);
+  const { openQuickBooking } = useQuickBookingContext();
 
   // Get tours for filter dropdown
   const { data: toursData } = trpc.tour.list.useQuery({
@@ -320,13 +320,13 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
                             )}
 
                             {/* Book Button */}
-                            <Link
-                              href={`/org/${orgSlug}/bookings/new?scheduleId=${schedule.scheduleId}&participants=${participants}` as Route}
+                            <button
+                              onClick={() => openQuickBooking({ scheduleId: schedule.scheduleId })}
                               className="flex-shrink-0 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5"
                             >
                               <Ticket className="h-4 w-4" />
                               Book
-                            </Link>
+                            </button>
                           </div>
                         </div>
                       );

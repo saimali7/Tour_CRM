@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/command";
 import { trpc } from "@/lib/trpc";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 
 type EntityType = "booking" | "customer" | "tour" | "schedule" | "guide";
 
@@ -59,6 +60,7 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
   const [search, setSearch] = React.useState("");
   const [isMounted, setIsMounted] = React.useState(false);
   const debouncedSearch = useDebounce(search, 300);
+  const { openQuickBooking } = useQuickBookingContext();
 
   React.useEffect(() => {
     setIsMounted(true);
@@ -241,18 +243,12 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
           {!search && (
             <>
               <CommandGroup heading="Quick Actions">
-                <CommandItem onSelect={() => navigate(`${basePath}/bookings?phone=1`)}>
+                <CommandItem onSelect={() => { setOpen(false); openQuickBooking(); }}>
                   <div className="h-8 w-8 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-600">
-                    <Phone className="h-4 w-4" />
-                  </div>
-                  <span className="font-medium">Phone Booking</span>
-                  <CommandShortcut>⌘P</CommandShortcut>
-                </CommandItem>
-                <CommandItem onSelect={() => navigate(`${basePath}/bookings/new`)}>
-                  <div className="h-8 w-8 rounded-xl bg-indigo-500/15 flex items-center justify-center text-indigo-600">
                     <Plus className="h-4 w-4" />
                   </div>
-                  <span className="font-medium">New Booking (Full Form)</span>
+                  <span className="font-medium">New Booking</span>
+                  <CommandShortcut>⌘B</CommandShortcut>
                 </CommandItem>
                 <CommandItem onSelect={() => navigate(`${basePath}/customers/new`)}>
                   <div className="h-8 w-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-600">

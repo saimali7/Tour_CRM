@@ -1,3 +1,5 @@
+"use client";
+
 import { LucideIcon, Inbox, Calendar, Users, MapPin, UserCheck, Plus, Upload, Lightbulb } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -113,15 +115,24 @@ export function EmptyState({
 }
 
 // Pre-configured empty states for common scenarios
-export function NoBookingsEmpty({ orgSlug }: { orgSlug: string }) {
+export function NoBookingsEmpty({
+  orgSlug,
+  onCreateBooking
+}: {
+  orgSlug: string;
+  onCreateBooking?: () => void;
+}) {
   return (
     <EmptyState
       icon={Calendar}
       title="No bookings yet"
       description="Create your first booking to get started with managing your tour operations."
-      action={{
+      action={onCreateBooking ? {
         label: "Create Booking",
-        href: `/org/${orgSlug}/bookings/new`,
+        onClick: onCreateBooking,
+      } : {
+        label: "Create Booking",
+        href: `/org/${orgSlug}/bookings`,
       }}
     />
   );

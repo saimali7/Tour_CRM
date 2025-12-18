@@ -16,21 +16,22 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ScheduleGuideAssignment } from "@/components/schedules/schedule-guide-assignment";
 import { ScheduleManifest } from "@/components/schedules/schedule-manifest";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { UnifiedBookingSheet } from "@/components/bookings/unified-booking-sheet";
 
 type Tab = "details" | "bookings" | "manifest";
 
 export default function ScheduleDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const slug = params.slug as string;
   const scheduleId = params.id as string;
   const [activeTab, setActiveTab] = useState<Tab>("details");
+  const [showQuickBook, setShowQuickBook] = useState(false);
 
   const { data: schedule, isLoading, error } = trpc.schedule.getById.useQuery({ id: scheduleId });
   const { data: scheduleBookings } = trpc.booking.getForSchedule.useQuery(
@@ -107,7 +108,7 @@ export default function ScheduleDetailPage() {
   };
 
   const handleAddBooking = () => {
-    router.push(`/org/${slug}/bookings/new?scheduleId=${scheduleId}` as Route);
+    setShowQuickBook(true);
   };
 
   const booked = schedule.bookedCount ?? 0;
@@ -474,6 +475,14 @@ export default function ScheduleDetailPage() {
       )}
 
       {activeTab === "manifest" && <ScheduleManifest scheduleId={scheduleId} />}
+
+      {/* Unified Booking Sheet */}
+      <UnifiedBookingSheet
+        open={showQuickBook}
+        onOpenChange={setShowQuickBook}
+        orgSlug={slug}
+        preselectedScheduleId={scheduleId}
+      />
     </div>
   );
 }

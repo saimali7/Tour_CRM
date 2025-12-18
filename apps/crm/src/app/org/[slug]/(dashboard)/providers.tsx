@@ -15,7 +15,7 @@ export function DashboardProviders({
   return (
     <TRPCProvider orgSlug={orgSlug}>
       <SlideOverProvider>
-        <QuickBookingProvider>
+        <QuickBookingProvider orgSlug={orgSlug}>
           {children}
           <Toaster position="bottom-right" />
         </QuickBookingProvider>

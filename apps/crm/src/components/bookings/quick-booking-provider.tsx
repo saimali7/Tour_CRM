@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { QuickBookingModal } from "./quick-booking-modal";
+import { UnifiedBookingSheet } from "./unified-booking-sheet";
 
 interface QuickBookingContextValue {
-  openQuickBooking: (options?: { customerId?: string; scheduleId?: string }) => void;
+  openQuickBooking: (options?: { customerId?: string; scheduleId?: string; tourId?: string }) => void;
   closeQuickBooking: () => void;
   isOpen: boolean;
 }
@@ -22,16 +22,19 @@ export function useQuickBookingContext() {
 
 interface QuickBookingProviderProps {
   children: React.ReactNode;
+  orgSlug: string;
 }
 
-export function QuickBookingProvider({ children }: QuickBookingProviderProps) {
+export function QuickBookingProvider({ children, orgSlug }: QuickBookingProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<string>();
   const [preselectedScheduleId, setPreselectedScheduleId] = useState<string>();
+  const [preselectedTourId, setPreselectedTourId] = useState<string>();
 
-  const openQuickBooking = useCallback((options?: { customerId?: string; scheduleId?: string }) => {
+  const openQuickBooking = useCallback((options?: { customerId?: string; scheduleId?: string; tourId?: string }) => {
     setPreselectedCustomerId(options?.customerId);
     setPreselectedScheduleId(options?.scheduleId);
+    setPreselectedTourId(options?.tourId);
     setIsOpen(true);
   }, []);
 
@@ -39,6 +42,7 @@ export function QuickBookingProvider({ children }: QuickBookingProviderProps) {
     setIsOpen(false);
     setPreselectedCustomerId(undefined);
     setPreselectedScheduleId(undefined);
+    setPreselectedTourId(undefined);
   }, []);
 
   // Keyboard shortcut: Cmd+B or Ctrl+B to open quick booking
@@ -62,11 +66,13 @@ export function QuickBookingProvider({ children }: QuickBookingProviderProps) {
   return (
     <QuickBookingContext.Provider value={{ openQuickBooking, closeQuickBooking, isOpen }}>
       {children}
-      <QuickBookingModal
+      <UnifiedBookingSheet
         open={isOpen}
         onOpenChange={setIsOpen}
+        orgSlug={orgSlug}
         preselectedCustomerId={preselectedCustomerId}
         preselectedScheduleId={preselectedScheduleId}
+        preselectedTourId={preselectedTourId}
       />
     </QuickBookingContext.Provider>
   );

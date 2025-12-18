@@ -27,6 +27,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -61,6 +62,7 @@ export function Customer360Sheet({
 }: Customer360SheetProps) {
   const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>("all");
   const [newNote, setNewNote] = useState("");
+  const { openQuickBooking } = useQuickBookingContext();
 
   const utils = trpc.useUtils();
 
@@ -235,11 +237,16 @@ export function Customer360Sheet({
 
             {/* Quick Actions */}
             <div className="flex gap-2">
-              <Button size="sm" asChild className="flex-1">
-                <Link href={`/org/${orgSlug}/bookings/new?customerId=${customerId}` as Route}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  New Booking
-                </Link>
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  onOpenChange(false);
+                  openQuickBooking({ customerId });
+                }}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New Booking
               </Button>
               {customer.email && (
                 <Button

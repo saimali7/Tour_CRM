@@ -51,7 +51,7 @@ import { TableSkeleton } from "@/components/ui/skeleton";
 import { NoBookingsEmpty, NoResultsEmpty } from "@/components/ui/empty-state";
 import { BulkRescheduleModal } from "@/components/bookings/bulk-reschedule-modal";
 import { BulkEmailModal } from "@/components/bookings/bulk-email-modal";
-import { PhoneBookingSheet } from "@/components/bookings/phone-booking-sheet";
+import { UnifiedBookingSheet } from "@/components/bookings/unified-booking-sheet";
 
 type StatusFilter = "all" | "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 type PaymentFilter = "all" | "pending" | "partial" | "paid" | "refunded" | "failed";
@@ -91,23 +91,23 @@ export default function BookingsPage() {
   const [bulkCancelReason, setBulkCancelReason] = useState("");
   const [showBulkRescheduleModal, setShowBulkRescheduleModal] = useState(false);
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
-  const [showPhoneBooking, setShowPhoneBooking] = useState(false);
+  const [showQuickBook, setShowQuickBook] = useState(false);
 
   // Auto-open quick booking from URL param (e.g., from command palette or dashboard)
   useEffect(() => {
     if (searchParams.get("phone") === "1" || searchParams.get("quick") === "1") {
-      setShowPhoneBooking(true);
+      setShowQuickBook(true);
       // Remove the query param to prevent re-opening on refresh
       router.replace(`/org/${slug}/bookings`, { scroll: false });
     }
   }, [searchParams, router, slug]);
 
-  // Keyboard shortcuts: Cmd+B or Cmd+P to open quick booking
+  // Keyboard shortcuts: Cmd+B to open quick booking
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && (e.key === "p" || e.key === "b")) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
         e.preventDefault();
-        setShowPhoneBooking(true);
+        setShowQuickBook(true);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
@@ -358,7 +358,7 @@ export default function BookingsPage() {
         </div>
 
         <button
-          onClick={() => setShowPhoneBooking(true)}
+          onClick={() => setShowQuickBook(true)}
           className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Zap className="h-4 w-4" />
@@ -447,7 +447,7 @@ export default function BookingsPage() {
           {search ? (
             <NoResultsEmpty searchTerm={search} />
           ) : (
-            <NoBookingsEmpty orgSlug={slug} />
+            <NoBookingsEmpty orgSlug={slug} onCreateBooking={() => setShowQuickBook(true)} />
           )}
         </div>
       ) : (
@@ -700,10 +700,10 @@ export default function BookingsPage() {
         }}
       />
 
-      {/* Phone Booking Sheet */}
-      <PhoneBookingSheet
-        open={showPhoneBooking}
-        onOpenChange={setShowPhoneBooking}
+      {/* Quick Book Sheet */}
+      <UnifiedBookingSheet
+        open={showQuickBook}
+        onOpenChange={setShowQuickBook}
         orgSlug={slug}
       />
     </div>

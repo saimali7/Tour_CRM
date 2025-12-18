@@ -159,9 +159,8 @@ export default function CustomerDetailPage() {
   };
 
   const handleRebook = (booking: { tourId?: string | null; scheduleId: string }) => {
-    // Navigate to booking form with customer pre-selected
-    // Note: A full rebook feature would clone participants, but this is a simpler version
-    router.push(`/org/${slug}/bookings/new?customerId=${customerId}` as Route);
+    // Open booking sheet with customer pre-selected
+    openQuickBooking({ customerId, tourId: booking.tourId ?? undefined });
   };
 
   if (isLoading) {

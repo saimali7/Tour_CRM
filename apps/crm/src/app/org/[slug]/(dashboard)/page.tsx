@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
@@ -17,6 +17,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
 import { format, isToday, isTomorrow, differenceInMinutes } from "date-fns";
+import { UnifiedBookingSheet } from "@/components/bookings/unified-booking-sheet";
 
 // =============================================================================
 // TYPES
@@ -71,6 +72,7 @@ function getUtilization(booked: number, max: number): number {
 export default function DashboardPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const [showQuickBook, setShowQuickBook] = useState(false);
 
   const {
     data: operationsData,
@@ -163,13 +165,13 @@ export default function DashboardPage() {
                 )
               )}
             </div>
-            <Link
-              href={`/org/${slug}/bookings?quick=1` as Route}
+            <button
+              onClick={() => setShowQuickBook(true)}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <Zap className="h-4 w-4" />
               Quick Book
-            </Link>
+            </button>
           </header>
 
           {/* Alerts */}
@@ -285,6 +287,13 @@ export default function DashboardPage() {
               </div>
             </section>
           )}
+
+      {/* Unified Booking Sheet */}
+      <UnifiedBookingSheet
+        open={showQuickBook}
+        onOpenChange={setShowQuickBook}
+        orgSlug={slug}
+      />
     </div>
   );
 }

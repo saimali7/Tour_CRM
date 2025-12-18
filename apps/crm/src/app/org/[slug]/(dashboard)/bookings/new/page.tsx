@@ -1,41 +1,38 @@
 "use client";
 
-import { NewBookingFlow } from "@/components/bookings/new-booking-flow";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { useEffect } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { Route } from "next";
-import { useParams, useSearchParams } from "next/navigation";
+import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 
+/**
+ * Legacy /bookings/new route - redirects to bookings list and opens the unified booking sheet.
+ * This page exists for backwards compatibility with old URLs and bookmarks.
+ */
 export default function NewBookingPage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const slug = params.slug as string;
+  const { openQuickBooking } = useQuickBookingContext();
 
-  // Get pre-selected values from URL query params
-  const preselectedTourId = searchParams.get("tourId") || undefined;
-  const preselectedScheduleId = searchParams.get("scheduleId") || undefined;
-  const preselectedCustomerId = searchParams.get("customerId") || undefined;
+  useEffect(() => {
+    // Extract any pre-selection params from URL
+    const customerId = searchParams.get("customerId") || undefined;
+    const tourId = searchParams.get("tourId") || undefined;
+    const scheduleId = searchParams.get("scheduleId") || undefined;
 
+    // Open the booking sheet with pre-selections
+    openQuickBooking({ customerId, tourId, scheduleId });
+
+    // Redirect to bookings list
+    router.replace(`/org/${slug}/bookings` as Route);
+  }, [slug, searchParams, router, openQuickBooking]);
+
+  // Show loading state while redirecting
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link
-          href={`/org/${slug}/bookings` as Route}
-          className="p-2 hover:bg-accent rounded-lg transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">New Booking</h1>
-          <p className="text-muted-foreground mt-1">Create a new tour reservation</p>
-        </div>
-      </div>
-
-      <NewBookingFlow
-        preselectedTourId={preselectedTourId}
-        preselectedScheduleId={preselectedScheduleId}
-        preselectedCustomerId={preselectedCustomerId}
-      />
+    <div className="flex justify-center items-center h-64">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
     </div>
   );
 }

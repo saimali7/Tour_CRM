@@ -46,32 +46,34 @@ export default async function DashboardLayout({
   const { organization, role } = await getOrgContext(slug);
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Navigation Progress Bar */}
-      <Suspense fallback={null}>
-        <NavigationProgress />
-      </Suspense>
+    <DashboardProviders orgSlug={slug}>
+      <div className="flex h-screen bg-background">
+        {/* Navigation Progress Bar */}
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
 
-      {/* Desktop Navigation Rail (60px) */}
-      <NavRail
-        orgSlug={slug}
-        orgName={organization.name}
-        userButton={<UserAccountButton />}
-      />
+        {/* Desktop Navigation Rail (60px) */}
+        <NavRail
+          orgSlug={slug}
+          orgName={organization.name}
+          userButton={<UserAccountButton />}
+        />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile header */}
-        <MobileHeader organization={organization} slug={slug} />
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Mobile header */}
+          <MobileHeader organization={organization} slug={slug} />
 
-        {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          <DashboardProviders orgSlug={slug}>{children}</DashboardProviders>
-        </main>
+          {/* Page content */}
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </div>
+
+        {/* Global keyboard shortcuts modal */}
+        <KeyboardShortcutsModal />
       </div>
-
-      {/* Global keyboard shortcuts modal */}
-      <KeyboardShortcutsModal />
-    </div>
+    </DashboardProviders>
   );
 }
