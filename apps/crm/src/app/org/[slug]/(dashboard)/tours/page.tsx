@@ -1,17 +1,15 @@
 "use client";
 
 import { trpc } from "@/lib/trpc";
-import { Edit, Trash2, Eye, Archive, Check, Copy, ChevronRight, ChevronDown, ChevronLeft, Calendar, List, LayoutGrid } from "lucide-react";
+import { Edit, Trash2, Eye, Archive, Check, Copy, Plus, Calendar, Clock, Users, DollarSign, ChevronRight, MoreHorizontal, CalendarPlus } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useState, useCallback, useMemo } from "react";
+import { useParams } from "next/navigation";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // Design system components
-import { PageHeader, PageHeaderAction } from "@/components/ui/page-header";
-import { FilterChipGroup } from "@/components/ui/filter-bar";
 import {
   Table,
   TableHeader,
@@ -27,67 +25,40 @@ import { TourStatusBadge } from "@/components/ui/status-badge";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { NoToursEmpty } from "@/components/ui/empty-state";
 import { useConfirmModal } from "@/components/ui/confirm-modal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
-// Tour-specific components
-import { TourScheduleStats } from "@/components/tours/tour-schedule-stats";
-import { TourSchedulePreview } from "@/components/tours/tour-schedule-preview";
-import { ToursDayView } from "@/components/tours/tours-day-view";
-import { ToursWeekView } from "@/components/tours/tours-week-view";
-
-type ViewMode = "day" | "week" | "list";
 type StatusFilter = "all" | "draft" | "active" | "paused" | "archived";
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "draft", label: "Draft" },
   { value: "active", label: "Active" },
+  { value: "draft", label: "Draft" },
   { value: "paused", label: "Paused" },
   { value: "archived", label: "Archived" },
 ];
 
-function formatDateLabel(date: Date): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-
-  if (target.getTime() === today.getTime()) return "Today";
-  if (target.getTime() === tomorrow.getTime()) return "Tomorrow";
-
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(date);
-}
-
 export default function ToursPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
-  const router = useRouter();
   const slug = params.slug as string;
 
-  // View mode
-  const initialView = (searchParams.get("view") as ViewMode) || "day";
-  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-
-  // List view state
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [expandedTourIds, setExpandedTourIds] = useState<Set<string>>(new Set());
   const { confirm, ConfirmModal } = useConfirmModal();
 
-  // Use the new endpoint with schedule stats (only for list view)
-  const { data, isLoading, error } = trpc.tour.listWithScheduleStats.useQuery(
-    {
-      pagination: { page, limit: 10 },
-      filters: statusFilter === "all" ? undefined : { status: statusFilter },
-    },
-    { enabled: viewMode === "list" }
-  );
+  // Fetch tours with schedule stats
+  const { data, isLoading, error } = trpc.tour.listWithScheduleStats.useQuery({
+    pagination: { page, limit: 20 },
+    filters: statusFilter === "all" ? undefined : { status: statusFilter },
+  });
+
+  const { data: stats } = trpc.tour.getStats.useQuery();
 
   const utils = trpc.useUtils();
 
@@ -95,6 +66,7 @@ export default function ToursPage() {
     onSuccess: () => {
       utils.tour.listWithScheduleStats.invalidate();
       utils.tour.list.invalidate();
+      utils.tour.getStats.invalidate();
       toast.success("Tour deleted successfully");
     },
     onError: (error) => {
@@ -106,6 +78,7 @@ export default function ToursPage() {
     onSuccess: () => {
       utils.tour.listWithScheduleStats.invalidate();
       utils.tour.list.invalidate();
+      utils.tour.getStats.invalidate();
       toast.success("Tour archived successfully");
     },
     onError: (error) => {
@@ -117,6 +90,7 @@ export default function ToursPage() {
     onSuccess: () => {
       utils.tour.listWithScheduleStats.invalidate();
       utils.tour.list.invalidate();
+      utils.tour.getStats.invalidate();
       toast.success("Tour published successfully");
     },
     onError: (error) => {
@@ -128,24 +102,13 @@ export default function ToursPage() {
     onSuccess: () => {
       utils.tour.listWithScheduleStats.invalidate();
       utils.tour.list.invalidate();
+      utils.tour.getStats.invalidate();
       toast.success("Tour duplicated successfully");
     },
     onError: (error) => {
       toast.error(`Failed to duplicate tour: ${error.message}`);
     },
   });
-
-  const toggleExpand = useCallback((tourId: string) => {
-    setExpandedTourIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(tourId)) {
-        next.delete(tourId);
-      } else {
-        next.add(tourId);
-      }
-      return next;
-    });
-  }, []);
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
@@ -172,337 +135,232 @@ export default function ToursPage() {
     duplicateMutation.mutate({ id, newName: `${name} (Copy)` });
   };
 
-  // View mode change
-  const handleViewChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    const url = new URL(window.location.href);
-    url.searchParams.set("view", mode);
-    router.replace(`${url.pathname}${url.search}` as Route);
-  };
-
-  // Date navigation
-  const navigateDate = (direction: "prev" | "next") => {
-    const newDate = new Date(selectedDate);
-    if (viewMode === "day") {
-      newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1));
-    } else if (viewMode === "week") {
-      newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7));
-    }
-    setSelectedDate(newDate);
-  };
-
-  const goToToday = () => {
-    setSelectedDate(new Date());
-  };
-
-  // List view handlers
   const handleFilterChange = (value: StatusFilter) => {
     setStatusFilter(value);
     setPage(1);
-    setExpandedTourIds(new Set());
   };
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-    setExpandedTourIds(new Set());
-  };
-
-  // Day click from week view
-  const handleDayClick = (date: Date) => {
-    setSelectedDate(date);
-    handleViewChange("day");
-  };
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+        <p className="text-destructive">Error loading tours: {error.message}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <PageHeader
-        title="Tours"
-        description={viewMode === "list" ? "Manage your tour offerings" : `Operations for ${formatDateLabel(selectedDate)}`}
-      >
-        <PageHeaderAction href={`/org/${slug}/tours/new`}>
-          Create Tour
-        </PageHeaderAction>
-      </PageHeader>
-
-      {/* View Mode Toggle & Navigation */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* Date Navigation (for day/week views) */}
-        {(viewMode === "day" || viewMode === "week") && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigateDate("prev")}
-              className="p-2 rounded-lg border border-input hover:bg-accent transition-colors"
-              aria-label="Previous"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={goToToday}
-              className="px-3 py-2 text-sm font-medium rounded-lg border border-input hover:bg-accent transition-colors"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => navigateDate("next")}
-              className="p-2 rounded-lg border border-input hover:bg-accent transition-colors"
-              aria-label="Next"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-            <span className="ml-2 text-sm font-medium text-foreground">
-              {formatDateLabel(selectedDate)}
-            </span>
-          </div>
-        )}
-
-        {/* Status Filter (for list view) */}
-        {viewMode === "list" && (
-          <FilterChipGroup
-            value={statusFilter}
-            onChange={handleFilterChange}
-            options={STATUS_OPTIONS}
-          />
-        )}
-
-        {/* View Toggle */}
-        <div className="flex rounded-lg border border-input bg-background p-1">
-          <button
-            onClick={() => handleViewChange("day")}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors",
-              viewMode === "day"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent"
-            )}
-          >
-            <LayoutGrid className="h-4 w-4" />
-            Day
-          </button>
-          <button
-            onClick={() => handleViewChange("week")}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors",
-              viewMode === "week"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent"
-            )}
-          >
-            <Calendar className="h-4 w-4" />
-            Week
-          </button>
-          <button
-            onClick={() => handleViewChange("list")}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors",
-              viewMode === "list"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent"
-            )}
-          >
-            <List className="h-4 w-4" />
-            Products
-          </button>
+    <div className="space-y-4">
+      {/* Header: Title + Inline Stats + Create Tour */}
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-6">
+          <h1 className="text-lg font-semibold text-foreground">Tours</h1>
+          {/* Inline Stats */}
+          {stats && (
+            <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
+              <span>
+                <span className="font-medium text-foreground">{stats.active}</span> active
+              </span>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium text-yellow-600">{stats.draft}</span> draft
+              </span>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium text-foreground">{stats.total}</span> total
+              </span>
+            </div>
+          )}
         </div>
+
+        <Link
+          href={`/org/${slug}/tours/new` as Route}
+          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Create Tour
+        </Link>
+      </header>
+
+      {/* Compact Filter Bar */}
+      <div className="flex items-center gap-3">
+        {/* Status Filter Chips */}
+        <div className="flex items-center gap-1 rounded-lg border border-input bg-background p-1">
+          {STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handleFilterChange(opt.value)}
+              className={cn(
+                "px-3 py-1 text-sm rounded-md transition-colors",
+                statusFilter === opt.value
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Calendar Link */}
+        <Link
+          href={`/org/${slug}/calendar` as Route}
+          className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Calendar className="h-4 w-4" />
+          View Calendar
+        </Link>
       </div>
 
-      {/* Day View */}
-      {viewMode === "day" && (
-        <ToursDayView orgSlug={slug} selectedDate={selectedDate} />
-      )}
-
-      {/* Week View */}
-      {viewMode === "week" && (
-        <ToursWeekView orgSlug={slug} weekStart={selectedDate} onDayClick={handleDayClick} />
-      )}
-
-      {/* List View (Product Catalog) */}
-      {viewMode === "list" && (
+      {/* Tour Cards Grid */}
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-lg border border-border bg-card p-4 animate-pulse">
+              <div className="h-5 w-32 bg-muted rounded mb-2" />
+              <div className="h-4 w-24 bg-muted rounded mb-4" />
+              <div className="flex gap-4">
+                <div className="h-4 w-16 bg-muted rounded" />
+                <div className="h-4 w-16 bg-muted rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : data?.data.length === 0 ? (
+        <div className="rounded-lg border border-border bg-card">
+          <NoToursEmpty orgSlug={slug} />
+        </div>
+      ) : (
         <>
-          {error ? (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
-              <p className="text-destructive">Error loading tours: {error.message}</p>
-            </div>
-          ) : isLoading ? (
-            <TableSkeleton rows={10} columns={7} />
-          ) : data?.data.length === 0 ? (
-            <div className="rounded-lg border border-border bg-card">
-              <NoToursEmpty orgSlug={slug} />
-            </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10"></TableHead>
-                    <TableHead>Tour</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Capacity</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Schedule Stats</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data?.data.map((tour) => {
-                    const isExpanded = expandedTourIds.has(tour.id);
-                    const stats = tour.scheduleStats;
+          {/* Tour Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {data?.data.map((tour) => {
+              const stats = tour.scheduleStats;
+              const utilizationColor = stats.utilizationPercent >= 80
+                ? "text-destructive"
+                : stats.utilizationPercent >= 50
+                  ? "text-warning"
+                  : "text-success";
 
-                    return (
-                      <>
-                        {/* Main Row */}
-                        <TableRow
-                          key={tour.id}
-                          className={cn(
-                            "cursor-pointer transition-colors",
-                            isExpanded && "bg-muted/50"
-                          )}
-                          onClick={() => toggleExpand(tour.id)}
+              return (
+                <div
+                  key={tour.id}
+                  className="group rounded-lg border border-border bg-card hover:border-primary/50 hover:shadow-sm transition-all"
+                >
+                  {/* Card Header */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/org/${slug}/tours/${tour.id}` as Route}
+                          className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1"
                         >
-                          {/* Expand Toggle */}
-                          <TableCell className="w-10 pr-0">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleExpand(tour.id);
-                              }}
-                              className="p-1 rounded hover:bg-accent transition-colors"
-                              aria-label={isExpanded ? "Collapse" : "Expand"}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </button>
-                          </TableCell>
+                          {tour.name}
+                        </Link>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          {tour.durationMinutes} min · ${parseFloat(tour.basePrice).toFixed(0)}
+                        </p>
+                      </div>
+                      <TourStatusBadge status={tour.status as "draft" | "active" | "archived"} />
+                    </div>
 
-                          {/* Tour Name */}
-                          <TableCell>
-                            <div>
-                              <div className="text-sm font-medium text-foreground">
-                                {tour.name}
-                              </div>
-                              <div className="text-sm text-muted-foreground">{tour.slug}</div>
-                            </div>
-                          </TableCell>
+                    {/* Quick Stats */}
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{stats.upcomingCount} upcoming</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Users className="h-3.5 w-3.5" />
+                        <span className={utilizationColor}>
+                          {stats.totalBooked}/{stats.totalCapacity}
+                        </span>
+                      </div>
+                    </div>
 
-                          {/* Status */}
-                          <TableCell>
-                            <TourStatusBadge status={tour.status as "draft" | "active" | "archived"} />
-                          </TableCell>
+                    {/* Next Schedule */}
+                    {stats.nextScheduleDate && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Next: {new Date(stats.nextScheduleDate).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    )}
+                  </div>
 
-                          {/* Duration */}
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {tour.durationMinutes} min
-                            </span>
-                          </TableCell>
+                  {/* Card Actions */}
+                  <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border bg-muted/30">
+                    <Link
+                      href={`/org/${slug}/tours/${tour.id}/schedules/new` as Route}
+                      className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <CalendarPlus className="h-4 w-4" />
+                      Add Schedule
+                    </Link>
 
-                          {/* Capacity */}
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {tour.minParticipants ?? 1} - {tour.maxParticipants}
-                            </span>
-                          </TableCell>
-
-                          {/* Price */}
-                          <TableCell>
-                            <span className="text-sm font-medium text-foreground">
-                              ${parseFloat(tour.basePrice).toFixed(2)}
-                            </span>
-                          </TableCell>
-
-                          {/* Schedule Stats */}
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <TourScheduleStats
-                              upcomingCount={stats.upcomingCount}
-                              totalCapacity={stats.totalCapacity}
-                              totalBooked={stats.totalBooked}
-                              utilizationPercent={stats.utilizationPercent}
-                              nextScheduleDate={stats.nextScheduleDate}
-                            />
-                          </TableCell>
-
-                          {/* Actions */}
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <TableActions>
-                              <Link href={`/org/${slug}/tours/${tour.id}` as Route}>
-                                <ActionButton tooltip="View tour">
-                                  <Eye className="h-4 w-4" />
-                                </ActionButton>
-                              </Link>
-                              <Link href={`/org/${slug}/tours/${tour.id}?tab=details` as Route}>
-                                <ActionButton tooltip="Edit tour">
-                                  <Edit className="h-4 w-4" />
-                                </ActionButton>
-                              </Link>
-                              <ActionButton
-                                tooltip="Duplicate tour"
-                                onClick={() => handleDuplicate(tour.id, tour.name)}
-                                disabled={duplicateMutation.isPending}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </ActionButton>
-                              {tour.status === "draft" && (
-                                <ActionButton
-                                  variant="success"
-                                  tooltip="Publish tour"
-                                  onClick={() => handlePublish(tour.id)}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </ActionButton>
-                              )}
-                              {tour.status === "active" && (
-                                <ActionButton
-                                  tooltip="Archive tour"
-                                  onClick={() => handleArchive(tour.id)}
-                                >
-                                  <Archive className="h-4 w-4" />
-                                </ActionButton>
-                              )}
-                              <ActionButton
-                                variant="danger"
-                                tooltip="Delete tour"
-                                onClick={() => handleDelete(tour.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </ActionButton>
-                            </TableActions>
-                          </TableCell>
-                        </TableRow>
-
-                        {/* Expanded Row */}
-                        {isExpanded && (
-                          <TableRow key={`${tour.id}-expanded`}>
-                            <TableCell colSpan={8} className="p-0">
-                              <TourSchedulePreview
-                                tourId={tour.id}
-                                orgSlug={slug}
-                                isExpanded={isExpanded}
-                                maxDisplay={5}
-                              />
-                            </TableCell>
-                          </TableRow>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/org/${slug}/tours/${tour.id}` as Route}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/org/${slug}/tours/${tour.id}?tab=details` as Route}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Tour
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicate(tour.id, tour.name)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {tour.status === "draft" && (
+                          <DropdownMenuItem onClick={() => handlePublish(tour.id)}>
+                            <Check className="h-4 w-4 mr-2" />
+                            Publish
+                          </DropdownMenuItem>
                         )}
-                      </>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                        {tour.status === "active" && (
+                          <DropdownMenuItem onClick={() => handleArchive(tour.id)}>
+                            <Archive className="h-4 w-4 mr-2" />
+                            Archive
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(tour.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-              {/* Pagination */}
-              {data && data.totalPages > 1 && (
-                <TablePagination
-                  page={page}
-                  totalPages={data.totalPages}
-                  total={data.total}
-                  pageSize={10}
-                  onPageChange={handlePageChange}
-                />
-              )}
-            </>
+          {/* Pagination */}
+          {data && data.totalPages > 1 && (
+            <TablePagination
+              page={page}
+              totalPages={data.totalPages}
+              total={data.total}
+              pageSize={20}
+              onPageChange={setPage}
+            />
           )}
         </>
       )}

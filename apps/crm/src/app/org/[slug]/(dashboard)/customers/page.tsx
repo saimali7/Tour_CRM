@@ -111,70 +111,75 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <PageHeader
-        title="Customers"
-        description="Manage your customer database"
-      >
-        <PageHeaderAction href={`/org/${slug}/customers/new`}>
+    <div className="space-y-4">
+      {/* Header: Title + Inline Stats + Add Customer */}
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-6">
+          <h1 className="text-lg font-semibold text-foreground">Customers</h1>
+          {/* Inline Stats */}
+          {stats && (
+            <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
+              <span>
+                <span className="font-medium text-foreground">{stats.total}</span> total
+              </span>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium text-emerald-600">+{stats.thisMonth}</span> this month
+              </span>
+            </div>
+          )}
+        </div>
+
+        <Link
+          href={`/org/${slug}/customers/new` as Route}
+          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <UserPlus className="h-4 w-4" />
           Add Customer
-        </PageHeaderAction>
-      </PageHeader>
+        </Link>
+      </header>
 
-      {/* Stats Row */}
-      {stats && (
-        <StatsRow>
-          <StatCard
-            icon={Users}
-            label="Total"
-            value={stats.total}
-            iconColor="text-primary"
-            iconBgColor="bg-primary/10"
+      {/* Compact Filter Bar */}
+      <div className="flex items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 max-w-sm">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search by name, phone, or email..."
+            className="w-full h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
-          <StatCard
-            icon={UserPlus}
-            label="This Month"
-            value={stats.thisMonth}
-            iconColor="text-success"
-            iconBgColor="bg-success/10"
-          />
-          <StatCard
-            icon={Calendar}
-            label="Website"
-            value={stats.bySource.website ?? 0}
-            iconColor="text-primary"
-            iconBgColor="bg-primary/10"
-          />
-          <StatCard
-            icon={Users}
-            label="Manual"
-            value={stats.bySource.manual ?? 0}
-            iconColor="text-warning"
-            iconBgColor="bg-warning/10"
-          />
-        </StatsRow>
-      )}
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <span className="sr-only">Clear</span>
+              ×
+            </button>
+          )}
+        </div>
 
-      {/* Filters */}
-      <FilterBar>
-        <FilterSearch
-          value={search}
-          onChange={(value) => {
-            setSearch(value);
-            setPage(1);
-          }}
-          placeholder="Search by name, email, or phone..."
-        />
-        <FilterChipGroup
+        {/* Source Dropdown */}
+        <select
           value={sourceFilter}
-          onChange={(value) => {
-            setSourceFilter(value);
+          onChange={(e) => {
+            setSourceFilter(e.target.value as SourceFilter);
             setPage(1);
           }}
-          options={SOURCE_OPTIONS}
-        />
-      </FilterBar>
+          className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+        >
+          {SOURCE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.value === "all" ? "All Sources" : opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Table */}
       {isLoading ? (
@@ -193,9 +198,9 @@ export default function CustomersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Customer</TableHead>
-                <TableHead>Contact</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Source</TableHead>
-                <TableHead>Location</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -203,74 +208,68 @@ export default function CustomersPage() {
             <TableBody>
               {data?.data.map((customer) => (
                 <TableRow key={customer.id}>
+                  {/* Customer: First name prominent, last name secondary */}
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-primary font-medium">
-                          {customer.firstName?.[0] ?? ''}
-                          {customer.lastName?.[0] ?? ''}
+                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-primary font-medium text-sm">
+                          {customer.firstName?.[0]?.toUpperCase() ?? '?'}
                         </span>
                       </div>
-                      <div>
-                        <div className="text-sm font-medium text-foreground">
-                          {customer.firstName} {customer.lastName}
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground truncate">
+                          {customer.firstName}
+                          {customer.lastName && (
+                            <span className="font-normal text-muted-foreground ml-1">
+                              {customer.lastName}
+                            </span>
+                          )}
                         </div>
                         {customer.tags && customer.tags.length > 0 && (
-                          <div className="flex gap-1 mt-1">
+                          <div className="flex gap-1 mt-0.5">
                             {customer.tags.slice(0, 2).map((tag) => (
                               <span
                                 key={tag}
-                                className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-secondary text-secondary-foreground"
+                                className="inline-flex items-center px-1.5 py-0 rounded text-[10px] bg-muted text-muted-foreground"
                               >
                                 {tag}
                               </span>
                             ))}
-                            {customer.tags.length > 2 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{customer.tags.length - 2}
-                              </span>
-                            )}
                           </div>
                         )}
                       </div>
                     </div>
                   </TableCell>
+                  {/* Phone: Primary contact method for tour operations */}
                   <TableCell>
-                    <div className="space-y-1">
-                      {customer.email && (
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Mail className="h-3.5 w-3.5" />
-                          <a
-                            href={`mailto:${customer.email}`}
-                            className="hover:text-primary transition-colors"
-                          >
-                            {customer.email}
-                          </a>
-                        </div>
-                      )}
-                      {customer.phone && (
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Phone className="h-3.5 w-3.5" />
-                          <a
-                            href={`tel:${customer.phone}`}
-                            className="hover:text-primary transition-colors"
-                          >
-                            {customer.phone}
-                          </a>
-                        </div>
-                      )}
-                    </div>
+                    {customer.phone ? (
+                      <a
+                        href={`tel:${customer.phone}`}
+                        className="inline-flex items-center gap-1.5 text-sm text-foreground hover:text-primary transition-colors font-mono"
+                      >
+                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                        {customer.phone}
+                      </a>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  {/* Email: Secondary contact */}
+                  <TableCell>
+                    {customer.email ? (
+                      <a
+                        href={`mailto:${customer.email}`}
+                        className="text-sm text-muted-foreground hover:text-primary transition-colors truncate block max-w-[200px]"
+                      >
+                        {customer.email}
+                      </a>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground">
-                      {customer.source ? customer.source.charAt(0).toUpperCase() + customer.source.slice(1) : "Unknown"}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {customer.city || customer.country
-                        ? [customer.city, customer.country].filter(Boolean).join(", ")
-                        : "-"}
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+                      {customer.source ? customer.source.charAt(0).toUpperCase() + customer.source.slice(1) : "—"}
                     </span>
                   </TableCell>
                   <TableCell>

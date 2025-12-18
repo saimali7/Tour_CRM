@@ -8,8 +8,6 @@ import {
   Mail,
   Phone,
   Users,
-  UserCheck,
-  UserX,
   Globe,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,7 +16,6 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 
 // Design system components
-import { PageHeader, PageHeaderAction, StatsRow, StatCard } from "@/components/ui/page-header";
 import { FilterBar, FilterSearch, FilterChipGroup } from "@/components/ui/filter-bar";
 import {
   Table,
@@ -126,50 +123,41 @@ export default function GuidesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <PageHeader
-        title="Guides"
-        description="Manage your tour guides"
-      >
-        <PageHeaderAction href={`/org/${slug}/guides/new`}>
-          Add Guide
-        </PageHeaderAction>
-      </PageHeader>
+    <div className="space-y-4">
+      {/* Header: Title + Inline Stats + Add Guide */}
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-6">
+          <h1 className="text-lg font-semibold text-foreground">Guides</h1>
+          {/* Inline Stats */}
+          {stats && (
+            <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
+              <span>
+                <span className="font-medium text-foreground">{stats.total}</span> total
+              </span>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium text-emerald-600">{stats.active}</span> active
+              </span>
+              {stats.onLeave > 0 && (
+                <>
+                  <span className="text-border">·</span>
+                  <span>
+                    <span className="font-medium text-yellow-600">{stats.onLeave}</span> on leave
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
-      {/* Stats Row */}
-      {stats && (
-        <StatsRow>
-          <StatCard
-            icon={Users}
-            label="Total"
-            value={stats.total}
-            iconColor="text-primary"
-            iconBgColor="bg-primary/10"
-          />
-          <StatCard
-            icon={UserCheck}
-            label="Active"
-            value={stats.active}
-            iconColor="text-success"
-            iconBgColor="bg-success/10"
-          />
-          <StatCard
-            icon={UserX}
-            label="On Leave"
-            value={stats.onLeave}
-            iconColor="text-warning"
-            iconBgColor="bg-warning/10"
-          />
-          <StatCard
-            icon={Globe}
-            label="Public"
-            value={stats.public}
-            iconColor="text-primary"
-            iconBgColor="bg-primary/10"
-          />
-        </StatsRow>
-      )}
+        <Link
+          href={`/org/${slug}/guides/new` as Route}
+          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Users className="h-4 w-4" />
+          Add Guide
+        </Link>
+      </header>
 
       {/* Filters */}
       <FilterBar>

@@ -1,534 +1,509 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import {
-  Calendar,
-  Users,
-  UserCheck,
-  DollarSign,
-  TrendingUp,
-  BarChart3,
   AlertTriangle,
+  CheckCircle2,
+  Users,
+  Clock,
+  MapPin,
+  Phone,
+  ChevronRight,
+  Zap,
+  Plus,
+  Printer,
+  ArrowRight,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  StatCard,
-  ActivityFeed,
-  TodaySchedule,
-  MetricCard,
-  SimpleChart,
-  ActionableAlert,
-  AlertsPanel,
-} from "@/components/dashboard";
-import { MorningBriefing } from "@/components/dashboard/morning-briefing";
-import { IntelligenceSurface } from "@/components/dashboard/intelligence-surface";
-import { CustomerIntelligenceCard } from "@/components/dashboard/customer-intelligence-card";
-import { GoalCard } from "@/components/goals/goal-card";
-import { GoalModal } from "@/components/goals/goal-modal";
-import { SetupChecklist } from "@/components/dashboard/setup-checklist";
+import Link from "next/link";
+import type { Route } from "next";
+import { cn } from "@/lib/utils";
+import { format, isToday, isTomorrow, differenceInMinutes } from "date-fns";
 
-type TabType = "operations" | "business";
+// =============================================================================
+// TYPES
+// =============================================================================
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
+interface ScheduleItem {
+  scheduleId: string;
+  tourName: string;
+  startsAt: Date | string;
+  endsAt?: Date | string;
+  bookedCount: number;
+  maxParticipants: number;
+  guideName?: string | null;
+  hasUnconfirmedGuide: boolean;
+  status?: string;
 }
 
-function formatDate(): string {
-  return new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+interface Alert {
+  id: string;
+  type: "critical" | "warning" | "info";
+  title: string;
+  subtitle: string;
+  action: { label: string; href: string };
 }
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+function getTimeLabel(date: Date): string {
+  return format(date, "h:mm a");
+}
+
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const mins = differenceInMinutes(date, now);
+
+  if (mins < 0) return "Started";
+  if (mins < 60) return `${mins}m`;
+  if (mins < 120) return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  return format(date, "h:mm a");
+}
+
+function getUtilization(booked: number, max: number): number {
+  if (max === 0) return 0;
+  return Math.round((booked / max) * 100);
+}
+
+// =============================================================================
+// MAIN DASHBOARD COMPONENT
+// =============================================================================
 
 export default function DashboardPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
-  const [activeTab, setActiveTab] = useState<TabType>("operations");
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
-  const [showGoalModal, setShowGoalModal] = useState(false);
-
-  const utils = trpc.useUtils();
 
   const {
     data: operationsData,
-    isLoading: operationsLoading,
-    error: operationsError,
+    isLoading,
+    error,
   } = trpc.dashboard.getOperationsDashboard.useQuery(undefined, {
-    refetchInterval: 60000,
+    refetchInterval: 30000, // Refresh every 30s
   });
 
-  const {
-    data: businessData,
-    isLoading: businessLoading,
-    error: businessError,
-  } = trpc.dashboard.getBusinessDashboard.useQuery({}, {
-    enabled: activeTab === "business",
-  });
-
-  const cancelScheduleMutation = trpc.schedule.cancel.useMutation({
-    onSuccess: () => {
-      utils.dashboard.getOperationsDashboard.invalidate();
-      utils.schedule.list.invalidate();
-    },
-  });
-
-  const handleDismissAlert = (alertId: string) => {
-    setDismissedAlerts((prev) => new Set(prev).add(alertId));
-  };
-
-  // Calculate alerts for "Needs Action" section
-  const alerts = useMemo(() => {
+  // Generate alerts from operations data
+  const alerts = useMemo((): Alert[] => {
     if (!operationsData) return [];
 
-    const alertsList: React.ReactElement[] = [];
+    const items: Alert[] = [];
+    const now = new Date();
 
-    // Critical: Unassigned guides
-    const unassignedSchedules = operationsData.upcomingSchedules.filter(
-      (s) => s.hasUnconfirmedGuide && !dismissedAlerts.has(`unassigned-${s.scheduleId}`)
-    );
-    unassignedSchedules.forEach((schedule) => {
-      alertsList.push(
-        <ActionableAlert
-          key={`unassigned-${schedule.scheduleId}`}
-          id={`unassigned-${schedule.scheduleId}`}
-          severity="critical"
-          title="No guide assigned"
-          description={`${schedule.tourName} • ${new Date(schedule.startsAt).toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          })} at ${new Date(schedule.startsAt).toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-          })} • ${schedule.bookedCount} guests`}
-          entityId={schedule.scheduleId}
-          entityType="schedule"
-          actions={[
-            {
-              label: "View Schedule",
-              onClick: () => router.push(`/org/${slug}/availability/${schedule.scheduleId}`),
-            },
-            {
-              label: "Cancel Tour",
-              variant: "destructive",
-              onClick: () => {
-                if (confirm(`Cancel ${schedule.tourName}? This will notify all booked customers.`)) {
-                  cancelScheduleMutation.mutate({ id: schedule.scheduleId });
-                }
-              },
-              isLoading: cancelScheduleMutation.isPending,
-            },
-          ]}
-          onDismiss={() => handleDismissAlert(`unassigned-${schedule.scheduleId}`)}
-        />
-      );
+    // Critical: Unassigned guides for today
+    operationsData.upcomingSchedules
+      .filter((s) => s.hasUnconfirmedGuide)
+      .forEach((schedule) => {
+        items.push({
+          id: `unassigned-${schedule.scheduleId}`,
+          type: "critical",
+          title: "No guide assigned",
+          subtitle: `${schedule.tourName} · ${getTimeLabel(new Date(schedule.startsAt))} · ${schedule.bookedCount} guests`,
+          action: { label: "Assign", href: `/org/${slug}/calendar` },
+        });
+      });
+
+    // Warning: Low capacity (< 30%) for upcoming tours
+    operationsData.upcomingSchedules
+      .filter((s) => {
+        const util = getUtilization(s.bookedCount, s.maxParticipants);
+        const daysAway = Math.ceil(
+          (new Date(s.startsAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        return util < 30 && util > 0 && daysAway > 1 && daysAway <= 7 && !s.hasUnconfirmedGuide;
+      })
+      .slice(0, 2)
+      .forEach((schedule) => {
+        const util = getUtilization(schedule.bookedCount, schedule.maxParticipants);
+        items.push({
+          id: `low-${schedule.scheduleId}`,
+          type: "warning",
+          title: `${util}% booked`,
+          subtitle: `${schedule.tourName} · ${format(new Date(schedule.startsAt), "EEE, MMM d")}`,
+          action: { label: "View", href: `/org/${slug}/calendar` },
+        });
+      });
+
+    return items;
+  }, [operationsData, slug]);
+
+  // Separate today's and upcoming schedules
+  const { todaySchedules, upcomingSchedules } = useMemo(() => {
+    if (!operationsData) return { todaySchedules: [], upcomingSchedules: [] };
+
+    const today: ScheduleItem[] = [];
+    const upcoming: ScheduleItem[] = [];
+
+    operationsData.upcomingSchedules.forEach((s) => {
+      const date = new Date(s.startsAt);
+      if (isToday(date)) {
+        today.push(s);
+      } else {
+        upcoming.push(s);
+      }
     });
 
-    // Warning: Low capacity schedules
-    const lowCapacitySchedules = operationsData.upcomingSchedules.filter((s) => {
-      const utilization = s.maxParticipants > 0 ? (s.bookedCount / s.maxParticipants) * 100 : 0;
-      const daysAway = Math.ceil((new Date(s.startsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-      return (
-        utilization < 30 &&
-        daysAway > 2 &&
-        !s.hasUnconfirmedGuide &&
-        !dismissedAlerts.has(`low-capacity-${s.scheduleId}`)
-      );
-    });
-    lowCapacitySchedules.slice(0, 2).forEach((schedule) => {
-      const utilization = schedule.maxParticipants > 0
-        ? Math.round((schedule.bookedCount / schedule.maxParticipants) * 100)
-        : 0;
-      alertsList.push(
-        <ActionableAlert
-          key={`low-capacity-${schedule.scheduleId}`}
-          id={`low-capacity-${schedule.scheduleId}`}
-          severity="warning"
-          title="Low bookings"
-          description={`${schedule.tourName} • ${utilization}% full (${schedule.bookedCount}/${schedule.maxParticipants}) • ${new Date(schedule.startsAt).toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          })}`}
-          entityId={schedule.scheduleId}
-          entityType="schedule"
-          actions={[
-            {
-              label: "View Schedule",
-              onClick: () => router.push(`/org/${slug}/availability/${schedule.scheduleId}`),
-            },
-            {
-              label: "View Customers",
-              variant: "secondary",
-              onClick: () => router.push(`/org/${slug}/customers`),
-            },
-          ]}
-          onDismiss={() => handleDismissAlert(`low-capacity-${schedule.scheduleId}`)}
-        />
-      );
-    });
+    return { todaySchedules: today, upcomingSchedules: upcoming.slice(0, 5) };
+  }, [operationsData]);
 
-    // Info: Tours happening soon
-    const upcomingSoonSchedules = operationsData.upcomingSchedules.filter((s) => {
-      const hoursAway = (new Date(s.startsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60);
-      return (
-        hoursAway > 0 &&
-        hoursAway <= 2 &&
-        s.bookedCount > 0 &&
-        !s.hasUnconfirmedGuide &&
-        !dismissedAlerts.has(`upcoming-soon-${s.scheduleId}`)
-      );
-    });
-    upcomingSoonSchedules.slice(0, 1).forEach((schedule) => {
-      const minutesAway = Math.round((new Date(schedule.startsAt).getTime() - new Date().getTime()) / (1000 * 60));
-      alertsList.push(
-        <ActionableAlert
-          key={`upcoming-soon-${schedule.scheduleId}`}
-          id={`upcoming-soon-${schedule.scheduleId}`}
-          severity="info"
-          title={`Starting in ${minutesAway} minutes`}
-          description={`${schedule.tourName} • ${schedule.bookedCount} guests${schedule.guideName ? ` • ${schedule.guideName}` : ""}`}
-          entityId={schedule.scheduleId}
-          entityType="schedule"
-          actions={[
-            {
-              label: "View Manifest",
-              onClick: () => router.push(`/org/${slug}/availability/${schedule.scheduleId}`),
-            },
-          ]}
-          onDismiss={() => handleDismissAlert(`upcoming-soon-${schedule.scheduleId}`)}
-        />
-      );
-    });
+  // Stats
+  const stats = useMemo(() => {
+    if (!operationsData) return null;
+    return {
+      tours: operationsData.todaysOperations.scheduledTours,
+      guests: operationsData.todaysOperations.totalParticipants,
+      guides: operationsData.todaysOperations.guidesWorking,
+      alerts: alerts.filter((a) => a.type === "critical").length,
+    };
+  }, [operationsData, alerts]);
 
-    return alertsList;
-  }, [operationsData, dismissedAlerts, router, slug, cancelScheduleMutation]);
-
-  if (operationsError || businessError) {
+  if (error) {
     return (
-      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
-        <p className="text-destructive">
-          Error loading dashboard: {operationsError?.message || businessError?.message}
-        </p>
+      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+        <p className="text-sm text-destructive">Error loading dashboard: {error.message}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Setup Checklist - Shows for new organizations */}
-      <SetupChecklist orgSlug={slug} />
+    <div className="space-y-4">
+      {/* ===== HEADER: Date + Inline Stats ===== */}
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">
+            {format(new Date(), "EEEE, MMMM d")}
+          </h1>
+          {isLoading ? (
+            <div className="h-4 w-48 bg-muted animate-pulse rounded mt-1" />
+          ) : stats && (
+            <p className="text-sm text-muted-foreground mt-0.5 font-mono tabular-nums">
+              <span className="text-foreground font-medium">{stats.tours}</span> tours
+              <span className="mx-1.5 text-border">·</span>
+              <span className="text-foreground font-medium">{stats.guests}</span> guests
+              <span className="mx-1.5 text-border">·</span>
+              <span className="text-foreground font-medium">{stats.guides}</span> guides
+              {stats.alerts > 0 && (
+                <>
+                  <span className="mx-1.5 text-border">·</span>
+                  <span className="text-destructive font-medium">{stats.alerts}</span>
+                  <span className="text-destructive"> alerts</span>
+                </>
+              )}
+            </p>
+          )}
+        </div>
 
-      {/* Tabs */}
-      <div className="border-b border-border">
-        <nav className="-mb-px flex gap-8">
-          <button
-            onClick={() => setActiveTab("operations")}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === "operations"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-            }`}
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/org/${slug}/bookings?quick=1` as Route}
+            className="inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Today
-          </button>
-          <button
-            onClick={() => setActiveTab("business")}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === "business"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-            }`}
-          >
-            Business
-          </button>
-        </nav>
+            <Zap className="h-3.5 w-3.5" />
+            Quick Book
+          </Link>
+        </div>
+      </header>
+
+      {/* ===== ALERTS BANNER ===== */}
+      {alerts.length > 0 && (
+        <div className="rounded-lg border-2 border-destructive/20 bg-destructive/5 overflow-hidden">
+          <div className="px-3 py-2 bg-destructive/10 border-b border-destructive/10">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <span className="text-sm font-medium text-destructive">
+                {alerts.length} {alerts.length === 1 ? "issue" : "issues"} need attention
+              </span>
+            </div>
+          </div>
+          <div className="divide-y divide-destructive/10">
+            {alerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="flex items-center justify-between px-3 py-2 hover:bg-destructive/5 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={cn(
+                      "h-2 w-2 rounded-full flex-shrink-0",
+                      alert.type === "critical" && "bg-destructive",
+                      alert.type === "warning" && "bg-yellow-500",
+                      alert.type === "info" && "bg-blue-500"
+                    )}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {alert.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {alert.subtitle}
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href={alert.action.href as Route}
+                  className="flex-shrink-0 text-xs font-medium text-destructive hover:underline"
+                >
+                  {alert.action.label}
+                  <ChevronRight className="h-3 w-3 inline ml-0.5" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ===== ALL CLEAR STATE ===== */}
+      {alerts.length === 0 && !isLoading && (
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30 px-4 py-3">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+              All clear
+            </p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              No urgent issues need your attention
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ===== TODAY'S SCHEDULE ===== */}
+      <section>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            Today's Schedule
+          </h2>
+          {todaySchedules.length > 0 && (
+            <button
+              onClick={() => window.print()}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              <Printer className="h-3 w-3" />
+              Print All
+            </button>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+            ))}
+          </div>
+        ) : todaySchedules.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border p-6 text-center">
+            <p className="text-sm text-muted-foreground">No tours scheduled for today</p>
+            <Link
+              href={`/org/${slug}/calendar` as Route}
+              className="text-xs text-primary hover:underline mt-1 inline-block"
+            >
+              View calendar
+            </Link>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+            {todaySchedules.map((schedule) => (
+              <ScheduleRow
+                key={schedule.scheduleId}
+                schedule={schedule}
+                slug={slug}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ===== UPCOMING (Next 7 Days) ===== */}
+      {upcomingSchedules.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              Coming Up
+            </h2>
+            <Link
+              href={`/org/${slug}/calendar` as Route}
+              className="text-xs text-primary hover:underline flex items-center gap-0.5"
+            >
+              View all
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+            {upcomingSchedules.map((schedule) => (
+              <UpcomingRow
+                key={schedule.scheduleId}
+                schedule={schedule}
+                slug={slug}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ===== QUICK ACTIONS ===== */}
+      <section className="pt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <QuickAction
+            href={`/org/${slug}/bookings/new`}
+            icon={Plus}
+            label="New Booking"
+          />
+          <QuickAction
+            href={`/org/${slug}/tours/new`}
+            icon={MapPin}
+            label="New Tour"
+          />
+          <QuickAction
+            href={`/org/${slug}/customers/new`}
+            icon={Users}
+            label="Add Customer"
+          />
+          <QuickAction
+            href={`/org/${slug}/analytics`}
+            icon={ChevronRight}
+            label="Analytics"
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// =============================================================================
+// SUB-COMPONENTS
+// =============================================================================
+
+interface ScheduleRowProps {
+  schedule: ScheduleItem;
+  slug: string;
+}
+
+function ScheduleRow({ schedule, slug }: ScheduleRowProps) {
+  const startTime = new Date(schedule.startsAt);
+  const util = getUtilization(schedule.bookedCount, schedule.maxParticipants);
+  const isStartingSoon = differenceInMinutes(startTime, new Date()) <= 60 && differenceInMinutes(startTime, new Date()) > 0;
+
+  return (
+    <Link
+      href={`/org/${slug}/availability/${schedule.scheduleId}` as Route}
+      className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group"
+    >
+      {/* Time */}
+      <div className="w-16 flex-shrink-0">
+        <p className={cn(
+          "text-sm font-mono tabular-nums",
+          isStartingSoon ? "text-primary font-semibold" : "text-foreground"
+        )}>
+          {getTimeLabel(startTime)}
+        </p>
+        {isStartingSoon && (
+          <p className="text-[10px] text-primary font-medium">
+            {getRelativeTime(startTime)}
+          </p>
+        )}
       </div>
 
-      {/* Operations Tab - Attention First Design */}
-      {activeTab === "operations" && (
-        <>
-          {operationsLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </div>
-          ) : operationsData ? (
-            <div className="space-y-6">
-              {/* Morning Briefing - Consolidated Today View with Print All */}
-              <MorningBriefing orgSlug={slug} />
+      {/* Tour Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">
+          {schedule.tourName}
+        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            {schedule.bookedCount}/{schedule.maxParticipants}
+          </span>
+          {schedule.guideName ? (
+            <span className="text-xs text-muted-foreground truncate">
+              · {schedule.guideName}
+            </span>
+          ) : (
+            <span className="text-xs text-destructive font-medium">
+              · No guide
+            </span>
+          )}
+        </div>
+      </div>
 
-              {/* NEEDS ACTION Section - First and Prominent */}
-              {alerts.length > 0 && (
-                <div className="rounded-xl border-2 border-warning/30 bg-warning/10 p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <AlertTriangle className="h-5 w-5 text-warning" />
-                    <h2 className="text-lg font-semibold text-warning-foreground">
-                      Needs Action ({alerts.length})
-                    </h2>
-                  </div>
-                  <AlertsPanel>{alerts}</AlertsPanel>
-                </div>
-              )}
+      {/* Capacity Bar */}
+      <div className="w-20 flex-shrink-0 hidden sm:block">
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn(
+              "h-full transition-all",
+              util >= 80 ? "bg-emerald-500" : util >= 50 ? "bg-primary" : "bg-yellow-500"
+            )}
+            style={{ width: `${util}%` }}
+          />
+        </div>
+        <p className="text-[10px] text-muted-foreground text-right mt-0.5">
+          {util}%
+        </p>
+      </div>
 
-              {/* All Clear Message */}
-              {alerts.length === 0 && (
-                <div className="rounded-xl border border-success/30 bg-success/10 p-6 text-center">
-                  <div className="mx-auto h-12 w-12 rounded-full bg-success/20 flex items-center justify-center mb-3">
-                    <UserCheck className="h-6 w-6 text-success" />
-                  </div>
-                  <h3 className="text-lg font-medium text-success-foreground">All clear!</h3>
-                  <p className="text-sm text-success-foreground/80 mt-1">
-                    No urgent items need your attention right now.
-                  </p>
-                </div>
-              )}
+      {/* Arrow */}
+      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+    </Link>
+  );
+}
 
-              {/* TODAY'S TOURS Section */}
-              <div className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-subheading text-foreground">
-                    Today's Tours
-                  </h2>
-                  <span className="text-sm text-muted-foreground">
-                    {operationsData.upcomingSchedules.length} scheduled
-                  </span>
-                </div>
-                <TodaySchedule
-                  schedule={operationsData.upcomingSchedules.map((s) => ({
-                    scheduleId: s.scheduleId,
-                    time: new Date(s.startsAt).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    }),
-                    tourName: s.tourName,
-                    tourId: s.scheduleId,
-                    bookedParticipants: s.bookedCount,
-                    capacity: s.maxParticipants,
-                    guide: s.guideName
-                      ? {
-                          id: s.scheduleId,
-                          name: s.guideName,
-                        }
-                      : null,
-                    status: s.hasUnconfirmedGuide
-                      ? "issue"
-                      : s.bookedCount === 0
-                      ? "needs_attention"
-                      : "on_track",
-                    statusReason: s.hasUnconfirmedGuide
-                      ? "No guide assigned"
-                      : undefined,
-                    startsAt: new Date(s.startsAt),
-                    endsAt: s.endsAt ? new Date(s.endsAt) : new Date(new Date(s.startsAt).getTime() + 2 * 60 * 60 * 1000),
-                  }))}
-                  orgSlug={slug}
-                />
-              </div>
+function UpcomingRow({ schedule, slug }: ScheduleRowProps) {
+  const startTime = new Date(schedule.startsAt);
+  const util = getUtilization(schedule.bookedCount, schedule.maxParticipants);
 
-              {/* QUICK STATS Section - At Bottom */}
-              <div className="rounded-xl border border-border bg-muted/50 p-5">
-                <h2 className="text-overline text-muted-foreground mb-4">
-                  Quick Stats
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-card rounded-lg p-4 border border-border">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Calendar className="h-4 w-4" />
-                      <span className="text-overline">Tours Today</span>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground">
-                      {operationsData.todaysOperations.scheduledTours}
-                    </p>
-                  </div>
-                  <div className="bg-card rounded-lg p-4 border border-border">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Users className="h-4 w-4" />
-                      <span className="text-overline">Guests Today</span>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground">
-                      {operationsData.todaysOperations.totalParticipants}
-                    </p>
-                  </div>
-                  <div className="bg-card rounded-lg p-4 border border-border">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <UserCheck className="h-4 w-4" />
-                      <span className="text-overline">Guides Working</span>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground">
-                      {operationsData.todaysOperations.guidesWorking}
-                    </p>
-                  </div>
-                  <div className="bg-card rounded-lg p-4 border border-border">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <AlertTriangle className="h-4 w-4" />
-                      <span className="text-overline">Unassigned</span>
-                    </div>
-                    <p className={`text-2xl font-bold ${operationsData.upcomingSchedules.filter(s => s.hasUnconfirmedGuide).length > 0 ? 'text-warning' : 'text-foreground'}`}>
-                      {operationsData.upcomingSchedules.filter(s => s.hasUnconfirmedGuide).length}
-                    </p>
-                  </div>
-                </div>
-              </div>
+  const dayLabel = isTomorrow(startTime)
+    ? "Tomorrow"
+    : format(startTime, "EEE, MMM d");
 
-              {/* Recent Activity - Collapsible/Secondary */}
-              <details className="rounded-xl border border-border bg-card group">
-                <summary className="p-5 cursor-pointer flex items-center justify-between hover:bg-accent rounded-xl">
-                  <h2 className="text-subheading text-foreground">
-                    Recent Activity
-                  </h2>
-                  <span className="text-sm text-muted-foreground group-open:hidden">
-                    Click to expand
-                  </span>
-                </summary>
-                <div className="px-5 pb-5">
-                  <ActivityFeed
-                    activities={operationsData.recentActivity.map((activity, idx) => ({
-                      id: `${activity.entityType}-${activity.entityId}-${idx}`,
-                      type: activity.type,
-                      entityType: activity.entityType,
-                      entityId: activity.entityId,
-                      description: activity.description,
-                      timestamp: activity.timestamp,
-                      actorName: "System",
-                    }))}
-                    orgSlug={slug}
-                  />
-                </div>
-              </details>
-            </div>
-          ) : null}
-        </>
-      )}
+  return (
+    <Link
+      href={`/org/${slug}/availability/${schedule.scheduleId}` as Route}
+      className="flex items-center gap-4 px-4 py-2.5 hover:bg-muted/50 transition-colors group"
+    >
+      {/* Date */}
+      <div className="w-24 flex-shrink-0">
+        <p className="text-xs text-muted-foreground">{dayLabel}</p>
+        <p className="text-sm font-mono tabular-nums text-foreground">
+          {getTimeLabel(startTime)}
+        </p>
+      </div>
 
-      {/* Business Tab */}
-      {activeTab === "business" && (
-        <>
-          {businessLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </div>
-          ) : businessData ? (
-            <div className="space-y-6">
-              {/* Business Header */}
-              <div>
-                <h1 className="text-title text-foreground">Business Overview</h1>
-                <p className="text-body text-muted-foreground mt-1">Track revenue, bookings, and performance</p>
-              </div>
+      {/* Tour */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-foreground truncate">{schedule.tourName}</p>
+      </div>
 
-              {/* Intelligence Surface - Forecasting & Insights */}
-              <IntelligenceSurface orgSlug={slug} />
+      {/* Booked */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Users className="h-3 w-3" />
+        {schedule.bookedCount}/{schedule.maxParticipants}
+        {schedule.hasUnconfirmedGuide && (
+          <span className="text-destructive">⚠</span>
+        )}
+      </div>
 
-              {/* Intelligence Grid - Customer Intelligence + Goals */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <CustomerIntelligenceCard orgSlug={slug} />
-                <GoalCard orgSlug={slug} onAddGoal={() => setShowGoalModal(true)} />
-              </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+    </Link>
+  );
+}
 
-              {/* Revenue Cards */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <StatCard
-                  title="Today's Revenue"
-                  value={`$${businessData.keyMetrics.todayVsYesterday.revenue.today}`}
-                  icon={DollarSign}
-                  color="green"
-                  trend={{
-                    value: businessData.keyMetrics.todayVsYesterday.revenue.change,
-                    direction:
-                      businessData.keyMetrics.todayVsYesterday.revenue.change >= 0
-                        ? "up"
-                        : "down",
-                  }}
-                />
-                <StatCard
-                  title="This Week"
-                  value={`$${businessData.keyMetrics.thisWeekVsLastWeek.revenue.thisWeek}`}
-                  icon={TrendingUp}
-                  color="blue"
-                  trend={{
-                    value: businessData.keyMetrics.thisWeekVsLastWeek.revenue.change,
-                    direction:
-                      businessData.keyMetrics.thisWeekVsLastWeek.revenue.change >= 0
-                        ? "up"
-                        : "down",
-                  }}
-                />
-                <StatCard
-                  title="Total Revenue"
-                  value={`$${businessData.revenueStats.totalRevenue}`}
-                  icon={BarChart3}
-                  color="purple"
-                />
-              </div>
+interface QuickActionProps {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}
 
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SimpleChart
-                  data={businessData.trendData.last30Days.revenue.map((r) => ({
-                    date: r.date,
-                    value: parseFloat(r.amount),
-                  }))}
-                  type="line"
-                  title="Revenue Trend (Last 30 Days)"
-                  valueFormatter={(v) => `$${v.toFixed(2)}`}
-                />
-                <SimpleChart
-                  data={businessData.trendData.last30Days.bookings.map((b) => ({
-                    date: b.date,
-                    value: b.count,
-                  }))}
-                  type="bar"
-                  title="Bookings Trend (Last 30 Days)"
-                  valueFormatter={(v) => v.toString()}
-                />
-              </div>
-
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <MetricCard
-                  label="Average Booking Value"
-                  value={`$${businessData.revenueStats.averageBookingValue}`}
-                />
-                <MetricCard
-                  label="Total Bookings"
-                  value={businessData.bookingStats.totalBookings}
-                />
-                <MetricCard
-                  label="Capacity Utilization"
-                  value={`${businessData.capacityUtilization.overallUtilization.toFixed(1)}%`}
-                  color={
-                    businessData.capacityUtilization.overallUtilization >= 80
-                      ? "success"
-                      : businessData.capacityUtilization.overallUtilization >= 50
-                      ? "warning"
-                      : "danger"
-                  }
-                />
-                <MetricCard
-                  label="Cancellation Rate"
-                  value={`${businessData.bookingStats.cancellationRate.toFixed(1)}%`}
-                  color={
-                    businessData.bookingStats.cancellationRate < 10
-                      ? "success"
-                      : "warning"
-                  }
-                />
-              </div>
-            </div>
-          ) : null}
-        </>
-      )}
-
-      {/* Goal Modal */}
-      <GoalModal
-        open={showGoalModal}
-        onOpenChange={setShowGoalModal}
-      />
-    </div>
+function QuickAction({ href, icon: Icon, label }: QuickActionProps) {
+  return (
+    <Link
+      href={href as Route}
+      className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-muted-foreground/20 transition-all text-sm text-muted-foreground hover:text-foreground"
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </Link>
   );
 }

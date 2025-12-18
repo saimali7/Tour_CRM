@@ -1,0 +1,87 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: D
+      - generic [ref=e6]:
+        - paragraph [ref=e7]: Demo Tours
+        - paragraph [ref=e8]: admin
+    - button "Search... ⌘K" [ref=e10]:
+      - img [ref=e11]
+      - generic [ref=e14]: Search...
+      - generic [ref=e15]: ⌘K
+    - navigation [ref=e16]:
+      - generic [ref=e17]:
+        - heading "Operations" [level=3] [ref=e18]
+        - generic [ref=e19]:
+          - link "Dashboard" [ref=e20] [cursor=pointer]:
+            - /url: /org/demo-tours
+            - img [ref=e21]
+            - generic [ref=e26]: Dashboard
+          - link "Bookings" [ref=e27] [cursor=pointer]:
+            - /url: /org/demo-tours/bookings
+            - img [ref=e28]
+            - generic [ref=e39]: Bookings
+          - link "Availability" [ref=e40] [cursor=pointer]:
+            - /url: /org/demo-tours/availability
+            - img [ref=e41]
+            - generic [ref=e47]: Availability
+      - generic [ref=e48]:
+        - heading "Management" [level=3] [ref=e49]
+        - generic [ref=e50]:
+          - link "Tours" [ref=e51] [cursor=pointer]:
+            - /url: /org/demo-tours/tours
+            - img [ref=e52]
+            - generic [ref=e56]: Tours
+          - link "Customers" [ref=e57] [cursor=pointer]:
+            - /url: /org/demo-tours/customers
+            - img [ref=e58]
+            - generic [ref=e63]: Customers
+          - link "Guides" [ref=e64] [cursor=pointer]:
+            - /url: /org/demo-tours/guides
+            - img [ref=e65]
+            - generic [ref=e69]: Guides
+      - generic [ref=e70]:
+        - heading "Business" [level=3] [ref=e71]
+        - generic [ref=e72]:
+          - link "Promo Codes" [ref=e73] [cursor=pointer]:
+            - /url: /org/demo-tours/promo-codes
+            - img [ref=e74]
+            - generic [ref=e77]: Promo Codes
+          - link "Reviews" [ref=e78] [cursor=pointer]:
+            - /url: /org/demo-tours/reviews
+            - img [ref=e79]
+            - generic [ref=e81]: Reviews
+          - link "Reports" [ref=e82] [cursor=pointer]:
+            - /url: /org/demo-tours/reports
+            - img [ref=e83]
+            - generic [ref=e88]: Reports
+          - link "Communications" [ref=e89] [cursor=pointer]:
+            - /url: /org/demo-tours/communications
+            - img [ref=e90]
+            - generic [ref=e93]: Communications
+      - generic [ref=e94]:
+        - heading "Admin" [level=3] [ref=e95]
+        - link "Settings" [ref=e97] [cursor=pointer]:
+          - /url: /org/demo-tours/settings
+          - img [ref=e98]
+          - generic [ref=e101]: Settings
+    - generic [ref=e102]:
+      - button "Theme" [disabled]:
+        - img
+        - generic: Theme
+      - button "Collapse" [ref=e103]:
+        - img
+        - generic [ref=e104]: Collapse
+    - generic [ref=e106]:
+      - img [ref=e108]
+      - paragraph [ref=e112]: Account
+  - main [ref=e113]:
+    - generic [ref=e114]:
+      - navigation [ref=e117]:
+        - button "Today" [ref=e118]
+        - button "Business" [ref=e119]
+      - region "Notifications alt+T"
+```

@@ -2,24 +2,23 @@
 
 import { trpc } from "@/lib/trpc";
 import {
-  Ticket,
   Eye,
   Edit,
   X,
   CheckCircle,
   Users,
-  Calendar,
-  DollarSign,
   Ban,
   Mail,
   RefreshCw,
-  Phone,
+  Zap,
+  Filter,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { ConfirmModal, useConfirmModal } from "@/components/ui/confirm-modal";
+import { useConfirmModal } from "@/components/ui/confirm-modal";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +28,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-// New design system components
-import { PageHeader, PageHeaderAction, StatsRow, StatCard } from "@/components/ui/page-header";
-import { FilterBar, FilterSearch, FilterChipGroup, FilterRow, SmallFilterChipGroup } from "@/components/ui/filter-bar";
+// Design system components
 import {
   Table,
   TableHeader,
@@ -95,19 +93,19 @@ export default function BookingsPage() {
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
   const [showPhoneBooking, setShowPhoneBooking] = useState(false);
 
-  // Auto-open phone booking from URL param (e.g., from command palette)
+  // Auto-open quick booking from URL param (e.g., from command palette or dashboard)
   useEffect(() => {
-    if (searchParams.get("phone") === "1") {
+    if (searchParams.get("phone") === "1" || searchParams.get("quick") === "1") {
       setShowPhoneBooking(true);
       // Remove the query param to prevent re-opening on refresh
       router.replace(`/org/${slug}/bookings`, { scroll: false });
     }
   }, [searchParams, router, slug]);
 
-  // Keyboard shortcut: Cmd+P to open phone booking
+  // Keyboard shortcuts: Cmd+B or Cmd+P to open quick booking
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "p" || e.key === "b")) {
         e.preventDefault();
         setShowPhoneBooking(true);
       }
@@ -115,6 +113,10 @@ export default function BookingsPage() {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Toggle filters visibility
+  const [showFilters, setShowFilters] = useState(false);
+  const hasActiveFilters = statusFilter !== "all" || paymentFilter !== "all" || search !== "";
 
   const { data, isLoading, error } = trpc.booking.list.useQuery({
     pagination: { page, limit: 20 },
@@ -328,89 +330,114 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <PageHeader
-        title="Bookings"
-        description="Manage customer reservations"
-      >
+    <div className="space-y-4">
+      {/* Header: Title + Inline Stats + Quick Book */}
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-6">
+          <h1 className="text-lg font-semibold text-foreground">Bookings</h1>
+          {/* Inline Stats */}
+          {stats && (
+            <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
+              <span>
+                <span className="font-medium text-foreground">{stats.total}</span> total
+              </span>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium text-yellow-600">{stats.pending}</span> pending
+              </span>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span> revenue
+              </span>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium text-foreground">{stats.participantCount}</span> guests
+              </span>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={() => setShowPhoneBooking(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-input bg-background hover:bg-accent transition-colors"
+          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
-          <Phone className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium">Phone Booking</span>
+          <Zap className="h-4 w-4" />
+          Quick Book
+          <span className="hidden md:inline text-primary-foreground/70 text-xs ml-1">⌘B</span>
         </button>
-        <PageHeaderAction href={`/org/${slug}/bookings/new`}>
-          New Booking
-        </PageHeaderAction>
-      </PageHeader>
+      </header>
 
-      {/* Stats Row */}
-      {stats && (
-        <StatsRow>
-          <StatCard
-            icon={Ticket}
-            label="Total"
-            value={stats.total}
-            iconColor="text-primary"
-            iconBgColor="bg-primary/10"
+      {/* Compact Filter Bar */}
+      <div className="flex items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 max-w-sm">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search bookings..."
+            className="w-full h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
-          <StatCard
-            icon={Calendar}
-            label="Pending"
-            value={stats.pending}
-            iconColor="text-warning"
-            iconBgColor="bg-warning/10"
-          />
-          <StatCard
-            icon={DollarSign}
-            label="Revenue"
-            value={`$${parseFloat(stats.revenue).toLocaleString()}`}
-            iconColor="text-success"
-            iconBgColor="bg-success/10"
-          />
-          <StatCard
-            icon={Users}
-            label="Participants"
-            value={stats.participantCount}
-            iconColor="text-primary"
-            iconBgColor="bg-primary/10"
-          />
-        </StatsRow>
-      )}
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
 
-      {/* Filters */}
-      <FilterBar>
-        <FilterSearch
-          value={search}
-          onChange={(value) => {
-            setSearch(value);
-            setPage(1);
-          }}
-          placeholder="Search by reference, customer name, or email..."
-        />
-        <FilterChipGroup
+        {/* Status Dropdown */}
+        <select
           value={statusFilter}
-          onChange={(value) => {
-            setStatusFilter(value);
+          onChange={(e) => {
+            setStatusFilter(e.target.value as StatusFilter);
             setPage(1);
           }}
-          options={STATUS_OPTIONS}
-        />
-      </FilterBar>
+          className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.value === "all" ? "All Status" : opt.label}
+            </option>
+          ))}
+        </select>
 
-      {/* Secondary Filters */}
-      <FilterRow label="Payment:">
-        <SmallFilterChipGroup
+        {/* Payment Dropdown */}
+        <select
           value={paymentFilter}
-          onChange={(value) => {
-            setPaymentFilter(value);
+          onChange={(e) => {
+            setPaymentFilter(e.target.value as PaymentFilter);
             setPage(1);
           }}
-          options={PAYMENT_OPTIONS}
-        />
-      </FilterRow>
+          className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+        >
+          {PAYMENT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.value === "all" ? "All Payment" : opt.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Clear Filters */}
+        {hasActiveFilters && (
+          <button
+            onClick={() => {
+              setSearch("");
+              setStatusFilter("all");
+              setPaymentFilter("all");
+              setPage(1);
+            }}
+            className="h-9 px-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
 
       {/* Table */}
       {isLoading ? (
@@ -473,12 +500,15 @@ export default function BookingsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <div className="text-sm font-medium text-foreground">
+                    <div className="max-w-[200px]">
+                      <div
+                        className="text-sm font-medium text-foreground truncate"
+                        title={booking.tour?.name || "Unknown Tour"}
+                      >
                         {booking.tour?.name || "Unknown Tour"}
                       </div>
                       {booking.schedule && (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-muted-foreground whitespace-nowrap">
                           {formatDate(booking.schedule.startsAt)} at{" "}
                           {formatTime(booking.schedule.startsAt)}
                         </div>

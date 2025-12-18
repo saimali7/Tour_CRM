@@ -1,0 +1,200 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: D
+        - generic [ref=e6]:
+          - paragraph [ref=e7]: Demo Tours
+          - paragraph [ref=e8]: admin
+      - button "Search... ⌘K" [ref=e10]:
+        - img [ref=e11]
+        - generic [ref=e14]: Search...
+        - generic [ref=e15]: ⌘K
+      - navigation [ref=e16]:
+        - generic [ref=e17]:
+          - heading "Operations" [level=3] [ref=e18]
+          - generic [ref=e19]:
+            - link "Dashboard" [ref=e20]:
+              - /url: /org/demo-tours
+              - img [ref=e21]
+              - generic [ref=e26]: Dashboard
+            - link "Bookings" [ref=e27]:
+              - /url: /org/demo-tours/bookings
+              - img [ref=e28]
+              - generic [ref=e30]: Bookings
+            - link "Availability" [ref=e31]:
+              - /url: /org/demo-tours/availability
+              - img [ref=e32]
+              - generic [ref=e35]: Availability
+        - generic [ref=e36]:
+          - heading "Management" [level=3] [ref=e37]
+          - generic [ref=e38]:
+            - link "Tours" [ref=e39]:
+              - /url: /org/demo-tours/tours
+              - img [ref=e40]
+              - generic [ref=e42]: Tours
+            - link "Customers" [ref=e43]:
+              - /url: /org/demo-tours/customers
+              - img [ref=e44]
+              - generic [ref=e49]: Customers
+            - link "Guides" [ref=e50]:
+              - /url: /org/demo-tours/guides
+              - img [ref=e51]
+              - generic [ref=e55]: Guides
+        - generic [ref=e56]:
+          - heading "Business" [level=3] [ref=e57]
+          - generic [ref=e58]:
+            - link "Promo Codes" [ref=e59]:
+              - /url: /org/demo-tours/promo-codes
+              - img [ref=e60]
+              - generic [ref=e63]: Promo Codes
+            - link "Reviews" [ref=e64]:
+              - /url: /org/demo-tours/reviews
+              - img [ref=e65]
+              - generic [ref=e67]: Reviews
+            - link "Reports" [ref=e68]:
+              - /url: /org/demo-tours/reports
+              - img [ref=e69]
+              - generic [ref=e71]: Reports
+            - link "Communications" [ref=e72]:
+              - /url: /org/demo-tours/communications
+              - img [ref=e73]
+              - generic [ref=e76]: Communications
+        - generic [ref=e77]:
+          - heading "Admin" [level=3] [ref=e78]
+          - link "Settings" [ref=e80]:
+            - /url: /org/demo-tours/settings
+            - img [ref=e81]
+            - generic [ref=e84]: Settings
+      - generic [ref=e85]:
+        - button "Theme" [ref=e86]:
+          - img
+          - generic [ref=e87]: Theme
+        - button "Collapse" [ref=e88]:
+          - img
+          - generic [ref=e89]: Collapse
+      - generic [ref=e91]:
+        - img [ref=e93]
+        - paragraph [ref=e97]: Account
+    - main [ref=e98]:
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - generic [ref=e101]:
+            - generic [ref=e102] [cursor=pointer]:
+              - generic [ref=e103]:
+                - img [ref=e105]
+                - generic [ref=e109]:
+                  - heading "Complete Your Setup" [level=3] [ref=e110]
+                  - paragraph [ref=e111]: 0 of 5 steps complete
+              - generic [ref=e112]:
+                - generic [ref=e113]:
+                  - img [ref=e114]
+                  - generic [ref=e117]: 0%
+                - button [ref=e118]:
+                  - img [ref=e119]
+            - generic [ref=e121]:
+              - generic [ref=e123]:
+                - img [ref=e125]
+                - generic [ref=e127]:
+                  - paragraph [ref=e128]: Create your organization
+                  - paragraph [ref=e129]: Set up your business name and preferences
+                - img [ref=e131]
+              - link "Complete business profile Add your address, phone, and website" [ref=e135]:
+                - /url: /org/demo-tours/settings#business
+                - generic [ref=e136] [cursor=pointer]:
+                  - img [ref=e138]
+                  - generic [ref=e140]:
+                    - paragraph [ref=e141]: Complete business profile
+                    - paragraph [ref=e142]: Add your address, phone, and website
+                  - img [ref=e144]
+              - link "Connect payment processing Accept online payments with Stripe" [ref=e147]:
+                - /url: /org/demo-tours/settings#payments
+                - generic [ref=e148] [cursor=pointer]:
+                  - img [ref=e150]
+                  - generic [ref=e152]:
+                    - paragraph [ref=e153]: Connect payment processing
+                    - paragraph [ref=e154]: Accept online payments with Stripe
+                  - img [ref=e156]
+              - link "Create your first tour Add a tour product to sell" [ref=e158]:
+                - /url: /org/demo-tours/tours/new
+                - generic [ref=e159] [cursor=pointer]:
+                  - img [ref=e161]
+                  - generic [ref=e163]:
+                    - paragraph [ref=e164]: Create your first tour
+                    - paragraph [ref=e165]: Add a tour product to sell
+                  - img [ref=e167]
+              - generic [ref=e170]:
+                - img [ref=e172]
+                - generic [ref=e174]:
+                  - paragraph [ref=e175]: Get your first booking
+                  - paragraph [ref=e176]: Receive a customer booking
+                - img [ref=e178]
+          - navigation [ref=e184]:
+            - button "Today" [ref=e185]
+            - button "Business" [ref=e186]
+          - generic [ref=e187]:
+            - generic [ref=e189]:
+              - img [ref=e191]
+              - generic [ref=e197]:
+                - heading "Good afternoon!" [level=2] [ref=e198]
+                - paragraph [ref=e199]: No tours scheduled for today. Time to focus on other things!
+            - generic [ref=e200]:
+              - img [ref=e202]
+              - heading "All clear!" [level=3] [ref=e206]
+              - paragraph [ref=e207]: No urgent items need your attention right now.
+            - generic [ref=e208]:
+              - generic [ref=e209]:
+                - heading "Today's Tours" [level=2] [ref=e210]
+                - generic [ref=e211]: 1 scheduled
+              - generic [ref=e213]:
+                - generic [ref=e214]: 9:00 AM
+                - generic:
+                  - link "Golden Gate Bridge Walking Tour" [ref=e215]:
+                    - /url: /org/demo-tours/availability/m4zfirxwi714qtkw50oe2xre
+                  - generic [ref=e216]: 12/15 guests
+                - button "No guide" [ref=e218]:
+                  - img [ref=e219]
+                  - generic [ref=e221]: No guide
+                - generic [ref=e222]:
+                  - link "Manifest" [ref=e223]:
+                    - /url: /org/demo-tours/availability/m4zfirxwi714qtkw50oe2xre
+                    - img [ref=e224]
+                    - generic [ref=e227]: Manifest
+                  - link "Details" [ref=e228]:
+                    - /url: /org/demo-tours/availability/m4zfirxwi714qtkw50oe2xre
+                    - img [ref=e229]
+                    - generic [ref=e232]: Details
+                  - button "Assign" [ref=e233]:
+                    - img [ref=e234]
+                    - generic [ref=e237]: Assign
+            - generic [ref=e238]:
+              - heading "Quick Stats" [level=2] [ref=e239]
+              - generic [ref=e240]:
+                - generic [ref=e241]:
+                  - generic [ref=e242]:
+                    - img [ref=e243]
+                    - generic [ref=e245]: Tours Today
+                  - paragraph [ref=e246]: "0"
+                - generic [ref=e247]:
+                  - generic [ref=e248]:
+                    - img [ref=e249]
+                    - generic [ref=e254]: Guests Today
+                  - paragraph [ref=e255]: "0"
+                - generic [ref=e256]:
+                  - generic [ref=e261]: Guides Working
+                  - paragraph [ref=e262]: "0"
+                - generic [ref=e263]:
+                  - generic [ref=e266]: Unassigned
+                  - paragraph [ref=e267]: "0"
+            - group [ref=e268]:
+              - generic "Recent Activity Click to expand" [ref=e269] [cursor=pointer]:
+                - heading "Recent Activity" [level=2] [ref=e270]
+                - generic [ref=e271]: Click to expand
+        - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e277] [cursor=pointer]:
+    - img [ref=e278]
+  - alert [ref=e283]
+```
