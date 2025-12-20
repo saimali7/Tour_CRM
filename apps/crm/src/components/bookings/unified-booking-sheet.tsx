@@ -13,6 +13,12 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Zap,
   Search,
   Plus,
@@ -21,6 +27,7 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Loader2,
   Check,
   AlertCircle,
@@ -154,6 +161,9 @@ export function UnifiedBookingSheet({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // UI state
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
+
   // Generate dates
   const dates = useMemo(() => generateDateRange(21), []);
   const visibleDates = dates.slice(dateScrollOffset, dateScrollOffset + 7);
@@ -208,7 +218,7 @@ export function UnifiedBookingSheet({
     { enabled: open }
   );
 
-  const { data: schedulesData } = trpc.schedule.list.useQuery(
+  const { data: schedulesData, isLoading: schedulesLoading, isFetching: schedulesFetching } = trpc.schedule.list.useQuery(
     {
       filters: {
         tourId: selectedTourId,
@@ -274,8 +284,46 @@ export function UnifiedBookingSheet({
         bookedCount: s.bookedCount || 0,
         maxParticipants: s.maxParticipants || 10,
         available: (s.maxParticipants || 10) - (s.bookedCount || 0),
+        // Differentiators for duplicate time slots
+        guideName: s.guide ? `${s.guide.firstName}${s.guide.lastName ? ` ${s.guide.lastName.charAt(0)}.` : ''}` : null,
+        meetingPoint: s.meetingPoint || null,
       }));
   }, [schedulesData, selectedDate]);
+
+  // Detect duplicate time slots (same time, different schedules)
+  const timeSlotCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    scheduleSlots.forEach(slot => {
+      counts.set(slot.time, (counts.get(slot.time) || 0) + 1);
+    });
+    return counts;
+  }, [scheduleSlots]);
+
+  // Query for next available schedule (when current date has no slots)
+  const { data: nextAvailableData } = trpc.schedule.list.useQuery(
+    {
+      filters: {
+        tourId: selectedTourId,
+        status: "scheduled",
+        hasAvailability: true,
+        dateRange: {
+          from: new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000), // day after selected
+          to: new Date(selectedDate.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days out
+        },
+      },
+      pagination: { page: 1, limit: 1 },
+      sort: { field: "startsAt", direction: "asc" },
+    },
+    {
+      enabled: open && !!selectedTourId && !schedulesLoading && scheduleSlots.length === 0,
+    }
+  );
+
+  // Next available date (when current date has no slots)
+  const nextAvailableDate = useMemo(() => {
+    if (!nextAvailableData?.data?.[0]) return null;
+    return new Date(nextAvailableData.data[0].startsAt);
+  }, [nextAvailableData]);
 
   // Selected tour
   const selectedTour = useMemo(() => {
@@ -365,6 +413,48 @@ export function UnifiedBookingSheet({
   // VALIDATION
   // ---------------------------------------------------------------------------
 
+  // Field-level validation for inline feedback
+  const validateField = useCallback((field: string): string | null => {
+    switch (field) {
+      case 'firstName':
+        if (customerMode === 'create' && !newCustomer.firstName.trim()) {
+          return 'First name required';
+        }
+        break;
+      case 'email':
+        if (customerMode === 'create' && newCustomer.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomer.email)) {
+          return 'Invalid email format';
+        }
+        break;
+      case 'contact':
+        if (customerMode === 'create' && !hasValidContact) {
+          return 'Email or phone required';
+        }
+        break;
+    }
+    return null;
+  }, [customerMode, newCustomer, hasValidContact]);
+
+  // Run inline validation when touched fields change
+  useEffect(() => {
+    const newErrors: Record<string, string> = {};
+    Object.keys(touched).forEach(field => {
+      if (touched[field]) {
+        const error = validateField(field);
+        if (error) newErrors[field] = error;
+      }
+    });
+    // Only update errors for touched fields, preserve submit-time errors for others
+    setErrors(prev => {
+      const untouchedErrors: Record<string, string> = {};
+      Object.keys(prev).forEach(key => {
+        const error = prev[key];
+        if (!touched[key] && error) untouchedErrors[key] = error;
+      });
+      return { ...untouchedErrors, ...newErrors };
+    });
+  }, [touched, validateField]);
+
   const validate = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -372,6 +462,10 @@ export function UnifiedBookingSheet({
     if (customerMode === "create") {
       if (!newCustomer.firstName.trim()) newErrors.firstName = "First name required";
       if (!hasValidContact) newErrors.contact = "Email or phone required";
+      // Check email format if provided
+      if (newCustomer.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newCustomer.email)) {
+        newErrors.email = "Invalid email format";
+      }
     } else if (!selectedCustomer) {
       newErrors.customer = "Select a customer";
     }
@@ -609,24 +703,37 @@ export function UnifiedBookingSheet({
                         Recent
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {recentCustomers.slice(0, 4).map((customer) => (
-                          <button
-                            key={customer.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedCustomer({
-                                id: customer.id,
-                                firstName: customer.firstName,
-                                lastName: customer.lastName,
-                                email: customer.email || "",
-                                phone: customer.phone || "",
-                              });
-                            }}
-                            className="px-3 py-1.5 text-sm bg-muted hover:bg-accent rounded-full transition-colors"
-                          >
-                            {customer.firstName} {customer.lastName[0]}.
-                          </button>
-                        ))}
+                        <TooltipProvider delayDuration={300}>
+                          {recentCustomers.slice(0, 4).map((customer) => (
+                            <Tooltip key={customer.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCustomer({
+                                      id: customer.id,
+                                      firstName: customer.firstName,
+                                      lastName: customer.lastName,
+                                      email: customer.email || "",
+                                      phone: customer.phone || "",
+                                    });
+                                  }}
+                                  className="px-3 py-1.5 text-sm bg-muted hover:bg-accent rounded-full transition-colors"
+                                >
+                                  {customer.firstName} {customer.lastName?.[0] || ""}.
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="text-sm">
+                                  <p className="font-medium">{customer.firstName} {customer.lastName}</p>
+                                  <p className="text-muted-foreground text-xs">
+                                    {customer.email || customer.phone || "No contact info"}
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                        </TooltipProvider>
                       </div>
                     </div>
                   )}
@@ -647,12 +754,16 @@ export function UnifiedBookingSheet({
                         type="text"
                         value={newCustomer.firstName}
                         onChange={(e) => setNewCustomer((prev) => ({ ...prev, firstName: e.target.value }))}
+                        onBlur={() => setTouched(prev => ({ ...prev, firstName: true }))}
                         placeholder="First Name *"
                         className={cn(
                           "w-full px-3 py-2.5 border rounded-lg bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all",
-                          errors.firstName ? "border-destructive" : "border-input"
+                          touched.firstName && errors.firstName ? "border-destructive" : "border-input"
                         )}
                       />
+                      {touched.firstName && errors.firstName && (
+                        <p className="text-xs text-destructive mt-1">{errors.firstName}</p>
+                      )}
                     </div>
                     <div>
                       <input
@@ -664,19 +775,30 @@ export function UnifiedBookingSheet({
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">Email or phone required</p>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="email"
-                      value={newCustomer.email}
-                      onChange={(e) => setNewCustomer((prev) => ({ ...prev, email: e.target.value }))}
-                      placeholder="Email"
-                      className={cn(
-                        "w-full pl-10 pr-3 py-2.5 border rounded-lg bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all",
-                        errors.contact && !hasValidContact ? "border-destructive" : "border-input"
-                      )}
-                    />
+                  {(touched.contact || touched.email || touched.phone) && errors.contact ? (
+                    <p className="text-xs text-destructive">{errors.contact}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Email or phone required</p>
+                  )}
+                  <div className="space-y-1">
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="email"
+                        value={newCustomer.email}
+                        onChange={(e) => setNewCustomer((prev) => ({ ...prev, email: e.target.value }))}
+                        onBlur={() => setTouched(prev => ({ ...prev, email: true, contact: true }))}
+                        placeholder="Email"
+                        className={cn(
+                          "w-full pl-10 pr-3 py-2.5 border rounded-lg bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all",
+                          touched.email && errors.email ? "border-destructive" :
+                          (touched.contact && errors.contact && !hasValidContact) ? "border-destructive" : "border-input"
+                        )}
+                      />
+                    </div>
+                    {touched.email && errors.email && (
+                      <p className="text-xs text-destructive">{errors.email}</p>
+                    )}
                   </div>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -684,10 +806,11 @@ export function UnifiedBookingSheet({
                       type="tel"
                       value={newCustomer.phone}
                       onChange={(e) => setNewCustomer((prev) => ({ ...prev, phone: e.target.value }))}
+                      onBlur={() => setTouched(prev => ({ ...prev, phone: true, contact: true }))}
                       placeholder="Phone"
                       className={cn(
                         "w-full pl-10 pr-3 py-2.5 border rounded-lg bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all",
-                        errors.contact && !hasValidContact ? "border-destructive" : "border-input"
+                        (touched.contact && errors.contact && !hasValidContact) ? "border-destructive" : "border-input"
                       )}
                     />
                   </div>
@@ -754,12 +877,27 @@ export function UnifiedBookingSheet({
             {selectedTourId && (
               <section className="space-y-3">
                 <label className="text-sm font-medium text-foreground">Date</label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  {/* Week back button */}
+                  <button
+                    type="button"
+                    onClick={() => setDateScrollOffset(Math.max(0, dateScrollOffset - 7))}
+                    disabled={dateScrollOffset === 0}
+                    className="p-1.5 rounded-lg border border-border hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Previous week"
+                  >
+                    <div className="flex">
+                      <ChevronLeft className="h-4 w-4" />
+                      <ChevronLeft className="h-4 w-4 -ml-2.5" />
+                    </div>
+                  </button>
+                  {/* Day back button */}
                   <button
                     type="button"
                     onClick={() => setDateScrollOffset(Math.max(0, dateScrollOffset - 1))}
                     disabled={dateScrollOffset === 0}
                     className="p-1.5 rounded-lg border border-border hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Previous day"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -793,13 +931,28 @@ export function UnifiedBookingSheet({
                       );
                     })}
                   </div>
+                  {/* Day forward button */}
                   <button
                     type="button"
                     onClick={() => setDateScrollOffset(Math.min(dates.length - 7, dateScrollOffset + 1))}
                     disabled={dateScrollOffset >= dates.length - 7}
                     className="p-1.5 rounded-lg border border-border hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Next day"
                   >
                     <ChevronRight className="h-4 w-4" />
+                  </button>
+                  {/* Week forward button */}
+                  <button
+                    type="button"
+                    onClick={() => setDateScrollOffset(Math.min(dates.length - 7, dateScrollOffset + 7))}
+                    disabled={dateScrollOffset >= dates.length - 7}
+                    className="p-1.5 rounded-lg border border-border hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Next week"
+                  >
+                    <div className="flex">
+                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-4 w-4 -ml-2.5" />
+                    </div>
                   </button>
                 </div>
               </section>
@@ -811,12 +964,26 @@ export function UnifiedBookingSheet({
             {selectedTourId && (
               <section className="space-y-3">
                 <label className="text-sm font-medium text-foreground">Time</label>
-                {scheduleSlots.length > 0 ? (
+                {(schedulesLoading || schedulesFetching) ? (
+                  /* Loading skeleton */
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="p-3 rounded-lg border-2 border-border animate-pulse">
+                        <div className="h-5 w-16 bg-muted rounded mx-auto mb-1" />
+                        <div className="h-3 w-12 bg-muted rounded mx-auto" />
+                      </div>
+                    ))}
+                  </div>
+                ) : scheduleSlots.length > 0 ? (
                   <div className="grid grid-cols-3 gap-2">
                     {scheduleSlots.map((slot) => {
                       const isFull = slot.available <= 0;
                       const isLow = slot.available > 0 && slot.available <= 5;
                       const isSelected = selectedScheduleId === slot.id;
+                      const hasDuplicates = (timeSlotCounts.get(slot.time) || 0) > 1;
+                      const differentiator = hasDuplicates
+                        ? (slot.guideName || slot.meetingPoint || `${slot.maxParticipants} max`)
+                        : null;
                       return (
                         <button
                           key={slot.id}
@@ -835,6 +1002,11 @@ export function UnifiedBookingSheet({
                           <p className={cn("font-semibold", isSelected ? "text-primary" : "text-foreground")}>
                             {slot.time}
                           </p>
+                          {differentiator && (
+                            <p className="text-[10px] text-muted-foreground truncate max-w-full px-1">
+                              {differentiator}
+                            </p>
+                          )}
                           <p
                             className={cn(
                               "text-xs mt-0.5 font-medium",
@@ -855,7 +1027,25 @@ export function UnifiedBookingSheet({
                   <div className="py-6 text-center bg-muted/50 rounded-lg border border-dashed border-border">
                     <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">No slots on this date</p>
-                    <p className="text-xs text-muted-foreground mt-1">Try another date</p>
+                    {nextAvailableDate ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDate(nextAvailableDate);
+                          // Calculate scroll offset to show the date
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const daysDiff = Math.floor((nextAvailableDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+                          setDateScrollOffset(Math.min(Math.max(0, daysDiff - 3), dates.length - 7));
+                          setSelectedScheduleId("");
+                        }}
+                        className="text-xs text-primary hover:underline mt-2 font-medium"
+                      >
+                        Next available: {nextAvailableDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">Try another date</p>
+                    )}
                   </div>
                 )}
                 {errors.schedule && (
@@ -979,6 +1169,37 @@ export function UnifiedBookingSheet({
                     </div>
                   </div>
                 </div>
+
+                {/* Collapsible price breakdown */}
+                {pricing.breakdown.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowPriceBreakdown(!showPriceBreakdown)}
+                      className="w-full text-left text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      {showPriceBreakdown ? 'Hide' : 'Show'} price breakdown
+                      <ChevronDown className={cn("h-3 w-3 transition-transform", showPriceBreakdown && "rotate-180")} />
+                    </button>
+
+                    {showPriceBreakdown && (
+                      <div className="p-3 bg-muted/30 rounded-lg space-y-1.5 text-sm">
+                        {pricing.breakdown.map((item, idx) => (
+                          <div key={idx} className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              {item.count}× {item.label}
+                            </span>
+                            <span className="font-medium">{formatCurrency(item.total)}</span>
+                          </div>
+                        ))}
+                        <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-semibold">
+                          <span>Total</span>
+                          <span className="text-primary">{formatCurrency(pricing.total)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
 
                 {totalGuests > availableSpots && (
                   <p className="text-sm text-destructive flex items-center gap-1">
