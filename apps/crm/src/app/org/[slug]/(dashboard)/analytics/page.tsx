@@ -2,16 +2,24 @@
 
 import { trpc } from "@/lib/trpc";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useState, useMemo } from "react";
-import { subDays, startOfDay, endOfDay } from "date-fns";
+import { useState, useMemo, useCallback } from "react";
+import { subDays, startOfDay, endOfDay, format } from "date-fns";
 import {
   DollarSign,
   CalendarDays,
   TrendingUp,
+  TrendingDown,
   Users,
   UserCircle,
   Download,
   Target,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  Star,
+  BarChart3,
+  UserPlus,
+  Repeat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +46,18 @@ function getDateRange(range: DateRange): { from: Date; to: Date } {
   return { from, to };
 }
 
+// Calculate comparison data for any metric
+function calculateTrend(current: number, previous: number): { change: number; trend: "up" | "down" | "neutral" } {
+  if (previous === 0) {
+    return { change: current > 0 ? 100 : 0, trend: current > 0 ? "up" : "neutral" };
+  }
+  const change = ((current - previous) / previous) * 100;
+  return {
+    change: Math.round(change * 10) / 10,
+    trend: change > 0 ? "up" : change < 0 ? "down" : "neutral",
+  };
+}
+
 export default function AnalyticsPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -49,23 +69,80 @@ export default function AnalyticsPage() {
   const [dateRange, setDateRange] = useState<DateRange>("30d");
 
   const { from, to } = useMemo(() => getDateRange(dateRange), [dateRange]);
+  const dayCount = dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : dateRange === "90d" ? 90 : 365;
 
-  // Booking stats
+  // Previous period for comparison
+  const { from: prevFrom, to: prevTo } = useMemo(() => {
+    const duration = to.getTime() - from.getTime();
+    return {
+      from: new Date(from.getTime() - duration),
+      to: new Date(to.getTime() - duration),
+    };
+  }, [from, to]);
+
+  // Current period booking stats
   const { data: bookingStats } = trpc.booking.getStats.useQuery({
     dateRange: { from, to },
   });
 
-  // Revenue data
-  const { data: revenueData } = trpc.analytics.getRevenueByPeriod.useQuery({
-    period: "day",
-    count: dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : dateRange === "90d" ? 90 : 365,
+  // Previous period booking stats for comparison
+  const { data: prevBookingStats } = trpc.booking.getStats.useQuery({
+    dateRange: { from: prevFrom, to: prevTo },
   });
 
-  // Booking trends
+  // Revenue stats with comparison
+  const { data: revenueStats } = trpc.analytics.getRevenueStats.useQuery({
+    dateRange: { from, to },
+  });
+
+  // Revenue data for chart
+  const { data: revenueData } = trpc.analytics.getRevenueByPeriod.useQuery({
+    period: "day",
+    count: dayCount,
+  });
+
+  // Booking trends for chart
   const { data: bookingTrends } = trpc.analytics.getBookingTrends.useQuery({
     period: "day",
-    count: dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : dateRange === "90d" ? 90 : 365,
+    count: dayCount,
   });
+
+  // Customer stats
+  const { data: customerStats } = trpc.customer.getStats.useQuery();
+
+  // Customer intelligence
+  const { data: segmentDistribution } = trpc.customer.getSegmentDistribution.useQuery();
+  const { data: topCustomers } = trpc.customer.getTopCustomersByCLV.useQuery({ limit: 5 });
+  const { data: clvBySource } = trpc.customer.getCLVBySource.useQuery();
+
+  // Guide stats
+  const { data: guideStats } = trpc.guide.getStats.useQuery();
+  const { data: guidesList } = trpc.guide.list.useQuery({ pagination: { limit: 100 } });
+
+  // Calculate real trends
+  const revenueTrend = useMemo(() => {
+    if (!bookingStats || !prevBookingStats) return { change: 0, trend: "neutral" as const };
+    const current = parseFloat(bookingStats.revenue || "0");
+    const previous = parseFloat(prevBookingStats.revenue || "0");
+    return calculateTrend(current, previous);
+  }, [bookingStats, prevBookingStats]);
+
+  const bookingsTrend = useMemo(() => {
+    if (!bookingStats || !prevBookingStats) return { change: 0, trend: "neutral" as const };
+    return calculateTrend(bookingStats.total, prevBookingStats.total);
+  }, [bookingStats, prevBookingStats]);
+
+  const guestsTrend = useMemo(() => {
+    if (!bookingStats || !prevBookingStats) return { change: 0, trend: "neutral" as const };
+    return calculateTrend(bookingStats.participantCount, prevBookingStats.participantCount);
+  }, [bookingStats, prevBookingStats]);
+
+  const avgBookingTrend = useMemo(() => {
+    if (!bookingStats || !prevBookingStats) return { change: 0, trend: "neutral" as const };
+    const current = parseFloat(bookingStats.averageBookingValue || "0");
+    const previous = parseFloat(prevBookingStats.averageBookingValue || "0");
+    return calculateTrend(current, previous);
+  }, [bookingStats, prevBookingStats]);
 
   // Update URL when tab changes
   const handleTabChange = (tab: string) => {
@@ -74,6 +151,64 @@ export default function AnalyticsPage() {
     newSearchParams.set("tab", tab);
     router.replace(`?${newSearchParams.toString()}`);
   };
+
+  // Export functionality
+  const handleExport = useCallback(() => {
+    const exportData: Record<string, unknown>[] = [];
+    const filename = `analytics-${activeTab}-${format(from, "yyyy-MM-dd")}-to-${format(to, "yyyy-MM-dd")}.csv`;
+
+    if (activeTab === "revenue" && revenueData) {
+      revenueData.forEach((d) => {
+        exportData.push({
+          Date: d.period,
+          Revenue: d.revenue,
+          Bookings: d.bookingCount,
+          Participants: d.participantCount,
+        });
+      });
+    } else if (activeTab === "bookings" && bookingTrends) {
+      bookingTrends.forEach((d) => {
+        exportData.push({
+          Date: d.period,
+          Bookings: d.bookings,
+          Participants: d.participants,
+          Cancelled: d.cancelled,
+          Completed: d.completed,
+        });
+      });
+    } else if (activeTab === "customers" && customerStats) {
+      exportData.push({
+        "Total Customers": customerStats.total,
+        "New This Month": customerStats.thisMonth,
+        ...customerStats.bySource,
+      });
+    } else if (activeTab === "guides" && guideStats) {
+      exportData.push({
+        "Total Guides": guideStats.total,
+        "Active": guideStats.active,
+        "Inactive": guideStats.inactive,
+        "On Leave": guideStats.onLeave,
+      });
+    }
+
+    if (exportData.length === 0) return;
+
+    // Convert to CSV
+    const firstRow = exportData[0];
+    if (!firstRow) return;
+    const headers = Object.keys(firstRow);
+    const csvContent = [
+      headers.join(","),
+      ...exportData.map((row) => headers.map((h) => `"${row[h] ?? ""}"`).join(",")),
+    ].join("\n");
+
+    // Download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+  }, [activeTab, from, to, revenueData, bookingTrends, customerStats, guideStats]);
 
   // Format currency
   const formatCurrency = (value: string | number) => {
@@ -84,6 +219,12 @@ export default function AnalyticsPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(num);
+  };
+
+  // Format percentage with sign
+  const formatChange = (change: number) => {
+    const sign = change > 0 ? "+" : "";
+    return `${sign}${change.toFixed(1)}%`;
   };
 
   return (
@@ -112,7 +253,7 @@ export default function AnalyticsPage() {
           </Select>
 
           {/* Export */}
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -125,29 +266,33 @@ export default function AnalyticsPage() {
           label="Revenue"
           value={formatCurrency(bookingStats?.revenue || 0)}
           icon={DollarSign}
-          trend="up"
-          change="+12%"
+          trend={revenueTrend.trend}
+          change={formatChange(revenueTrend.change)}
+          sparklineData={revenueData?.slice(-7).map((d) => parseFloat(d.revenue || "0"))}
+          primary
         />
         <StatCard
           label="Bookings"
           value={bookingStats?.total?.toString() || "0"}
           icon={CalendarDays}
-          trend="up"
-          change="+8%"
+          trend={bookingsTrend.trend}
+          change={formatChange(bookingsTrend.change)}
+          sparklineData={bookingTrends?.slice(-7).map((d) => d.bookings)}
         />
         <StatCard
           label="Guests"
           value={bookingStats?.participantCount?.toString() || "0"}
           icon={Users}
-          trend="up"
-          change="+15%"
+          trend={guestsTrend.trend}
+          change={formatChange(guestsTrend.change)}
+          sparklineData={bookingTrends?.slice(-7).map((d) => d.participants)}
         />
         <StatCard
           label="Avg Booking"
           value={formatCurrency(bookingStats?.averageBookingValue || 0)}
           icon={TrendingUp}
-          trend="neutral"
-          change="+2%"
+          trend={avgBookingTrend.trend}
+          change={formatChange(avgBookingTrend.change)}
         />
       </div>
 
@@ -181,7 +326,7 @@ export default function AnalyticsPage() {
         </TabsList>
 
         {/* Revenue Tab */}
-        <TabsContent value="revenue" className="space-y-6 mt-6">
+        <TabsContent value="revenue" className="space-y-6 mt-6 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SimpleChart
@@ -215,7 +360,7 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         {/* Bookings Tab */}
-        <TabsContent value="bookings" className="space-y-6 mt-6">
+        <TabsContent value="bookings" className="space-y-6 mt-6 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border bg-card p-4">
               <p className="text-sm text-muted-foreground">Total Bookings</p>
@@ -246,74 +391,283 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         {/* Capacity Tab */}
-        <TabsContent value="capacity" className="space-y-6 mt-6">
+        <TabsContent value="capacity" className="space-y-6 mt-6 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
           <CapacityHeatmap orgSlug={slug} />
         </TabsContent>
 
         {/* Customers Tab */}
-        <TabsContent value="customers" className="space-y-6 mt-6">
+        <TabsContent value="customers" className="space-y-6 mt-6 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">Total Customers</p>
-              <p className="text-2xl font-bold">-</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Total Customers</p>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{customerStats?.total?.toLocaleString() || "0"}</p>
             </div>
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">New This Period</p>
-              <p className="text-2xl font-bold">-</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">New This Month</p>
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{customerStats?.thisMonth?.toLocaleString() || "0"}</p>
             </div>
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">Repeat Rate</p>
-              <p className="text-2xl font-bold">-</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Repeat Rate</p>
+                <Repeat className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1">
+                {segmentDistribution
+                  ? (() => {
+                      const total = Object.values(segmentDistribution).reduce((sum, val) => sum + val, 0);
+                      const repeatCustomers = (segmentDistribution.vip || 0) + (segmentDistribution.loyal || 0);
+                      return `${((repeatCustomers / Math.max(1, total)) * 100).toFixed(1)}%`;
+                    })()
+                  : "0%"}
+              </p>
             </div>
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">Avg CLV</p>
-              <p className="text-2xl font-bold">-</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Avg CLV</p>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1">
+                {topCustomers && topCustomers.length > 0
+                  ? formatCurrency(topCustomers.reduce((sum, c) => sum + parseFloat(c.historicalCLV || "0"), 0) / topCustomers.length)
+                  : "$0"}
+              </p>
             </div>
           </div>
 
-          <div className="rounded-lg border bg-card p-6">
-            <h3 className="text-lg font-semibold mb-4">Customer Acquisition</h3>
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              Customer trend chart will appear here
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Customer Segments */}
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Customer Segments</h3>
+              {segmentDistribution ? (
+                <div className="space-y-4">
+                  {[
+                    { label: "VIP", value: segmentDistribution.vip || 0, color: "bg-purple-500" },
+                    { label: "Loyal", value: segmentDistribution.loyal || 0, color: "bg-green-500" },
+                    { label: "Promising", value: segmentDistribution.promising || 0, color: "bg-blue-500" },
+                    { label: "At Risk", value: segmentDistribution.at_risk || 0, color: "bg-orange-500" },
+                    { label: "Dormant", value: segmentDistribution.dormant || 0, color: "bg-gray-400" },
+                  ].map((segment) => {
+                    const total = Object.values(segmentDistribution).reduce((sum, val) => sum + val, 0) || 1;
+                    const percentage = (segment.value / total) * 100;
+                    return (
+                      <div key={segment.label}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-foreground">{segment.label}</span>
+                          <span className="text-muted-foreground">{segment.value} ({percentage.toFixed(1)}%)</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={cn("h-full rounded-full transition-all", segment.color)}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  No customer data available
+                </div>
+              )}
+            </div>
+
+            {/* Top Customers by CLV */}
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Top Customers by Lifetime Value</h3>
+              {topCustomers && topCustomers.length > 0 ? (
+                <div className="space-y-3">
+                  {topCustomers.map((customer, index) => (
+                    <div key={customer.customerId} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Customer #{customer.customerId.slice(-6)}</p>
+                          <p className="text-xs text-muted-foreground">{customer.totalBookings} bookings</p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-semibold text-foreground">{formatCurrency(customer.historicalCLV || "0")}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  No customer data available
+                </div>
+              )}
             </div>
           </div>
+
+          {/* CLV by Source */}
+          {clvBySource && Object.keys(clvBySource).length > 0 && (
+            <div className="rounded-lg border bg-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Customer Value by Source</h3>
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                {Object.entries(clvBySource).map(([source, data]) => (
+                  <div key={source} className="text-center p-4 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{source || "Unknown"}</p>
+                    <p className="text-lg font-semibold">{formatCurrency(data.averageCLV)}</p>
+                    <p className="text-xs text-muted-foreground">{data.customerCount} customers</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* Guides Tab */}
-        <TabsContent value="guides" className="space-y-6 mt-6">
+        <TabsContent value="guides" className="space-y-6 mt-6 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">Active Guides</p>
-              <p className="text-2xl font-bold">-</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Active Guides</p>
+                <UserCircle className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{guideStats?.active || 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {guideStats?.total || 0} total guides
+              </p>
             </div>
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">Tours Led</p>
-              <p className="text-2xl font-bold">-</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">On Leave</p>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{guideStats?.onLeave || 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {guideStats?.inactive || 0} inactive
+              </p>
             </div>
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">Avg Tours/Guide</p>
-              <p className="text-2xl font-bold">-</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Public Profiles</p>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{guideStats?.public || 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                visible on website
+              </p>
             </div>
             <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">Avg Rating</p>
-              <p className="text-2xl font-bold">-</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Avg Rating</p>
+                <Star className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1">—</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                no ratings yet
+              </p>
             </div>
           </div>
 
+          {/* Guide List */}
           <div className="rounded-lg border bg-card p-6">
-            <h3 className="text-lg font-semibold mb-4">Guide Performance</h3>
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              Guide performance chart will appear here
-            </div>
+            <h3 className="text-lg font-semibold mb-4">Guide Roster</h3>
+            {guidesList && guidesList.data.length > 0 ? (
+              <div className="space-y-3">
+                {guidesList.data.slice(0, 10).map((guide) => (
+                  <div key={guide.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        {guide.avatarUrl ? (
+                          <img src={guide.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <span className="text-sm font-medium text-primary">
+                            {guide.firstName?.[0]}{guide.lastName?.[0]}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{guide.firstName} {guide.lastName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {guide.languages?.join(", ") || "No languages set"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 text-xs font-medium rounded-full",
+                          guide.status === "active" && "bg-green-500/10 text-green-600",
+                          guide.status === "inactive" && "bg-gray-500/10 text-gray-600",
+                          guide.status === "on_leave" && "bg-orange-500/10 text-orange-600"
+                        )}
+                      >
+                        {guide.status}
+                      </span>
+                      {guide.isPublic && (
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-500/10 text-blue-600">
+                          Public
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {guidesList.total > 10 && (
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    And {guidesList.total - 10} more guides...
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <UserCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No guides added yet</p>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
         {/* Goals Tab */}
-        <TabsContent value="goals" className="space-y-6 mt-6">
+        <TabsContent value="goals" className="space-y-6 mt-6 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
           <GoalCard orgSlug={slug} />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Sparkline Component
+function Sparkline({ data, trend }: { data: number[]; trend: "up" | "down" | "neutral" }) {
+  if (!data || data.length < 2) return null;
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const height = 24;
+  const width = 60;
+  // Add padding so line doesn't touch edges
+  const paddingY = 3;
+  const drawableHeight = height - paddingY * 2;
+
+  const points = data.map((value, index) => {
+    const x = (index / (data.length - 1)) * width;
+    const normalizedY = (value - min) / range;
+    const y = paddingY + (1 - normalizedY) * drawableHeight;
+    return `${x},${y}`;
+  }).join(" ");
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <polyline
+        fill="none"
+        stroke={trend === "up" ? "#22c55e" : trend === "down" ? "#ef4444" : "#9ca3af"}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+    </svg>
   );
 }
 
@@ -324,26 +678,52 @@ interface StatCardProps {
   icon: React.ElementType;
   trend: "up" | "down" | "neutral";
   change: string;
+  sparklineData?: number[];
+  primary?: boolean;
 }
 
-function StatCard({ label, value, icon: Icon, trend, change }: StatCardProps) {
+function StatCard({ label, value, icon: Icon, trend, change, sparklineData, primary }: StatCardProps) {
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className={cn(
+      "rounded-lg border p-4 transition-all",
+      primary
+        ? "border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-white dark:from-emerald-950/30 dark:via-emerald-950/20 dark:to-background shadow-sm"
+        : "bg-card border-border"
+    )}>
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <p className={cn(
+          "text-sm",
+          primary ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
+        )}>{label}</p>
+        <Icon className={cn(
+          "h-4 w-4",
+          primary ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+        )} />
       </div>
-      <p className="text-2xl font-bold mt-1">{value}</p>
-      <p
-        className={cn(
-          "text-xs mt-1",
-          trend === "up" && "text-green-600",
-          trend === "down" && "text-red-600",
-          trend === "neutral" && "text-muted-foreground"
+      <div className="flex items-end justify-between mt-1">
+        <p className={cn(
+          "font-bold tabular-nums",
+          primary ? "text-3xl text-emerald-700 dark:text-emerald-300" : "text-2xl"
+        )}>{value}</p>
+        {sparklineData && sparklineData.length > 1 && (
+          <Sparkline data={sparklineData} trend={trend} />
         )}
-      >
-        {change} vs last period
-      </p>
+      </div>
+      <div className="flex items-center gap-1 mt-1">
+        {trend === "up" && <ArrowUpRight className="h-3 w-3 text-green-600" />}
+        {trend === "down" && <ArrowDownRight className="h-3 w-3 text-red-600" />}
+        {trend === "neutral" && <Minus className="h-3 w-3 text-muted-foreground" />}
+        <p
+          className={cn(
+            "text-xs",
+            trend === "up" && "text-green-600",
+            trend === "down" && "text-red-600",
+            trend === "neutral" && "text-muted-foreground"
+          )}
+        >
+          {change} vs last period
+        </p>
+      </div>
     </div>
   );
 }

@@ -54,6 +54,11 @@ export interface CreateTourInput {
   accessibility?: string;
   cancellationPolicy?: string;
   cancellationHours?: number;
+  // Booking window settings
+  minimumNoticeHours?: number;
+  maximumAdvanceDays?: number;
+  allowSameDayBooking?: boolean;
+  sameDayCutoffTime?: string;
   status?: TourStatus;
   isPublic?: boolean;
   metaTitle?: string;
@@ -311,6 +316,10 @@ export class TourService extends BaseService {
         accessibility: input.accessibility,
         cancellationPolicy: input.cancellationPolicy,
         cancellationHours: input.cancellationHours,
+        minimumNoticeHours: input.minimumNoticeHours,
+        maximumAdvanceDays: input.maximumAdvanceDays,
+        allowSameDayBooking: input.allowSameDayBooking,
+        sameDayCutoffTime: input.sameDayCutoffTime,
         status: input.status || "draft",
         isPublic: input.isPublic,
         metaTitle: input.metaTitle,
@@ -436,6 +445,10 @@ export class TourService extends BaseService {
       accessibility: original.accessibility || undefined,
       cancellationPolicy: original.cancellationPolicy || undefined,
       cancellationHours: original.cancellationHours || undefined,
+      minimumNoticeHours: original.minimumNoticeHours || undefined,
+      maximumAdvanceDays: original.maximumAdvanceDays || undefined,
+      allowSameDayBooking: original.allowSameDayBooking ?? undefined,
+      sameDayCutoffTime: original.sameDayCutoffTime || undefined,
       status: "draft",
       isPublic: false,
       metaTitle: original.metaTitle || undefined,

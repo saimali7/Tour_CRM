@@ -13,12 +13,14 @@ import {
   Zap,
   Filter,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useConfirmModal } from "@/components/ui/confirm-modal";
+import { useBookingOptimisticMutations } from "@/hooks/use-optimistic-mutations";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +54,9 @@ import { NoBookingsEmpty, NoResultsEmpty } from "@/components/ui/empty-state";
 import { BulkRescheduleModal } from "@/components/bookings/bulk-reschedule-modal";
 import { BulkEmailModal } from "@/components/bookings/bulk-email-modal";
 import { UnifiedBookingSheet } from "@/components/bookings/unified-booking-sheet";
+import { BookingMobileCard, BookingMobileCardSkeleton } from "@/components/bookings/booking-mobile-card";
+import { useIsMobile } from "@/hooks/use-media-query";
+import { useContextPanel } from "@/providers/context-panel-provider";
 
 type StatusFilter = "all" | "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 type PaymentFilter = "all" | "pending" | "partial" | "paid" | "refunded" | "failed";
@@ -79,6 +84,8 @@ export default function BookingsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const slug = params.slug as string;
+  const isMobile = useIsMobile();
+  const { openPanel } = useContextPanel();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
@@ -130,68 +137,41 @@ export default function BookingsPage() {
 
   const { data: stats } = trpc.booking.getStats.useQuery({});
 
+  // Get utils for invalidation in modals
   const utils = trpc.useUtils();
 
-  const confirmMutation = trpc.booking.confirm.useMutation({
-    onSuccess: () => {
-      utils.booking.list.invalidate();
-      utils.booking.getStats.invalidate();
-      toast.success("Booking confirmed successfully");
-    },
-    onError: (error) => {
-      toast.error(`Failed to confirm booking: ${error.message}`);
-    },
-  });
+  // Use optimistic mutations for instant UI feedback
+  const {
+    confirmBooking: confirmMutation,
+    cancelBooking: cancelMutation,
+    bulkConfirm: bulkConfirmMutationBase,
+    bulkCancel: bulkCancelMutationBase,
+  } = useBookingOptimisticMutations();
 
-  const cancelMutation = trpc.booking.cancel.useMutation({
-    onSuccess: () => {
-      utils.booking.list.invalidate();
-      utils.booking.getStats.invalidate();
-      toast.success("Booking cancelled successfully");
+  // Wrap bulk mutations to handle selection clearing and dialog state
+  const bulkConfirmMutation = {
+    ...bulkConfirmMutationBase,
+    mutate: (args: Parameters<typeof bulkConfirmMutationBase.mutate>[0]) => {
+      bulkConfirmMutationBase.mutate(args, {
+        onSuccess: () => {
+          selection.clearSelection();
+        },
+      });
     },
-    onError: (error) => {
-      toast.error(`Failed to cancel booking: ${error.message}`);
-    },
-  });
+  };
 
-  // Bulk mutations
-  const bulkConfirmMutation = trpc.booking.bulkConfirm.useMutation({
-    onSuccess: (result) => {
-      utils.booking.list.invalidate();
-      utils.booking.getStats.invalidate();
-      selection.clearSelection();
-      if (result.errors.length === 0) {
-        toast.success(`${result.confirmed.length} bookings confirmed`);
-      } else {
-        toast.warning(
-          `${result.confirmed.length} confirmed, ${result.errors.length} failed`
-        );
-      }
+  const bulkCancelMutation = {
+    ...bulkCancelMutationBase,
+    mutate: (args: Parameters<typeof bulkCancelMutationBase.mutate>[0]) => {
+      bulkCancelMutationBase.mutate(args, {
+        onSuccess: () => {
+          selection.clearSelection();
+          setShowBulkCancelDialog(false);
+          setBulkCancelReason("");
+        },
+      });
     },
-    onError: (error) => {
-      toast.error(`Bulk confirm failed: ${error.message}`);
-    },
-  });
-
-  const bulkCancelMutation = trpc.booking.bulkCancel.useMutation({
-    onSuccess: (result) => {
-      utils.booking.list.invalidate();
-      utils.booking.getStats.invalidate();
-      selection.clearSelection();
-      setShowBulkCancelDialog(false);
-      setBulkCancelReason("");
-      if (result.errors.length === 0) {
-        toast.success(`${result.cancelled.length} bookings cancelled`);
-      } else {
-        toast.warning(
-          `${result.cancelled.length} cancelled, ${result.errors.length} failed`
-        );
-      }
-    },
-    onError: (error) => {
-      toast.error(`Bulk cancel failed: ${error.message}`);
-    },
-  });
+  };
 
   // Selection hook - memoize getItemId to prevent recreation
   const getItemId = useCallback((item: { id: string }) => item.id, []);
@@ -324,42 +304,76 @@ export default function BookingsPage() {
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
-        <p className="text-destructive">Error loading bookings: {error.message}</p>
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+            <X className="h-5 w-5 text-destructive" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-destructive">Failed to load bookings</p>
+            <p className="text-xs text-destructive/70 mt-0.5">{error.message}</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header: Title + Inline Stats + Quick Book */}
-      <header className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
+    <div className="space-y-4 md:space-y-6">
+      {/* Header: Title + Stats + Quick Book - Responsive */}
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6">
           <h1 className="text-lg font-semibold text-foreground">Bookings</h1>
-          {/* Inline Stats */}
+          {/* Inline Stats - Hidden on mobile */}
           {stats && (
             <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
               <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
               <span><span className="font-medium text-amber-600">{stats.pending}</span> pending</span>
               <span><span className="font-medium text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span> revenue</span>
-              <span><span className="font-medium text-foreground">{stats.participantCount}</span> guests</span>
+              <span className="hidden lg:inline"><span className="font-medium text-foreground">{stats.participantCount}</span> guests</span>
             </div>
           )}
+          {/* Mobile Quick Book button */}
+          <button
+            onClick={() => setShowQuickBook(true)}
+            className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-target"
+            aria-label="Quick book"
+          >
+            <Zap className="h-5 w-5" />
+          </button>
         </div>
 
+        {/* Desktop Quick Book button */}
         <button
           onClick={() => setShowQuickBook(true)}
-          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Zap className="h-4 w-4" />
           Quick Book
-          <span className="hidden md:inline text-primary-foreground/70 text-xs ml-1">⌘B</span>
+          <span className="hidden md:inline text-primary-foreground/70 text-xs ml-1">B</span>
         </button>
       </header>
 
-      {/* Compact Filter Bar */}
-      <div className="flex items-center gap-3" role="search" aria-label="Filter bookings">
+      {/* Mobile Stats Row */}
+      {stats && (
+        <div className="sm:hidden flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
+          <div className="flex items-center gap-4 text-xs">
+            <span><span className="font-semibold text-foreground">{stats.total}</span> <span className="text-muted-foreground">total</span></span>
+            <span><span className="font-semibold text-amber-600">{stats.pending}</span> <span className="text-muted-foreground">pending</span></span>
+            <span className="font-semibold text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Bar - Responsive */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3" role="search" aria-label="Filter bookings">
         {/* Search */}
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1">
           <input
             type="search"
             value={search}
@@ -368,74 +382,82 @@ export default function BookingsPage() {
               setPage(1);
             }}
             placeholder="Search bookings..."
-            aria-label="Search bookings by reference number, customer name, or email"
-            className="w-full h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            aria-label="Search bookings"
+            className="w-full h-10 sm:h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
               aria-label="Clear search"
             >
-              <X className="h-4 w-4" aria-hidden="true" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
-        {/* Status Dropdown */}
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as StatusFilter);
-            setPage(1);
-          }}
-          aria-label="Filter by booking status"
-          className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.value === "all" ? "All Status" : opt.label}
-            </option>
-          ))}
-        </select>
-
-        {/* Payment Dropdown */}
-        <select
-          value={paymentFilter}
-          onChange={(e) => {
-            setPaymentFilter(e.target.value as PaymentFilter);
-            setPage(1);
-          }}
-          aria-label="Filter by payment status"
-          className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-        >
-          {PAYMENT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.value === "all" ? "All Payment" : opt.label}
-            </option>
-          ))}
-        </select>
-
-        {/* Clear Filters */}
-        {hasActiveFilters && (
-          <button
-            onClick={() => {
-              setSearch("");
-              setStatusFilter("all");
-              setPaymentFilter("all");
+        {/* Filter Dropdowns */}
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as StatusFilter);
               setPage(1);
             }}
-            className="h-9 px-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Clear all filters"
+            aria-label="Filter by status"
+            className="flex-1 sm:flex-none h-10 sm:h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
-            Clear
-          </button>
-        )}
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.value === "all" ? "Status" : opt.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={paymentFilter}
+            onChange={(e) => {
+              setPaymentFilter(e.target.value as PaymentFilter);
+              setPage(1);
+            }}
+            aria-label="Filter by payment"
+            className="flex-1 sm:flex-none h-10 sm:h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          >
+            {PAYMENT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.value === "all" ? "Payment" : opt.label}
+              </option>
+            ))}
+          </select>
+
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+                setPaymentFilter("all");
+                setPage(1);
+              }}
+              className="h-10 sm:h-9 px-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Clear filters"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Table */}
+      {/* Content: Mobile Cards or Desktop Table */}
       {isLoading ? (
-        <TableSkeleton rows={10} columns={7} />
+        isMobile ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <BookingMobileCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : (
+          <TableSkeleton rows={10} columns={7} />
+        )
       ) : data?.data.length === 0 ? (
         <div className="rounded-lg border border-border bg-card">
           {search ? (
@@ -444,7 +466,21 @@ export default function BookingsPage() {
             <NoBookingsEmpty orgSlug={slug} onCreateBooking={() => setShowQuickBook(true)} />
           )}
         </div>
+      ) : isMobile ? (
+        /* Mobile: Card List View */
+        <div className="space-y-3">
+          {data?.data.map((booking) => (
+            <BookingMobileCard
+              key={booking.id}
+              booking={booking}
+              orgSlug={slug}
+              onConfirm={booking.status === "pending" ? handleConfirm : undefined}
+              onCancel={(booking.status === "pending" || booking.status === "confirmed") ? handleCancel : undefined}
+            />
+          ))}
+        </div>
       ) : (
+        /* Desktop: Table View */
         <>
           <Table>
             <TableHeader>
@@ -465,10 +501,56 @@ export default function BookingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.data.map((booking) => (
+              {data?.data.map((booking) => {
+                const total = parseFloat(booking.total);
+                const isHighValue = total >= 500;
+                const isOptimistic = (booking as any)._optimistic;
+                return (
                 <TableRow
                   key={booking.id}
                   data-state={selection.isSelected(booking.id) ? "selected" : undefined}
+                  className={cn(
+                    "transition-colors cursor-pointer",
+                    booking.status === "confirmed" && "border-l-2 border-l-emerald-500",
+                    booking.status === "pending" && "border-l-2 border-l-amber-500",
+                    booking.status === "cancelled" && "border-l-2 border-l-red-400",
+                    booking.paymentStatus === "paid" && !selection.isSelected(booking.id) && "bg-emerald-50/30 dark:bg-emerald-950/10",
+                    // Optimistic update styling - subtle opacity to indicate pending server confirmation
+                    isOptimistic && "opacity-70"
+                  )}
+                  onClick={(e) => {
+                    // Don't open panel if clicking on checkbox, actions, or links
+                    const target = e.target as HTMLElement;
+                    if (
+                      target.closest('input[type="checkbox"]') ||
+                      target.closest('button') ||
+                      target.closest('a')
+                    ) {
+                      return;
+                    }
+                    openPanel({
+                      type: "booking",
+                      id: booking.id,
+                      data: {
+                        referenceNumber: booking.referenceNumber,
+                        status: booking.status,
+                        paymentStatus: booking.paymentStatus,
+                        total: booking.total,
+                        totalParticipants: booking.totalParticipants,
+                        customer: booking.customer ? {
+                          firstName: booking.customer.firstName,
+                          lastName: booking.customer.lastName,
+                          email: booking.customer.email,
+                        } : undefined,
+                        tour: booking.tour ? {
+                          name: booking.tour.name,
+                        } : undefined,
+                        schedule: booking.schedule ? {
+                          startsAt: booking.schedule.startsAt,
+                        } : undefined,
+                      },
+                    });
+                  }}
                 >
                   <TableCell>
                     <SelectRowCheckbox
@@ -510,10 +592,20 @@ export default function BookingsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <BookingStatusBadge status={booking.status as "pending" | "confirmed" | "completed" | "cancelled" | "no_show"} />
+                    <div className="flex items-center gap-1.5">
+                      <BookingStatusBadge status={booking.status as "pending" | "confirmed" | "completed" | "cancelled" | "no_show"} />
+                      {isOptimistic && (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <PaymentStatusBadge status={booking.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed"} />
+                    <div className="flex items-center gap-1.5">
+                      <PaymentStatusBadge status={booking.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed"} />
+                      {isOptimistic && booking.paymentStatus !== (data?.data.find(b => b.id === booking.id) as any)?._originalPaymentStatus && (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -522,9 +614,19 @@ export default function BookingsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm font-medium text-foreground">
-                      ${parseFloat(booking.total).toFixed(2)}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className={cn(
+                        "text-sm font-semibold tabular-nums",
+                        isHighValue ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
+                      )}>
+                        ${total.toFixed(0)}
+                      </span>
+                      {isHighValue && (
+                        <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                          High Value
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <TableActions>
@@ -559,7 +661,8 @@ export default function BookingsPage() {
                     </TableActions>
                   </TableCell>
                 </TableRow>
-              ))}
+              );
+              })}
             </TableBody>
           </Table>
 

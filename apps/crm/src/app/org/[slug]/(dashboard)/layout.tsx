@@ -5,7 +5,9 @@ import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { Suspense } from "react";
 import { User } from "lucide-react";
 import { NavRail } from "@/components/layout/nav-rail";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { MobileHeader } from "./mobile-header";
+import { MobileNav } from "@/components/layout/mobile-nav";
 
 // Check if Clerk is enabled
 const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
@@ -60,16 +62,15 @@ export default async function DashboardLayout({
           userButton={<UserAccountButton />}
         />
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Mobile header */}
-          <MobileHeader organization={organization} slug={slug} />
+        {/* Main Content Area - responds to context panel state */}
+        <DashboardShell
+          mobileHeader={<MobileHeader organization={organization} slug={slug} />}
+        >
+          {children}
+        </DashboardShell>
 
-          {/* Page content */}
-          <main className="flex-1 overflow-auto p-6">
-            {children}
-          </main>
-        </div>
+        {/* Mobile bottom navigation */}
+        <MobileNav orgSlug={slug} />
 
         {/* Global keyboard shortcuts modal */}
         <KeyboardShortcutsModal />

@@ -37,6 +37,11 @@ const baseTourSchema = z.object({
   meetingPointDetails: z.string().max(500, "Meeting point details must be less than 500 characters").optional(),
   cancellationPolicy: z.string().max(2000, "Cancellation policy must be less than 2000 characters").optional(),
   cancellationHours: z.number().int().min(0).optional(),
+  // Booking window settings
+  minimumNoticeHours: z.number().int().min(0).max(720).default(2),
+  maximumAdvanceDays: z.number().int().min(1).max(365).default(90),
+  allowSameDayBooking: z.boolean().default(true),
+  sameDayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (use HH:MM)").optional(),
 });
 
 // Create tour validation with refinement

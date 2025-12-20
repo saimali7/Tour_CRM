@@ -11,6 +11,7 @@ import {
   Calendar,
   UserPlus,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -18,6 +19,8 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Customer360Sheet } from "@/components/customers/customer-360-sheet";
+import { CustomerMobileCard, CustomerMobileCardSkeleton } from "@/components/customers/customer-mobile-card";
+import { useIsMobile } from "@/hooks/use-media-query";
 
 // Design system components
 import { PageHeader, PageHeaderAction, StatsRow, StatCard } from "@/components/ui/page-header";
@@ -51,6 +54,7 @@ const SOURCE_OPTIONS: { value: SourceFilter; label: string }[] = [
 export default function CustomersPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const isMobile = useIsMobile();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -105,39 +109,72 @@ export default function CustomersPage() {
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
-        <p className="text-destructive">Error loading customers: {error.message}</p>
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-destructive">Failed to load customers</p>
+            <p className="text-xs text-destructive/70 mt-0.5">{error.message}</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header: Title + Inline Stats + Add Customer */}
-      <header className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
+    <div className="space-y-4 md:space-y-6">
+      {/* Header: Title + Stats + Add Customer - Responsive */}
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6">
           <h1 className="text-lg font-semibold text-foreground">Customers</h1>
-          {/* Inline Stats */}
+          {/* Inline Stats - Hidden on mobile */}
           {stats && (
             <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
               <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
               <span><span className="font-medium text-emerald-600">+{stats.thisMonth}</span> this month</span>
             </div>
           )}
+          {/* Mobile Add button */}
+          <Link
+            href={`/org/${slug}/customers/new` as Route}
+            className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-target"
+            aria-label="Add customer"
+          >
+            <UserPlus className="h-5 w-5" />
+          </Link>
         </div>
 
+        {/* Desktop Add button */}
         <Link
           href={`/org/${slug}/customers/new` as Route}
-          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <UserPlus className="h-4 w-4" />
           Add Customer
         </Link>
       </header>
 
-      {/* Compact Filter Bar */}
-      <div className="flex items-center gap-3" role="search" aria-label="Filter customers">
+      {/* Mobile Stats Row */}
+      {stats && (
+        <div className="sm:hidden flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
+          <div className="flex items-center gap-4 text-xs">
+            <span><span className="font-semibold text-foreground">{stats.total}</span> <span className="text-muted-foreground">total</span></span>
+            <span><span className="font-semibold text-emerald-600">+{stats.thisMonth}</span> <span className="text-muted-foreground">this month</span></span>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Bar - Responsive */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3" role="search" aria-label="Filter customers">
         {/* Search */}
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1">
           <input
             type="search"
             value={search}
@@ -145,17 +182,17 @@ export default function CustomersPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Search by name, phone, or email..."
-            aria-label="Search customers by name, phone, or email"
-            className="w-full h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            placeholder="Search customers..."
+            aria-label="Search customers"
+            className="w-full h-10 sm:h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+              aria-label="Clear search"
             >
-              <span className="sr-only">Clear</span>
-              ×
+              <span aria-hidden="true">x</span>
             </button>
           )}
         </div>
@@ -167,20 +204,28 @@ export default function CustomersPage() {
             setSourceFilter(e.target.value as SourceFilter);
             setPage(1);
           }}
-          aria-label="Filter by customer source"
-          className="h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          aria-label="Filter by source"
+          className="h-10 sm:h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
         >
           {SOURCE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
-              {opt.value === "all" ? "All Sources" : opt.label}
+              {opt.value === "all" ? "Source" : opt.label}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Table */}
+      {/* Content: Mobile Cards or Desktop Table */}
       {isLoading ? (
-        <TableSkeleton rows={10} columns={6} />
+        isMobile ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <CustomerMobileCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : (
+          <TableSkeleton rows={10} columns={6} />
+        )
       ) : data?.data.length === 0 ? (
         <div className="rounded-lg border border-border bg-card">
           {search ? (
@@ -189,7 +234,28 @@ export default function CustomersPage() {
             <NoCustomersEmpty orgSlug={slug} />
           )}
         </div>
+      ) : isMobile ? (
+        /* Mobile: Card List View */
+        <div className="space-y-3">
+          {data?.data.map((customer) => (
+            <CustomerMobileCard
+              key={customer.id}
+              customer={{
+                id: customer.id,
+                firstName: customer.firstName,
+                lastName: customer.lastName ?? '',
+                email: customer.email,
+                phone: customer.phone,
+                totalBookings: 0, // Would need to be added to query
+                totalSpent: '0',
+                lastBookingAt: null,
+              }}
+              orgSlug={slug}
+            />
+          ))}
+        </div>
       ) : (
+        /* Desktop: Table View */
         <>
           <Table>
             <TableHeader>

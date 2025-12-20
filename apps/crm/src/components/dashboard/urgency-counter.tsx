@@ -96,7 +96,10 @@ export function UrgencyCounter({
 
     if (criticalSchedules.length === 0) return null;
 
-    const firstCritical = new Date(criticalSchedules[0].startsAt);
+    const firstSchedule = criticalSchedules[0];
+    if (!firstSchedule) return null;
+
+    const firstCritical = new Date(firstSchedule.startsAt);
     const hoursUntil = Math.max(0, differenceInHours(firstCritical, now));
     const minutesUntil = Math.max(0, differenceInMinutes(firstCritical, now));
 

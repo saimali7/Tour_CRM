@@ -1,10 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Users, Clock, User, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Clock, User, AlertCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 type CalendarView = "month" | "week" | "day";
 
@@ -340,13 +345,14 @@ function MonthView({
           const isToday = isSameDay(date, today);
           const stats = getDayStats(date);
           const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+          const daySchedules = getSchedulesForDate(date);
+          const hasSchedules = stats.count > 0 && isCurrentMonth;
 
-          return (
+          const dayCellContent = (
             <button
-              key={idx}
               onClick={() => onSelectDate(date)}
               className={cn(
-                "min-h-[100px] p-2 border-b border-r border-border text-left transition-colors hover:bg-muted/50",
+                "w-full min-h-[100px] p-2 border-b border-r border-border text-left transition-colors hover:bg-muted/50",
                 !isCurrentMonth && "bg-muted/20",
                 isWeekend && isCurrentMonth && "bg-muted/10",
                 isToday && "ring-2 ring-inset ring-primary"
@@ -362,7 +368,7 @@ function MonthView({
               </div>
 
               {/* Day summary */}
-              {stats.count > 0 && isCurrentMonth && (
+              {hasSchedules && (
                 <div className="space-y-1">
                   {/* Tour count badge */}
                   <div className="flex items-center gap-1">
@@ -396,6 +402,112 @@ function MonthView({
               )}
             </button>
           );
+
+          // Wrap days with schedules in HoverCard for preview
+          if (hasSchedules) {
+            return (
+              <HoverCard key={idx} openDelay={200} closeDelay={100}>
+                <HoverCardTrigger asChild>
+                  {dayCellContent}
+                </HoverCardTrigger>
+                <HoverCardContent
+                  side="right"
+                  align="start"
+                  className="w-72 p-0"
+                  sideOffset={8}
+                >
+                  {/* Header */}
+                  <div className="px-3 py-2.5 border-b border-border bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-foreground">
+                        {new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" }).format(date)}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground">
+                          {stats.totalBooked}/{stats.totalCapacity} booked
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tour list */}
+                  <div className="divide-y divide-border max-h-[240px] overflow-y-auto">
+                    {daySchedules.slice(0, 5).map((schedule) => {
+                      const booked = schedule.bookedCount ?? 0;
+                      const max = schedule.maxParticipants;
+                      const remaining = max - booked;
+
+                      return (
+                        <div key={schedule.id} className="px-3 py-2.5 hover:bg-muted/50 transition-colors">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              {/* Time */}
+                              <div className="text-xs font-semibold text-primary">
+                                {formatTime(schedule.startsAt)}
+                              </div>
+                              {/* Tour name */}
+                              <div className="text-sm font-medium text-foreground truncate mt-0.5">
+                                {schedule.tour?.name ?? "Unknown Tour"}
+                              </div>
+                              {/* Guide */}
+                              <div className="flex items-center gap-1 mt-1">
+                                {schedule.guide ? (
+                                  <>
+                                    <User className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground truncate">
+                                      {schedule.guide.firstName} {schedule.guide.lastName}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertCircle className="h-3 w-3 text-warning" />
+                                    <span className="text-xs text-warning">No guide</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            {/* Capacity */}
+                            <div className="flex flex-col items-end">
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3 text-muted-foreground" />
+                                <span className={cn(
+                                  "text-xs font-medium",
+                                  remaining === 0 ? "text-destructive" : remaining <= 3 ? "text-warning" : "text-success"
+                                )}>
+                                  {remaining} left
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {booked}/{max}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {daySchedules.length > 5 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+                        +{daySchedules.length - 5} more tour{daySchedules.length - 5 !== 1 ? "s" : ""}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-3 py-2 border-t border-border bg-muted/30">
+                    <button
+                      onClick={() => onSelectDate(date)}
+                      className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      View full day
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            );
+          }
+
+          return <div key={idx}>{dayCellContent}</div>;
         })}
       </div>
 

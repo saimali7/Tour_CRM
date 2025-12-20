@@ -11,6 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // =============================================================================
 // TABLE PRIMITIVES
@@ -101,18 +107,28 @@ interface TableHeadProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
 
 const TableHead = React.forwardRef<HTMLTableCellElement, TableHeadProps>(
   ({ className, children, sortable, sorted, onSort, ...props }, ref) => {
+    // Generate accessible label for sort button
+    const getSortLabel = () => {
+      const columnName = typeof children === 'string' ? children : 'column';
+      if (sorted === "asc") return `Sort ${columnName} descending`;
+      if (sorted === "desc") return `Clear ${columnName} sort`;
+      return `Sort ${columnName} ascending`;
+    };
+
     const content = sortable ? (
       <button
-        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1 hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded px-1 -ml-1"
         onClick={onSort}
+        aria-label={getSortLabel()}
+        aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"}
       >
         {children}
         {sorted === "asc" ? (
-          <ChevronUp className="h-4 w-4" />
+          <ChevronUp className="h-4 w-4" aria-hidden="true" />
         ) : sorted === "desc" ? (
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4" aria-hidden="true" />
         ) : (
-          <ChevronsUpDown className="h-4 w-4 opacity-50" />
+          <ChevronsUpDown className="h-4 w-4 opacity-50" aria-hidden="true" />
         )}
       </button>
     ) : (
@@ -189,25 +205,28 @@ function TablePagination({
   const end = Math.min(page * pageSize, total);
 
   return (
-    <div
+    <nav
       className={cn(
         "flex items-center justify-between px-2 py-4",
         className
       )}
+      aria-label="Pagination"
     >
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground" aria-live="polite">
         Showing <span className="font-medium">{start}</span> to{" "}
         <span className="font-medium">{end}</span> of{" "}
         <span className="font-medium">{total}</span> results
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2" role="group" aria-label="Page navigation">
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
+          aria-label="Go to previous page"
           className={cn(
             "inline-flex items-center justify-center rounded-md text-sm font-medium",
             "h-9 px-3 border border-input bg-background",
             "hover:bg-accent hover:text-accent-foreground",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             "disabled:pointer-events-none disabled:opacity-50",
             "transition-colors"
           )}
@@ -228,15 +247,20 @@ function TablePagination({
               pageNum = page - 2 + i;
             }
 
+            const isCurrent = pageNum === page;
+
             return (
               <button
                 key={pageNum}
                 onClick={() => onPageChange(pageNum)}
+                aria-label={`Go to page ${pageNum}`}
+                aria-current={isCurrent ? "page" : undefined}
                 className={cn(
                   "inline-flex items-center justify-center rounded-md text-sm font-medium",
                   "h-9 w-9",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   "transition-colors",
-                  pageNum === page
+                  isCurrent
                     ? "bg-primary text-primary-foreground"
                     : "hover:bg-accent hover:text-accent-foreground"
                 )}
@@ -249,10 +273,12 @@ function TablePagination({
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
+          aria-label="Go to next page"
           className={cn(
             "inline-flex items-center justify-center rounded-md text-sm font-medium",
             "h-9 px-3 border border-input bg-background",
             "hover:bg-accent hover:text-accent-foreground",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             "disabled:pointer-events-none disabled:opacity-50",
             "transition-colors"
           )}
@@ -260,7 +286,7 @@ function TablePagination({
           Next
         </button>
       </div>
-    </div>
+    </nav>
   );
 }
 
@@ -294,27 +320,43 @@ const ActionButton = React.forwardRef<HTMLButtonElement, ActionButtonProps>(
       default:
         "text-muted-foreground hover:text-foreground hover:bg-accent",
       success:
-        "text-success hover:text-success/80 hover:bg-success/10",
+        "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/50",
       danger:
         "text-destructive hover:text-destructive/80 hover:bg-destructive/10",
     };
 
-    return (
+    const button = (
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center rounded-md p-1.5",
-          "transition-colors",
+          // Increased size: min-w-8 min-h-8 for 32px hit target
+          "inline-flex items-center justify-center rounded-md min-w-8 min-h-8 p-2",
+          "transition-all duration-150",
+          "hover:scale-105 active:scale-95",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           variantClasses[variant],
           className
         )}
-        title={tooltip}
         aria-label={tooltip}
         {...props}
       >
         {children}
       </button>
     );
+
+    // If tooltip provided, wrap in tooltip component
+    if (tooltip) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>{button}</TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            {tooltip}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return button;
   }
 );
 ActionButton.displayName = "ActionButton";
@@ -356,12 +398,13 @@ function TableRowActions({
           className={cn(
             "inline-flex items-center justify-center rounded-md p-1.5",
             "transition-colors",
-            "text-muted-foreground hover:text-foreground hover:bg-accent"
+            "text-muted-foreground hover:text-foreground hover:bg-accent",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           )}
           title={primaryAction.label}
           aria-label={primaryAction.label}
         >
-          {primaryAction.icon || <Eye className="h-4 w-4" />}
+          {primaryAction.icon || <Eye className="h-4 w-4" aria-hidden="true" />}
         </button>
       )}
 
@@ -372,11 +415,12 @@ function TableRowActions({
             className={cn(
               "inline-flex items-center justify-center rounded-md p-1.5",
               "transition-colors",
-              "text-muted-foreground hover:text-foreground hover:bg-accent"
+              "text-muted-foreground hover:text-foreground hover:bg-accent",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             )}
             aria-label="More actions"
           >
-            <MoreHorizontal className="h-4 w-4" />
+            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">

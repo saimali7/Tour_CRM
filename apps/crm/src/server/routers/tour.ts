@@ -43,6 +43,11 @@ const createTourSchema = z.object({
   accessibility: z.string().max(2000).optional(),
   cancellationPolicy: z.string().max(5000).optional(),
   cancellationHours: z.number().min(0).max(720).optional(), // Max 30 days
+  // Booking window settings
+  minimumNoticeHours: z.number().min(0).max(720).optional(),
+  maximumAdvanceDays: z.number().min(1).max(365).optional(),
+  allowSameDayBooking: z.boolean().optional(),
+  sameDayCutoffTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format").optional(),
   status: z.enum(["draft", "active", "paused", "archived"]).optional(),
   isPublic: z.boolean().optional(),
   metaTitle: z.string().max(200).optional(),

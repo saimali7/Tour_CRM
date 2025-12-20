@@ -1,13 +1,13 @@
 "use client";
 
 import { trpc } from "@/lib/trpc";
-import { Edit, Trash2, Eye, Archive, Check, Copy, Plus, Calendar, Clock, Users, DollarSign, ChevronRight, MoreHorizontal, CalendarPlus } from "lucide-react";
+import { Edit, Trash2, Eye, Archive, Check, Copy, Plus, Calendar, Clock, Users, DollarSign, ChevronRight, MoreHorizontal, CalendarPlus, AlertTriangle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { useState, useCallback } from "react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useTourOptimisticMutations } from "@/hooks/use-optimistic-mutations";
 
 // Design system components
 import {
@@ -60,55 +60,13 @@ export default function ToursPage() {
 
   const { data: stats } = trpc.tour.getStats.useQuery();
 
-  const utils = trpc.useUtils();
-
-  const deleteMutation = trpc.tour.delete.useMutation({
-    onSuccess: () => {
-      utils.tour.listWithScheduleStats.invalidate();
-      utils.tour.list.invalidate();
-      utils.tour.getStats.invalidate();
-      toast.success("Tour deleted successfully");
-    },
-    onError: (error) => {
-      toast.error(`Failed to delete tour: ${error.message}`);
-    },
-  });
-
-  const archiveMutation = trpc.tour.archive.useMutation({
-    onSuccess: () => {
-      utils.tour.listWithScheduleStats.invalidate();
-      utils.tour.list.invalidate();
-      utils.tour.getStats.invalidate();
-      toast.success("Tour archived successfully");
-    },
-    onError: (error) => {
-      toast.error(`Failed to archive tour: ${error.message}`);
-    },
-  });
-
-  const publishMutation = trpc.tour.publish.useMutation({
-    onSuccess: () => {
-      utils.tour.listWithScheduleStats.invalidate();
-      utils.tour.list.invalidate();
-      utils.tour.getStats.invalidate();
-      toast.success("Tour published successfully");
-    },
-    onError: (error) => {
-      toast.error(`Failed to publish tour: ${error.message}`);
-    },
-  });
-
-  const duplicateMutation = trpc.tour.duplicate.useMutation({
-    onSuccess: () => {
-      utils.tour.listWithScheduleStats.invalidate();
-      utils.tour.list.invalidate();
-      utils.tour.getStats.invalidate();
-      toast.success("Tour duplicated successfully");
-    },
-    onError: (error) => {
-      toast.error(`Failed to duplicate tour: ${error.message}`);
-    },
-  });
+  // Use optimistic mutations for instant UI feedback
+  const {
+    deleteTour: deleteMutation,
+    archiveTour: archiveMutation,
+    publishTour: publishMutation,
+    duplicateTour: duplicateMutation,
+  } = useTourOptimisticMutations();
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
@@ -143,7 +101,21 @@ export default function ToursPage() {
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
-        <p className="text-destructive">Error loading tours: {error.message}</p>
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-destructive">Failed to load tours</p>
+            <p className="text-xs text-destructive/70 mt-0.5">{error.message}</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
@@ -227,6 +199,7 @@ export default function ToursPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {data?.data.map((tour) => {
               const stats = tour.scheduleStats;
+              const isOptimistic = (tour as any)._optimistic;
               const utilizationColor = stats.utilizationPercent >= 80
                 ? "text-destructive"
                 : stats.utilizationPercent >= 50
@@ -236,18 +209,35 @@ export default function ToursPage() {
               return (
                 <div
                   key={tour.id}
-                  className="group rounded-lg border border-border bg-card hover:border-primary/50 hover:shadow-sm transition-all"
+                  className={cn(
+                    "group rounded-lg border bg-card hover:border-primary/50 hover:shadow-sm transition-all",
+                    stats.utilizationPercent >= 80 && tour.status === "active"
+                      ? "border-emerald-200 dark:border-emerald-900/50"
+                      : "border-border",
+                    tour.status === "active" && stats.upcomingCount > 0 && "ring-1 ring-primary/10",
+                    // Optimistic update styling - subtle opacity and pulse animation
+                    isOptimistic && "opacity-70 animate-pulse"
+                  )}
                 >
                   {/* Card Header */}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/org/${slug}/tours/${tour.id}` as Route}
-                          className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1"
-                        >
-                          {tour.name}
-                        </Link>
+                        {isOptimistic ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                            <span className="font-medium text-foreground line-clamp-1">
+                              {tour.name}
+                            </span>
+                          </div>
+                        ) : (
+                          <Link
+                            href={`/org/${slug}/tours/${tour.id}` as Route}
+                            className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1"
+                          >
+                            {tour.name}
+                          </Link>
+                        )}
                         <p className="text-sm text-muted-foreground mt-0.5">
                           {tour.durationMinutes} min · ${parseFloat(tour.basePrice).toFixed(0)}
                         </p>
@@ -261,11 +251,30 @@ export default function ToursPage() {
                         <Calendar className="h-3.5 w-3.5" />
                         <span>{stats.upcomingCount} upcoming</span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Users className="h-3.5 w-3.5" />
-                        <span className={utilizationColor}>
-                          {stats.totalBooked}/{stats.totalCapacity}
-                        </span>
+
+                      {/* Visual capacity bar */}
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all",
+                                stats.utilizationPercent >= 80 ? "bg-emerald-500" :
+                                stats.utilizationPercent >= 50 ? "bg-primary" :
+                                stats.utilizationPercent >= 20 ? "bg-amber-500" : "bg-red-400"
+                              )}
+                              style={{ width: `${Math.min(stats.utilizationPercent, 100)}%` }}
+                            />
+                          </div>
+                          <span className={cn(
+                            "text-xs font-medium tabular-nums",
+                            stats.utilizationPercent >= 80 ? "text-emerald-600 dark:text-emerald-400" :
+                            stats.utilizationPercent < 30 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
+                          )}>
+                            {stats.utilizationPercent}%
+                          </span>
+                        </div>
                       </div>
                     </div>
 

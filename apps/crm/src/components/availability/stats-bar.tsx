@@ -63,7 +63,7 @@ export function StatsBar({ stats, dateLabel, isLoading }: StatsBarProps) {
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <CalendarDays className="h-4 w-4" />
-            <span className="text-xs font-medium uppercase tracking-wide">Tours</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Tours</span>
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.totalTours}</p>
           <p className="text-xs text-muted-foreground mt-1">scheduled</p>
@@ -73,7 +73,7 @@ export function StatsBar({ stats, dateLabel, isLoading }: StatsBarProps) {
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <Users className="h-4 w-4" />
-            <span className="text-xs font-medium uppercase tracking-wide">Capacity</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Capacity</span>
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.totalCapacity}</p>
           <p className="text-xs text-muted-foreground mt-1">total spots</p>
@@ -83,7 +83,7 @@ export function StatsBar({ stats, dateLabel, isLoading }: StatsBarProps) {
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <TrendingUp className="h-4 w-4" />
-            <span className="text-xs font-medium uppercase tracking-wide">Booked</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Booked</span>
           </div>
           <p className="text-2xl font-bold text-foreground">
             {stats.totalBooked}
@@ -98,7 +98,7 @@ export function StatsBar({ stats, dateLabel, isLoading }: StatsBarProps) {
         <div className="rounded-lg border-2 border-success bg-success/5 p-4">
           <div className="flex items-center gap-2 text-success mb-1">
             <Users className="h-4 w-4" />
-            <span className="text-xs font-medium uppercase tracking-wide">Available</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Available</span>
           </div>
           <p className="text-2xl font-bold text-success">{stats.availableSpots}</p>
           <p className="text-xs text-success/80 mt-1">spots to sell</p>

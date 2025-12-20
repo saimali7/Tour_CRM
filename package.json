@@ -20,6 +20,7 @@
     "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@tour/typescript-config": "workspace:*",
+    "@types/canvas-confetti": "^1.9.0",
     "@vitest/coverage-v8": "^4.0.15",
     "postcss": "^8.5.6",
     "prettier": "^3.4.2",
@@ -31,6 +32,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "canvas-confetti": "^1.9.4",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.3"
   }

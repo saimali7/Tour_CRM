@@ -162,7 +162,8 @@ export const scheduleRouter = createRouter({
     )
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.schedule.checkAvailability(input.id, input.participants);
+      // Uses tour-level booking window settings automatically
+      return services.schedule.checkAvailabilityWithSettings(input.id, input.participants);
     }),
 
   getStats: protectedProcedure

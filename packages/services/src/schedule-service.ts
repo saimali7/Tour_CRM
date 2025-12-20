@@ -509,6 +509,7 @@ export class ScheduleService extends BaseService {
 
   /**
    * Check availability with booking window settings
+   * If bookingWindowSettings is not provided, automatically fetches tour-level settings
    */
   async checkAvailabilityWithSettings(
     id: string,
@@ -518,7 +519,7 @@ export class ScheduleService extends BaseService {
       maximumAdvanceDays?: number;
       allowSameDayBooking?: boolean;
       sameDayCutoffTime?: string;
-    }
+    } | null
   ): Promise<{
     available: boolean;
     remainingSpots: number;
@@ -529,34 +530,53 @@ export class ScheduleService extends BaseService {
       return basicCheck;
     }
 
-    if (!bookingWindowSettings) {
-      return basicCheck;
+    const schedule = await this.getById(id);
+
+    // If no settings provided, fetch from the associated tour
+    let settings = bookingWindowSettings;
+    if (settings === undefined) {
+      const tour = await this.db.query.tours.findFirst({
+        where: and(
+          eq(tours.id, schedule.tourId),
+          eq(tours.organizationId, this.organizationId)
+        ),
+      });
+      if (tour) {
+        settings = {
+          minimumNoticeHours: tour.minimumNoticeHours ?? undefined,
+          maximumAdvanceDays: tour.maximumAdvanceDays ?? undefined,
+          allowSameDayBooking: tour.allowSameDayBooking ?? undefined,
+          sameDayCutoffTime: tour.sameDayCutoffTime ?? undefined,
+        };
+      }
     }
 
-    const schedule = await this.getById(id);
+    if (!settings) {
+      return basicCheck;
+    }
     const now = new Date();
     const startsAt = new Date(schedule.startsAt);
 
     // Check minimum notice
-    if (bookingWindowSettings.minimumNoticeHours) {
+    if (settings.minimumNoticeHours) {
       const hoursUntilStart = (startsAt.getTime() - now.getTime()) / (1000 * 60 * 60);
-      if (hoursUntilStart < bookingWindowSettings.minimumNoticeHours) {
+      if (hoursUntilStart < settings.minimumNoticeHours) {
         return {
           available: false,
           remainingSpots: basicCheck.remainingSpots,
-          reason: `Bookings must be made at least ${bookingWindowSettings.minimumNoticeHours} hours in advance`,
+          reason: `Bookings must be made at least ${settings.minimumNoticeHours} hours in advance`,
         };
       }
     }
 
     // Check maximum advance days
-    if (bookingWindowSettings.maximumAdvanceDays && bookingWindowSettings.maximumAdvanceDays > 0) {
+    if (settings.maximumAdvanceDays && settings.maximumAdvanceDays > 0) {
       const daysUntilStart = (startsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysUntilStart > bookingWindowSettings.maximumAdvanceDays) {
+      if (daysUntilStart > settings.maximumAdvanceDays) {
         return {
           available: false,
           remainingSpots: basicCheck.remainingSpots,
-          reason: `Bookings can only be made up to ${bookingWindowSettings.maximumAdvanceDays} days in advance`,
+          reason: `Bookings can only be made up to ${settings.maximumAdvanceDays} days in advance`,
         };
       }
     }
@@ -568,7 +588,7 @@ export class ScheduleService extends BaseService {
       startsAt.getDate() === now.getDate();
 
     if (isToday) {
-      if (!bookingWindowSettings.allowSameDayBooking) {
+      if (settings.allowSameDayBooking === false) {
         return {
           available: false,
           remainingSpots: basicCheck.remainingSpots,
@@ -577,8 +597,8 @@ export class ScheduleService extends BaseService {
       }
 
       // Check cutoff time
-      if (bookingWindowSettings.sameDayCutoffTime) {
-        const [cutoffHours, cutoffMinutes] = bookingWindowSettings.sameDayCutoffTime
+      if (settings.sameDayCutoffTime) {
+        const [cutoffHours, cutoffMinutes] = settings.sameDayCutoffTime
           .split(":")
           .map(Number);
         const cutoffTime = new Date(now);
@@ -588,7 +608,7 @@ export class ScheduleService extends BaseService {
           return {
             available: false,
             remainingSpots: basicCheck.remainingSpots,
-            reason: `Same-day booking cutoff time (${bookingWindowSettings.sameDayCutoffTime}) has passed`,
+            reason: `Same-day booking cutoff time (${settings.sameDayCutoffTime}) has passed`,
           };
         }
       }

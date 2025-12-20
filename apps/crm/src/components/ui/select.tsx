@@ -8,6 +8,7 @@ export interface SelectProps {
   value: string;
   onValueChange: (value: string) => void;
   children: React.ReactNode;
+  disabled?: boolean;
 }
 
 export interface SelectTriggerProps {
@@ -33,14 +34,15 @@ const SelectContext = React.createContext<{
   onValueChange: (value: string) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
+  disabled: boolean;
 } | null>(null);
 
-export function Select({ value, onValueChange, children }: SelectProps) {
+export function Select({ value, onValueChange, children, disabled = false }: SelectProps) {
   const [open, setOpen] = React.useState(false);
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen }}>
-      <div className="relative">{children}</div>
+    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, disabled }}>
+      <div className={cn("relative", disabled && "opacity-50 cursor-not-allowed")}>{children}</div>
     </SelectContext.Provider>
   );
 }
@@ -55,7 +57,8 @@ export function SelectTrigger({
   return (
     <button
       type="button"
-      onClick={() => context.setOpen(!context.open)}
+      onClick={() => !context.disabled && context.setOpen(!context.open)}
+      disabled={context.disabled}
       className={cn(
         "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm",
         "ring-offset-background",

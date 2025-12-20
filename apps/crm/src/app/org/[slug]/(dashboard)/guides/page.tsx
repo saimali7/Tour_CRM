@@ -9,6 +9,7 @@ import {
   Phone,
   Users,
   Globe,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -117,7 +118,21 @@ export default function GuidesPage() {
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
-        <p className="text-destructive">Error loading guides: {error.message}</p>
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-destructive">Failed to load guides</p>
+            <p className="text-xs text-destructive/70 mt-0.5">{error.message}</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }

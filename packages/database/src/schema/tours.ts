@@ -55,6 +55,12 @@ export const tours = pgTable("tours", {
   cancellationPolicy: text("cancellation_policy"),
   cancellationHours: integer("cancellation_hours").default(24),
 
+  // Booking window settings (per-tour override)
+  minimumNoticeHours: integer("minimum_notice_hours").default(2),
+  maximumAdvanceDays: integer("maximum_advance_days").default(90),
+  allowSameDayBooking: boolean("allow_same_day_booking").default(true),
+  sameDayCutoffTime: text("same_day_cutoff_time"), // e.g., "12:00" in 24h format
+
   // Deposit settings
   depositEnabled: boolean("deposit_enabled").default(false),
   depositType: text("deposit_type").$type<"percentage" | "fixed">().default("percentage"),

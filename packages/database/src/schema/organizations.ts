@@ -114,6 +114,37 @@ export interface SetupProgress {
   };
 }
 
+export interface NotificationSettings {
+  // Master channel toggles
+  emailEnabled?: boolean;
+  smsEnabled?: boolean;
+
+  // Customer notifications
+  customer?: {
+    bookingConfirmed?: { email?: boolean; sms?: boolean; timing?: string };
+    paymentReceived?: { email?: boolean; sms?: boolean; timing?: string };
+    tourReminder24h?: { email?: boolean; sms?: boolean; timing?: string };
+    tourReminder2h?: { email?: boolean; sms?: boolean; timing?: string };
+    bookingCancelled?: { email?: boolean; sms?: boolean; timing?: string };
+    refundProcessed?: { email?: boolean; sms?: boolean; timing?: string };
+  };
+
+  // Staff notifications
+  staff?: {
+    newBooking?: boolean;
+    paymentReceived?: boolean;
+    bookingCancelled?: boolean;
+    lowAvailability?: boolean;
+  };
+
+  // Guide notifications
+  guide?: {
+    scheduleAssignment?: boolean;
+    scheduleUpdate?: boolean;
+    dayOfReminder?: boolean;
+  };
+}
+
 export interface OrganizationSettings {
   // Booking settings
   defaultCurrency?: string;
@@ -124,9 +155,12 @@ export interface OrganizationSettings {
   // Booking window/availability settings
   bookingWindow?: BookingWindowSettings;
 
-  // Notification settings
+  // Notification settings (legacy - kept for backwards compatibility)
   emailNotifications?: boolean;
   smsNotifications?: boolean;
+
+  // Detailed notification settings
+  notificationSettings?: NotificationSettings;
 
   // Booking policies
   cancellationPolicy?: string;

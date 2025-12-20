@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { TRPCProvider } from "@/providers/trpc-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AccessibilityProvider } from "@/components/accessibility-provider";
 import "@tour/ui/globals.css";
 
 const inter = Inter({
@@ -31,7 +33,11 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <TRPCProvider>{children}</TRPCProvider>
+          <TooltipProvider>
+            <AccessibilityProvider>
+              <TRPCProvider>{children}</TRPCProvider>
+            </AccessibilityProvider>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

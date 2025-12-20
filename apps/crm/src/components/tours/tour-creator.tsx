@@ -17,9 +17,11 @@ import {
   ArrowLeft,
   Save,
   Send,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
+import { useIsMobile } from "@/hooks/use-media-query";
 
 // Tab Components
 import { EssentialsTab } from "./tour-creator/essentials-tab";
@@ -62,6 +64,12 @@ export interface TourFormState {
   cancellationPolicy: string;
   metaTitle: string;
   metaDescription: string;
+
+  // Booking window
+  minimumNoticeHours: number;
+  maximumAdvanceDays: number;
+  allowSameDayBooking: boolean;
+  sameDayCutoffTime: string;
 }
 
 interface TourCreatorProps {
@@ -75,15 +83,16 @@ type TabId = "essentials" | "content" | "schedule" | "settings";
 interface Tab {
   id: TabId;
   label: string;
+  shortLabel: string;
   icon: React.ElementType;
   description: string;
 }
 
 const TABS: Tab[] = [
-  { id: "essentials", label: "Essentials", icon: Sparkles, description: "Name, price & capacity" },
-  { id: "content", label: "Content", icon: FileText, description: "Description & images" },
-  { id: "schedule", label: "Schedule", icon: Calendar, description: "When it runs" },
-  { id: "settings", label: "Settings", icon: Settings, description: "Policies & SEO" },
+  { id: "essentials", label: "Essentials", shortLabel: "Basics", icon: Sparkles, description: "Name, price & capacity" },
+  { id: "content", label: "Content", shortLabel: "Content", icon: FileText, description: "Description & images" },
+  { id: "schedule", label: "Schedule", shortLabel: "When", icon: Calendar, description: "When it runs" },
+  { id: "settings", label: "Settings", shortLabel: "Config", icon: Settings, description: "Policies & SEO" },
 ];
 
 const DEFAULT_FORM_STATE: TourFormState = {
@@ -124,6 +133,12 @@ const DEFAULT_FORM_STATE: TourFormState = {
   cancellationPolicy: "",
   metaTitle: "",
   metaDescription: "",
+
+  // Booking window
+  minimumNoticeHours: 2,
+  maximumAdvanceDays: 90,
+  allowSameDayBooking: true,
+  sameDayCutoffTime: "12:00",
 };
 
 // Smart defaults based on category
@@ -201,6 +216,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
   const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
+  const isMobile = useIsMobile();
 
   const [activeTab, setActiveTab] = useState<TabId>("essentials");
   const [formState, setFormState] = useState<TourFormState>({
@@ -208,6 +224,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
     ...initialData,
   });
   const [touchedTabs, setTouchedTabs] = useState<Set<TabId>>(new Set(["essentials"]));
+  const [showMobileActions, setShowMobileActions] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -367,6 +384,10 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           meetingPointDetails: formState.meetingPointDetails || undefined,
           cancellationPolicy: formState.cancellationPolicy || undefined,
           cancellationHours: formState.cancellationHours,
+          minimumNoticeHours: formState.minimumNoticeHours,
+          maximumAdvanceDays: formState.maximumAdvanceDays,
+          allowSameDayBooking: formState.allowSameDayBooking,
+          sameDayCutoffTime: formState.sameDayCutoffTime || undefined,
           metaTitle: formState.metaTitle || undefined,
           metaDescription: formState.metaDescription || undefined,
           status: publish ? "active" as const : "draft" as const,
@@ -431,27 +452,29 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col">
-      {/* Header */}
+      {/* Header - Responsive */}
       <div className="flex-shrink-0 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               onClick={() => router.back()}
-              className="p-2 -ml-2 hover:bg-accent rounded-lg transition-colors"
+              className="p-2 -ml-2 hover:bg-accent rounded-lg transition-colors touch-target"
+              aria-label="Go back"
             >
               <ArrowLeft className="h-5 w-5 text-muted-foreground" />
             </button>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">
                 {mode === "edit" ? "Edit Tour" : "Create Tour"}
               </h1>
               {formState.name && (
-                <p className="text-sm text-muted-foreground">{formState.name}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">{formState.name}</p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Desktop Actions */}
+          <div className="hidden sm:flex items-center gap-3">
             <button
               type="button"
               onClick={() => handleSave(false)}
@@ -475,11 +498,25 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
               {mode === "edit" ? "Save & Publish" : "Create & Publish"}
             </button>
           </div>
+
+          {/* Mobile Save Button */}
+          <button
+            type="button"
+            onClick={() => setShowMobileActions(true)}
+            className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-lg bg-primary text-primary-foreground touch-target"
+            aria-label="Save options"
+          >
+            {isSubmitting ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </button>
         </div>
 
-        {/* Tabs */}
-        <div className="px-6 pb-0">
-          <nav className="flex gap-1" role="tablist">
+        {/* Tabs - Responsive */}
+        <div className="px-4 sm:px-6 pb-0 overflow-x-auto scrollbar-hide">
+          <nav className="flex gap-1 min-w-max" role="tablist">
             {TABS.map((tab, index) => {
               const isActive = activeTab === tab.id;
               const isCompleted = tabCompletion[tab.id].complete;
@@ -494,7 +531,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                   onClick={() => goToTab(tab.id)}
                   disabled={!canNavigate}
                   className={cn(
-                    "relative flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg transition-all",
+                    "relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-sm font-medium rounded-t-lg transition-all touch-target",
                     isActive
                       ? "bg-card text-foreground border-t border-l border-r border-border -mb-px"
                       : canNavigate
@@ -504,7 +541,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                 >
                   <span
                     className={cn(
-                      "flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors",
+                      "flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-xs transition-colors",
                       isCompleted
                         ? "bg-emerald-500/15 text-emerald-600"
                         : isActive
@@ -512,11 +549,12 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                           : "bg-muted text-muted-foreground"
                     )}
                   >
-                    {isCompleted ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
+                    {isCompleted ? <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
                   </span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
                   <span className="hidden sm:inline">{tab.label}</span>
                   {index < TABS.length - 1 && (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 ml-2 hidden lg:block" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 ml-1 sm:ml-2 hidden lg:block" />
                   )}
                 </button>
               );
@@ -525,9 +563,9 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
         </div>
       </div>
 
-      {/* Tab Content */}
+      {/* Tab Content - Responsive padding */}
       <div className="flex-1 bg-card border-t border-border">
-        <div className="max-w-4xl mx-auto p-6">
+        <div className="max-w-4xl mx-auto p-4 sm:p-6">
           {activeTab === "essentials" && (
             <EssentialsTab
               formState={formState}
@@ -548,36 +586,41 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
         </div>
       </div>
 
-      {/* Footer Navigation */}
-      <div className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur sticky bottom-0">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+      {/* Footer Navigation - Responsive */}
+      <div className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur sticky bottom-0 safe-area-pb">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <button
             type="button"
             onClick={goPrevious}
             disabled={isFirstTab}
             className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+              "inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-target",
               isFirstTab
                 ? "text-muted-foreground/50 cursor-not-allowed"
                 : "text-foreground hover:bg-accent"
             )}
           >
             <ChevronLeft className="h-4 w-4" />
-            Previous
+            <span className="hidden sm:inline">Previous</span>
+            <span className="sm:hidden">Back</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {TABS.map((tab) => (
-              <div
+              <button
                 key={tab.id}
+                onClick={() => goToTab(tab.id)}
+                disabled={!canNavigateToTab(tab.id)}
                 className={cn(
-                  "w-2 h-2 rounded-full transition-colors",
+                  "w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-colors",
                   activeTab === tab.id
                     ? "bg-primary"
                     : tabCompletion[tab.id].complete
                       ? "bg-emerald-500"
-                      : "bg-muted-foreground/30"
+                      : "bg-muted-foreground/30",
+                  canNavigateToTab(tab.id) && "cursor-pointer"
                 )}
+                aria-label={`Go to ${tab.label}`}
               />
             ))}
           </div>
@@ -587,17 +630,93 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
             onClick={goNext}
             disabled={isLastTab || !canNavigateToTab(TABS[currentTabIndex + 1]?.id ?? "essentials")}
             className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+              "inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-target",
               isLastTab || !canNavigateToTab(TABS[currentTabIndex + 1]?.id ?? "essentials")
                 ? "text-muted-foreground/50 cursor-not-allowed"
                 : "bg-primary text-primary-foreground hover:bg-primary/90"
             )}
           >
-            Next
+            <span>Next</span>
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
       </div>
+
+      {/* Mobile Actions Sheet */}
+      {showMobileActions && (
+        <div className="fixed inset-0 z-50 sm:hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowMobileActions(false)}
+          />
+
+          {/* Sheet */}
+          <div className="mobile-sheet">
+            <div className="mobile-sheet-handle" />
+
+            <div className="px-4 pb-4 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold text-foreground">Save Tour</h3>
+                <button
+                  onClick={() => setShowMobileActions(false)}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors touch-target"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+
+              {!tabCompletion.essentials.complete && (
+                <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 rounded-lg">
+                  Complete the Essentials tab before saving
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileActions(false);
+                  handleSave(false);
+                }}
+                disabled={isSubmitting || !tabCompletion.essentials.complete}
+                className="w-full flex items-center justify-center gap-2 h-12 text-base font-medium text-foreground bg-muted hover:bg-accent rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="h-5 w-5" />
+                Save as Draft
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileActions(false);
+                  handleSave(true);
+                }}
+                disabled={isSubmitting || !tabCompletion.essentials.complete}
+                className="w-full flex items-center justify-center gap-2 h-12 text-base font-medium bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+                {mode === "edit" ? "Save & Publish" : "Create & Publish"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileActions(false);
+                  router.back();
+                }}
+                className="w-full flex items-center justify-center gap-2 h-12 text-base font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

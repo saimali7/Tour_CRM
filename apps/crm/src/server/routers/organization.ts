@@ -23,7 +23,7 @@ const updateOrganizationSchema = z.object({
   country: z.string().optional(),
   postalCode: z.string().optional(),
   timezone: z.string().optional(),
-  logoUrl: z.string().url().optional(),
+  logoUrl: z.string().optional(),
   primaryColor: z.string().optional(),
 });
 
@@ -58,6 +58,36 @@ const paymentSettingsSchema = z.object({
   refundDeadlineHours: z.number().min(0).max(720),
 });
 
+const notificationEventSchema = z.object({
+  email: z.boolean().optional(),
+  sms: z.boolean().optional(),
+  timing: z.string().optional(),
+});
+
+const notificationSettingsSchema = z.object({
+  emailEnabled: z.boolean().optional(),
+  smsEnabled: z.boolean().optional(),
+  customer: z.object({
+    bookingConfirmed: notificationEventSchema.optional(),
+    paymentReceived: notificationEventSchema.optional(),
+    tourReminder24h: notificationEventSchema.optional(),
+    tourReminder2h: notificationEventSchema.optional(),
+    bookingCancelled: notificationEventSchema.optional(),
+    refundProcessed: notificationEventSchema.optional(),
+  }).optional(),
+  staff: z.object({
+    newBooking: z.boolean().optional(),
+    paymentReceived: z.boolean().optional(),
+    bookingCancelled: z.boolean().optional(),
+    lowAvailability: z.boolean().optional(),
+  }).optional(),
+  guide: z.object({
+    scheduleAssignment: z.boolean().optional(),
+    scheduleUpdate: z.boolean().optional(),
+    dayOfReminder: z.boolean().optional(),
+  }).optional(),
+});
+
 const updateSettingsSchema = z.object({
   defaultCurrency: z.string().optional(),
   defaultLanguage: z.string().optional(),
@@ -65,6 +95,7 @@ const updateSettingsSchema = z.object({
   requireAddress: z.boolean().optional(),
   emailNotifications: z.boolean().optional(),
   smsNotifications: z.boolean().optional(),
+  notificationSettings: notificationSettingsSchema.optional(),
   cancellationPolicy: z.string().optional(),
   refundPolicy: z.string().optional(),
   tax: taxSettingsSchema.optional(),
@@ -100,7 +131,7 @@ export const organizationRouter = createRouter({
   updateBranding: adminProcedure
     .input(
       z.object({
-        logoUrl: z.string().url().optional(),
+        logoUrl: z.string().optional(),
         primaryColor: z.string().optional(),
       })
     )

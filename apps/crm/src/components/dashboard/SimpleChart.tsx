@@ -1,3 +1,13 @@
+"use client";
+
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+
 interface ChartDataPoint {
   date: string;
   value: number;
@@ -11,9 +21,15 @@ interface SimpleChartProps {
   height?: number;
 }
 
+const chartConfig = {
+  value: {
+    label: "Revenue",
+    color: "hsl(var(--primary))",
+  },
+} satisfies ChartConfig;
+
 export function SimpleChart({
   data,
-  type,
   title,
   valueFormatter = (v) => v.toString(),
   height = 200,
@@ -32,87 +48,103 @@ export function SimpleChart({
     );
   }
 
-  const maxValue = Math.max(...data.map((d) => d.value));
-  const minValue = Math.min(...data.map((d) => d.value));
-  const range = maxValue - minValue || 1;
+  // Transform data for recharts
+  const chartData = data.map((d) => ({
+    date: d.date,
+    value: d.value,
+    // Format the date for display
+    formattedDate: new Date(d.date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+  }));
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
       <h3 className="text-lg font-semibold text-foreground mb-4">{title}</h3>
-      <div className="relative" style={{ height }}>
-        {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-xs text-muted-foreground pr-2">
-          <span>{valueFormatter(maxValue)}</span>
-          <span>{valueFormatter((maxValue + minValue) / 2)}</span>
-          <span>{valueFormatter(minValue)}</span>
-        </div>
-
-        {/* Chart area */}
-        <div className="ml-16 h-full flex items-end gap-1">
-          {data.map((point, index) => {
-            const heightPercent =
-              range > 0 ? ((point.value - minValue) / range) * 100 : 50;
-
-            return (
-              <div key={index} className="flex-1 flex flex-col items-center group">
-                {/* Bar or Line Point */}
-                <div className="relative w-full flex items-end justify-center h-full">
-                  {type === "bar" ? (
-                    <div
-                      className="w-full bg-primary hover:bg-primary/80 rounded-t transition-all"
-                      style={{ height: `${heightPercent}%` }}
-                      title={`${point.date}: ${valueFormatter(point.value)}`}
-                    />
-                  ) : (
-                    <div
-                      className="absolute bottom-0 w-2 h-2 bg-primary rounded-full"
-                      style={{ bottom: `${heightPercent}%` }}
-                      title={`${point.date}: ${valueFormatter(point.value)}`}
-                    />
-                  )}
-                  {/* Tooltip on hover */}
-                  <div className="absolute bottom-full mb-2 hidden group-hover:block bg-foreground text-background text-xs rounded px-2 py-1 whitespace-nowrap z-10">
-                    {valueFormatter(point.value)}
-                  </div>
-                </div>
-
-                {/* X-axis label */}
-                {index % Math.ceil(data.length / 6) === 0 && (
-                  <span className="text-xs text-muted-foreground mt-2 transform -rotate-45 origin-top-left">
-                    {new Date(point.date).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Line connecting points for line chart */}
-        {type === "line" && data.length > 1 && (
-          <svg
-            className="absolute top-0 left-16 pointer-events-none"
-            style={{ width: "calc(100% - 4rem)", height: "100%" }}
-          >
-            <polyline
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-primary"
-              points={data
-                .map((point, index) => {
-                  const x = (index / (data.length - 1)) * 100;
-                  const y =
-                    100 - (range > 0 ? ((point.value - minValue) / range) * 100 : 50);
-                  return `${x}%,${y}%`;
-                })
-                .join(" ")}
-            />
-          </svg>
-        )}
-      </div>
+      <ChartContainer config={chartConfig} className="w-full" style={{ height }}>
+        <AreaChart
+          data={chartData}
+          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient id="fillValue" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="5%"
+                stopColor="hsl(var(--primary))"
+                stopOpacity={0.3}
+              />
+              <stop
+                offset="95%"
+                stopColor="hsl(var(--primary))"
+                stopOpacity={0.05}
+              />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="hsl(var(--border))"
+            strokeOpacity={0.5}
+          />
+          <XAxis
+            dataKey="formattedDate"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+            tickFormatter={(value) => valueFormatter(value)}
+            width={60}
+          />
+          <ChartTooltip
+            cursor={{ stroke: "hsl(var(--border))", strokeDasharray: "4 4" }}
+            content={
+              <ChartTooltipContent
+                formatter={(value, _name, item) => {
+                  const formattedDate = (item.payload as { formattedDate?: string })?.formattedDate;
+                  return (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-muted-foreground text-xs">
+                        {formattedDate}
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {valueFormatter(Number(value))}
+                      </span>
+                    </div>
+                  );
+                }}
+                hideIndicator
+              />
+            }
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="hsl(var(--primary))"
+            strokeWidth={2.5}
+            fill="url(#fillValue)"
+            dot={{
+              fill: "hsl(var(--primary))",
+              stroke: "hsl(var(--background))",
+              strokeWidth: 2,
+              r: 4,
+            }}
+            activeDot={{
+              fill: "hsl(var(--primary))",
+              stroke: "hsl(var(--background))",
+              strokeWidth: 2,
+              r: 6,
+            }}
+          />
+        </AreaChart>
+      </ChartContainer>
     </div>
   );
 }
