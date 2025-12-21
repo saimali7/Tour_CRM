@@ -270,7 +270,7 @@ export default function GeneralSettingsPage() {
                 value={businessForm.address}
                 onChange={(e) => handleChange("address", e.target.value)}
                 className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                placeholder="123 Main Street, Suite 100"
+                placeholder="Street address"
               />
             </div>
 
@@ -287,13 +287,13 @@ export default function GeneralSettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">State</label>
+                <label className="text-sm font-medium text-foreground">State / Province</label>
                 <input
                   type="text"
                   value={businessForm.state}
                   onChange={(e) => handleChange("state", e.target.value)}
                   className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  placeholder="CA"
+                  placeholder="State / Province"
                 />
               </div>
               <div className="space-y-2">
@@ -303,7 +303,7 @@ export default function GeneralSettingsPage() {
                   value={businessForm.postalCode}
                   onChange={(e) => handleChange("postalCode", e.target.value)}
                   className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  placeholder="94102"
+                  placeholder="Postal code"
                 />
               </div>
               <div className="space-y-2">
