@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@tour/ui", "@tour/database", "@tour/validators", "@tour/config"],
   typedRoutes: true,
   turbopack: {
-    root: "..",
+    root: "../..",
   },
   typescript: {
     // We run typecheck separately
