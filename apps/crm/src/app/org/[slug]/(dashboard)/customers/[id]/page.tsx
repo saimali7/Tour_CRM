@@ -493,7 +493,14 @@ export default function CustomerDetailPage() {
               {customer.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                  className={cn(
+                    "inline-flex items-center px-3 py-1 rounded-full text-sm",
+                    tag === "vip"
+                      ? "bg-amber-500/10 text-amber-600"
+                      : tag === "repeat-customer"
+                      ? "bg-emerald-500/10 text-emerald-600"
+                      : "bg-primary/10 text-primary"
+                  )}
                 >
                   {tag}
                 </span>

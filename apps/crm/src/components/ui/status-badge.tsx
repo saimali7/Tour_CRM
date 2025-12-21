@@ -350,6 +350,8 @@ const variantConfig: Record<StatusVariant, { className: string; icon: LucideIcon
   neutral: { className: "status-no-show", icon: Clock },
 };
 
+type BadgeSize = "sm" | "default" | "lg";
+
 interface StatusBadgeProps {
   label: string;
   variant: StatusVariant;
@@ -357,7 +359,14 @@ interface StatusBadgeProps {
   showIcon?: boolean;
   icon?: LucideIcon;
   compact?: boolean;
+  size?: BadgeSize;
 }
+
+const sizeClasses: Record<BadgeSize, { badge: string; icon: string }> = {
+  sm: { badge: "px-2 py-0.5 text-[10px]", icon: "h-2.5 w-2.5" },
+  default: { badge: "px-2.5 py-0.5 text-xs", icon: "h-3 w-3" },
+  lg: { badge: "px-3 py-1 text-sm", icon: "h-3.5 w-3.5" },
+};
 
 export function StatusBadge({
   label,
@@ -366,9 +375,11 @@ export function StatusBadge({
   showIcon = true,
   icon,
   compact = false,
+  size = "default",
 }: StatusBadgeProps) {
   const config = variantConfig[variant];
   const Icon = icon || config.icon;
+  const sizeClass = sizeClasses[size];
 
   if (compact) {
     return (
@@ -389,12 +400,13 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium",
+        "inline-flex items-center gap-1 rounded-full font-medium",
+        sizeClass.badge,
         config.className,
         className
       )}
     >
-      {showIcon && <Icon className="h-3 w-3" aria-hidden="true" />}
+      {showIcon && <Icon className={sizeClass.icon} aria-hidden="true" />}
       {label}
     </span>
   );

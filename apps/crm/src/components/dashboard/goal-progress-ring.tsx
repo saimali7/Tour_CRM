@@ -90,7 +90,7 @@ export function GoalProgressRing({ className, orgSlug }: GoalProgressRingProps) 
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card p-5 transition-all hover:shadow-md",
+        "rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30",
         className
       )}
     >

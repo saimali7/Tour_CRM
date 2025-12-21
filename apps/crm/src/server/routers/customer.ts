@@ -118,6 +118,22 @@ export const customerRouter = createRouter({
       return { success: true };
     }),
 
+  bulkDelete: protectedProcedure
+    .input(z.object({ ids: z.array(z.string()).min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      let deletedCount = 0;
+      for (const id of input.ids) {
+        try {
+          await services.customer.delete(id);
+          deletedCount++;
+        } catch {
+          // Skip failed deletions (e.g., customer has bookings)
+        }
+      }
+      return { deletedCount, requestedCount: input.ids.length };
+    }),
+
   addTags: protectedProcedure
     .input(z.object({ id: z.string(), tags: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {

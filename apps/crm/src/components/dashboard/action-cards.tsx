@@ -7,10 +7,9 @@ import { cn } from "@/lib/utils";
 import {
   DollarSign,
   UserX,
+  UserCheck,
   Clock,
   ChevronRight,
-  AlertTriangle,
-  TrendingUp,
 } from "lucide-react";
 
 // =============================================================================
@@ -25,12 +24,12 @@ interface ActionCardData {
   icon: React.ReactNode;
   href: string;
   variant: "warning" | "danger" | "info" | "success";
-  priority: number; // Lower = higher priority
 }
 
 interface ActionCardsProps {
   pendingPayments: { count: number; amount: number };
   toursNeedingGuides: number;
+  toursWithGuides: number;
   unconfirmedBookings: number;
   orgSlug: string;
   className?: string;
@@ -56,62 +55,60 @@ function formatCurrency(amount: number): string {
 export function ActionCards({
   pendingPayments,
   toursNeedingGuides,
+  toursWithGuides,
   unconfirmedBookings,
   orgSlug,
   className,
 }: ActionCardsProps) {
-  // Build action cards from data
-  const cards: ActionCardData[] = [];
-
-  // Pending payments - show if there are any
-  if (pendingPayments.count > 0) {
-    cards.push({
+  // Always show all 3 cards
+  const cards: ActionCardData[] = [
+    // Card 1: Payments Due
+    {
       id: "pending-payments",
       label: "Payments Due",
-      value: formatCurrency(pendingPayments.amount),
-      subtext: `${pendingPayments.count} booking${pendingPayments.count !== 1 ? "s" : ""}`,
+      value: pendingPayments.count > 0 ? formatCurrency(pendingPayments.amount) : "$0",
+      subtext: pendingPayments.count > 0
+        ? `${pendingPayments.count} booking${pendingPayments.count !== 1 ? "s" : ""}`
+        : "All paid",
       icon: <DollarSign className="h-5 w-5" />,
       href: `/org/${orgSlug}/bookings?payment=pending`,
-      variant: pendingPayments.amount > 500 ? "danger" : "warning",
-      priority: 1,
-    });
-  }
-
-  // Tours needing guides - urgent
-  if (toursNeedingGuides > 0) {
-    cards.push({
-      id: "needs-guides",
-      label: "Need Guide",
-      value: toursNeedingGuides,
-      subtext: "upcoming tour" + (toursNeedingGuides !== 1 ? "s" : ""),
-      icon: <UserX className="h-5 w-5" />,
-      href: `/org/${orgSlug}/calendar?filter=needs-guide`,
-      variant: "danger",
-      priority: 0, // Highest priority
-    });
-  }
-
-  // Unconfirmed bookings
-  if (unconfirmedBookings > 0) {
-    cards.push({
+      variant: pendingPayments.amount > 500 ? "danger" : pendingPayments.count > 0 ? "warning" : "success",
+    },
+    // Card 2: Guide Assignment Status
+    toursNeedingGuides > 0
+      ? {
+        id: "needs-guides",
+        label: "Need Guide",
+        value: toursNeedingGuides,
+        subtext: `upcoming tour${toursNeedingGuides !== 1 ? "s" : ""}`,
+        icon: <UserX className="h-5 w-5" />,
+        href: `/org/${orgSlug}/calendar?filter=needs-guide`,
+        variant: "danger" as const,
+      }
+      : {
+        id: "guides-assigned",
+        label: "Guides Assigned",
+        value: toursWithGuides,
+        subtext: toursWithGuides > 0
+          ? `tour${toursWithGuides !== 1 ? "s" : ""} ready`
+          : "No upcoming tours",
+        icon: <UserCheck className="h-5 w-5" />,
+        href: `/org/${orgSlug}/calendar`,
+        variant: "success" as const,
+      },
+    // Card 3: Awaiting Confirmation
+    {
       id: "unconfirmed",
       label: "Awaiting Confirmation",
       value: unconfirmedBookings,
-      subtext: "booking" + (unconfirmedBookings !== 1 ? "s" : ""),
+      subtext: unconfirmedBookings > 0
+        ? `booking${unconfirmedBookings !== 1 ? "s" : ""}`
+        : "All confirmed",
       icon: <Clock className="h-5 w-5" />,
       href: `/org/${orgSlug}/bookings?status=pending`,
-      variant: "warning",
-      priority: 2,
-    });
-  }
-
-  // Sort by priority (lower = higher priority)
-  cards.sort((a, b) => a.priority - b.priority);
-
-  // If no action items, show success state
-  if (cards.length === 0) {
-    return null; // Let the parent handle "all clear" state
-  }
+      variant: unconfirmedBookings > 0 ? "warning" : "success",
+    },
+  ];
 
   return (
     <div className={cn("grid grid-cols-1 sm:grid-cols-3 gap-3", className)}>
@@ -134,30 +131,36 @@ function ActionCard({
   href,
   variant,
 }: ActionCardData) {
+  // shadcn-style: White background with colored left border accent
+  // Uses CSS variables which respect the app's dark mode class
   const variantStyles = {
     danger: {
-      container: "border-red-200 bg-gradient-to-br from-red-50 to-orange-50/50 dark:border-red-900/50 dark:from-red-950/30 dark:to-orange-950/20",
-      icon: "bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400",
-      value: "text-red-700 dark:text-red-300",
-      label: "text-red-900/70 dark:text-red-200/70",
+      container: "bg-card border border-border",
+      icon: "bg-red-100 text-red-600",
+      value: "text-foreground",
+      label: "text-muted-foreground",
+      urgent: true,
     },
     warning: {
-      container: "border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50/50 dark:border-amber-900/50 dark:from-amber-950/30 dark:to-yellow-950/20",
-      icon: "bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400",
-      value: "text-amber-700 dark:text-amber-300",
-      label: "text-amber-900/70 dark:text-amber-200/70",
+      container: "bg-card border border-border",
+      icon: "bg-amber-100 text-amber-600",
+      value: "text-foreground",
+      label: "text-muted-foreground",
+      urgent: false,
     },
     info: {
-      container: "border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:border-blue-900/50 dark:from-blue-950/30 dark:to-indigo-950/20",
-      icon: "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400",
-      value: "text-blue-700 dark:text-blue-300",
-      label: "text-blue-900/70 dark:text-blue-200/70",
+      container: "bg-card border border-border",
+      icon: "bg-blue-100 text-blue-600",
+      value: "text-foreground",
+      label: "text-muted-foreground",
+      urgent: false,
     },
     success: {
-      container: "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50/50 dark:border-emerald-900/50 dark:from-emerald-950/30 dark:to-teal-950/20",
-      icon: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400",
-      value: "text-emerald-700 dark:text-emerald-300",
-      label: "text-emerald-900/70 dark:text-emerald-200/70",
+      container: "bg-card border border-border",
+      icon: "bg-emerald-100 text-emerald-600",
+      value: "text-foreground",
+      label: "text-muted-foreground",
+      urgent: false,
     },
   };
 
@@ -167,8 +170,8 @@ function ActionCard({
     <Link
       href={href as Route}
       className={cn(
-        "group relative rounded-xl border p-4 transition-all duration-200",
-        "hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
+        "group relative rounded-xl p-4 transition-all duration-200",
+        "hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]",
         styles.container
       )}
     >
@@ -193,7 +196,7 @@ function ActionCard({
 
       {/* Hover indicator */}
       <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-        <ChevronRight className={cn("h-4 w-4", styles.value)} />
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
       </div>
     </Link>
   );

@@ -146,7 +146,7 @@ export function PriorityScheduleList({
   }
 
   return (
-    <section className={cn("animate-in slide-in-from-bottom-2 duration-500", className)}>
+    <section className={cn(className)}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
           <AlertTriangle className="h-3.5 w-3.5" />
@@ -161,7 +161,7 @@ export function PriorityScheduleList({
         </Link>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="divide-y divide-border">
           {sortedSchedules.map((schedule, idx) => (
             <PriorityScheduleRow
@@ -210,11 +210,8 @@ function PriorityScheduleRow({
     <Link
       href={`/org/${slug}/schedules/${schedule.scheduleId}` as Route}
       className={cn(
-        "flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group",
-        "animate-in fade-in slide-in-from-bottom-1 duration-300",
-        isHighPriority && "bg-red-50/50 dark:bg-red-950/10"
+        "flex items-center gap-4 px-4 py-3 transition-colors group"
       )}
-      style={{ animationDelay: `${index * 50}ms` }}
     >
       {/* Priority Indicator */}
       <div className={cn("w-1 h-12 rounded-full flex-shrink-0", statusColor)} />
@@ -280,8 +277,7 @@ function PriorityScheduleRow({
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              getCapacityColor(utilization),
-              utilization < 30 && "animate-pulse"
+              getCapacityColor(utilization)
             )}
             style={{ width: `${Math.max(utilization, 4)}%` }}
           />
@@ -306,24 +302,21 @@ function EmptyState({
   return (
     <div
       className={cn(
-        "rounded-xl border border-emerald-200 dark:border-emerald-900 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/20 p-6 text-center",
+        "rounded-xl border border-border bg-card p-6 text-center",
         className
       )}
     >
       <div className="flex justify-center mb-3">
-        <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-          <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+        <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
+          <CheckCircle2 className="h-6 w-6 text-emerald-600" />
         </div>
       </div>
-      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200 mb-1">
+      <p className="text-sm font-medium text-foreground mb-1">
         {message}
-      </p>
-      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-4">
-        All upcoming tours have healthy booking levels
       </p>
       <Link
         href={`/org/${slug}/calendar` as Route}
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
       >
         View full calendar
         <ArrowRight className="h-3 w-3" />

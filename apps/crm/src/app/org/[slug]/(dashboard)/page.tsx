@@ -228,9 +228,14 @@ export default function DashboardPage() {
 
   // Action cards metrics - actionable items needing attention
   const actionCardsData = useMemo(() => {
-    // Count tours needing guides from upcoming schedules
+    // Count tours needing guides from upcoming schedules (today only)
     const toursNeedingGuides = operationsData?.upcomingSchedules.filter(
       (s) => s.hasUnconfirmedGuide && isToday(new Date(s.startsAt))
+    ).length || 0;
+
+    // Count tours with guides assigned (upcoming tours that are ready)
+    const toursWithGuides = operationsData?.upcomingSchedules.filter(
+      (s) => !s.hasUnconfirmedGuide
     ).length || 0;
 
     // Get pending bookings count from stats
@@ -250,6 +255,7 @@ export default function DashboardPage() {
       },
       toursNeedingGuides,
       unconfirmedBookings,
+      toursWithGuides,
     };
   }, [operationsData, bookingStats, businessData]);
 
@@ -280,7 +286,7 @@ export default function DashboardPage() {
     currentHour < 12 ? "Good morning" : currentHour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-4 md:space-y-6">
       {/* ================================================================
           COMPACT HEADER - Date, Stats, Metrics, Action
           ================================================================ */}
@@ -311,34 +317,34 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Revenue Hero Card */}
+        {/* Revenue Hero Card - shadcn style: white bg, colored border accent */}
         {isLoading ? (
-          <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-white dark:from-emerald-950/30 dark:via-emerald-950/20 dark:to-background p-5 animate-pulse">
+          <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between">
               <div className="space-y-2">
-                <div className="h-3 w-20 bg-emerald-200 dark:bg-emerald-800 rounded" />
-                <div className="h-8 w-28 bg-emerald-200 dark:bg-emerald-800 rounded" />
+                <div className="h-3 w-20 skeleton rounded" />
+                <div className="h-8 w-28 skeleton rounded" />
               </div>
               <div className="text-right space-y-2">
-                <div className="h-3 w-16 bg-emerald-200 dark:bg-emerald-800 rounded ml-auto" />
-                <div className="h-6 w-20 bg-emerald-200 dark:bg-emerald-800 rounded" />
+                <div className="h-3 w-16 skeleton rounded ml-auto" />
+                <div className="h-6 w-20 skeleton rounded" />
               </div>
             </div>
           </div>
         ) : revenueMetrics && (
-          <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-white dark:from-emerald-950/30 dark:via-emerald-950/20 dark:to-background p-5">
+          <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                   Today&apos;s Revenue
                 </p>
-                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums tracking-tight">
+                <p className="text-3xl font-bold text-foreground tabular-nums tracking-tight">
                   {formatCurrency(revenueMetrics.todayRevenue)}
                 </p>
                 {revenueMetrics.todayChange !== 0 && (
                   <p className={cn(
                     "text-sm font-medium mt-1 flex items-center gap-1",
-                    revenueMetrics.todayChange > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
+                    revenueMetrics.todayChange > 0 ? "text-emerald-600" : "text-red-500"
                   )}>
                     {revenueMetrics.todayChange > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                     {revenueMetrics.todayChange > 0 && "+"}{revenueMetrics.todayChange.toFixed(0)}% vs yesterday
@@ -353,7 +359,7 @@ export default function DashboardPage() {
                 {revenueMetrics.weekChange !== 0 && (
                   <p className={cn(
                     "text-xs font-medium mt-0.5",
-                    revenueMetrics.weekChange > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"
+                    revenueMetrics.weekChange > 0 ? "text-emerald-600" : "text-red-500"
                   )}>
                     {revenueMetrics.weekChange > 0 && "+"}{revenueMetrics.weekChange.toFixed(0)}% vs last week
                   </p>
@@ -415,17 +421,16 @@ export default function DashboardPage() {
       </header>
 
       {/* ================================================================
-          ACTION CARDS - Urgency items needing attention
+          ACTION CARDS - Always show status cards
           ================================================================ */}
-      {!isLoading && (actionCardsData.pendingPayments.count > 0 ||
-                       actionCardsData.toursNeedingGuides > 0 ||
-                       actionCardsData.unconfirmedBookings > 0) && (
+      {!isLoading && (
         <ActionCards
           pendingPayments={actionCardsData.pendingPayments}
           toursNeedingGuides={actionCardsData.toursNeedingGuides}
+          toursWithGuides={actionCardsData.toursWithGuides}
           unconfirmedBookings={actionCardsData.unconfirmedBookings}
           orgSlug={slug}
-          className="animate-in slide-in-from-bottom-2 duration-300"
+          className=""
         />
       )}
 
@@ -433,7 +438,7 @@ export default function DashboardPage() {
           LIVE NOW (if any tours are happening)
           ================================================================ */}
       {liveSchedules.length > 0 && (
-        <section className="animate-in slide-in-from-bottom-2 duration-300">
+        <section>
           <div className="flex items-center gap-2 mb-3">
             <div className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -459,7 +464,7 @@ export default function DashboardPage() {
       {/* ================================================================
           TODAY'S SCHEDULE
           ================================================================ */}
-      <section className="animate-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: "100ms" }}>
+      <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
             <MapPin className="h-3.5 w-3.5" />
@@ -489,7 +494,7 @@ export default function DashboardPage() {
         ) : todaySchedules.length === 0 && liveSchedules.length === 0 ? (
           <EmptySchedule slug={slug} />
         ) : (
-          <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm divide-y divide-border">
+          <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
             {todaySchedules.map((schedule, idx) => (
               <ScheduleRow
                 key={schedule.scheduleId}
@@ -601,10 +606,10 @@ function MetricCard({
   return (
     <div
       className={cn(
-        "relative rounded-xl border p-5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 overflow-hidden",
-        variant === "primary" && "border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10",
-        variant === "success" && "border-emerald-200 dark:border-emerald-900 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20",
-        variant === "default" && "border-border bg-card"
+        "relative rounded-xl p-5 transition-all duration-200 hover:-translate-y-0.5 overflow-hidden",
+        variant === "primary" && "card-info",
+        variant === "success" && "card-success",
+        variant === "default" && "card-elevated"
       )}
     >
       <div className="flex items-center justify-between mb-3">
@@ -613,8 +618,8 @@ function MetricCard({
         </span>
         <span className={cn(
           "p-1.5 rounded-lg",
-          variant === "primary" && "bg-primary/10 text-primary",
-          variant === "success" && "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400",
+          variant === "primary" && "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400",
+          variant === "success" && "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400",
           variant === "default" && "bg-muted text-muted-foreground"
         )}>
           {icon}
@@ -661,24 +666,23 @@ function MetricCard({
 
 function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   return (
-    <div className="rounded-lg border-2 border-destructive/30 bg-destructive/5 overflow-hidden animate-in slide-in-from-top-2 duration-300">
-      <div className="px-4 py-2.5 bg-destructive/10 border-b border-destructive/20">
+    <div className="rounded-lg card-danger overflow-hidden">
+      <div className="px-4 py-2.5 bg-red-100 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800/50">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          <span className="text-sm font-semibold text-destructive">
+          <AlertTriangle className="h-4 w-4 text-red-700 dark:text-red-400" />
+          <span className="text-sm font-semibold text-red-700 dark:text-red-300">
             {alerts.length} {alerts.length === 1 ? "issue needs" : "issues need"} attention
           </span>
         </div>
       </div>
-      <div className="divide-y divide-destructive/10">
+      <div className="divide-y divide-red-200/50 dark:divide-red-800/30">
         {alerts.map((alert, idx) => (
           <div
             key={alert.id}
-            className="flex items-center justify-between px-4 py-3 hover:bg-destructive/5 transition-colors animate-in fade-in duration-300"
-            style={{ animationDelay: `${idx * 50}ms` }}
+            className="flex items-center justify-between px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+              <div className="h-2 w-2 rounded-full bg-red-500" />
               <div>
                 <p className="text-sm font-medium text-foreground">{alert.title}</p>
                 <p className="text-xs text-muted-foreground">{alert.subtitle}</p>
@@ -686,7 +690,7 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
             </div>
             <Link
               href={alert.action.href as Route}
-              className="text-xs font-medium text-destructive hover:underline flex items-center gap-0.5 px-3 py-1.5 rounded-md hover:bg-destructive/10 transition-colors"
+              className="text-xs font-medium text-red-700 dark:text-red-400 hover:underline flex items-center gap-0.5 px-3 py-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
             >
               {alert.action.label}
               <ChevronRight className="h-3 w-3" />
@@ -700,15 +704,15 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
 
 function AllClearBanner() {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-gradient-to-r from-emerald-50 to-emerald-50/50 dark:border-emerald-900 dark:from-emerald-950/30 dark:to-emerald-950/10 px-4 py-3 animate-in fade-in duration-500">
+    <div className="flex items-center gap-3 rounded-lg card-success px-4 py-3">
       <div className="flex-shrink-0 h-9 w-9 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-        <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+        <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
       </div>
       <div>
         <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
           All clear
         </p>
-        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+        <p className="text-xs text-emerald-700 dark:text-emerald-400">
           No urgent issues need your attention
         </p>
       </div>
@@ -720,7 +724,7 @@ function EmptySchedule({ slug }: { slug: string }) {
   return (
     <div className="rounded-xl border-2 border-dashed border-border/60 p-10 text-center bg-gradient-to-b from-muted/20 to-muted/40">
       <div className="flex justify-center mb-4">
-        <div className="h-14 w-14 rounded-2xl bg-muted/80 flex items-center justify-center shadow-inner">
+        <div className="h-14 w-14 rounded-2xl bg-muted/80 flex items-center justify-center">
           <Calendar className="h-7 w-7 text-muted-foreground/70" />
         </div>
       </div>
@@ -806,8 +810,7 @@ function ScheduleRow({ schedule, slug, index }: ScheduleRowProps) {
   return (
     <Link
       href={`/org/${slug}/schedules/${schedule.scheduleId}` as Route}
-      className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group animate-in fade-in slide-in-from-bottom-1 duration-300"
-      style={{ animationDelay: `${index * 50}ms` }}
+      className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group"
     >
       <div className="w-16 flex-shrink-0">
         <p
@@ -844,8 +847,8 @@ function ScheduleRow({ schedule, slug, index }: ScheduleRowProps) {
           {schedule.guideName ? (
             <span className="text-xs text-muted-foreground">· {schedule.guideName}</span>
           ) : (
-            <span className="text-xs text-destructive font-medium flex items-center gap-0.5">
-              · <AlertTriangle className="h-3 w-3" /> No guide
+            <span className="text-xs text-destructive font-semibold flex items-center gap-1 bg-destructive/10 px-1.5 py-0.5 rounded-md">
+              <AlertTriangle className="h-3 w-3" /> No guide
             </span>
           )}
         </div>
@@ -885,10 +888,8 @@ function UpcomingRow({ schedule, slug, index }: ScheduleRowProps) {
     <Link
       href={`/org/${slug}/schedules/${schedule.scheduleId}` as Route}
       className={cn(
-        "flex items-center gap-4 px-4 py-2.5 hover:bg-muted/50 transition-colors group animate-in fade-in slide-in-from-bottom-1 duration-300",
-        needsAttention && "bg-amber-50/50 dark:bg-amber-950/20"
+        "flex items-center gap-4 px-4 py-2.5 hover:bg-muted/50 transition-colors group"
       )}
-      style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="w-20 flex-shrink-0">
         <p className="text-xs text-muted-foreground">{dayLabel}</p>
@@ -944,8 +945,7 @@ function ActivityRow({
 
   return (
     <div
-      className="flex items-center gap-3 px-4 py-2.5 animate-in fade-in duration-300"
-      style={{ animationDelay: `${index * 50}ms` }}
+      className="flex items-center gap-3 px-4 py-2.5"
     >
       <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted flex items-center justify-center">
         {icon}

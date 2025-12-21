@@ -139,12 +139,12 @@ export function UrgencyCounter({
   return (
     <div
       className={cn(
-        "rounded-xl border-2 p-5 transition-all animate-in slide-in-from-top-2 duration-300",
+        "rounded-xl border-2 p-5 transition-all",
         isVeryCritical
-          ? "border-red-300 bg-gradient-to-br from-red-50 to-orange-50 dark:border-red-800 dark:from-red-950/40 dark:to-orange-950/30"
+          ? "card-danger border-red-300 dark:border-red-700"
           : isCritical
-            ? "border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 dark:border-amber-800 dark:from-amber-950/40 dark:to-yellow-950/30"
-            : "border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/20",
+            ? "card-warning border-amber-300 dark:border-amber-700"
+            : "card-info border-blue-200 dark:border-blue-700",
         className
       )}
     >
@@ -171,7 +171,7 @@ export function UrgencyCounter({
                     : isCritical
                       ? "text-amber-600 dark:text-amber-400"
                       : "text-blue-600 dark:text-blue-400",
-                  isVeryCritical && "animate-pulse"
+                  isVeryCritical && ""
                 )}
               />
             </div>
@@ -231,8 +231,8 @@ export function UrgencyCounter({
             onClick={onDiscountClick}
             className={cn(
               "inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all",
-              "bg-white dark:bg-black/20 border shadow-sm",
-              "hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]",
+              "bg-white dark:bg-black/20 border",
+              "hover:-translate-y-0.5 active:scale-[0.98]",
               isVeryCritical
                 ? "border-red-200 dark:border-red-800 text-red-700 dark:text-red-300"
                 : isCritical
@@ -252,7 +252,7 @@ export function UrgencyCounter({
                 : isCritical
                   ? "bg-amber-600 hover:bg-amber-700 text-white"
                   : "bg-blue-600 hover:bg-blue-700 text-white",
-              "shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
+              "hover:-translate-y-0.5 active:scale-[0.98]"
             )}
           >
             <Zap className="h-3.5 w-3.5" />

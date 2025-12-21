@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Mail,
@@ -22,6 +22,10 @@ import {
   AlertTriangle,
   CheckCircle,
   Sparkles,
+  Pencil,
+  Check,
+  X,
+  Tag,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -29,6 +33,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -36,6 +41,201 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+
+// Inline editable field component
+function InlineEditField({
+  value,
+  onSave,
+  icon: Icon,
+  placeholder,
+  type = "text",
+  isSaving,
+}: {
+  value: string | null | undefined;
+  onSave: (value: string) => void;
+  icon: typeof Mail;
+  placeholder: string;
+  type?: "text" | "email" | "tel";
+  isSaving: boolean;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value || "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    setEditValue(value || "");
+  }, [value]);
+
+  const handleSave = () => {
+    if (editValue !== value) {
+      onSave(editValue);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(value || "");
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSave();
+    } else if (e.key === "Escape") {
+      handleCancel();
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Input
+          ref={inputRef}
+          type={type}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSave}
+          placeholder={placeholder}
+          className="h-7 text-sm flex-1"
+          disabled={isSaving}
+        />
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={handleCancel}
+          className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between text-sm group">
+      <div className="flex items-center gap-2 text-muted-foreground flex-1 min-w-0">
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{value || <span className="italic">Not set</span>}</span>
+      </div>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => setIsEditing(true)}
+          className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+          title="Edit"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+        {value && (
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(value);
+              toast.success(`${placeholder} copied`);
+            }}
+            className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+            title="Copy"
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Inline tag adder component
+function TagAdder({
+  existingTags,
+  onAddTag,
+}: {
+  existingTags: string[];
+  onAddTag: (tag: string) => void;
+}) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newTag, setNewTag] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isAdding && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isAdding]);
+
+  const handleAdd = () => {
+    const tag = newTag.trim().toLowerCase();
+    if (tag && !existingTags.includes(tag)) {
+      onAddTag(tag);
+      setNewTag("");
+      setIsAdding(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleAdd();
+    } else if (e.key === "Escape") {
+      setNewTag("");
+      setIsAdding(false);
+    }
+  };
+
+  if (isAdding) {
+    return (
+      <div className="inline-flex items-center gap-1">
+        <input
+          ref={inputRef}
+          type="text"
+          value={newTag}
+          onChange={(e) => setNewTag(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => {
+            if (!newTag.trim()) setIsAdding(false);
+          }}
+          placeholder="new tag"
+          className="h-5 w-20 px-2 text-xs rounded border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <button
+          onClick={handleAdd}
+          className="p-0.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+        >
+          <Check className="h-3 w-3" />
+        </button>
+        <button
+          onClick={() => {
+            setNewTag("");
+            setIsAdding(false);
+          }}
+          className="p-0.5 text-muted-foreground hover:bg-muted rounded transition-colors"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setIsAdding(true)}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+    >
+      <Plus className="h-3 w-3" />
+      Add tag
+    </button>
+  );
+}
 
 interface Customer360SheetProps {
   customerId: string;
@@ -103,6 +303,25 @@ export function Customer360Sheet({
       toast.error(error.message);
     },
   });
+
+  // Update customer mutation for inline editing
+  const updateCustomerMutation = trpc.customer.update.useMutation({
+    onSuccess: () => {
+      utils.customer.getByIdWithStats.invalidate({ id: customerId });
+      utils.customer.list.invalidate();
+      toast.success("Customer updated");
+    },
+    onError: (error) => {
+      toast.error(`Failed to update: ${error.message}`);
+    },
+  });
+
+  const handleUpdateField = (field: string, value: string) => {
+    updateCustomerMutation.mutate({
+      id: customerId,
+      data: { [field]: value || null },
+    });
+  };
 
   const isLoading = customerLoading || scoreLoading;
 
@@ -220,32 +439,60 @@ export function Customer360Sheet({
                 )}
               </div>
 
-              {/* Tags */}
-              {customer.tags && customer.tags.length > 0 && (
+              {/* Tags - Editable */}
+              <div className="space-y-2">
                 <div className="flex flex-wrap gap-1">
-                  {customer.tags.map((tag) => (
+                  {(customer.tags || []).map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted text-muted-foreground"
+                      className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs group/tag",
+                        tag === "vip"
+                          ? "bg-amber-500/10 text-amber-600"
+                          : "bg-muted text-muted-foreground"
+                      )}
                     >
                       {tag}
+                      <button
+                        onClick={() => {
+                          const newTags = (customer.tags || []).filter(t => t !== tag);
+                          updateCustomerMutation.mutate({
+                            id: customerId,
+                            data: { tags: newTags },
+                          });
+                        }}
+                        className="opacity-0 group-hover/tag:opacity-100 hover:text-destructive transition-opacity"
+                        title="Remove tag"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     </span>
                   ))}
+                  <TagAdder
+                    existingTags={customer.tags || []}
+                    onAddTag={(tag) => {
+                      const newTags = [...(customer.tags || []), tag];
+                      updateCustomerMutation.mutate({
+                        id: customerId,
+                        data: { tags: newTags },
+                      });
+                    }}
+                  />
                 </div>
-              )}
+              </div>
             </SheetHeader>
 
             {/* Quick Actions */}
             <div className="flex gap-2">
               <Button
                 size="sm"
-                className="flex-1"
+                className="flex-1 gap-1.5"
                 onClick={() => {
                   onOpenChange(false);
                   openQuickBooking({ customerId });
                 }}
               >
-                <Plus className="h-4 w-4 mr-1" />
+                <Plus className="h-4 w-4" />
                 New Booking
               </Button>
               {customer.email && (
@@ -270,42 +517,29 @@ export function Customer360Sheet({
               )}
             </div>
 
-            {/* Contact Info */}
+            {/* Contact Info - Inline Editable */}
             <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-              <h4 className="text-sm font-medium text-foreground">Contact</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-foreground">Contact</h4>
+                <span className="text-[10px] text-muted-foreground">Click to edit</span>
+              </div>
               <div className="space-y-2">
-                {customer.email && (
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span>{customer.email}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2"
-                      onClick={() => handleCopy(customer.email!, "Email")}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-                {customer.phone && (
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{customer.phone}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2"
-                      onClick={() => handleCopy(customer.phone!, "Phone")}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
+                <InlineEditField
+                  value={customer.email}
+                  onSave={(value) => handleUpdateField("email", value)}
+                  icon={Mail}
+                  placeholder="Email"
+                  type="email"
+                  isSaving={updateCustomerMutation.isPending}
+                />
+                <InlineEditField
+                  value={customer.phone}
+                  onSave={(value) => handleUpdateField("phone", value)}
+                  icon={Phone}
+                  placeholder="Phone"
+                  type="tel"
+                  isSaving={updateCustomerMutation.isPending}
+                />
                 {(customer.city || customer.country) && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" />

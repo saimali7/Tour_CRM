@@ -559,14 +559,16 @@ export default function BookingsPage() {
                     />
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <div className="text-sm font-mono font-medium text-foreground">
-                        {booking.referenceNumber}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
+                    <div className="space-y-0.5">
+                      {/* Customer name - primary focus */}
+                      <div className="text-sm font-medium text-foreground">
                         {booking.customer
                           ? `${booking.customer.firstName} ${booking.customer.lastName}`
                           : "Unknown Customer"}
+                      </div>
+                      {/* Reference - de-emphasized */}
+                      <div className="text-[11px] font-mono text-muted-foreground/60 tracking-tight">
+                        {booking.referenceNumber}
                       </div>
                       {booking.customer?.email && (
                         <div className="text-xs text-muted-foreground/70">

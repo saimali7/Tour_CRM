@@ -44,35 +44,31 @@ interface ProactiveInsight {
 
 const typeConfig = {
   warning: {
-    bg: "bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20",
-    border: "border-amber-200 dark:border-amber-800",
+    cardClass: "card-warning",
     icon: AlertTriangle,
-    iconColor: "text-amber-600 dark:text-amber-400",
-    badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
+    iconColor: "text-amber-700 dark:text-amber-400",
+    badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
     label: "Needs Attention",
   },
   opportunity: {
-    bg: "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20",
-    border: "border-blue-200 dark:border-blue-800",
+    cardClass: "card-info",
     icon: Zap,
-    iconColor: "text-blue-600 dark:text-blue-400",
-    badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300",
+    iconColor: "text-blue-700 dark:text-blue-400",
+    badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
     label: "Opportunity",
   },
   success: {
-    bg: "bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/20",
-    border: "border-emerald-200 dark:border-emerald-800",
+    cardClass: "card-success",
     icon: CheckCircle2,
-    iconColor: "text-emerald-600 dark:text-emerald-400",
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+    iconColor: "text-emerald-700 dark:text-emerald-400",
+    badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
     label: "On Track",
   },
   info: {
-    bg: "bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/20",
-    border: "border-slate-200 dark:border-slate-700",
+    cardClass: "card-muted",
     icon: Info,
-    iconColor: "text-slate-600 dark:text-slate-400",
-    badge: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    iconColor: "text-slate-700 dark:text-slate-400",
+    badge: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300",
     label: "Info",
   },
 };
@@ -192,9 +188,8 @@ function AlertGroup({
   return (
     <div
       className={cn(
-        "rounded-xl border overflow-hidden animate-in slide-in-from-top-2 duration-300",
-        config.bg,
-        config.border
+        "rounded-xl overflow-hidden",
+        config.cardClass
       )}
     >
       {/* Header */}
@@ -225,8 +220,7 @@ function AlertItem({ alert, index }: { alert: ProactiveInsight; index: number })
 
   return (
     <div
-      className="px-4 py-3 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors animate-in fade-in duration-300"
-      style={{ animationDelay: `${index * 50}ms` }}
+      className="px-4 py-3 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -272,15 +266,15 @@ function AlertItem({ alert, index }: { alert: ProactiveInsight; index: number })
 
 function AllClearState() {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-emerald-50/50 dark:border-emerald-900 dark:from-emerald-950/30 dark:to-emerald-950/10 px-4 py-4 animate-in fade-in duration-500">
+    <div className="flex items-center gap-3 rounded-xl card-success px-4 py-4">
       <div className="flex-shrink-0 h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-        <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+        <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
       </div>
       <div>
         <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
           All systems operational
         </p>
-        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+        <p className="text-xs text-emerald-700 dark:text-emerald-400">
           No urgent issues or opportunities requiring attention
         </p>
       </div>

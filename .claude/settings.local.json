@@ -116,7 +116,9 @@
       "Bash(pnpm --filter @tour/services exec tsc:*)",
       "mcp__playwright__browser_hover",
       "mcp__playwright__browser_console_messages",
-      "mcp__playwright__browser_install"
+      "mcp__playwright__browser_install",
+      "Bash(pnpm dlx:*)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -3)"
     ]
   }
 }

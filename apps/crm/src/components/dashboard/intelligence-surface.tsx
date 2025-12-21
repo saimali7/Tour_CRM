@@ -55,10 +55,10 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Forecasting Card */}
-        <div className="bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-xl border border-blue-500/10 p-6">
+        <div className="card-info rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-blue-600" />
+              <Target className="h-5 w-5 text-blue-700 dark:text-blue-400" />
               <h3 className="text-sm font-medium text-muted-foreground">
                 Revenue Forecast
               </h3>
@@ -204,9 +204,9 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
                   key={insight.id}
                   className={cn(
                     "p-3 rounded-lg border",
-                    insight.type === "warning" && "bg-orange-500/5 border-orange-500/20",
-                    insight.type === "opportunity" && "bg-blue-500/5 border-blue-500/20",
-                    insight.type === "success" && "bg-emerald-500/5 border-emerald-500/20",
+                    insight.type === "warning" && "bg-warning-subtle border-warning-subtle",
+                    insight.type === "opportunity" && "bg-info-subtle border-info-subtle",
+                    insight.type === "success" && "bg-success-subtle border-success-subtle",
                     insight.type === "info" && "bg-muted border-border"
                   )}
                 >
@@ -215,20 +215,20 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
                       <div
                         className={cn(
                           "p-1.5 rounded-md",
-                          insight.type === "warning" && "bg-orange-500/10",
-                          insight.type === "opportunity" && "bg-blue-500/10",
-                          insight.type === "success" && "bg-emerald-500/10",
+                          insight.type === "warning" && "bg-amber-100 dark:bg-amber-900/40",
+                          insight.type === "opportunity" && "bg-blue-100 dark:bg-blue-900/40",
+                          insight.type === "success" && "bg-emerald-100 dark:bg-emerald-900/40",
                           insight.type === "info" && "bg-muted"
                         )}
                       >
                         {insight.type === "warning" && (
-                          <AlertTriangle className="h-4 w-4 text-orange-600" />
+                          <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
                         )}
                         {insight.type === "opportunity" && (
-                          <Lightbulb className="h-4 w-4 text-blue-600" />
+                          <Lightbulb className="h-4 w-4 text-blue-700 dark:text-blue-400" />
                         )}
                         {insight.type === "success" && (
-                          <CheckCircle className="h-4 w-4 text-emerald-600" />
+                          <CheckCircle className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
                         )}
                         {insight.type === "info" && (
                           <Target className="h-4 w-4 text-muted-foreground" />

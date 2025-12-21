@@ -420,10 +420,10 @@ export default function AnalyticsPage() {
               <p className="text-2xl font-bold mt-1">
                 {segmentDistribution
                   ? (() => {
-                      const total = Object.values(segmentDistribution).reduce((sum, val) => sum + val, 0);
-                      const repeatCustomers = (segmentDistribution.vip || 0) + (segmentDistribution.loyal || 0);
-                      return `${((repeatCustomers / Math.max(1, total)) * 100).toFixed(1)}%`;
-                    })()
+                    const total = Object.values(segmentDistribution).reduce((sum, val) => sum + val, 0);
+                    const repeatCustomers = (segmentDistribution.vip || 0) + (segmentDistribution.loyal || 0);
+                    return `${((repeatCustomers / Math.max(1, total)) * 100).toFixed(1)}%`;
+                  })()
                   : "0%"}
               </p>
             </div>
@@ -687,23 +687,23 @@ function StatCard({ label, value, icon: Icon, trend, change, sparklineData, prim
     <div className={cn(
       "rounded-lg border p-4 transition-all",
       primary
-        ? "border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-white dark:from-emerald-950/30 dark:via-emerald-950/20 dark:to-background shadow-sm"
+        ? "bg-card border-border"
         : "bg-card border-border"
     )}>
       <div className="flex items-center justify-between">
         <p className={cn(
           "text-sm",
-          primary ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
+          primary ? "font-semibold text-emerald-600" : "text-muted-foreground"
         )}>{label}</p>
         <Icon className={cn(
           "h-4 w-4",
-          primary ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+          primary ? "text-emerald-600" : "text-muted-foreground"
         )} />
       </div>
       <div className="flex items-end justify-between mt-1">
         <p className={cn(
-          "font-bold tabular-nums",
-          primary ? "text-3xl text-emerald-700 dark:text-emerald-300" : "text-2xl"
+          "font-bold tabular-nums text-foreground",
+          primary ? "text-3xl" : "text-2xl"
         )}>{value}</p>
         {sparklineData && sparklineData.length > 1 && (
           <Sparkline data={sparklineData} trend={trend} />

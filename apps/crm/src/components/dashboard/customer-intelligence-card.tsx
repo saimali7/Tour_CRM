@@ -91,10 +91,10 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
   let cumulativeOffset = 0;
 
   return (
-    <div className="bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-orange-500/5 rounded-xl border border-purple-500/10 p-6">
+    <div className="card-opportunity rounded-xl p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-purple-600" />
+          <Sparkles className="h-5 w-5 text-purple-700 dark:text-purple-400" />
           <h3 className="text-lg font-semibold text-foreground">Customer Intelligence</h3>
         </div>
         <Button
@@ -285,7 +285,7 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
 
           {reengagementCandidates && reengagementCandidates.length > 0 ? (
             <div className="space-y-3">
-              <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+              <div className="p-3 rounded-lg bg-info-subtle border border-info-subtle">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-2xl font-bold text-foreground">
@@ -295,8 +295,8 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
                       customers need attention
                     </p>
                   </div>
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <UserCheck className="h-5 w-5 text-blue-600" />
+                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/40">
+                    <UserCheck className="h-5 w-5 text-blue-700 dark:text-blue-400" />
                   </div>
                 </div>
               </div>

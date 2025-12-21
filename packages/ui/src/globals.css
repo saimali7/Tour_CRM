@@ -227,6 +227,8 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Focus visible - consistent focus ring */
@@ -239,6 +241,81 @@ body {
 ::selection {
   background-color: hsl(var(--primary) / 0.2);
   color: hsl(var(--primary));
+}
+
+/* =============================================================================
+   LIGHT MODE ENHANCEMENTS
+   Refined shadows, subtle depth, and polish for light mode
+   =============================================================================*/
+
+/* Cards get refined shadows in light mode */
+:root .card,
+:root [class*="rounded-lg"][class*="border"][class*="bg-card"] {
+  box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.03),
+              0 1px 3px 0 hsl(0 0% 0% / 0.05);
+}
+
+/* Elevated cards (hover, focus) */
+:root .card:hover,
+:root [class*="rounded-lg"][class*="border"][class*="bg-card"]:hover {
+  box-shadow: 0 4px 6px -1px hsl(0 0% 0% / 0.07),
+              0 2px 4px -1px hsl(0 0% 0% / 0.04);
+}
+
+/* Light mode: Reset gradient backgrounds from dark: media query variants
+   This ensures cards with dark:bg-gradient-* show clean white in light mode */
+:root:not(.dark) [class*="dark:bg-gradient"] {
+  background-image: none !important;
+}
+
+/* Input fields - subtle inset feel for light mode */
+:root input:not([type="checkbox"]):not([type="radio"]),
+:root textarea,
+:root select {
+  box-shadow: inset 0 1px 2px hsl(0 0% 0% / 0.04);
+}
+
+/* Light mode scrollbars - subtle */
+:root:not(.dark) ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:root:not(.dark) ::-webkit-scrollbar-track {
+  background: hsl(220 14% 96%);
+}
+
+:root:not(.dark) ::-webkit-scrollbar-thumb {
+  background: hsl(220 13% 80%);
+  border-radius: 4px;
+}
+
+:root:not(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: hsl(220 13% 70%);
+}
+
+/* Button depth in light mode */
+:root button[class*="bg-primary"] {
+  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.1),
+              inset 0 1px 0 hsl(0 0% 100% / 0.15);
+}
+
+:root button[class*="bg-primary"]:hover {
+  box-shadow: 0 2px 4px hsl(0 0% 0% / 0.12),
+              inset 0 1px 0 hsl(0 0% 100% / 0.2);
+}
+
+:root button[class*="bg-primary"]:active {
+  box-shadow: inset 0 1px 2px hsl(0 0% 0% / 0.15);
+}
+
+/* Tables - refined row styling */
+:root table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+:root table tbody tr:hover {
+  background-color: hsl(220 14% 98%);
 }
 
 /* =============================================================================
@@ -328,15 +405,17 @@ body {
   border-color: hsl(220 13% 80%);
 }
 
-/* Payment Status Colors */
+/* Payment Status Colors - Enhanced differentiation */
 .payment-pending {
-  background-color: hsl(38 92% 95%);
-  color: hsl(38 92% 30%);
+  background-color: hsl(45 93% 94%);      /* yellow-gold tint */
+  color: hsl(45 90% 28%);
+  border: 1px solid hsl(45 80% 75%);
 }
 
 .payment-partial {
-  background-color: hsl(24 95% 95%);      /* orange-50 */
-  color: hsl(24 95% 30%);
+  background-color: hsl(280 60% 95%);     /* purple tint - clearly distinct */
+  color: hsl(280 70% 35%);
+  border: 1px solid hsl(280 50% 80%);
 }
 
 .payment-paid {
@@ -391,15 +470,17 @@ body {
   border-color: hsl(0 0% 22%);
 }
 
-/* Dark mode payment status */
+/* Dark mode payment status - Enhanced differentiation */
 .dark .payment-pending {
-  background-color: hsl(38 50% 12%);
-  color: hsl(38 70% 65%);
+  background-color: hsl(45 50% 12%);
+  color: hsl(45 70% 70%);
+  border: 1px solid hsl(45 40% 25%);
 }
 
 .dark .payment-partial {
-  background-color: hsl(24 55% 13%);
-  color: hsl(24 70% 60%);
+  background-color: hsl(280 40% 14%);     /* purple tint - clearly distinct */
+  color: hsl(280 55% 70%);
+  border: 1px solid hsl(280 35% 30%);
 }
 
 .dark .payment-paid {
@@ -822,6 +903,122 @@ body {
 }
 
 /* =============================================================================
+   MICRO-INTERACTIONS
+   Subtle animations for enhanced UX feedback
+   =============================================================================*/
+
+/* Card hover lift effect */
+.hover-lift {
+  transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -4px hsl(0 0% 0% / 0.1),
+              0 4px 6px -2px hsl(0 0% 0% / 0.05);
+}
+
+.dark .hover-lift:hover {
+  box-shadow: 0 8px 16px -4px hsl(0 0% 0% / 0.4),
+              0 4px 6px -2px hsl(0 0% 0% / 0.2);
+}
+
+.hover-lift:active {
+  transform: translateY(0);
+}
+
+/* Button press effect */
+.press-effect {
+  transition: transform 100ms var(--ease-out);
+}
+
+.press-effect:active {
+  transform: scale(0.97);
+}
+
+/* Glow on hover for important elements */
+.hover-glow {
+  transition: box-shadow 200ms var(--ease-out);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+
+/* Icon rotation on hover */
+.icon-rotate {
+  transition: transform 200ms var(--ease-out);
+}
+
+.icon-rotate:hover svg,
+.group:hover .icon-rotate svg {
+  transform: rotate(90deg);
+}
+
+/* Arrow slide on hover */
+.arrow-slide {
+  transition: transform 150ms var(--ease-out);
+}
+
+.group:hover .arrow-slide {
+  transform: translateX(4px);
+}
+
+/* Subtle bounce for attention */
+@keyframes subtle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.animate-subtle-bounce {
+  animation: subtle-bounce 1s ease-in-out infinite;
+}
+
+/* Attention pulse */
+@keyframes attention-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+.animate-attention {
+  animation: attention-pulse 2s ease-in-out infinite;
+}
+
+/* Stagger animation delays for lists */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+
+/* Smooth reveal on scroll/load */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-reveal-up {
+  animation: reveal-up 300ms var(--ease-out) forwards;
+}
+
+/* Number counter effect - for stats */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* =============================================================================
    DATA TABLE UTILITIES
    Enhanced table styles for data-dense views
    =============================================================================*/
@@ -1171,6 +1368,151 @@ body.modal-open {
   border-radius: 9999px;
   margin: 0.75rem auto;
 }
+
+/* =============================================================================
+   PREMIUM CARD VARIANTS - shadcn/ui Light Mode Style
+   Clean, subtle backgrounds in light mode - colored accents in borders/text
+   =============================================================================*/
+
+/* Base card styles for light mode - clean white with subtle shadows */
+:root .card-elevated {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(220 13% 91%);
+  box-shadow:
+    0 1px 2px 0 hsl(0 0% 0% / 0.03),
+    0 1px 3px 0 hsl(0 0% 0% / 0.05);
+}
+
+:root .card-elevated:hover {
+  box-shadow:
+    0 4px 6px -1px hsl(0 0% 0% / 0.07),
+    0 2px 4px -1px hsl(0 0% 0% / 0.04);
+}
+
+/* Semantic Card Variants - Light Mode */
+/* shadcn style: Nearly white backgrounds, subtle borders, colored accents via text/icons */
+
+/* Success/Revenue Cards - Very subtle green tint */
+:root .card-success {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(220 13% 91%);
+  box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+}
+
+/* Warning Cards - Very subtle amber tint */
+:root .card-warning {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(220 13% 91%);
+  box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+}
+
+/* Danger Cards - Very subtle red tint */
+:root .card-danger {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(220 13% 91%);
+  box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+}
+
+/* Info/Primary Cards - Very subtle blue tint */
+:root .card-info {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(220 13% 91%);
+  box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+}
+
+/* Opportunity Cards - Very subtle purple tint */
+:root .card-opportunity {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(220 13% 91%);
+  box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+}
+
+/* Neutral/Muted Cards - Light gray */
+:root .card-muted {
+  background: hsl(220 14% 98%);
+  border: 1px solid hsl(220 13% 91%);
+}
+
+/* Hero/Featured Cards - Clean white with depth */
+:root .card-hero {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(220 13% 91%);
+  box-shadow:
+    0 1px 3px 0 hsl(0 0% 0% / 0.05),
+    0 2px 4px -1px hsl(0 0% 0% / 0.03);
+}
+
+/* Dark Mode Card Variants - Keep existing dark gradients */
+.dark .card-elevated {
+  background: hsl(0 0% 5.5%);
+  border: 1px solid hsl(0 0% 14%);
+  box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.03);
+}
+
+.dark .card-success {
+  background: linear-gradient(135deg, hsl(160 45% 8%) 0%, hsl(158 40% 6%) 100%);
+  border: 1px solid hsl(160 35% 18%);
+}
+
+.dark .card-warning {
+  background: linear-gradient(135deg, hsl(38 50% 8%) 0%, hsl(45 45% 6%) 100%);
+  border: 1px solid hsl(38 40% 18%);
+}
+
+.dark .card-danger {
+  background: linear-gradient(135deg, hsl(0 45% 10%) 0%, hsl(0 40% 7%) 100%);
+  border: 1px solid hsl(0 35% 20%);
+}
+
+.dark .card-info {
+  background: linear-gradient(135deg, hsl(217 50% 10%) 0%, hsl(230 45% 8%) 100%);
+  border: 1px solid hsl(217 40% 20%);
+}
+
+.dark .card-opportunity {
+  background: linear-gradient(135deg, hsl(230 50% 10%) 0%, hsl(245 45% 8%) 100%);
+  border: 1px solid hsl(238 40% 20%);
+}
+
+.dark .card-muted {
+  background: linear-gradient(135deg, hsl(0 0% 7%) 0%, hsl(0 0% 5%) 100%);
+  border: 1px solid hsl(0 0% 14%);
+}
+
+.dark .card-hero {
+  background: linear-gradient(145deg, hsl(0 0% 7%) 0%, hsl(0 0% 5%) 100%);
+  border: 1px solid hsl(0 0% 16%);
+  box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.03);
+}
+
+/* Inline semantic backgrounds - for use with Tailwind classes */
+/* Light mode: Very subtle tinted backgrounds (shadcn style) */
+:root .bg-success-subtle { background: hsl(158 30% 97%); }
+:root .bg-warning-subtle { background: hsl(48 40% 97%); }
+:root .bg-danger-subtle { background: hsl(0 35% 97%); }
+:root .bg-info-subtle { background: hsl(214 40% 97%); }
+:root .bg-opportunity-subtle { background: hsl(250 35% 97%); }
+
+/* Light mode borders - subtle gray */
+:root .border-success-subtle { border-color: hsl(220 13% 91%); }
+:root .border-warning-subtle { border-color: hsl(220 13% 91%); }
+:root .border-danger-subtle { border-color: hsl(220 13% 91%); }
+:root .border-info-subtle { border-color: hsl(220 13% 91%); }
+:root .border-opportunity-subtle { border-color: hsl(220 13% 91%); }
+
+/* Dark mode: muted backgrounds */
+.dark .bg-success-subtle { background: hsl(160 45% 8%); }
+.dark .bg-warning-subtle { background: hsl(38 50% 8%); }
+.dark .bg-danger-subtle { background: hsl(0 45% 10%); }
+.dark .bg-info-subtle { background: hsl(217 50% 10%); }
+.dark .bg-opportunity-subtle { background: hsl(230 50% 10%); }
+
+/* Dark mode borders */
+.dark .border-success-subtle { border-color: hsl(160 35% 18%); }
+.dark .border-warning-subtle { border-color: hsl(38 40% 18%); }
+.dark .border-danger-subtle { border-color: hsl(0 35% 20%); }
+.dark .border-info-subtle { border-color: hsl(217 40% 20%); }
+.dark .border-opportunity-subtle { border-color: hsl(238 40% 20%); }
 
 /* =============================================================================
    PRINT STYLES

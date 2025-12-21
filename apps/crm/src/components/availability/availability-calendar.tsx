@@ -352,48 +352,61 @@ function MonthView({
             <button
               onClick={() => onSelectDate(date)}
               className={cn(
-                "w-full min-h-[100px] p-2 border-b border-r border-border text-left transition-colors hover:bg-muted/50",
-                !isCurrentMonth && "bg-muted/20",
-                isWeekend && isCurrentMonth && "bg-muted/10",
-                isToday && "ring-2 ring-inset ring-primary"
+                "group/cell w-full min-h-[100px] p-2 border-b border-r border-border text-left",
+                "transition-all duration-150 ease-out",
+                "hover:bg-accent/60 hover:shadow-sm hover:z-10 hover:scale-[1.01]",
+                "active:scale-[0.99] active:shadow-none",
+                !isCurrentMonth && "bg-muted/20 hover:bg-muted/40",
+                isWeekend && isCurrentMonth && "bg-muted/5",
+                isToday && "ring-2 ring-inset ring-primary bg-primary/5"
               )}
             >
               {/* Date number */}
               <div className={cn(
-                "text-sm font-medium mb-1",
-                isCurrentMonth ? "text-foreground" : "text-muted-foreground",
-                isToday && "text-primary"
+                "text-sm font-semibold mb-1.5 transition-colors",
+                isCurrentMonth ? "text-foreground" : "text-muted-foreground/60",
+                isToday && "text-primary",
+                "group-hover/cell:text-primary"
               )}>
                 {date.getDate()}
               </div>
 
               {/* Day summary */}
               {hasSchedules && (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {/* Tour count badge */}
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <span className={cn(
-                      "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium",
-                      stats.utilization >= 80 ? "bg-success/20 text-success" : "bg-primary/10 text-primary"
+                      "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold",
+                      "transition-all duration-150",
+                      stats.utilization >= 80
+                        ? "bg-success/15 text-success ring-1 ring-success/20"
+                        : "bg-primary/10 text-primary ring-1 ring-primary/10"
                     )}>
                       {stats.count} tour{stats.count !== 1 ? "s" : ""}
                     </span>
                     {stats.needsGuide > 0 && (
-                      <AlertCircle className="h-3 w-3 text-warning" />
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-warning/15 text-warning ring-1 ring-warning/30 animate-pulse">
+                        <AlertCircle className="h-3 w-3" />
+                        <span className="text-[10px] font-bold">{stats.needsGuide}</span>
+                      </span>
                     )}
                   </div>
 
-                  {/* Capacity bar */}
-                  <div className="space-y-0.5">
-                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  {/* Capacity bar - enhanced */}
+                  <div className="space-y-1">
+                    <div className="w-full h-2 bg-muted/80 rounded-full overflow-hidden shadow-inner">
                       <div
-                        className={cn("h-full rounded-full", getCapacityColor(stats.totalBooked, stats.totalCapacity))}
+                        className={cn(
+                          "h-full rounded-full transition-all duration-300 ease-out",
+                          getCapacityColor(stats.totalBooked, stats.totalCapacity)
+                        )}
                         style={{ width: `${Math.min(100, stats.utilization)}%` }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground">{stats.totalBooked}/{stats.totalCapacity}</span>
-                      <span className={getCapacityTextColor(stats.totalBooked, stats.totalCapacity)}>
+                    <div className="flex items-center justify-between text-[10px] font-medium">
+                      <span className="text-muted-foreground tabular-nums">{stats.totalBooked}/{stats.totalCapacity}</span>
+                      <span className={cn("tabular-nums", getCapacityTextColor(stats.totalBooked, stats.totalCapacity))}>
                         {stats.spotsLeft} left
                       </span>
                     </div>
@@ -413,72 +426,82 @@ function MonthView({
                 <HoverCardContent
                   side="right"
                   align="start"
-                  className="w-72 p-0"
-                  sideOffset={8}
+                  className="w-80 p-0 shadow-xl border-border/80 animate-in fade-in-0 zoom-in-95 duration-200"
+                  sideOffset={12}
                 >
                   {/* Header */}
-                  <div className="px-3 py-2.5 border-b border-border bg-muted/30">
+                  <div className="px-4 py-3 border-b border-border bg-gradient-to-b from-muted/50 to-transparent">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-foreground">
-                        {new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" }).format(date)}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-muted-foreground">
-                          {stats.totalBooked}/{stats.totalCapacity} booked
+                      <div>
+                        <span className="text-sm font-bold text-foreground">
+                          {new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date)}
+                        </span>
+                        <span className="text-sm text-muted-foreground ml-1">
+                          {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10">
+                        <Users className="h-3 w-3 text-primary" />
+                        <span className="text-xs font-semibold text-primary tabular-nums">
+                          {stats.totalBooked}/{stats.totalCapacity}
                         </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Tour list */}
-                  <div className="divide-y divide-border max-h-[240px] overflow-y-auto">
-                    {daySchedules.slice(0, 5).map((schedule) => {
+                  <div className="divide-y divide-border/50 max-h-[280px] overflow-y-auto">
+                    {daySchedules.slice(0, 5).map((schedule, idx) => {
                       const booked = schedule.bookedCount ?? 0;
                       const max = schedule.maxParticipants;
                       const remaining = max - booked;
 
                       return (
-                        <div key={schedule.id} className="px-3 py-2.5 hover:bg-muted/50 transition-colors">
-                          <div className="flex items-start justify-between gap-2">
+                        <div
+                          key={schedule.id}
+                          className="px-4 py-3 hover:bg-accent/50 transition-colors cursor-pointer"
+                          style={{ animationDelay: `${idx * 50}ms` }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
-                              {/* Time */}
-                              <div className="text-xs font-semibold text-primary">
-                                {formatTime(schedule.startsAt)}
+                              {/* Time badge */}
+                              <div className="inline-flex items-center px-2 py-0.5 rounded bg-primary/10 text-primary">
+                                <Clock className="h-3 w-3 mr-1" />
+                                <span className="text-xs font-bold tabular-nums">
+                                  {formatTime(schedule.startsAt)}
+                                </span>
                               </div>
                               {/* Tour name */}
-                              <div className="text-sm font-medium text-foreground truncate mt-0.5">
+                              <div className="text-sm font-semibold text-foreground truncate mt-1.5">
                                 {schedule.tour?.name ?? "Unknown Tour"}
                               </div>
                               {/* Guide */}
-                              <div className="flex items-center gap-1 mt-1">
+                              <div className="flex items-center gap-1.5 mt-1.5">
                                 {schedule.guide ? (
-                                  <>
-                                    <User className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground truncate">
+                                  <div className="flex items-center gap-1 text-muted-foreground">
+                                    <User className="h-3 w-3" />
+                                    <span className="text-xs truncate">
                                       {schedule.guide.firstName} {schedule.guide.lastName}
                                     </span>
-                                  </>
+                                  </div>
                                 ) : (
-                                  <>
-                                    <AlertCircle className="h-3 w-3 text-warning" />
-                                    <span className="text-xs text-warning">No guide</span>
-                                  </>
+                                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-warning/15 text-warning">
+                                    <AlertCircle className="h-3 w-3" />
+                                    <span className="text-xs font-semibold">Needs guide</span>
+                                  </div>
                                 )}
                               </div>
                             </div>
                             {/* Capacity */}
-                            <div className="flex flex-col items-end">
-                              <div className="flex items-center gap-1">
-                                <Users className="h-3 w-3 text-muted-foreground" />
-                                <span className={cn(
-                                  "text-xs font-medium",
-                                  remaining === 0 ? "text-destructive" : remaining <= 3 ? "text-warning" : "text-success"
-                                )}>
-                                  {remaining} left
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-muted-foreground">
-                                {booked}/{max}
+                            <div className="flex flex-col items-end gap-1">
+                              <span className={cn(
+                                "text-sm font-bold tabular-nums",
+                                remaining === 0 ? "text-destructive" : remaining <= 3 ? "text-warning" : "text-success"
+                              )}>
+                                {remaining}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-medium">
+                                of {max} left
                               </span>
                             </div>
                           </div>
@@ -486,20 +509,20 @@ function MonthView({
                       );
                     })}
                     {daySchedules.length > 5 && (
-                      <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+                      <div className="px-4 py-2.5 text-xs text-muted-foreground text-center bg-muted/30">
                         +{daySchedules.length - 5} more tour{daySchedules.length - 5 !== 1 ? "s" : ""}
                       </div>
                     )}
                   </div>
 
                   {/* Footer */}
-                  <div className="px-3 py-2 border-t border-border bg-muted/30">
+                  <div className="px-4 py-2.5 border-t border-border bg-gradient-to-t from-muted/50 to-transparent">
                     <button
                       onClick={() => onSelectDate(date)}
-                      className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 py-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-all hover:gap-3"
                     >
                       View full day
-                      <ArrowRight className="h-3 w-3" />
+                      <ArrowRight className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </HoverCardContent>
@@ -611,7 +634,7 @@ function WeekView({
                     No tours
                   </div>
                 ) : (
-                  schedules.map((schedule) => {
+                  schedules.map((schedule, idx) => {
                     const booked = schedule.bookedCount ?? 0;
                     const max = schedule.maxParticipants;
                     const remaining = max - booked;
@@ -622,45 +645,53 @@ function WeekView({
                         key={schedule.id}
                         href={`/org/${orgSlug}/schedules/${schedule.id}` as Route}
                         className={cn(
-                          "block rounded-lg p-2 text-xs transition-all hover:ring-1 hover:ring-primary/50",
-                          percent >= 100 ? "bg-destructive/10" : percent >= 80 ? "bg-warning/10" : "bg-muted/50"
+                          "group/card block rounded-lg p-2.5 text-xs",
+                          "transition-all duration-150 ease-out",
+                          "hover:ring-2 hover:ring-primary/40 hover:shadow-md hover:-translate-y-0.5",
+                          "active:translate-y-0 active:shadow-sm",
+                          percent >= 100
+                            ? "bg-destructive/10 ring-1 ring-destructive/20"
+                            : percent >= 80
+                            ? "bg-warning/10 ring-1 ring-warning/20"
+                            : "bg-muted/50 ring-1 ring-border/50"
                         )}
+                        style={{ animationDelay: `${idx * 50}ms` }}
                       >
                         {/* Time */}
-                        <div className="font-semibold text-foreground">
+                        <div className="font-bold text-foreground tabular-nums">
                           {formatTime(schedule.startsAt)}
                         </div>
                         {/* Tour name */}
-                        <div className="text-muted-foreground truncate mt-0.5" title={schedule.tour?.name ?? "Unknown"}>
+                        <div className="text-muted-foreground truncate mt-0.5 font-medium group-hover/card:text-foreground transition-colors" title={schedule.tour?.name ?? "Unknown"}>
                           {schedule.tour?.name ?? "Unknown"}
                         </div>
                         {/* Guide */}
                         {schedule.guide ? (
-                          <div className="flex items-center gap-1 mt-1 text-muted-foreground">
+                          <div className="flex items-center gap-1 mt-1.5 text-muted-foreground">
                             <User className="h-3 w-3" />
                             <span className="truncate">{schedule.guide.firstName}</span>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1 mt-1 text-warning">
+                          <div className="flex items-center gap-1 mt-1.5 text-warning bg-warning/15 px-1.5 py-0.5 rounded-md ring-1 ring-warning/30 animate-pulse">
                             <AlertCircle className="h-3 w-3" />
-                            <span>No guide</span>
+                            <span className="font-semibold">No guide</span>
                           </div>
                         )}
                         {/* Capacity */}
-                        <div className="flex items-center gap-1.5 mt-1.5">
+                        <div className="flex items-center gap-1.5 mt-2">
                           <Users className="h-3 w-3 text-muted-foreground" />
                           <span className={cn(
-                            "font-medium",
+                            "font-bold tabular-nums",
                             remaining === 0 ? "text-destructive" : remaining <= 3 ? "text-warning" : "text-success"
                           )}>
                             {remaining}
                           </span>
-                          <span className="text-muted-foreground">/ {max}</span>
+                          <span className="text-muted-foreground/70 text-[10px]">of {max}</span>
                         </div>
                         {/* Capacity bar */}
-                        <div className="w-full h-1 bg-muted rounded-full mt-1 overflow-hidden">
+                        <div className="w-full h-1.5 bg-muted/80 rounded-full mt-1.5 overflow-hidden shadow-inner">
                           <div
-                            className={cn("h-full rounded-full", getCapacityColor(booked, max))}
+                            className={cn("h-full rounded-full transition-all duration-300", getCapacityColor(booked, max))}
                             style={{ width: `${Math.min(100, percent)}%` }}
                           />
                         </div>

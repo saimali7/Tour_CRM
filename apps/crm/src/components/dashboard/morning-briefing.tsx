@@ -201,10 +201,10 @@ ${todaySchedules?.map((s) => `- ${format(new Date(s.startsAt), "h:mm a")} - ${s.
   // Don't show if no schedules today
   if (!todaySchedules || todaySchedules.length === 0) {
     return (
-      <div className="bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-xl border border-blue-500/10 p-6">
+      <div className="card-info rounded-xl p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-blue-500/10 rounded-lg">
-            <Sun className="h-5 w-5 text-blue-600" />
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+            <Sun className="h-5 w-5 text-blue-700 dark:text-blue-400" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -220,15 +220,15 @@ ${todaySchedules?.map((s) => `- ${format(new Date(s.startsAt), "h:mm a")} - ${s.
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-xl border border-blue-500/10 overflow-hidden">
+    <div className="card-info rounded-xl overflow-hidden">
       {/* Header */}
       <div
         className="p-6 cursor-pointer flex items-center justify-between"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/10 rounded-lg">
-            <Sun className="h-5 w-5 text-blue-600" />
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+            <Sun className="h-5 w-5 text-blue-700 dark:text-blue-400" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -281,9 +281,9 @@ ${todaySchedules?.map((s) => `- ${format(new Date(s.startsAt), "h:mm a")} - ${s.
                     key={index}
                     className={cn(
                       "flex items-center justify-between p-3 rounded-lg border",
-                      alert.type === "error" && "bg-red-500/5 border-red-500/20",
-                      alert.type === "warning" && "bg-orange-500/5 border-orange-500/20",
-                      alert.type === "info" && "bg-blue-500/5 border-blue-500/20"
+                      alert.type === "error" && "bg-danger-subtle border-danger-subtle",
+                      alert.type === "warning" && "bg-warning-subtle border-warning-subtle",
+                      alert.type === "info" && "bg-info-subtle border-info-subtle"
                     )}
                   >
                     <div className="flex items-center gap-2">

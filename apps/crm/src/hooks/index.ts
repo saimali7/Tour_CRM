@@ -1,5 +1,6 @@
 export { useDebounce } from "./use-debounce";
 export { useLocalStorage, clearLocalStorage } from "./use-local-storage";
+export { useKeyboardNavigation, useHotkeys } from "./use-keyboard-navigation";
 
 // Responsive/Media Query hooks
 export {
