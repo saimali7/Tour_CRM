@@ -404,6 +404,9 @@ export function Customer360Sheet({
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
         {isLoading ? (
           <div className="space-y-6 animate-pulse">
+            <SheetHeader>
+              <SheetTitle className="sr-only">Loading customer details</SheetTitle>
+            </SheetHeader>
             <div className="h-8 bg-muted rounded w-48" />
             <div className="h-4 bg-muted rounded w-32" />
             <div className="h-24 bg-muted rounded" />
@@ -582,8 +585,8 @@ export function Customer360Sheet({
                 <p className="text-xl font-bold text-foreground">
                   ${customer.totalBookings && customer.totalBookings > 0
                     ? (
-                        parseFloat(customer.totalSpent || "0") / customer.totalBookings
-                      ).toFixed(0)
+                      parseFloat(customer.totalSpent || "0") / customer.totalBookings
+                    ).toFixed(0)
                     : 0}
                 </p>
                 <p className="text-xs text-muted-foreground">Avg Order</p>
@@ -697,6 +700,9 @@ export function Customer360Sheet({
           </div>
         ) : (
           <div className="text-center py-12 text-muted-foreground">
+            <SheetHeader>
+              <SheetTitle className="sr-only">Customer not found</SheetTitle>
+            </SheetHeader>
             Customer not found
           </div>
         )}

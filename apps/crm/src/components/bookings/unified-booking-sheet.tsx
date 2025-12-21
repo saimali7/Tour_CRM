@@ -218,6 +218,25 @@ export function UnifiedBookingSheet({
     { enabled: open }
   );
 
+  // Fetch preselected customer by ID when opening from customer context
+  const { data: preselectedCustomerData } = trpc.customer.getById.useQuery(
+    { id: preselectedCustomerId! },
+    { enabled: open && !!preselectedCustomerId }
+  );
+
+  // Auto-select preselected customer when data arrives
+  useEffect(() => {
+    if (preselectedCustomerData && preselectedCustomerId && open) {
+      setSelectedCustomer({
+        id: preselectedCustomerData.id,
+        firstName: preselectedCustomerData.firstName,
+        lastName: preselectedCustomerData.lastName,
+        email: preselectedCustomerData.email || "",
+        phone: preselectedCustomerData.phone || "",
+      });
+    }
+  }, [preselectedCustomerData, preselectedCustomerId, open]);
+
   const { data: schedulesData, isLoading: schedulesLoading, isFetching: schedulesFetching } = trpc.schedule.list.useQuery(
     {
       filters: {
@@ -792,7 +811,7 @@ export function UnifiedBookingSheet({
                         className={cn(
                           "w-full pl-10 pr-3 py-2.5 border rounded-lg bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all",
                           touched.email && errors.email ? "border-destructive" :
-                          (touched.contact && errors.contact && !hasValidContact) ? "border-destructive" : "border-input"
+                            (touched.contact && errors.contact && !hasValidContact) ? "border-destructive" : "border-input"
                         )}
                       />
                     </div>
@@ -995,8 +1014,8 @@ export function UnifiedBookingSheet({
                             isFull
                               ? "border-border bg-muted/50 opacity-50 cursor-not-allowed"
                               : isSelected
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-primary/50"
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/50"
                           )}
                         >
                           <p className={cn("font-semibold", isSelected ? "text-primary" : "text-foreground")}>
@@ -1013,8 +1032,8 @@ export function UnifiedBookingSheet({
                               isFull
                                 ? "text-destructive"
                                 : isLow
-                                ? "text-orange-600"
-                                : "text-emerald-600"
+                                  ? "text-orange-600"
+                                  : "text-emerald-600"
                             )}
                           >
                             {isFull ? "Full" : `${slot.available} left`}
@@ -1067,8 +1086,8 @@ export function UnifiedBookingSheet({
                   <span className={cn(
                     "text-xs font-medium px-2 py-1 rounded-full",
                     availableSpots > 5 ? "bg-emerald-100 text-emerald-700" :
-                    availableSpots > 0 ? "bg-orange-100 text-orange-700" :
-                    "bg-red-100 text-red-700"
+                      availableSpots > 0 ? "bg-orange-100 text-orange-700" :
+                        "bg-red-100 text-red-700"
                   )}>
                     {availableSpots} spots left
                   </span>

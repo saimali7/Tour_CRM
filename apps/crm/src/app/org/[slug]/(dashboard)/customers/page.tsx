@@ -8,7 +8,7 @@ import {
   Mail,
   Phone,
   UserPlus,
-  Sparkles,
+  Focus,
   AlertTriangle,
   MoreHorizontal,
   Star,
@@ -691,7 +691,7 @@ export default function CustomersPage() {
                             )}
                             title="Quick View (360°)"
                           >
-                            <Sparkles className="h-4 w-4" />
+                            <Focus className="h-4 w-4" />
                           </button>
 
                           {/* Overflow Menu */}
