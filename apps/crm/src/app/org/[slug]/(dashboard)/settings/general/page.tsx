@@ -67,8 +67,8 @@ export default function GeneralSettingsPage() {
     setHasChanges(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = (e?: React.FormEvent) => {
+    e?.preventDefault();
     updateOrgMutation.mutate(businessForm);
   };
 
@@ -96,21 +96,47 @@ export default function GeneralSettingsPage() {
           </p>
         </div>
 
-        {/* Success Toast */}
-        <div
-          className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
-            saveSuccess
-              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
-              : "translate-x-4 opacity-0 pointer-events-none"
-          )}
-        >
-          <CheckCircle2 className="h-4 w-4" />
-          <span className="text-sm font-medium">Changes saved</span>
+        <div className="flex items-center gap-3">
+          {/* Success Toast */}
+          <div
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
+              saveSuccess
+                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
+                : "translate-x-4 opacity-0 pointer-events-none"
+            )}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            <span className="text-sm font-medium">Changes saved</span>
+          </div>
+
+          {/* Save Button */}
+          <button
+            onClick={handleSave}
+            disabled={isSubmitting || !hasChanges}
+            className={cn(
+              "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+              hasChanges
+                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
+            )}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Save Changes
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <div className="space-y-6">
         {/* Business Information Card */}
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
@@ -293,33 +319,7 @@ export default function GeneralSettingsPage() {
             </div>
           </div>
         </div>
-
-        {/* Save Button */}
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={isSubmitting || !hasChanges}
-            className={cn(
-              "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
-              hasChanges
-                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
-            )}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Changes
-              </>
-            )}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

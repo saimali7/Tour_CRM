@@ -11,7 +11,6 @@ import {
   DollarSign,
   Users,
   Sparkles,
-  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -75,8 +74,8 @@ export default function BookingSettingsPage() {
     }
   }, [settings]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     updateSettingsMutation.mutate(bookingForm);
   };
 
@@ -137,10 +136,34 @@ export default function BookingSettingsPage() {
             <CheckCircle2 className="h-4 w-4" />
             <span className="text-sm font-medium">Changes saved</span>
           </div>
+
+          {/* Save Button */}
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !hasChanges}
+            className={cn(
+              "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+              hasChanges
+                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
+            )}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Save Changes
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* Defaults Section */}
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
@@ -193,27 +216,6 @@ export default function BookingSettingsPage() {
           </div>
         </div>
 
-        {/* Booking Window Info */}
-        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 overflow-hidden">
-          <div className="p-5">
-            <div className="flex items-start gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
-                <Info className="h-5 w-5 text-blue-600" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="font-semibold text-foreground">Booking Window Settings</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Booking window settings (minimum notice, maximum advance days, same-day booking)
-                  are now configured per-tour. Edit each tour&apos;s settings to control when customers
-                  can book that specific tour.
-                </p>
-                <p className="text-xs text-muted-foreground pt-1">
-                  Go to <span className="font-medium text-foreground">Tours</span> → Select a tour → <span className="font-medium text-foreground">Settings</span> tab
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Customer Requirements Section */}
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
@@ -366,33 +368,7 @@ export default function BookingSettingsPage() {
             </div>
           </div>
         </div>
-
-        {/* Save Button */}
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={isSubmitting || !hasChanges}
-            className={cn(
-              "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
-              hasChanges
-                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
-            )}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Changes
-              </>
-            )}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

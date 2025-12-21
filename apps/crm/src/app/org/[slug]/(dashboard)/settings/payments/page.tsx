@@ -13,6 +13,10 @@ import {
   Building2,
   Wallet,
   CircleDollarSign,
+  Clock,
+  Zap,
+  RefreshCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +54,15 @@ export default function PaymentsPage() {
     allowPartialPayments: false,
   });
 
+  // Payment link settings
+  const [paymentLinkExpirationHours, setPaymentLinkExpirationHours] = useState(24);
+  const [paymentReminderHours, setPaymentReminderHours] = useState(6);
+  const [autoSendPaymentReminders, setAutoSendPaymentReminders] = useState(true);
+
+  // Refund settings
+  const [refundDeadlineHours, setRefundDeadlineHours] = useState(24);
+  const [autoRefundOnCancellation, setAutoRefundOnCancellation] = useState(false);
+
   // Initialize form when settings load
   useEffect(() => {
     if (settings?.payment) {
@@ -58,26 +71,31 @@ export default function PaymentsPage() {
         allowOnlinePayments: settings.payment.allowOnlinePayments ?? true,
         allowPartialPayments: settings.payment.allowPartialPayments ?? false,
       });
+      setPaymentLinkExpirationHours(settings.payment.paymentLinkExpirationHours ?? 24);
+      setPaymentReminderHours(settings.payment.paymentReminderHours ?? 6);
+      setAutoSendPaymentReminders(settings.payment.autoSendPaymentReminders ?? true);
+      setRefundDeadlineHours(settings.payment.refundDeadlineHours ?? 24);
+      setAutoRefundOnCancellation(settings.payment.autoRefundOnCancellation ?? false);
     }
   }, [settings]);
 
-  const handleSavePaymentSettings = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSavePaymentSettings = (e?: React.FormEvent) => {
+    e?.preventDefault();
     updateSettingsMutation.mutate({
       payment: {
         ...settings?.payment,
         acceptedPaymentMethods: paymentForm.acceptedPaymentMethods,
         allowOnlinePayments: paymentForm.allowOnlinePayments,
         allowPartialPayments: paymentForm.allowPartialPayments,
-        paymentLinkExpirationHours: settings?.payment?.paymentLinkExpirationHours ?? 24,
-        autoSendPaymentReminders: settings?.payment?.autoSendPaymentReminders ?? true,
-        paymentReminderHours: settings?.payment?.paymentReminderHours ?? 6,
+        paymentLinkExpirationHours,
+        autoSendPaymentReminders,
+        paymentReminderHours,
+        refundDeadlineHours,
+        autoRefundOnCancellation,
         depositEnabled: settings?.payment?.depositEnabled ?? false,
         depositType: settings?.payment?.depositType ?? "percentage",
         depositAmount: settings?.payment?.depositAmount ?? 25,
         depositDueDays: settings?.payment?.depositDueDays ?? 7,
-        autoRefundOnCancellation: settings?.payment?.autoRefundOnCancellation ?? false,
-        refundDeadlineHours: settings?.payment?.refundDeadlineHours ?? 48,
       },
     });
   };
@@ -113,21 +131,46 @@ export default function PaymentsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Payments</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure payment processing and methods
+            Configure payment processing, methods, and policies
           </p>
         </div>
+        <div className="flex items-center gap-3">
+          {/* Success Toast */}
+          <div
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
+              saveSuccess
+                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
+                : "translate-x-4 opacity-0 pointer-events-none"
+            )}
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            <span className="text-sm font-medium">Changes saved</span>
+          </div>
 
-        {/* Success Toast */}
-        <div
-          className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
-            saveSuccess
-              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
-              : "translate-x-4 opacity-0 pointer-events-none"
-          )}
-        >
-          <CheckCircle2 className="h-4 w-4" />
-          <span className="text-sm font-medium">Changes saved</span>
+          {/* Save Button */}
+          <button
+            onClick={handleSavePaymentSettings}
+            disabled={isSubmitting || !hasChanges}
+            className={cn(
+              "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
+              hasChanges
+                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
+            )}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Save Changes
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -252,41 +295,9 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      {/* How Payments Work */}
-      <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
-              <CircleDollarSign className="h-4 w-4 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">How Payments Work</h3>
-              <p className="text-xs text-muted-foreground">Payment flow overview</p>
-            </div>
-          </div>
-        </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { step: "1", title: "Customer Books", desc: "Customers pay securely through your booking page" },
-              { step: "2", title: "Stripe Processes", desc: "Payment is processed securely by Stripe" },
-              { step: "3", title: "You Get Paid", desc: "Funds are deposited to your bank account" },
-            ].map((item, index) => (
-              <div key={item.step} className="text-center">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-sm font-bold text-primary">{item.step}</span>
-                </div>
-                <h4 className="font-medium text-foreground mb-1">{item.title}</h4>
-                <p className="text-sm text-muted-foreground">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Payment Methods & Options Form */}
-      <form onSubmit={handleSavePaymentSettings} className="space-y-6">
+      {/* Payment Methods & Options */}
+      <div className="space-y-6">
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
             <div className="flex items-center gap-3">
@@ -424,32 +435,174 @@ export default function PaymentsPage() {
           </div>
         </div>
 
-        {/* Save Button */}
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            disabled={isSubmitting || !hasChanges}
-            className={cn(
-              "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200",
-              hasChanges
-                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
-            )}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Changes
-              </>
-            )}
-          </button>
+        {/* Payment Links */}
+        <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
+                <CreditCard className="h-4 w-4 text-violet-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Payment Links</h3>
+                <p className="text-xs text-muted-foreground">Configure payment link expiration and reminders</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  Link Expiration
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="168"
+                    value={paymentLinkExpirationHours}
+                    onChange={(e) => {
+                      setPaymentLinkExpirationHours(parseInt(e.target.value) || 24);
+                      setHasChanges(true);
+                    }}
+                    className="w-full h-10 px-3 pr-14 rounded-lg border border-input bg-background text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">hours</span>
+                </div>
+                <p className="text-xs text-muted-foreground">1-168 hours (max 7 days)</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <Zap className="h-3.5 w-3.5 text-muted-foreground" />
+                  Reminder Before Expiry
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="24"
+                    value={paymentReminderHours}
+                    onChange={(e) => {
+                      setPaymentReminderHours(parseInt(e.target.value) || 6);
+                      setHasChanges(true);
+                    }}
+                    className="w-full h-10 px-3 pr-14 rounded-lg border border-input bg-background text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">hours</span>
+                </div>
+                <p className="text-xs text-muted-foreground">1-24 hours</p>
+              </div>
+            </div>
+
+            <div
+              onClick={() => {
+                setAutoSendPaymentReminders(!autoSendPaymentReminders);
+                setHasChanges(true);
+              }}
+              className={cn(
+                "flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all",
+                autoSendPaymentReminders
+                  ? "border-primary/30 bg-primary/5"
+                  : "border-border bg-muted/30 hover:bg-muted/50"
+              )}
+            >
+              <div className={cn(
+                "mt-0.5 h-4 w-4 rounded border-2 flex items-center justify-center transition-colors",
+                autoSendPaymentReminders
+                  ? "border-primary bg-primary"
+                  : "border-muted-foreground/30"
+              )}>
+                {autoSendPaymentReminders && (
+                  <svg className="h-2.5 w-2.5 text-primary-foreground" fill="currentColor" viewBox="0 0 12 12">
+                    <path d="M10.28 2.28L3.989 8.575 1.695 6.28A1 1 0 00.28 7.695l3 3a1 1 0 001.414 0l7-7A1 1 0 0010.28 2.28z" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-foreground">Auto-send payment reminders</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Automatically send reminder emails before payment links expire
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      </form>
+
+        {/* Refund Settings */}
+        <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
+                <RefreshCcw className="h-4 w-4 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Refund Settings</h3>
+                <p className="text-xs text-muted-foreground">Configure refund policies and automation</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Refund Deadline</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="720"
+                  value={refundDeadlineHours}
+                  onChange={(e) => {
+                    setRefundDeadlineHours(parseInt(e.target.value) || 0);
+                    setHasChanges(true);
+                  }}
+                  className="w-full h-10 px-3 pr-20 rounded-lg border border-input bg-background text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">hours before</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Hours before tour when refunds are no longer available (0-720 hours / 30 days)
+              </p>
+            </div>
+
+            <div
+              onClick={() => {
+                setAutoRefundOnCancellation(!autoRefundOnCancellation);
+                setHasChanges(true);
+              }}
+              className={cn(
+                "flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all",
+                autoRefundOnCancellation
+                  ? "border-amber-500/30 bg-amber-500/5"
+                  : "border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10"
+              )}
+            >
+              <div className={cn(
+                "mt-0.5 h-4 w-4 rounded border-2 flex items-center justify-center transition-colors",
+                autoRefundOnCancellation
+                  ? "border-amber-500 bg-amber-500"
+                  : "border-amber-400/50"
+              )}>
+                {autoRefundOnCancellation && (
+                  <svg className="h-2.5 w-2.5 text-white" fill="currentColor" viewBox="0 0 12 12">
+                    <path d="M10.28 2.28L3.989 8.575 1.695 6.28A1 1 0 00.28 7.695l3 3a1 1 0 001.414 0l7-7A1 1 0 0010.28 2.28z" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-foreground">Auto-refund on cancellation</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Automatically process refunds when bookings are cancelled (requires payment gateway integration and may have processing fees)
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
