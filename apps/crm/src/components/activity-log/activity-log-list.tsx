@@ -178,12 +178,19 @@ export function ActivityLogCard({
   entityId,
   title = "Activity Log",
   limit = 10,
+  showTitle = true,
 }: {
   entityType?: ActivityEntity;
   entityId?: string;
   title?: string;
   limit?: number;
+  showTitle?: boolean;
 }) {
+  // When used inside a collapsible section, we can hide the card wrapper
+  if (!showTitle) {
+    return <ActivityLogList entityType={entityType} entityId={entityId} limit={limit} />;
+  }
+
   return (
     <div className="bg-card rounded-lg border border-border p-6">
       <h3 className="text-lg font-semibold text-foreground mb-4">{title}</h3>

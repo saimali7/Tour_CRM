@@ -22,8 +22,14 @@ import {
   Copy,
   Send,
   Link2,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  MapPin,
+  ExternalLink,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams, useRouter } from "next/navigation";
@@ -37,9 +43,73 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@tour/ui";
 import { toast } from "sonner";
 import { PageSpinner, ButtonSpinner } from "@/components/ui/spinner";
+
+// Collapsible section component
+function CollapsibleSection({
+  title,
+  count,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+        aria-expanded={isOpen}
+        aria-controls={`section-${title.toLowerCase().replace(/\s+/g, "-")}`}
+      >
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            {title}
+          </h2>
+          {count !== undefined && (
+            <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
+              {count}
+            </span>
+          )}
+        </div>
+        {isOpen ? (
+          <ChevronUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        )}
+      </button>
+      {isOpen && (
+        <div
+          id={`section-${title.toLowerCase().replace(/\s+/g, "-")}`}
+          className="px-4 pb-4 border-t border-border pt-4"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function BookingDetailPage() {
   const params = useParams();
@@ -128,6 +198,10 @@ export default function BookingDetailPage() {
       utils.booking.list.invalidate();
       setShowRescheduleModal(false);
       setSelectedScheduleId(null);
+      toast.success("Booking rescheduled successfully");
+    },
+    onError: (error) => {
+      toast.error(`Failed to reschedule: ${error.message}`);
     },
   });
 
@@ -249,6 +323,61 @@ export default function BookingDetailPage() {
     { bookingId },
     { enabled: !!booking }
   );
+
+  // Calculate urgency/time context
+  const timeContext = useMemo(() => {
+    if (!booking?.schedule?.startsAt) return null;
+    const tourDate = new Date(booking.schedule.startsAt);
+    const now = new Date();
+    const diffMs = tourDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return { label: "Tour completed", variant: "muted" as const };
+    if (diffDays === 0) return { label: "Today", variant: "warning" as const };
+    if (diffDays === 1) return { label: "Tomorrow", variant: "warning" as const };
+    if (diffDays <= 3) return { label: `In ${diffDays} days`, variant: "info" as const };
+    if (diffDays <= 7) return { label: `In ${diffDays} days`, variant: "default" as const };
+    return null;
+  }, [booking?.schedule?.startsAt]);
+
+  // Determine action required - uses action types instead of function references to avoid TDZ issues
+  const actionRequired = useMemo(() => {
+    if (!booking || !balanceInfo) return null;
+
+    const actions: Array<{ message: string; action: string; variant: "warning" | "info" | "destructive"; actionType: "confirm" | "payment" | "review" }> = [];
+
+    // Pending confirmation
+    if (booking.status === "pending") {
+      actions.push({
+        message: "Booking awaiting confirmation",
+        action: "Confirm Now",
+        variant: "warning",
+        actionType: "confirm",
+      });
+    }
+
+    // Balance due
+    if (parseFloat(balanceInfo.balance) > 0 && booking.status !== "cancelled") {
+      actions.push({
+        message: `Balance due: $${parseFloat(balanceInfo.balance).toFixed(2)}`,
+        action: "Collect Payment",
+        variant: "warning",
+        actionType: "payment",
+      });
+    }
+
+    // Tour happening soon
+    if (timeContext?.variant === "warning" && booking.status === "confirmed") {
+      actions.push({
+        message: `Tour is ${timeContext.label.toLowerCase()}`,
+        action: "Review Details",
+        variant: "info",
+        actionType: "review",
+      });
+    }
+
+    return actions.length > 0 ? actions : null;
+  }, [booking, balanceInfo, timeContext]);
 
   const handleProcessRefund = async (refundId: string, viaStripe: boolean) => {
     const confirmed = await confirmModal.confirm({
@@ -384,7 +513,6 @@ export default function BookingDetailPage() {
   };
 
   const handleOpenPaymentModal = () => {
-    // Set default amount to remaining balance
     if (balanceInfo) {
       setPaymentAmount(balanceInfo.balance);
     }
@@ -435,6 +563,14 @@ export default function BookingDetailPage() {
     }).format(new Date(date));
   };
 
+  const formatShortDate = (date: Date) => {
+    return new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(date));
+  };
+
   const formatTime = (date: Date) => {
     return new Intl.DateTimeFormat("en-US", {
       hour: "numeric",
@@ -477,25 +613,150 @@ export default function BookingDetailPage() {
     }
   };
 
+  // Determine primary action based on booking state
+  const getPrimaryAction = () => {
+    if (booking.status === "pending") {
+      return {
+        label: "Confirm Booking",
+        icon: CheckCircle,
+        onClick: handleConfirm,
+        loading: confirmMutation.isPending,
+        className: "bg-success text-success-foreground hover:bg-success/90",
+      };
+    }
+    if (booking.status === "confirmed") {
+      return {
+        label: "Mark Complete",
+        icon: CheckCircle,
+        onClick: handleComplete,
+        loading: completeMutation.isPending,
+        className: "bg-info text-info-foreground hover:bg-info/90",
+      };
+    }
+    if (booking.status === "cancelled" && booking.paymentStatus === "paid") {
+      return {
+        label: "Issue Refund",
+        icon: RotateCcw,
+        onClick: () => {
+          setRefundAmount(booking.total);
+          setShowRefundModal(true);
+        },
+        loading: false,
+        className: "bg-primary text-primary-foreground hover:bg-primary/90",
+      };
+    }
+    return null;
+  };
+
+  const primaryAction = getPrimaryAction();
+
   return (
     <div className="space-y-6">
+      {/* Action Required Banner */}
+      {actionRequired && actionRequired.length > 0 && (
+        <div className="space-y-2">
+          {actionRequired.map((action, index) => (
+            <div
+              key={index}
+              className={`flex items-center justify-between p-3 rounded-lg border ${
+                action.variant === "warning"
+                  ? "bg-warning/5 border-warning/20"
+                  : action.variant === "destructive"
+                  ? "bg-destructive/5 border-destructive/20"
+                  : "bg-info/5 border-info/20"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <AlertTriangle
+                  className={`h-5 w-5 ${
+                    action.variant === "warning"
+                      ? "text-warning"
+                      : action.variant === "destructive"
+                      ? "text-destructive"
+                      : "text-info"
+                  }`}
+                  aria-hidden="true"
+                />
+                <span className="text-sm font-medium text-foreground">{action.message}</span>
+              </div>
+              {action.actionType !== "review" && (
+                <button
+                  onClick={() => {
+                    if (action.actionType === "confirm") handleConfirm();
+                    else if (action.actionType === "payment") handleOpenPaymentModal();
+                  }}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                    action.variant === "warning"
+                      ? "bg-warning text-warning-foreground hover:bg-warning/90"
+                      : action.variant === "destructive"
+                      ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      : "bg-info text-info-foreground hover:bg-info/90"
+                  }`}
+                >
+                  {action.action}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex items-start gap-4">
           <button
             onClick={() => router.back()}
-            className="p-2 hover:bg-accent rounded-lg transition-colors"
+            className="p-2 hover:bg-accent rounded-lg transition-colors mt-1"
             aria-label="Go back to bookings list"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           </button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-foreground font-mono">
-                {booking.referenceNumber}
+          <div className="space-y-1">
+            {/* Tour Name - Primary */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-xl font-semibold text-foreground tracking-tight">
+                {booking.tour?.name || "Tour"}
               </h1>
+              {timeContext && (
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    timeContext.variant === "warning"
+                      ? "bg-warning/10 text-warning border border-warning/20"
+                      : timeContext.variant === "info"
+                      ? "bg-info/10 text-info border border-info/20"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {timeContext.label}
+                </span>
+              )}
+            </div>
+
+            {/* Schedule Info */}
+            {booking.schedule && (
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                  {formatShortDate(booking.schedule.startsAt)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" aria-hidden="true" />
+                  {formatTime(booking.schedule.startsAt)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4" aria-hidden="true" />
+                  {booking.totalParticipants} guest{booking.totalParticipants !== 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
+
+            {/* Reference & Status */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs font-mono text-muted-foreground">
+                {booking.referenceNumber}
+              </span>
               <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
                   booking.status
                 )}`}
               >
@@ -504,588 +765,496 @@ export default function BookingDetailPage() {
                   : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
               </span>
               <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentColor(
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getPaymentColor(
                   booking.paymentStatus
                 )}`}
               >
                 {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
               </span>
             </div>
-            <p className="text-muted-foreground mt-1">
-              {booking.tour?.name} • {booking.schedule && formatDate(booking.schedule.startsAt)}
-            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {booking.status === "pending" && (
+        {/* Action Buttons - Clear Hierarchy */}
+        <div className="flex items-center gap-2 ml-12 md:ml-0">
+          {/* Primary Action */}
+          {primaryAction && (
             <button
-              onClick={handleConfirm}
-              disabled={confirmMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-success px-4 py-2 text-sm font-medium text-success-foreground hover:bg-success/90 transition-colors disabled:opacity-50"
+              onClick={primaryAction.onClick}
+              disabled={primaryAction.loading}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${primaryAction.className}`}
             >
-              <CheckCircle className="h-4 w-4" />
-              Confirm
+              {primaryAction.loading ? (
+                <ButtonSpinner />
+              ) : (
+                <primaryAction.icon className="h-4 w-4" aria-hidden="true" />
+              )}
+              {primaryAction.label}
             </button>
           )}
-          {booking.status === "confirmed" && (
-            <>
-              <button
-                onClick={handleComplete}
-                disabled={completeMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm font-medium text-info-foreground hover:bg-info/90 transition-colors disabled:opacity-50"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Complete
-              </button>
-              <button
-                onClick={handleNoShow}
-                disabled={noShowMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors disabled:opacity-50"
-              >
-                <UserMinus className="h-4 w-4" />
-                No Show
-              </button>
-            </>
-          )}
-          {(booking.status === "pending" || booking.status === "confirmed") && (
-            <>
-              <button
-                onClick={() => setShowRescheduleModal(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                <CalendarClock className="h-4 w-4" />
-                Reschedule
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={cancelMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
-              >
-                <X className="h-4 w-4" />
-                Cancel
-              </button>
-            </>
-          )}
-          {booking.status === "cancelled" && booking.paymentStatus === "paid" && (
-            <button
-              onClick={() => {
-                setRefundAmount(booking.total);
-                setShowRefundModal(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Issue Refund
-            </button>
-          )}
+
+          {/* Edit Button */}
           <Link
             href={`/org/${slug}/bookings/${booking.id}/edit` as Route}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors"
           >
-            <Edit className="h-4 w-4" />
-            Edit
+            <Edit className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Edit</span>
           </Link>
-        </div>
-      </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-info/10 rounded-lg">
-              <Calendar className="h-5 w-5 text-info" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Date</p>
-              <p className="font-semibold text-foreground">
-                {booking.schedule && formatDate(booking.schedule.startsAt)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Clock className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Time</p>
-              <p className="font-semibold text-foreground">
-                {booking.schedule && formatTime(booking.schedule.startsAt)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-success/10 rounded-lg">
-              <Users className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Guests</p>
-              <p className="font-semibold text-foreground">{booking.totalParticipants}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-warning/10 rounded-lg">
-              <DollarSign className="h-5 w-5 text-warning" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total</p>
-              <p className="font-semibold text-foreground">${parseFloat(booking.total).toFixed(2)}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Customer Info */}
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Customer</h2>
-          {booking.customer ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-primary font-medium">
-                    {booking.customer.firstName?.charAt(0) ?? ""}
-                    {booking.customer.lastName?.charAt(0) ?? ""}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">
-                    {booking.customer.firstName} {booking.customer.lastName}
-                  </p>
-                  <Link
-                    href={`/org/${slug}/customers/${booking.customer.id}` as Route}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    View Profile
-                  </Link>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Mail className="h-4 w-4" />
-                <a href={`mailto:${booking.customer.email}`} className="hover:text-primary">
-                  {booking.customer.email}
-                </a>
-              </div>
-              {booking.customer.phone && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  <a href={`tel:${booking.customer.phone}`} className="hover:text-primary">
-                    {booking.customer.phone}
-                  </a>
-                </div>
+          {/* More Actions Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="inline-flex items-center justify-center rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+                aria-label="More actions"
+              >
+                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {booking.status === "confirmed" && (
+                <>
+                  <DropdownMenuItem onClick={handleNoShow}>
+                    <UserMinus className="h-4 w-4 mr-2" aria-hidden="true" />
+                    Mark No Show
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
               )}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">Customer information not available</p>
-          )}
-        </div>
-
-        {/* Payment Info */}
-        <div className="bg-card rounded-lg border border-border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-foreground">Payment Details</h2>
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="text-foreground">${parseFloat(booking.subtotal).toFixed(2)}</span>
-            </div>
-            {booking.discount && parseFloat(booking.discount) > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Discount</span>
-                <span className="text-success">
-                  -${parseFloat(booking.discount).toFixed(2)}
-                </span>
-              </div>
-            )}
-            {booking.tax && parseFloat(booking.tax) > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tax</span>
-                <span className="text-foreground">${parseFloat(booking.tax).toFixed(2)}</span>
-              </div>
-            )}
-            <hr />
-            <div className="flex justify-between font-semibold">
-              <span className="text-foreground">Total</span>
-              <span className="text-foreground">${parseFloat(booking.total).toFixed(2)}</span>
-            </div>
-            {balanceInfo && (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Paid</span>
-                  <span className="text-success">
-                    ${parseFloat(balanceInfo.totalPaid).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between font-medium pt-2 border-t">
-                  <span className="text-foreground">Balance Due</span>
-                  <span className={parseFloat(balanceInfo.balance) > 0 ? "text-warning" : "text-success"}>
-                    ${parseFloat(balanceInfo.balance).toFixed(2)}
-                  </span>
-                </div>
-              </>
-            )}
-            <div className="flex items-center gap-2 pt-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <Badge variant={
-                booking.paymentStatus === "paid" ? "success" :
-                booking.paymentStatus === "partial" ? "warning" :
-                booking.paymentStatus === "pending" ? "pending" : "muted"
-              }>
-                {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
-              </Badge>
-            </div>
-          </div>
+              {(booking.status === "pending" || booking.status === "confirmed") && (
+                <>
+                  <DropdownMenuItem onClick={() => setShowRescheduleModal(true)}>
+                    <CalendarClock className="h-4 w-4 mr-2" aria-hidden="true" />
+                    Reschedule
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleCancel}
+                    variant="destructive"
+                  >
+                    <X className="h-4 w-4 mr-2" aria-hidden="true" />
+                    Cancel Booking
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Guest Breakdown */}
-      <div className="bg-card rounded-lg border border-border p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Guest Breakdown</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <p className="text-2xl font-semibold text-foreground">{booking.adultCount}</p>
-            <p className="text-sm text-muted-foreground">Adults</p>
-          </div>
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <p className="text-2xl font-semibold text-foreground">{booking.childCount ?? 0}</p>
-            <p className="text-sm text-muted-foreground">Children</p>
-          </div>
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <p className="text-2xl font-semibold text-foreground">{booking.infantCount ?? 0}</p>
-            <p className="text-sm text-muted-foreground">Infants</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Participants */}
-      {booking.participants && booking.participants.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Participants ({booking.participants.length})
-          </h2>
-          <div className="divide-y divide-border">
-            {booking.participants.map((participant) => (
-              <div key={participant.id} className="py-3 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">
-                    {participant.firstName} {participant.lastName}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {participant.type.charAt(0).toUpperCase() + participant.type.slice(1)}
-                    {participant.email && ` • ${participant.email}`}
-                  </p>
+      {/* Main Content - Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Main Info */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Customer Card - Always Visible */}
+          <div className="bg-card rounded-lg border border-border p-5">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">
+              Customer
+            </h2>
+            {booking.customer ? (
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-primary font-semibold text-lg">
+                      {booking.customer.firstName?.charAt(0) ?? ""}
+                      {booking.customer.lastName?.charAt(0) ?? ""}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-foreground text-lg">
+                      {booking.customer.firstName} {booking.customer.lastName}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                      <a
+                        href={`mailto:${booking.customer.email}`}
+                        className="flex items-center gap-1.5 hover:text-primary transition-colors"
+                      >
+                        <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                        {booking.customer.email}
+                      </a>
+                      {booking.customer.phone && (
+                        <a
+                          href={`tel:${booking.customer.phone}`}
+                          className="flex items-center gap-1.5 hover:text-primary transition-colors"
+                        >
+                          <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+                          {booking.customer.phone}
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {(participant.dietaryRequirements || participant.accessibilityNeeds) && (
-                  <div className="flex items-center gap-1">
-                    <AlertCircle className="h-4 w-4 text-warning" />
-                    <span className="text-xs text-warning-foreground">Special requirements</span>
+                <Link
+                  href={`/org/${slug}/customers/${booking.customer.id}` as Route}
+                  className="text-sm text-primary hover:underline flex items-center gap-1"
+                >
+                  View Profile
+                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                </Link>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">Customer information not available</p>
+            )}
+          </div>
+
+          {/* Guest Breakdown - Collapsible */}
+          <CollapsibleSection
+            title="Guests"
+            count={booking.totalParticipants}
+            defaultOpen={false}
+          >
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center p-3 bg-muted/50 rounded-lg">
+                <p className="text-2xl font-bold text-foreground tabular-nums">{booking.adultCount}</p>
+                <p className="text-xs text-muted-foreground">Adults</p>
+              </div>
+              <div className="text-center p-3 bg-muted/50 rounded-lg">
+                <p className="text-2xl font-bold text-foreground tabular-nums">{booking.childCount ?? 0}</p>
+                <p className="text-xs text-muted-foreground">Children</p>
+              </div>
+              <div className="text-center p-3 bg-muted/50 rounded-lg">
+                <p className="text-2xl font-bold text-foreground tabular-nums">{booking.infantCount ?? 0}</p>
+                <p className="text-xs text-muted-foreground">Infants</p>
+              </div>
+            </div>
+
+            {/* Participants List */}
+            {booking.participants && booking.participants.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Participant Details
+                </h3>
+                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+                  {booking.participants.map((participant) => (
+                    <div key={participant.id} className="p-3 flex items-center justify-between bg-card">
+                      <div>
+                        <p className="font-medium text-foreground text-sm">
+                          {participant.firstName} {participant.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {participant.type.charAt(0).toUpperCase() + participant.type.slice(1)}
+                          {participant.email && ` • ${participant.email}`}
+                        </p>
+                      </div>
+                      {(participant.dietaryRequirements || participant.accessibilityNeeds) && (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-warning/10 rounded">
+                          <AlertCircle className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
+                          <span className="text-xs text-warning-foreground">Special needs</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CollapsibleSection>
+
+          {/* Special Requests - Only if present */}
+          {(booking.specialRequests ||
+            booking.dietaryRequirements ||
+            booking.accessibilityNeeds ||
+            booking.internalNotes) && (
+            <CollapsibleSection title="Notes & Requirements" defaultOpen={true}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {booking.specialRequests && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                      Special Requests
+                    </p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{booking.specialRequests}</p>
+                  </div>
+                )}
+                {booking.dietaryRequirements && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                      Dietary Requirements
+                    </p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{booking.dietaryRequirements}</p>
+                  </div>
+                )}
+                {booking.accessibilityNeeds && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                      Accessibility Needs
+                    </p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{booking.accessibilityNeeds}</p>
+                  </div>
+                )}
+                {booking.internalNotes && (
+                  <div className="p-3 bg-warning/5 border border-warning/20 rounded-lg">
+                    <p className="text-xs font-medium text-warning uppercase tracking-wide mb-1">
+                      Internal Notes
+                    </p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{booking.internalNotes}</p>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </CollapsibleSection>
+          )}
 
-      {/* Special Requests */}
-      {(booking.specialRequests ||
-        booking.dietaryRequirements ||
-        booking.accessibilityNeeds ||
-        booking.internalNotes) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {booking.specialRequests && (
-            <div className="bg-card rounded-lg border border-border p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Special Requests</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap">{booking.specialRequests}</p>
-            </div>
-          )}
-          {booking.dietaryRequirements && (
-            <div className="bg-card rounded-lg border border-border p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Dietary Requirements</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap">{booking.dietaryRequirements}</p>
-            </div>
-          )}
-          {booking.accessibilityNeeds && (
-            <div className="bg-card rounded-lg border border-border p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Accessibility Needs</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap">{booking.accessibilityNeeds}</p>
-            </div>
-          )}
-          {booking.internalNotes && (
-            <div className="bg-warning/5 rounded-lg border border-warning/20 p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Internal Notes</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap">{booking.internalNotes}</p>
-            </div>
-          )}
+          {/* Activity History - Collapsible */}
+          <CollapsibleSection title="Activity" defaultOpen={false}>
+            <ActivityLogCard
+              entityType="booking"
+              entityId={bookingId}
+              limit={10}
+              showTitle={false}
+            />
+          </CollapsibleSection>
         </div>
-      )}
 
-      {/* Booking Info */}
-      <div className="bg-card rounded-lg border border-border p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Booking Information</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">Source</p>
-            <p className="font-medium text-foreground">
-              {booking.source.charAt(0).toUpperCase() + booking.source.slice(1).replace("_", " ")}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Created</p>
-            <p className="font-medium text-foreground">
-              {new Intl.DateTimeFormat("en-US", {
-                dateStyle: "medium",
-                timeStyle: "short",
-              }).format(new Date(booking.createdAt))}
-            </p>
-          </div>
-          {booking.confirmedAt && (
-            <div>
-              <p className="text-muted-foreground">Confirmed</p>
-              <p className="font-medium text-foreground">
-                {new Intl.DateTimeFormat("en-US", {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                }).format(new Date(booking.confirmedAt))}
-              </p>
+        {/* Right Column - Payment & Meta */}
+        <div className="space-y-6">
+          {/* Payment Card - Consolidated, Prominent */}
+          <div
+            className={`rounded-lg border p-5 ${
+              balanceInfo && parseFloat(balanceInfo.balance) > 0
+                ? "bg-warning/5 border-warning/30"
+                : "bg-card border-border"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Payment
+              </h2>
+              <Badge
+                variant={
+                  booking.paymentStatus === "paid"
+                    ? "success"
+                    : booking.paymentStatus === "partial"
+                    ? "warning"
+                    : booking.paymentStatus === "pending"
+                    ? "pending"
+                    : "muted"
+                }
+              >
+                {booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1)}
+              </Badge>
             </div>
-          )}
-          {booking.cancelledAt && (
-            <div>
-              <p className="text-muted-foreground">Cancelled</p>
-              <p className="font-medium text-foreground">
-                {new Intl.DateTimeFormat("en-US", {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                }).format(new Date(booking.cancelledAt))}
-              </p>
-            </div>
-          )}
-        </div>
-        {booking.cancellationReason && (
-          <div className="mt-4 p-3 bg-destructive/5 rounded-lg">
-            <p className="text-sm text-muted-foreground">Cancellation Reason</p>
-            <p className="text-destructive">{booking.cancellationReason}</p>
-          </div>
-        )}
-      </div>
 
-      {/* Payment History & Management */}
-      <div className="bg-card rounded-lg border border-border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Payment Management</h2>
-          <div className="flex items-center gap-2">
+            {/* Balance - Most Prominent */}
+            {balanceInfo && (
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground">Balance Due</p>
+                <p
+                  className={`text-3xl font-bold tabular-nums ${
+                    parseFloat(balanceInfo.balance) > 0 ? "text-warning" : "text-success"
+                  }`}
+                >
+                  ${parseFloat(balanceInfo.balance).toFixed(2)}
+                </p>
+              </div>
+            )}
+
+            {/* Payment Breakdown */}
+            <div className="space-y-2 text-sm border-t border-border pt-4">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-mono tabular-nums">${parseFloat(booking.subtotal).toFixed(2)}</span>
+              </div>
+              {booking.discount && parseFloat(booking.discount) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span className="font-mono tabular-nums text-success">
+                    -${parseFloat(booking.discount).toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {booking.tax && parseFloat(booking.tax) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span className="font-mono tabular-nums">${parseFloat(booking.tax).toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-medium pt-2 border-t border-border">
+                <span>Total</span>
+                <span className="font-mono tabular-nums">${parseFloat(booking.total).toFixed(2)}</span>
+              </div>
+              {balanceInfo && (
+                <div className="flex justify-between text-success">
+                  <span className="text-muted-foreground">Paid</span>
+                  <span className="font-mono tabular-nums">${parseFloat(balanceInfo.totalPaid).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Actions */}
             {booking.status !== "cancelled" && balanceInfo && parseFloat(balanceInfo.balance) > 0 && (
-              <>
+              <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                <button
+                  onClick={handleOpenPaymentModal}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Record Payment
+                </button>
                 <button
                   onClick={handleCreatePaymentLink}
                   disabled={createPaymentLinkMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-lg bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center justify-center rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                  aria-label="Generate payment link"
                 >
-                  <Link2 className="h-4 w-4" />
-                  Generate Link
+                  {createPaymentLinkMutation.isPending ? (
+                    <ButtonSpinner />
+                  ) : (
+                    <Link2 className="h-4 w-4" aria-hidden="true" />
+                  )}
                 </button>
-                <button
-                  onClick={handleOpenPaymentModal}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  Record Payment
-                </button>
-              </>
+              </div>
             )}
-          </div>
-        </div>
 
-        {/* Balance Summary */}
-        {balanceInfo && (
-          <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted rounded-lg">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-1">Total</p>
-              <p className="text-xl font-semibold text-foreground">
-                ${parseFloat(balanceInfo.bookingTotal).toFixed(2)}
-              </p>
-            </div>
-            <div className="text-center border-l border-r border-border">
-              <p className="text-sm text-muted-foreground mb-1">Paid</p>
-              <p className="text-xl font-semibold text-success">
-                ${parseFloat(balanceInfo.totalPaid).toFixed(2)}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-1">Balance Due</p>
-              <p className={`text-xl font-semibold ${parseFloat(balanceInfo.balance) > 0 ? "text-warning" : "text-success"}`}>
-                ${parseFloat(balanceInfo.balance).toFixed(2)}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Payment History */}
-        {payments && payments.length > 0 ? (
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">Payment History</h3>
-            <div className="border border-border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Date</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Amount</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Method</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Reference</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Recorded By</th>
-                    <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+            {/* Payment History - Compact */}
+            {payments && payments.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                  Payment History
+                </p>
+                <div className="space-y-2">
                   {payments.map((payment) => (
-                    <tr key={payment.id} className="hover:bg-muted/50">
-                      <td className="px-4 py-3 text-sm text-foreground">
-                        {new Intl.DateTimeFormat("en-US", {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        }).format(new Date(payment.recordedAt))}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-foreground">
-                        ${parseFloat(payment.amount).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-foreground">
-                        <Badge variant="outline">
-                          {payment.method.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
-                        {payment.reference || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {payment.recordedByName || "System"}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleDeletePayment(payment.id)}
-                          disabled={deletePaymentMutation.isPending}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No payment records yet</p>
-            {booking.status !== "cancelled" && (
-              <p className="text-sm mt-1">Record manual payments or generate a payment link for the customer</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Activity Log */}
-      <ActivityLogCard
-        entityType="booking"
-        entityId={bookingId}
-        title="Activity History"
-        limit={15}
-      />
-
-      {/* Refunds Section */}
-      {refunds && refunds.length > 0 && (
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Refunds</h2>
-          <div className="space-y-3">
-            {refunds.map((refund) => (
-              <div
-                key={refund.id}
-                className="flex items-center justify-between p-4 bg-muted rounded-lg"
-              >
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">
-                    ${parseFloat(refund.amount).toFixed(2)} {refund.currency}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {refund.reason.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())} •{" "}
-                    {new Intl.DateTimeFormat("en-US", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(refund.createdAt))}
-                  </p>
-                  {refund.reasonDetails && (
-                    <p className="text-sm text-muted-foreground mt-1 italic">
-                      {refund.reasonDetails}
-                    </p>
-                  )}
-                  {refund.processedAt && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Processed: {new Intl.DateTimeFormat("en-US", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(refund.processedAt))}
-                    </p>
-                  )}
-                  {refund.stripeRefundId && (
-                    <p className="text-xs text-muted-foreground mt-1 font-mono">
-                      Stripe ID: {refund.stripeRefundId}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {refund.status === "pending" && (
-                    <>
-                      {booking.stripePaymentIntentId && (
-                        <button
-                          onClick={() => handleProcessRefund(refund.id, true)}
-                          disabled={processRefundMutation.isPending}
-                          className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                        >
-                          Process via Stripe
-                        </button>
-                      )}
+                    <div
+                      key={payment.id}
+                      className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded"
+                    >
+                      <div>
+                        <p className="font-medium font-mono tabular-nums">
+                          ${parseFloat(payment.amount).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {payment.method.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())} •{" "}
+                          {new Intl.DateTimeFormat("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          }).format(new Date(payment.recordedAt))}
+                        </p>
+                      </div>
                       <button
-                        onClick={() => handleProcessRefund(refund.id, false)}
-                        disabled={processManualRefundMutation.isPending}
-                        className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors disabled:opacity-50"
+                        onClick={() => handleDeletePayment(payment.id)}
+                        disabled={deletePaymentMutation.isPending}
+                        className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label="Delete payment"
                       >
-                        Mark as Processed
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
-                    </>
-                  )}
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                      refund.status === "succeeded"
-                        ? "bg-success/10 text-success-foreground border-success/20"
-                        : refund.status === "pending"
-                        ? "bg-warning/10 text-warning-foreground border-warning/20"
-                        : refund.status === "processing"
-                        ? "bg-info/10 text-info-foreground border-info/20"
-                        : refund.status === "failed"
-                        ? "bg-destructive/10 text-destructive-foreground border-destructive/20"
-                        : "bg-muted text-muted-foreground border-border"
-                    }`}
-                  >
-                    {refund.status.charAt(0).toUpperCase() + refund.status.slice(1)}
-                  </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
+
+          {/* Booking Meta - Compact */}
+          <div className="bg-card rounded-lg border border-border p-5">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+              Booking Info
+            </h2>
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Source</dt>
+                <dd className="font-medium">
+                  {booking.source.charAt(0).toUpperCase() + booking.source.slice(1).replace("_", " ")}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Created</dt>
+                <dd className="font-medium">
+                  {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  }).format(new Date(booking.createdAt))}
+                </dd>
+              </div>
+              {booking.confirmedAt && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Confirmed</dt>
+                  <dd className="font-medium">
+                    {new Intl.DateTimeFormat("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    }).format(new Date(booking.confirmedAt))}
+                  </dd>
+                </div>
+              )}
+              {booking.cancelledAt && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Cancelled</dt>
+                  <dd className="font-medium text-destructive">
+                    {new Intl.DateTimeFormat("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    }).format(new Date(booking.cancelledAt))}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            {booking.cancellationReason && (
+              <div className="mt-3 p-2 bg-destructive/5 rounded text-sm">
+                <p className="text-xs text-muted-foreground">Cancellation Reason</p>
+                <p className="text-destructive">{booking.cancellationReason}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Refunds - Only if present */}
+          {refunds && refunds.length > 0 && (
+            <div className="bg-card rounded-lg border border-border p-5">
+              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                Refunds
+              </h2>
+              <div className="space-y-3">
+                {refunds.map((refund) => (
+                  <div key={refund.id} className="p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-semibold font-mono tabular-nums">
+                        ${parseFloat(refund.amount).toFixed(2)}
+                      </p>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                          refund.status === "succeeded"
+                            ? "bg-success/10 text-success-foreground border-success/20"
+                            : refund.status === "pending"
+                            ? "bg-warning/10 text-warning-foreground border-warning/20"
+                            : refund.status === "processing"
+                            ? "bg-info/10 text-info-foreground border-info/20"
+                            : "bg-destructive/10 text-destructive-foreground border-destructive/20"
+                        }`}
+                      >
+                        {refund.status.charAt(0).toUpperCase() + refund.status.slice(1)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {refund.reason.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                    </p>
+                    {refund.status === "pending" && (
+                      <div className="flex gap-2 mt-2">
+                        {booking.stripePaymentIntentId && (
+                          <button
+                            onClick={() => handleProcessRefund(refund.id, true)}
+                            disabled={processRefundMutation.isPending}
+                            className="flex-1 px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          >
+                            Via Stripe
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleProcessRefund(refund.id, false)}
+                          disabled={processManualRefundMutation.isPending}
+                          className="flex-1 px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded hover:bg-secondary/90 transition-colors disabled:opacity-50"
+                        >
+                          Mark Processed
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Reschedule Modal */}
       <Dialog
@@ -1099,8 +1268,12 @@ export default function BookingDetailPage() {
           <DialogHeader>
             <DialogTitle>Reschedule Booking</DialogTitle>
             <DialogDescription>
-              Select a new date and time for this booking. The booking will be moved
-              to the selected schedule.
+              Currently scheduled for{" "}
+              <strong>
+                {booking.schedule && formatDate(booking.schedule.startsAt)} at{" "}
+                {booking.schedule && formatTime(booking.schedule.startsAt)}
+              </strong>
+              . Select a new date and time below.
             </DialogDescription>
           </DialogHeader>
 
@@ -1142,7 +1315,7 @@ export default function BookingDetailPage() {
                               weekday: "short",
                               month: "short",
                               day: "numeric",
-                            }).format(new Date(schedule.startsAt))} - ${available} spots left`}
+                            }).format(new Date(schedule.startsAt))} at ${formatTime(schedule.startsAt)} - ${available} spots left`}
                           />
                           <div>
                             <p className="font-medium text-foreground">
@@ -1153,11 +1326,7 @@ export default function BookingDetailPage() {
                               }).format(new Date(schedule.startsAt))}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {new Intl.DateTimeFormat("en-US", {
-                                hour: "numeric",
-                                minute: "2-digit",
-                                hour12: true,
-                              }).format(new Date(schedule.startsAt))}
+                              {formatTime(schedule.startsAt)}
                             </p>
                           </div>
                         </div>
@@ -1312,8 +1481,11 @@ export default function BookingDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <label className="text-sm font-medium text-foreground">Cancellation Reason (optional)</label>
+            <label htmlFor="cancel-reason" className="text-sm font-medium text-foreground">
+              Cancellation Reason (optional)
+            </label>
             <textarea
+              id="cancel-reason"
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               className="w-full mt-2 p-3 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
@@ -1342,8 +1514,8 @@ export default function BookingDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Record Payment Modal */}
-      <Dialog
+      {/* Record Payment Sidebar */}
+      <Sheet
         open={showPaymentModal}
         onOpenChange={(open) => {
           setShowPaymentModal(open);
@@ -1354,27 +1526,95 @@ export default function BookingDetailPage() {
           }
         }}
       >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>
-              Record a manual payment for this booking. Use this for cash, check, or bank transfers.
-            </DialogDescription>
-          </DialogHeader>
+        <SheetContent className="w-full sm:max-w-md p-0 flex flex-col">
+          {/* Header */}
+          <div className="bg-muted/50 border-b border-border px-6 py-5">
+            <SheetHeader className="space-y-1">
+              <SheetTitle className="text-lg font-semibold">Record Payment</SheetTitle>
+              <SheetDescription className="text-sm text-muted-foreground">
+                {booking?.tour?.name} • {booking?.customer?.firstName} {booking?.customer?.lastName}
+              </SheetDescription>
+            </SheetHeader>
 
-          <div className="py-4 space-y-4">
+            {/* Balance Display */}
+            <div className="mt-4 flex items-end justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Balance Due</p>
+                <p className={`text-3xl font-bold tabular-nums ${
+                  balanceInfo && parseFloat(balanceInfo.balance) > 0 ? "text-warning" : "text-success"
+                }`}>
+                  ${balanceInfo ? parseFloat(balanceInfo.balance).toFixed(2) : "0.00"}
+                </p>
+              </div>
+              <div className="text-right text-sm text-muted-foreground">
+                <p>Total: ${parseFloat(booking.total).toFixed(2)}</p>
+                {balanceInfo && (
+                  <p>Paid: ${parseFloat(balanceInfo.totalPaid).toFixed(2)}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Form Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
             {createPaymentMutation.error && (
-              <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
+              <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
                 <p className="text-sm text-destructive">{createPaymentMutation.error.message}</p>
               </div>
             )}
 
+            {/* Quick Amount Selection */}
             <div>
-              <label htmlFor="payment-amount" className="block text-sm font-medium text-foreground mb-1">
-                Amount <span className="text-destructive">*</span>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Amount
               </label>
+              <div className="flex gap-2 mb-3">
+                {balanceInfo && parseFloat(balanceInfo.balance) > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentAmount(balanceInfo.balance)}
+                      className={`flex-1 px-3 py-2.5 text-sm font-medium rounded-lg border-2 transition-all ${
+                        paymentAmount === balanceInfo.balance
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:border-primary/50 text-foreground"
+                      }`}
+                    >
+                      Full
+                      <span className="block text-xs opacity-70">${parseFloat(balanceInfo.balance).toFixed(2)}</span>
+                    </button>
+                    {parseFloat(balanceInfo.balance) > 20 && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentAmount((parseFloat(balanceInfo.balance) / 2).toFixed(2))}
+                        className={`flex-1 px-3 py-2.5 text-sm font-medium rounded-lg border-2 transition-all ${
+                          paymentAmount === (parseFloat(balanceInfo.balance) / 2).toFixed(2)
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/50 text-foreground"
+                        }`}
+                      >
+                        50%
+                        <span className="block text-xs opacity-70">${(parseFloat(balanceInfo.balance) / 2).toFixed(2)}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setPaymentAmount("")}
+                      className={`flex-1 px-3 py-2.5 text-sm font-medium rounded-lg border-2 transition-all ${
+                        paymentAmount !== balanceInfo.balance && paymentAmount !== (parseFloat(balanceInfo.balance) / 2).toFixed(2)
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:border-primary/50 text-foreground"
+                      }`}
+                    >
+                      Custom
+                      <span className="block text-xs opacity-70">Enter amount</span>
+                    </button>
+                  </>
+                )}
+              </div>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
                   $
                 </span>
                 <input
@@ -1384,81 +1624,115 @@ export default function BookingDetailPage() {
                   min="0"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                  className="w-full pl-8 pr-3 py-3 border border-input rounded-lg bg-background text-foreground text-xl font-semibold tabular-nums focus:ring-2 focus:ring-ring focus:border-ring"
                   placeholder="0.00"
-                  aria-describedby="payment-amount-help"
+                  aria-label="Payment amount"
                 />
               </div>
-              {balanceInfo && (
-                <p id="payment-amount-help" className="text-xs text-muted-foreground mt-1">
-                  Balance due: ${parseFloat(balanceInfo.balance).toFixed(2)}
-                </p>
-              )}
             </div>
 
+            {/* Payment Method Pills */}
             <div>
-              <label htmlFor="payment-method" className="block text-sm font-medium text-foreground mb-1">
-                Payment Method <span className="text-destructive">*</span>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Payment Method
               </label>
-              <select
-                id="payment-method"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card" | "bank_transfer" | "check" | "other")}
-                className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-              >
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="check">Check</option>
-                <option value="other">Other</option>
-              </select>
+              <div className="grid grid-cols-3 gap-2">
+                {(["cash", "card", "bank_transfer", "check", "other"] as const).map((method) => {
+                  const labels: Record<typeof method, string> = {
+                    cash: "Cash",
+                    card: "Card",
+                    bank_transfer: "Transfer",
+                    check: "Check",
+                    other: "Other",
+                  };
+                  const icons: Record<typeof method, React.ReactNode> = {
+                    cash: <DollarSign className="h-4 w-4" />,
+                    card: <CreditCard className="h-4 w-4" />,
+                    bank_transfer: <RotateCcw className="h-4 w-4" />,
+                    check: <Edit className="h-4 w-4" />,
+                    other: <MoreHorizontal className="h-4 w-4" />,
+                  };
+                  return (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setPaymentMethod(method)}
+                      className={`flex flex-col items-center gap-1 px-3 py-3 text-sm font-medium rounded-lg border-2 transition-all ${
+                        paymentMethod === method
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border hover:border-primary/50 text-foreground"
+                      }`}
+                      aria-pressed={paymentMethod === method}
+                    >
+                      {icons[method]}
+                      <span className="text-xs">{labels[method]}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
+            {/* Reference Field */}
             <div>
               <label htmlFor="payment-reference" className="block text-sm font-medium text-foreground mb-1">
-                Reference (optional)
+                Reference <span className="text-muted-foreground font-normal">(optional)</span>
               </label>
               <input
                 id="payment-reference"
                 type="text"
                 value={paymentReference}
                 onChange={(e) => setPaymentReference(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
-                placeholder="Transaction ID, check number, etc."
-                aria-describedby="payment-reference-help"
+                className="w-full px-3 py-2.5 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                placeholder="Transaction ID, check #, receipt..."
+                aria-label="Payment reference"
               />
-              <p id="payment-reference-help" className="text-xs text-muted-foreground mt-1">
-                For tracking purposes (e.g., transaction ID, check number)
-              </p>
             </div>
 
+            {/* Notes */}
             <div>
               <label htmlFor="payment-notes" className="block text-sm font-medium text-foreground mb-1">
-                Notes (optional)
+                Notes <span className="text-muted-foreground font-normal">(optional)</span>
               </label>
               <textarea
                 id="payment-notes"
                 value={paymentNotes}
                 onChange={(e) => setPaymentNotes(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring"
+                className="w-full px-3 py-2.5 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring resize-none"
                 placeholder="Additional details about this payment..."
               />
             </div>
           </div>
 
-          <DialogFooter>
-            <button
-              onClick={() => {
-                setShowPaymentModal(false);
-                setPaymentAmount("");
-                setPaymentReference("");
-                setPaymentNotes("");
-              }}
-              className="px-4 py-2 text-foreground hover:bg-accent rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
+          {/* Footer - Fixed at bottom */}
+          <div className="border-t border-border bg-card px-6 py-4 mt-auto">
+            {/* Summary */}
+            {paymentAmount && parseFloat(paymentAmount) > 0 && (
+              <div className="mb-4 p-3 bg-muted/50 rounded-lg space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Recording</span>
+                  <span className="font-semibold text-foreground">
+                    ${parseFloat(paymentAmount).toFixed(2)} via {paymentMethod === "bank_transfer" ? "Transfer" : paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}
+                  </span>
+                </div>
+                {balanceInfo && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Balance after</span>
+                    <span className={`font-semibold ${
+                      parseFloat(balanceInfo.balance) - parseFloat(paymentAmount) <= 0
+                        ? "text-emerald-600"
+                        : "text-foreground"
+                    }`}>
+                      ${Math.max(0, parseFloat(balanceInfo.balance) - parseFloat(paymentAmount)).toFixed(2)}
+                      {parseFloat(balanceInfo.balance) - parseFloat(paymentAmount) <= 0 && (
+                        <span className="ml-1 text-xs">✓ Paid in full</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
               onClick={handleRecordPayment}
               disabled={
@@ -1466,14 +1740,21 @@ export default function BookingDetailPage() {
                 parseFloat(paymentAmount) <= 0 ||
                 createPaymentMutation.isPending
               }
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 inline-flex items-center"
+              className="w-full px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 inline-flex items-center justify-center font-medium transition-colors text-base"
             >
               {createPaymentMutation.isPending && <ButtonSpinner />}
               {createPaymentMutation.isPending ? "Recording..." : "Record Payment"}
             </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">⌘</kbd>
+              <span className="mx-0.5">+</span>
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Enter</kbd>
+              <span className="ml-1">to submit</span>
+            </p>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Payment Link Modal */}
       <Dialog

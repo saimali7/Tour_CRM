@@ -917,11 +917,13 @@ export class BookingService extends BaseService {
   }
 
   async getForSchedule(scheduleId: string): Promise<BookingWithRelations[]> {
+    // Get all active bookings for this schedule (pending, confirmed, completed - exclude cancelled and no_show)
     const result = await this.getAll(
-      { scheduleId, status: "confirmed" },
+      { scheduleId },
       { limit: 100 }
     );
-    return result.data;
+    // Filter out cancelled and no_show bookings
+    return result.data.filter(b => b.status !== "cancelled" && b.status !== "no_show");
   }
 
   async getTodaysBookings(): Promise<BookingWithRelations[]> {

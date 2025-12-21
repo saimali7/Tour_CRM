@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { Route } from "next";
 import { trpc } from "@/lib/trpc";
@@ -41,6 +41,12 @@ export function NotificationCenter() {
   const slug = params.slug as string;
   const [open, setOpen] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Prevent hydration mismatch with Radix Popover random IDs
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Get operations data to generate notifications
   const { data: operationsData } = trpc.dashboard.getOperationsDashboard.useQuery(undefined, {
@@ -144,6 +150,19 @@ export function NotificationCenter() {
         return <Clock className="h-4 w-4 text-blue-500" />;
     }
   };
+
+  // Render a placeholder button during SSR/initial mount to prevent hydration mismatch
+  if (!isMounted) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative h-9 w-9"
+      >
+        <Bell className="h-4 w-4" />
+      </Button>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

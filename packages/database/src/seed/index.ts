@@ -22,10 +22,14 @@ const client = postgres(databaseUrl);
 const db = drizzle(client, { schema });
 
 // Generate a unique reference number (same logic as base-service.ts)
+// Format: PREFIX-XXXXXX (6 easy-to-read alphanumeric chars, no 0/O/1/I/L)
 function generateReferenceNumber(prefix: string): string {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `${prefix}-${timestamp}${random}`;
+  const chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${prefix}-${code}`;
 }
 
 async function seed() {

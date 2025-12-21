@@ -10,9 +10,9 @@ import {
   MapPin,
   User,
   Plus,
-  ExternalLink,
   Ticket,
   TrendingUp,
+  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -133,15 +133,14 @@ export default function ScheduleDetailPage() {
                 {schedule.tour?.name || "Schedule Details"}
               </h1>
               <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  schedule.status === "scheduled"
-                    ? "bg-primary/10 text-primary"
-                    : schedule.status === "in_progress"
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${schedule.status === "scheduled"
+                  ? "bg-primary/10 text-primary"
+                  : schedule.status === "in_progress"
                     ? "status-pending"
                     : schedule.status === "completed"
-                    ? "status-completed"
-                    : "status-cancelled"
-                }`}
+                      ? "status-completed"
+                      : "status-cancelled"
+                  }`}
               >
                 {schedule.status === "in_progress" ? "In Progress" : schedule.status}
               </span>
@@ -173,8 +172,8 @@ export default function ScheduleDetailPage() {
           <span className={cn(
             "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium",
             fillRate >= 100 ? "bg-destructive/10 text-destructive" :
-            fillRate >= 80 ? "bg-warning/10 text-warning" :
-            "bg-success/10 text-success"
+              fillRate >= 80 ? "bg-warning/10 text-warning" :
+                "bg-success/10 text-success"
           )}>
             <TrendingUp className="h-4 w-4" />
             {fillRate}% filled
@@ -190,7 +189,7 @@ export default function ScheduleDetailPage() {
               className={cn(
                 "h-3 rounded-full transition-all",
                 fillRate >= 100 ? "bg-destructive" :
-                fillRate >= 80 ? "bg-warning" : "bg-success"
+                  fillRate >= 80 ? "bg-warning" : "bg-success"
               )}
               style={{ width: `${fillRate}%` }}
             />
@@ -212,21 +211,19 @@ export default function ScheduleDetailPage() {
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           <button
             onClick={() => setActiveTab("details")}
-            className={`${
-              activeTab === "details"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+            className={`${activeTab === "details"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
           >
             Details
           </button>
           <button
             onClick={() => setActiveTab("bookings")}
-            className={`${
-              activeTab === "bookings"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+            className={`${activeTab === "bookings"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
           >
             Bookings
             <span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full">
@@ -235,11 +232,10 @@ export default function ScheduleDetailPage() {
           </button>
           <button
             onClick={() => setActiveTab("manifest")}
-            className={`${
-              activeTab === "manifest"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+            className={`${activeTab === "manifest"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
           >
             Manifest
           </button>
@@ -413,7 +409,8 @@ export default function ScheduleDetailPage() {
               {scheduleBookings.map((booking) => (
                 <div
                   key={booking.id}
-                  className="p-4 flex items-center justify-between hover:bg-accent/50"
+                  onClick={() => router.push(`/org/${slug}/bookings/${booking.id}` as Route)}
+                  className="p-4 flex items-center justify-between hover:bg-accent/50 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -450,13 +447,7 @@ export default function ScheduleDetailPage() {
                       </p>
                     </div>
                   </div>
-                  <Link
-                    href={`/org/${slug}/bookings/${booking.id}` as Route}
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    View
-                  </Link>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
               ))}
             </div>

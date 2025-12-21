@@ -56,7 +56,6 @@ import { BulkEmailModal } from "@/components/bookings/bulk-email-modal";
 import { UnifiedBookingSheet } from "@/components/bookings/unified-booking-sheet";
 import { BookingMobileCard, BookingMobileCardSkeleton } from "@/components/bookings/booking-mobile-card";
 import { useIsMobile } from "@/hooks/use-media-query";
-import { useContextPanel } from "@/providers/context-panel-provider";
 
 type StatusFilter = "all" | "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 type PaymentFilter = "all" | "pending" | "partial" | "paid" | "refunded" | "failed";
@@ -85,7 +84,6 @@ export default function BookingsPage() {
   const router = useRouter();
   const slug = params.slug as string;
   const isMobile = useIsMobile();
-  const { openPanel } = useContextPanel();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
@@ -519,7 +517,7 @@ export default function BookingsPage() {
                     isOptimistic && "opacity-70"
                   )}
                   onClick={(e) => {
-                    // Don't open panel if clicking on checkbox, actions, or links
+                    // Don't navigate if clicking on checkbox, actions, or links
                     const target = e.target as HTMLElement;
                     if (
                       target.closest('input[type="checkbox"]') ||
@@ -528,28 +526,8 @@ export default function BookingsPage() {
                     ) {
                       return;
                     }
-                    openPanel({
-                      type: "booking",
-                      id: booking.id,
-                      data: {
-                        referenceNumber: booking.referenceNumber,
-                        status: booking.status,
-                        paymentStatus: booking.paymentStatus,
-                        total: booking.total,
-                        totalParticipants: booking.totalParticipants,
-                        customer: booking.customer ? {
-                          firstName: booking.customer.firstName,
-                          lastName: booking.customer.lastName,
-                          email: booking.customer.email,
-                        } : undefined,
-                        tour: booking.tour ? {
-                          name: booking.tour.name,
-                        } : undefined,
-                        schedule: booking.schedule ? {
-                          startsAt: booking.schedule.startsAt,
-                        } : undefined,
-                      },
-                    });
+                    // Navigate directly to booking details page
+                    router.push(`/org/${slug}/bookings/${booking.id}`);
                   }}
                 >
                   <TableCell>

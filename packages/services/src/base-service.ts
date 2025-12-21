@@ -29,11 +29,17 @@ export abstract class BaseService {
 
   /**
    * Generate a unique reference number
+   * Format: PREFIX-XXXXXX (6 easy-to-read alphanumeric chars)
+   * Avoids confusing characters: 0/O, 1/I/L
    */
   protected generateReferenceNumber(prefix: string): string {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `${prefix}-${timestamp}${random}`;
+    // Use only easy-to-read characters (no 0, O, 1, I, L to avoid confusion)
+    const chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${prefix}-${code}`;
   }
 
   /**

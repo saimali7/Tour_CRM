@@ -60,13 +60,6 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
     pagination: { page: 1, limit: 100 },
   });
 
-  const selectedSchedule = schedulesData?.data.find((s) => s.id === formData.scheduleId);
-
-  const { data: pricingTiers } = trpc.tour.listPricingTiers.useQuery(
-    { tourId: selectedSchedule?.tour?.id || "" },
-    { enabled: !!selectedSchedule?.tour?.id }
-  );
-
   const [formData, setFormData] = useState({
     customerId: booking?.customerId ?? preselectedCustomerId ?? "",
     scheduleId: booking?.scheduleId ?? preselectedScheduleId ?? "",
@@ -80,6 +73,14 @@ export function BookingForm({ booking, preselectedCustomerId, preselectedSchedul
     accessibilityNeeds: booking?.accessibilityNeeds ?? "",
     internalNotes: booking?.internalNotes ?? "",
   });
+
+  // Find selected schedule - must be after formData declaration
+  const selectedSchedule = schedulesData?.data.find((s) => s.id === formData.scheduleId);
+
+  const { data: pricingTiers } = trpc.tour.listPricingTiers.useQuery(
+    { tourId: selectedSchedule?.tour?.id || "" },
+    { enabled: !!selectedSchedule?.tour?.id }
+  );
 
   const [calculatedPrice, setCalculatedPrice] = useState({
     subtotal: booking?.subtotal ?? "0",

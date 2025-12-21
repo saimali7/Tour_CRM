@@ -28,6 +28,7 @@ import {
   Star,
   Target,
   Zap,
+  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -498,8 +499,8 @@ export default function CustomerDetailPage() {
                     tag === "vip"
                       ? "bg-amber-500/10 text-amber-600"
                       : tag === "repeat-customer"
-                      ? "bg-emerald-500/10 text-emerald-600"
-                      : "bg-primary/10 text-primary"
+                        ? "bg-emerald-500/10 text-emerald-600"
+                        : "bg-primary/10 text-primary"
                   )}
                 >
                   {tag}
@@ -527,11 +528,10 @@ export default function CustomerDetailPage() {
           <nav className="flex -mb-px">
             <button
               onClick={() => setActiveTab("bookings")}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "bookings"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              }`}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "bookings"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                }`}
             >
               <div className="flex items-center gap-2">
                 <Ticket className="h-4 w-4" />
@@ -540,11 +540,10 @@ export default function CustomerDetailPage() {
             </button>
             <button
               onClick={() => setActiveTab("notes")}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "notes"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              }`}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "notes"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                }`}
             >
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
@@ -553,11 +552,10 @@ export default function CustomerDetailPage() {
             </button>
             <button
               onClick={() => setActiveTab("communications")}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "communications"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              }`}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "communications"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                }`}
             >
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4" />
@@ -577,7 +575,8 @@ export default function CustomerDetailPage() {
                   {bookings.map((booking) => (
                     <div
                       key={booking.id}
-                      className="py-4 flex items-center justify-between"
+                      onClick={() => router.push(`/org/${slug}/bookings/${booking.id}` as Route)}
+                      className="py-4 flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 px-6 transition-colors"
                     >
                       <div className="flex items-center gap-4">
                         <div>
@@ -608,7 +607,7 @@ export default function CustomerDetailPage() {
                             {booking.totalParticipants} guests
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           {(booking.status === "completed" || booking.status === "cancelled") && (
                             <button
                               onClick={() => handleRebook(booking)}
@@ -619,12 +618,7 @@ export default function CustomerDetailPage() {
                               Rebook
                             </button>
                           )}
-                          <Link
-                            href={`/org/${slug}/bookings/${booking.id}` as Route}
-                            className="text-primary hover:underline text-sm"
-                          >
-                            View
-                          </Link>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </div>
                     </div>
@@ -673,9 +667,8 @@ export default function CustomerDetailPage() {
                   {notes.data.map((note) => (
                     <div
                       key={note.id}
-                      className={`p-4 rounded-lg border ${
-                        note.isPinned ? "border-warning/30 bg-warning/10" : "border-border bg-muted"
-                      }`}
+                      className={`p-4 rounded-lg border ${note.isPinned ? "border-warning/30 bg-warning/10" : "border-border bg-muted"
+                        }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -698,9 +691,8 @@ export default function CustomerDetailPage() {
                         <div className="flex items-center gap-1 ml-4">
                           <button
                             onClick={() => handleTogglePin(note.id)}
-                            className={`p-1.5 rounded hover:bg-accent ${
-                              note.isPinned ? "text-warning" : "text-muted-foreground"
-                            }`}
+                            className={`p-1.5 rounded hover:bg-accent ${note.isPinned ? "text-warning" : "text-muted-foreground"
+                              }`}
                             title={note.isPinned ? "Unpin" : "Pin"}
                           >
                             <Pin className="h-4 w-4" />
@@ -742,9 +734,8 @@ export default function CustomerDetailPage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              comm.type === "email" ? "bg-primary/10 text-primary" : "bg-success/10 text-success"
-                            }`}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${comm.type === "email" ? "bg-primary/10 text-primary" : "bg-success/10 text-success"
+                              }`}>
                               {comm.type === "email" ? (
                                 <Mail className="h-3 w-3 mr-1" />
                               ) : (
@@ -752,13 +743,12 @@ export default function CustomerDetailPage() {
                               )}
                               {comm.type.toUpperCase()}
                             </span>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              comm.status === "delivered" || comm.status === "opened" || comm.status === "clicked"
-                                ? "bg-success/10 text-success"
-                                : comm.status === "failed" || comm.status === "bounced"
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${comm.status === "delivered" || comm.status === "opened" || comm.status === "clicked"
+                              ? "bg-success/10 text-success"
+                              : comm.status === "failed" || comm.status === "bounced"
                                 ? "bg-destructive/10 text-destructive"
                                 : "bg-secondary text-secondary-foreground"
-                            }`}>
+                              }`}>
                               {comm.status === "delivered" && <Check className="h-3 w-3 mr-1" />}
                               {comm.status === "failed" && <X className="h-3 w-3 mr-1" />}
                               {comm.status.charAt(0).toUpperCase() + comm.status.slice(1)}
