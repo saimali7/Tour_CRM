@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Clock, Users, MapPin, ChevronDown, ChevronUp, FileText, User, DollarSign, Check } from "lucide-react";
+import { Loader2, Clock, Users, MapPin, ChevronDown, ChevronUp, FileText, DollarSign, Check } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,6 @@ interface ScheduleFormProps {
   schedule?: {
     id: string;
     tourId: string;
-    guideId: string | null;
     startsAt: Date;
     endsAt: Date;
     maxParticipants: number;
@@ -34,13 +33,8 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
     filters: { status: "active" },
   });
 
-  const { data: guidesData } = trpc.guide.list.useQuery({
-    pagination: { page: 1, limit: 100 },
-  });
-
   const [formData, setFormData] = useState({
     tourId: schedule?.tourId ?? "",
-    guideId: schedule?.guideId ?? "",
     date: schedule?.startsAt ? new Date(schedule.startsAt).toISOString().split("T")[0] : "",
     startTime: schedule?.startsAt ? new Date(schedule.startsAt).toTimeString().slice(0, 5) : "09:00",
     endTime: schedule?.endsAt ? new Date(schedule.endsAt).toTimeString().slice(0, 5) : "11:00",
@@ -53,7 +47,6 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
   });
 
   // Collapsible sections
-  const [showGuide, setShowGuide] = useState(isEditing && !!schedule?.guideId);
   const [showOverrides, setShowOverrides] = useState(
     isEditing && !!(schedule?.price || schedule?.meetingPoint)
   );
@@ -79,7 +72,7 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
       utils.schedule.list.invalidate();
       utils.schedule.getById.invalidate({ id: schedule?.id });
       toast.success("Schedule updated successfully");
-      router.push(`/org/${slug}/availability`);
+      router.push(`/org/${slug}/availability/${schedule?.id}`);
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update schedule");
@@ -112,7 +105,6 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
 
     const submitData = {
       tourId: formData.tourId,
-      guideId: formData.guideId || undefined,
       startsAt,
       endsAt,
       maxParticipants: formData.maxParticipants,
@@ -127,7 +119,6 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
       updateMutation.mutate({
         id: schedule.id,
         data: {
-          guideId: submitData.guideId,
           startsAt: submitData.startsAt,
           endsAt: submitData.endsAt,
           maxParticipants: submitData.maxParticipants,
@@ -376,23 +367,6 @@ export function ScheduleForm({ schedule }: ScheduleFormProps) {
       {/* Optional Sections */}
       {formData.tourId && (
         <div className="space-y-3">
-          {/* Guide Assignment */}
-          <CollapsibleSection title="Assign Guide" icon={User} isOpen={showGuide} onToggle={() => setShowGuide(!showGuide)}>
-            <select
-              value={formData.guideId}
-              onChange={(e) => setFormData((prev) => ({ ...prev, guideId: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-input rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            >
-              <option value="">No guide assigned yet</option>
-              {guidesData?.data.map((guide) => (
-                <option key={guide.id} value={guide.id}>
-                  {guide.firstName} {guide.lastName}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground mt-2">You can also assign guides later from the schedule detail page</p>
-          </CollapsibleSection>
-
           {/* Overrides */}
           <CollapsibleSection title="Price & Meeting Point" icon={DollarSign} isOpen={showOverrides} onToggle={() => setShowOverrides(!showOverrides)}>
             <div className="space-y-4">

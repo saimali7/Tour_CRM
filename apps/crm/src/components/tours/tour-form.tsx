@@ -15,6 +15,7 @@ export interface TourFormData {
   durationMinutes: number;
   minParticipants: number;
   maxParticipants: number;
+  guestsPerGuide: number;
   basePrice: string;
   category: string;
   tags: string[];
@@ -78,6 +79,7 @@ export function TourForm({
     durationMinutes: 60,
     minParticipants: 1,
     maxParticipants: 10,
+    guestsPerGuide: 6,
     basePrice: "0.00",
     category: "",
     tags: [],
@@ -156,6 +158,7 @@ export function TourForm({
       durationMinutes: formData.durationMinutes,
       minParticipants: formData.minParticipants,
       maxParticipants: formData.maxParticipants,
+      guestsPerGuide: formData.guestsPerGuide,
       basePrice: formData.basePrice,
       category: formData.category || undefined,
       tags: formData.tags.length > 0 ? formData.tags : undefined,
@@ -433,7 +436,7 @@ export function TourForm({
       <div className="bg-card rounded-lg border border-border p-6 space-y-6">
         <h2 className="text-lg font-semibold text-foreground">Pricing & Capacity</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
               Base Price ($) *
@@ -472,6 +475,29 @@ export function TourForm({
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Guests per Guide
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={formData.guestsPerGuide}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  guestsPerGuide: parseInt(e.target.value) || 6,
+                }))
+              }
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Auto-calculates guides needed per booking
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
               Min Participants

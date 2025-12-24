@@ -1,7 +1,9 @@
-import { eq, and, desc, asc, sql, count, ilike, or, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, ilike, or, gte, lte, inArray } from "drizzle-orm";
 import {
   guides,
   schedules,
+  bookings,
+  guideAssignments,
   type Guide,
   type GuideStatus,
 } from "@tour/database";
@@ -124,16 +126,20 @@ export class GuideService extends BaseService {
 
     const now = new Date();
 
+    // Count schedules where this guide has confirmed assignments (via bookings)
     const statsResult = await this.db
       .select({
-        totalSchedules: count(),
-        upcomingSchedules: sql<number>`COUNT(*) FILTER (WHERE ${schedules.startsAt} > ${now} AND ${schedules.status} = 'scheduled')`,
+        totalSchedules: sql<number>`COUNT(DISTINCT ${schedules.id})`,
+        upcomingSchedules: sql<number>`COUNT(DISTINCT ${schedules.id}) FILTER (WHERE ${schedules.startsAt} > ${now.toISOString()}::timestamp AND ${schedules.status} = 'scheduled')`,
       })
-      .from(schedules)
+      .from(guideAssignments)
+      .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
+      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
       .where(
         and(
-          eq(schedules.guideId, id),
-          eq(schedules.organizationId, this.organizationId)
+          eq(guideAssignments.guideId, id),
+          eq(guideAssignments.organizationId, this.organizationId),
+          eq(guideAssignments.status, "confirmed")
         )
       );
 
@@ -141,7 +147,7 @@ export class GuideService extends BaseService {
 
     return {
       ...guide,
-      totalSchedules: stats?.totalSchedules ?? 0,
+      totalSchedules: Number(stats?.totalSchedules ?? 0),
       upcomingSchedules: Number(stats?.upcomingSchedules ?? 0),
     };
   }
@@ -245,20 +251,39 @@ export class GuideService extends BaseService {
   ) {
     await this.getById(id);
 
-    const conditions = [
-      eq(schedules.guideId, id),
+    // Get schedules where this guide has confirmed assignments (via bookings)
+    const assignmentConditions = [
+      eq(guideAssignments.guideId, id),
+      eq(guideAssignments.organizationId, this.organizationId),
+      eq(guideAssignments.status, "confirmed"),
+    ];
+
+    const assignments = await this.db
+      .select({ scheduleId: bookings.scheduleId })
+      .from(guideAssignments)
+      .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
+      .where(and(...assignmentConditions));
+
+    const scheduleIds = [...new Set(assignments.map((a) => a.scheduleId))];
+
+    if (scheduleIds.length === 0) {
+      return [];
+    }
+
+    const scheduleConditions = [
+      inArray(schedules.id, scheduleIds),
       eq(schedules.organizationId, this.organizationId),
     ];
 
     if (dateRange?.from) {
-      conditions.push(gte(schedules.startsAt, dateRange.from));
+      scheduleConditions.push(gte(schedules.startsAt, dateRange.from));
     }
     if (dateRange?.to) {
-      conditions.push(lte(schedules.startsAt, dateRange.to));
+      scheduleConditions.push(lte(schedules.startsAt, dateRange.to));
     }
 
     return this.db.query.schedules.findMany({
-      where: and(...conditions),
+      where: and(...scheduleConditions),
       orderBy: [asc(schedules.startsAt)],
       with: {
         tour: true,
@@ -281,24 +306,35 @@ export class GuideService extends BaseService {
         )
       );
 
-    const conflictConditions = [
+    // Check for overlapping schedules where guides have confirmed assignments
+    // A schedule overlaps if it starts before our end AND ends after our start
+    const scheduleConditions = [
       eq(schedules.organizationId, this.organizationId),
       eq(schedules.status, "scheduled"),
-      sql`${schedules.guideId} IS NOT NULL`,
-      sql`(${schedules.startsAt}, ${schedules.endsAt}) OVERLAPS (${startsAt}, ${endsAt})`,
+      lte(schedules.startsAt, endsAt),
+      gte(schedules.endsAt, startsAt),
     ];
 
     if (excludeScheduleId) {
-      conflictConditions.push(sql`${schedules.id} != ${excludeScheduleId}`);
+      scheduleConditions.push(sql`${schedules.id} != ${excludeScheduleId}`);
     }
 
-    const conflictingSchedules = await this.db
-      .select({ guideId: schedules.guideId })
-      .from(schedules)
-      .where(and(...conflictConditions));
+    // Find guides with confirmed assignments for overlapping schedules
+    const busyGuides = await this.db
+      .select({ guideId: guideAssignments.guideId })
+      .from(guideAssignments)
+      .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
+      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
+      .where(
+        and(
+          eq(guideAssignments.organizationId, this.organizationId),
+          eq(guideAssignments.status, "confirmed"),
+          ...scheduleConditions
+        )
+      );
 
     const busyGuideIds = new Set(
-      conflictingSchedules.map((s) => s.guideId).filter(Boolean)
+      busyGuides.map((b) => b.guideId)
     );
 
     return activeGuides.filter((g) => !busyGuideIds.has(g.id));

@@ -304,7 +304,6 @@ export function UnifiedBookingSheet({
         maxParticipants: s.maxParticipants || 10,
         available: (s.maxParticipants || 10) - (s.bookedCount || 0),
         // Differentiators for duplicate time slots
-        guideName: s.guide ? `${s.guide.firstName}${s.guide.lastName ? ` ${s.guide.lastName.charAt(0)}.` : ''}` : null,
         meetingPoint: s.meetingPoint || null,
       }));
   }, [schedulesData, selectedDate]);
@@ -1001,7 +1000,7 @@ export function UnifiedBookingSheet({
                       const isSelected = selectedScheduleId === slot.id;
                       const hasDuplicates = (timeSlotCounts.get(slot.time) || 0) > 1;
                       const differentiator = hasDuplicates
-                        ? (slot.guideName || slot.meetingPoint || `${slot.maxParticipants} max`)
+                        ? (slot.meetingPoint || `${slot.maxParticipants} max`)
                         : null;
                       return (
                         <button

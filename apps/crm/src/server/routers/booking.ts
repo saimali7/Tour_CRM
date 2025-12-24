@@ -43,9 +43,22 @@ const participantSchema = z.object({
 
 const priceStringSchema = z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid decimal (e.g., 99.99)");
 
+const pricingSnapshotSchema = z.object({
+  optionId: z.string().optional(),
+  optionName: z.string().optional(),
+  pricingModel: z.any().optional(),
+  experienceMode: z.enum(["join", "book", "charter"]).optional(),
+  priceBreakdown: z.string().optional(),
+}).optional();
+
 const createBookingSchema = z.object({
   customerId: z.string().max(100),
   scheduleId: z.string().max(100),
+  bookingOptionId: z.string().optional(),
+  guestAdults: z.number().min(0).max(100).optional(),
+  guestChildren: z.number().min(0).max(100).optional(),
+  guestInfants: z.number().min(0).max(100).optional(),
+  pricingSnapshot: pricingSnapshotSchema,
   adultCount: z.number().min(1).max(100),
   childCount: z.number().min(0).max(100).optional(),
   infantCount: z.number().min(0).max(100).optional(),
@@ -113,26 +126,31 @@ export const bookingRouter = createRouter({
       const booking = await services.booking.create(input);
 
       // Send booking created email via Inngest (only if customer has email)
+      // Wrapped in try-catch so Inngest failures don't break booking creation
       if (booking.customer?.email && booking.schedule && booking.tour) {
-        await inngest.send({
-          name: "booking/created",
-          data: {
-            organizationId: ctx.orgContext.organizationId,
-            bookingId: booking.id,
-            customerId: booking.customerId,
-            customerEmail: booking.customer.email,
-            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-            bookingReference: booking.referenceNumber,
-            tourName: booking.tour.name,
-            tourDate: format(new Date(booking.schedule.startsAt), "MMMM d, yyyy"),
-            tourTime: format(new Date(booking.schedule.startsAt), "h:mm a"),
-            participants: booking.totalParticipants,
-            totalAmount: booking.total,
-            currency: booking.currency,
-            meetingPoint: booking.tour.meetingPoint || undefined,
-            meetingPointDetails: booking.tour.meetingPointDetails || undefined,
-          },
-        });
+        try {
+          await inngest.send({
+            name: "booking/created",
+            data: {
+              organizationId: ctx.orgContext.organizationId,
+              bookingId: booking.id,
+              customerId: booking.customerId,
+              customerEmail: booking.customer.email,
+              customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+              bookingReference: booking.referenceNumber,
+              tourName: booking.tour.name,
+              tourDate: format(new Date(booking.schedule.startsAt), "MMMM d, yyyy"),
+              tourTime: format(new Date(booking.schedule.startsAt), "h:mm a"),
+              participants: booking.totalParticipants,
+              totalAmount: booking.total,
+              currency: booking.currency,
+              meetingPoint: booking.tour.meetingPoint || undefined,
+              meetingPointDetails: booking.tour.meetingPointDetails || undefined,
+            },
+          });
+        } catch (inngestError) {
+          console.error("Failed to send booking created event to Inngest:", inngestError);
+        }
       }
 
       return booking;

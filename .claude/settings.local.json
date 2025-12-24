@@ -118,7 +118,14 @@
       "mcp__playwright__browser_console_messages",
       "mcp__playwright__browser_install",
       "Bash(pnpm dlx:*)",
-      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -3)"
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -3)",
+      "Bash(pnpm --filter @tour/validators typecheck:*)",
+      "Bash(timeout 120 npx tsc:*)",
+      "Bash(pnpm drizzle-kit execute:*)",
+      "mcp__playwright__browser_network_requests",
+      "WebFetch(domain:localhost)",
+      "mcp__playwright__browser_fill_form",
+      "Bash(script -q /dev/null bash -c 'echo \"\"\"\" | npx drizzle-kit push 2>&1')"
     ]
   }
 }

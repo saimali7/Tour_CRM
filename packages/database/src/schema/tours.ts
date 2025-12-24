@@ -25,6 +25,9 @@ export const tours = pgTable("tours", {
   minParticipants: integer("min_participants").default(1),
   maxParticipants: integer("max_participants").notNull(),
 
+  // Guide capacity - how many guests one guide can handle
+  guestsPerGuide: integer("guests_per_guide").notNull().default(6),
+
   // Pricing (base price, can be overridden per schedule)
   basePrice: numeric("base_price", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").default("USD"),
@@ -191,6 +194,7 @@ export const toursRelations = relations(tours, ({ one, many }) => ({
   }),
   pricingTiers: many(tourPricingTiers),
   variants: many(tourVariants),
+  // Note: bookingOptions relation defined in booking-options.ts to avoid circular deps
 }));
 
 export const tourPricingTiersRelations = relations(tourPricingTiers, ({ one }) => ({

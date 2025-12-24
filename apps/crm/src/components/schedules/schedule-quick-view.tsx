@@ -189,41 +189,40 @@ export function ScheduleQuickView({
         </div>
       )}
 
-      {/* Guide Info */}
+      {/* Guide Staffing Info */}
       <div className="border rounded-lg p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" />
-            Guide
-          </h4>
-          {onGuideClick && schedule.guide && (
-            <button
-              onClick={() => onGuideClick(schedule.guide!.id)}
-              className="text-xs text-primary hover:underline"
-            >
-              View Profile
-            </button>
-          )}
-        </div>
-        {schedule.guide ? (
-          <div>
-            <p className="font-medium">
-              {schedule.guide.firstName} {schedule.guide.lastName}
-            </p>
-            {schedule.guide.email && (
-              <a
-                href={`mailto:${schedule.guide.email}`}
-                className="text-sm text-muted-foreground hover:text-primary"
-              >
-                {schedule.guide.email}
-              </a>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-warning font-medium">
-            No guide assigned
-          </p>
-        )}
+        <h4 className="text-sm font-medium flex items-center gap-2">
+          <User className="h-4 w-4 text-muted-foreground" />
+          Guide Staffing
+        </h4>
+        {(() => {
+          const guidesAssigned = schedule.guidesAssigned || 0;
+          const guidesRequired = schedule.guidesRequired || 0;
+          const needsGuides = guidesAssigned < guidesRequired;
+          const guideStatus = needsGuides
+            ? `Needs ${guidesRequired - guidesAssigned} more guide(s)`
+            : 'Fully staffed';
+
+          return (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {guidesAssigned} / {guidesRequired} guides
+                </span>
+                <span className={`text-xs font-medium ${
+                  needsGuides ? "text-warning" : "text-success"
+                }`}>
+                  {guideStatus}
+                </span>
+              </div>
+              {needsGuides && (
+                <p className="text-xs text-muted-foreground">
+                  Guides are assigned through individual bookings
+                </p>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Meeting Point */}

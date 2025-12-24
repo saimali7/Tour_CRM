@@ -3,7 +3,7 @@ import { createRouter, publicProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 import { TRPCError } from "@trpc/server";
 import { getGuideContext } from "../../lib/guide-auth";
-import { db, eq, and, gte, lte } from "@tour/database";
+import { db, eq, and, gte, lte, inArray } from "@tour/database";
 import { schedules, bookings, guideAssignments } from "@tour/database/schema";
 
 /**
@@ -35,42 +35,59 @@ export const guidePortalRouter = createRouter({
   getMyDashboard: guideProcedure.query(async ({ ctx }) => {
     const { guideId, organizationId } = ctx.guideContext;
 
-    // Get upcoming tours (next 7 days)
+    // Get upcoming tours (next 7 days) where the guide has confirmed assignments
     const today = new Date();
     const nextWeek = new Date();
     nextWeek.setDate(today.getDate() + 7);
 
-    const upcomingSchedules = await db.query.schedules.findMany({
+    // First get confirmed assignments for this guide that link to upcoming schedules
+    const confirmedAssignments = await db.query.guideAssignments.findMany({
       where: and(
-        eq(schedules.organizationId, organizationId),
-        gte(schedules.startsAt, today),
-        lte(schedules.startsAt, nextWeek),
-        eq(schedules.status, "scheduled")
+        eq(guideAssignments.organizationId, organizationId),
+        eq(guideAssignments.guideId, guideId),
+        eq(guideAssignments.status, "confirmed")
       ),
       with: {
-        tour: true,
-        assignments: {
-          where: and(
-            eq(guideAssignments.guideId, guideId),
-            eq(guideAssignments.status, "confirmed")
-          ),
-        },
-        bookings: {
-          where: eq(bookings.status, "confirmed"),
+        booking: {
           with: {
-            customer: true,
+            schedule: {
+              with: {
+                tour: true,
+              },
+            },
           },
         },
       },
-      orderBy: (schedules, { asc }) => [asc(schedules.startsAt)],
     });
 
-    // Filter to only schedules where guide is confirmed
-    const myUpcomingSchedules = upcomingSchedules.filter(
-      (schedule) => schedule.assignments.length > 0
+    // Filter to upcoming schedules and deduplicate by scheduleId
+    // Type assertion needed because Drizzle's nested relation types aren't properly inferred
+    type ScheduleWithTour = typeof schedules.$inferSelect & { tour?: { id: string; name: string } | null };
+    const scheduleMap = new Map<string, ScheduleWithTour & { bookingCount: number }>();
+    for (const assignment of confirmedAssignments) {
+      // The with clause includes schedule but TypeScript doesn't know about it
+      const booking = assignment.booking as unknown as { schedule: ScheduleWithTour | null; scheduleId: string };
+      const schedule = booking.schedule;
+      if (
+        schedule &&
+        schedule.startsAt >= today &&
+        schedule.startsAt <= nextWeek &&
+        schedule.status === "scheduled"
+      ) {
+        if (!scheduleMap.has(schedule.id)) {
+          scheduleMap.set(schedule.id, { ...schedule, bookingCount: 1 });
+        } else {
+          const existing = scheduleMap.get(schedule.id)!;
+          existing.bookingCount++;
+        }
+      }
+    }
+
+    const myUpcomingSchedules = Array.from(scheduleMap.values()).sort(
+      (a, b) => a.startsAt.getTime() - b.startsAt.getTime()
     );
 
-    // Get pending assignments
+    // Get pending assignments (via bookings)
     const pendingAssignments = await db.query.guideAssignments.findMany({
       where: and(
         eq(guideAssignments.organizationId, organizationId),
@@ -78,9 +95,13 @@ export const guidePortalRouter = createRouter({
         eq(guideAssignments.status, "pending")
       ),
       with: {
-        schedule: {
+        booking: {
           with: {
-            tour: true,
+            schedule: {
+              with: {
+                tour: true,
+              },
+            },
           },
         },
       },
@@ -127,26 +148,28 @@ export const guidePortalRouter = createRouter({
       const assignments = await db.query.guideAssignments.findMany({
         where: and(...whereConditions),
         with: {
-          schedule: {
+          booking: {
             with: {
-              tour: true,
-              bookings: {
-                where: eq(bookings.status, "confirmed"),
+              schedule: {
                 with: {
-                  customer: true,
+                  tour: true,
                 },
               },
+              customer: true,
             },
           },
         },
         orderBy: (guideAssignments, { desc }) => [desc(guideAssignments.createdAt)],
       });
 
-      // Filter by date range if provided
-      let filteredAssignments = assignments;
+      // Filter by date range if provided (based on booking's schedule)
+      // Type assertion needed for nested relations
+      type AssignmentWithBooking = typeof assignments[number] & { booking: { schedule: { startsAt: Date } | null } };
+      let filteredAssignments = assignments as AssignmentWithBooking[];
       if (input.dateRange?.from || input.dateRange?.to) {
-        filteredAssignments = assignments.filter((assignment) => {
-          const scheduleDate = assignment.schedule.startsAt;
+        filteredAssignments = (assignments as AssignmentWithBooking[]).filter((assignment) => {
+          const scheduleDate = assignment.booking.schedule?.startsAt;
+          if (!scheduleDate) return false;
           if (input.dateRange?.from && scheduleDate < input.dateRange.from) {
             return false;
           }
@@ -175,15 +198,14 @@ export const guidePortalRouter = createRouter({
           eq(guideAssignments.guideId, guideId)
         ),
         with: {
-          schedule: {
+          booking: {
             with: {
-              tour: true,
-              bookings: {
-                where: eq(bookings.status, "confirmed"),
+              schedule: {
                 with: {
-                  customer: true,
+                  tour: true,
                 },
               },
+              customer: true,
             },
           },
         },
@@ -272,21 +294,42 @@ export const guidePortalRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const { guideId, organizationId } = ctx.guideContext;
 
-      // Verify the guide is assigned to this schedule
-      const assignment = await db.query.guideAssignments.findFirst({
+      // Verify the guide is assigned to this schedule (via any booking on this schedule)
+      const assignmentCheck = await db.query.guideAssignments.findFirst({
         where: and(
-          eq(guideAssignments.scheduleId, input.scheduleId),
           eq(guideAssignments.guideId, guideId),
           eq(guideAssignments.organizationId, organizationId),
           eq(guideAssignments.status, "confirmed")
         ),
+        with: {
+          booking: true,
+        },
       });
 
-      if (!assignment) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You are not assigned to this schedule",
+      // Check if assignment's booking is for this schedule
+      if (!assignmentCheck || assignmentCheck.booking.scheduleId !== input.scheduleId) {
+        // Double-check with a more complete query
+        const allAssignments = await db.query.guideAssignments.findMany({
+          where: and(
+            eq(guideAssignments.guideId, guideId),
+            eq(guideAssignments.organizationId, organizationId),
+            eq(guideAssignments.status, "confirmed")
+          ),
+          with: {
+            booking: true,
+          },
         });
+
+        const hasScheduleAssignment = allAssignments.some(
+          (a) => a.booking.scheduleId === input.scheduleId
+        );
+
+        if (!hasScheduleAssignment) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You are not assigned to this schedule",
+          });
+        }
       }
 
       // Get the schedule with all details

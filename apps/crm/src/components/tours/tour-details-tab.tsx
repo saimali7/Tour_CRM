@@ -13,6 +13,7 @@ interface TourDetailsTabProps {
     durationMinutes: number;
     maxParticipants: number;
     minParticipants: number | null;
+    guestsPerGuide: number;
     basePrice: string;
     category: string | null;
     tags: string[] | null;
@@ -41,6 +42,7 @@ export function TourDetailsTab({ tourId, tour, onSuccess }: TourDetailsTabProps)
     durationMinutes: tour.durationMinutes,
     minParticipants: tour.minParticipants ?? 1,
     maxParticipants: tour.maxParticipants,
+    guestsPerGuide: tour.guestsPerGuide,
     basePrice: tour.basePrice,
     category: tour.category ?? "",
     tags: tour.tags ?? [],

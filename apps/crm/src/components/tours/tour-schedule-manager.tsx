@@ -669,20 +669,20 @@ export function TourScheduleManager({ tourId, orgSlug, tourDefaults }: TourSched
                       </span>
                     </div>
 
-                    {/* Guide Status - only show if booked or assigned */}
-                    {(bookedCount > 0 || schedule.guide) && (
+                    {/* Guide Status - only show if booked or guides required */}
+                    {(bookedCount > 0 || (schedule.guidesRequired ?? 0) > 0) && (
                       <div className="mt-2 flex items-center gap-2 text-sm">
-                        {schedule.guide ? (
+                        {(schedule.guidesAssigned ?? 0) > 0 ? (
                           <span className="flex items-center gap-1.5 text-success">
                             <CheckCircle2 className="h-4 w-4" />
-                            {schedule.guide.firstName} {schedule.guide.lastName}
+                            {schedule.guidesAssigned}/{schedule.guidesRequired} guides assigned
                           </span>
-                        ) : (
+                        ) : (schedule.guidesRequired ?? 0) > 0 ? (
                           <span className="flex items-center gap-1.5 text-warning">
                             <AlertCircle className="h-4 w-4" />
-                            Needs guide assignment
+                            Needs {schedule.guidesRequired} guide{schedule.guidesRequired !== 1 ? 's' : ''}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     )}
                   </div>

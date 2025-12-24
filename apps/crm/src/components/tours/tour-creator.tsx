@@ -18,6 +18,7 @@ import {
   Save,
   Send,
   X,
+  DollarSign,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -25,6 +26,7 @@ import { useIsMobile } from "@/hooks/use-media-query";
 
 // Tab Components
 import { EssentialsTab } from "./tour-creator/essentials-tab";
+import { PricingTab, type PricingFormState } from "./tour-creator/pricing-tab";
 import { ContentTab } from "./tour-creator/content-tab";
 import { ScheduleTab } from "./tour-creator/schedule-tab";
 import { SettingsTab } from "./tour-creator/settings-tab";
@@ -70,6 +72,9 @@ export interface TourFormState {
   maximumAdvanceDays: number;
   allowSameDayBooking: boolean;
   sameDayCutoffTime: string;
+
+  // Pricing configuration (for creating default booking option)
+  pricingConfig?: PricingFormState;
 }
 
 interface TourCreatorProps {
@@ -78,7 +83,7 @@ interface TourCreatorProps {
   initialData?: Partial<TourFormState>;
 }
 
-type TabId = "essentials" | "content" | "schedule" | "settings";
+type TabId = "essentials" | "pricing" | "content" | "schedule" | "settings";
 
 interface Tab {
   id: TabId;
@@ -90,6 +95,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: "essentials", label: "Essentials", shortLabel: "Basics", icon: Sparkles, description: "Name, price & capacity" },
+  { id: "pricing", label: "Pricing", shortLabel: "Price", icon: DollarSign, description: "Pricing & capacity" },
   { id: "content", label: "Content", shortLabel: "Content", icon: FileText, description: "Description & images" },
   { id: "schedule", label: "Schedule", shortLabel: "When", icon: Calendar, description: "When it runs" },
   { id: "settings", label: "Settings", shortLabel: "Config", icon: Settings, description: "Policies & SEO" },
@@ -232,6 +238,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
   const createMutation = trpc.tour.create.useMutation();
   const updateMutation = trpc.tour.update.useMutation();
   const autoGenerateMutation = trpc.schedule.autoGenerate.useMutation();
+  const createBookingOptionMutation = trpc.bookingOptions.create.useMutation();
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
@@ -272,6 +279,30 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
       formState.maxParticipants > 0
     );
 
+    // Check if pricing is configured
+    const pc = formState.pricingConfig;
+    let pricingComplete = false;
+    if (pc) {
+      switch (pc.pricingType) {
+        case "per_person":
+          pricingComplete = !!pc.adultPrice && parseFloat(pc.adultPrice) > 0;
+          break;
+        case "per_unit":
+          pricingComplete = !!pc.pricePerUnit && parseFloat(pc.pricePerUnit) > 0;
+          break;
+        case "flat_rate":
+          pricingComplete = !!pc.flatPrice && parseFloat(pc.flatPrice) > 0;
+          break;
+        case "base_plus_person":
+          pricingComplete = !!pc.basePricePricing && parseFloat(pc.basePricePricing) > 0;
+          break;
+        case "tiered_group":
+          pricingComplete = pc.tierRanges.length > 0 &&
+            pc.tierRanges.every(t => t.price && parseFloat(t.price) > 0);
+          break;
+      }
+    }
+
     const contentComplete = !!(
       formState.description ||
       formState.includes.length > 0 ||
@@ -288,6 +319,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
 
     return {
       essentials: { complete: essentialsComplete, required: true },
+      pricing: { complete: pricingComplete, required: false },
       content: { complete: contentComplete, required: false },
       schedule: { complete: scheduleComplete, required: false },
       settings: { complete: settingsComplete, required: false },
@@ -403,6 +435,116 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           const result = await createMutation.mutateAsync(payload);
           savedTourId = result.id;
           toast.success("Tour created successfully");
+
+          // Create default booking option from pricing config
+          if (formState.pricingConfig && tabCompletion.pricing.complete) {
+            try {
+              const pc = formState.pricingConfig;
+
+              // Build pricing model based on type
+              const buildPricingModel = () => {
+                const createId = () => Math.random().toString(36).slice(2, 9);
+
+                switch (pc.pricingType) {
+                  case "per_person": {
+                    const tiers = [
+                      {
+                        id: createId(),
+                        name: "adult",
+                        price: { amount: Math.round(parseFloat(pc.adultPrice || "0") * 100), currency: "USD" },
+                        ageMin: 13,
+                        isDefault: true,
+                        sortOrder: 0,
+                      },
+                    ];
+                    if (pc.hasChildPrice && pc.childPrice) {
+                      tiers.push({
+                        id: createId(),
+                        name: "child",
+                        price: { amount: Math.round(parseFloat(pc.childPrice) * 100), currency: "USD" },
+                        ageMin: 3,
+                        ageMax: 12,
+                        isDefault: false,
+                        sortOrder: 1,
+                      } as typeof tiers[0]);
+                    }
+                    if (pc.hasInfantPrice) {
+                      tiers.push({
+                        id: createId(),
+                        name: "infant",
+                        price: { amount: Math.round(parseFloat(pc.infantPrice || "0") * 100), currency: "USD" },
+                        ageMin: 0,
+                        ageMax: 2,
+                        isDefault: false,
+                        sortOrder: 2,
+                      } as typeof tiers[0]);
+                    }
+                    return { type: "per_person" as const, tiers };
+                  }
+                  case "per_unit":
+                    return {
+                      type: "per_unit" as const,
+                      unitName: "Vehicle",
+                      unitNamePlural: "Vehicles",
+                      pricePerUnit: { amount: Math.round(parseFloat(pc.pricePerUnit || "0") * 100), currency: "USD" },
+                      maxOccupancy: parseInt(pc.maxOccupancy) || 6,
+                      minOccupancy: 1,
+                    };
+                  case "flat_rate":
+                    return {
+                      type: "flat_rate" as const,
+                      price: { amount: Math.round(parseFloat(pc.flatPrice || "0") * 100), currency: "USD" },
+                      maxParticipants: parseInt(pc.flatMaxParticipants) || 10,
+                    };
+                  case "tiered_group":
+                    return {
+                      type: "tiered_group" as const,
+                      tiers: pc.tierRanges.map((tier) => ({
+                        minSize: parseInt(tier.min) || 1,
+                        maxSize: parseInt(tier.max) || 10,
+                        price: { amount: Math.round(parseFloat(tier.price || "0") * 100), currency: "USD" },
+                      })),
+                    };
+                  case "base_plus_person":
+                    return {
+                      type: "base_plus_person" as const,
+                      basePrice: { amount: Math.round(parseFloat(pc.basePricePricing || "0") * 100), currency: "USD" },
+                      perPersonPrice: { amount: Math.round(parseFloat(pc.pricePerAdditional || "0") * 100), currency: "USD" },
+                      includedParticipants: parseInt(pc.includedParticipants) || 2,
+                      maxParticipants: parseInt(pc.baseMaxParticipants) || 10,
+                    };
+                  default:
+                    return { type: "per_person" as const, tiers: [] };
+                }
+              };
+
+              // Build capacity model
+              const buildCapacityModel = () => {
+                if (pc.capacityType === "shared") {
+                  return { type: "shared" as const, totalSeats: parseInt(pc.totalSeats) || formState.maxParticipants };
+                }
+                return {
+                  type: "unit" as const,
+                  totalUnits: parseInt(pc.totalUnits) || 3,
+                  occupancyPerUnit: parseInt(pc.occupancyPerUnit) || 6,
+                };
+              };
+
+              await createBookingOptionMutation.mutateAsync({
+                tourId: savedTourId,
+                name: "Standard Experience",
+                shortDescription: "Join our regular tour",
+                pricingModel: buildPricingModel(),
+                capacityModel: buildCapacityModel(),
+                schedulingType: "fixed",
+                isDefault: true,
+              });
+              toast.success("Booking option created");
+            } catch (optionError) {
+              console.error("Failed to create booking option:", optionError);
+              // Don't fail the whole flow, the tour is created
+            }
+          }
         }
 
         // Generate schedules if enabled
@@ -440,6 +582,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
       createMutation,
       updateMutation,
       autoGenerateMutation,
+      createBookingOptionMutation,
       utils,
       router,
       slug,
@@ -573,6 +716,9 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
               onNameChange={handleNameChange}
               onCategoryChange={handleCategoryChange}
             />
+          )}
+          {activeTab === "pricing" && (
+            <PricingTab formState={formState} updateForm={updateForm} />
           )}
           {activeTab === "content" && (
             <ContentTab formState={formState} updateForm={updateForm} />

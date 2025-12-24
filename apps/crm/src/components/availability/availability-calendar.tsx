@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Users, Clock, User, AlertCircle, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Clock, AlertCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { QuickGuideAssign } from "@/components/guides/QuickGuideAssign";
 
 type CalendarView = "month" | "week" | "day";
 
@@ -20,14 +21,12 @@ interface Schedule {
   status: "scheduled" | "in_progress" | "completed" | "cancelled";
   bookedCount: number | null;
   maxParticipants: number;
+  guidesRequired?: number | null;
+  guidesAssigned?: number | null;
   tour?: {
     id: string;
     name: string;
     durationMinutes?: number;
-  } | null;
-  guide?: {
-    firstName: string;
-    lastName: string;
   } | null;
 }
 
@@ -158,7 +157,11 @@ export function AvailabilityCalendar({
     const daySchedules = getSchedulesForDate(date);
     const totalCapacity = daySchedules.reduce((sum, s) => sum + s.maxParticipants, 0);
     const totalBooked = daySchedules.reduce((sum, s) => sum + (s.bookedCount ?? 0), 0);
-    const needsGuide = daySchedules.filter(s => !s.guide).length;
+    const needsGuide = daySchedules.filter(s => {
+      const required = s.guidesRequired ?? 1;
+      const assigned = s.guidesAssigned ?? 0;
+      return assigned < required;
+    }).length;
     return {
       count: daySchedules.length,
       totalCapacity,
@@ -477,19 +480,27 @@ function MonthView({
                               </div>
                               {/* Guide */}
                               <div className="flex items-center gap-1.5 mt-1.5">
-                                {schedule.guide ? (
-                                  <div className="flex items-center gap-1 text-muted-foreground">
-                                    <User className="h-3 w-3" />
-                                    <span className="text-xs truncate">
-                                      {schedule.guide.firstName} {schedule.guide.lastName}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-warning/15 text-warning">
-                                    <AlertCircle className="h-3 w-3" />
-                                    <span className="text-xs font-semibold">Needs guide</span>
-                                  </div>
-                                )}
+                                {(() => {
+                                  const required = schedule.guidesRequired ?? 1;
+                                  const assigned = schedule.guidesAssigned ?? 0;
+                                  if (assigned < required) {
+                                    return (
+                                      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-warning/15 text-warning">
+                                        <AlertCircle className="h-3 w-3" />
+                                        <span className="text-xs font-semibold">
+                                          Needs {required - assigned} guide{required - assigned !== 1 ? 's' : ''}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-success/15 text-success">
+                                      <span className="text-xs font-semibold">
+                                        {assigned} guide{assigned !== 1 ? 's' : ''} assigned
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
                             {/* Capacity */}
@@ -666,17 +677,12 @@ function WeekView({
                           {schedule.tour?.name ?? "Unknown"}
                         </div>
                         {/* Guide */}
-                        {schedule.guide ? (
-                          <div className="flex items-center gap-1 mt-1.5 text-muted-foreground">
-                            <User className="h-3 w-3" />
-                            <span className="truncate">{schedule.guide.firstName}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 mt-1.5 text-warning bg-warning/15 px-1.5 py-0.5 rounded-md ring-1 ring-warning/30 animate-pulse">
-                            <AlertCircle className="h-3 w-3" />
-                            <span className="font-semibold">No guide</span>
-                          </div>
-                        )}
+                        <div className="mt-1.5" onClick={(e) => e.preventDefault()}>
+                          <QuickGuideAssign
+                            scheduleId={schedule.id}
+                            compact
+                          />
+                        </div>
                         {/* Capacity */}
                         <div className="flex items-center gap-1.5 mt-2">
                           <Users className="h-3 w-3 text-muted-foreground" />
@@ -740,7 +746,11 @@ function DayView({
   const stats = useMemo(() => {
     const totalCapacity = schedules.reduce((sum, s) => sum + s.maxParticipants, 0);
     const totalBooked = schedules.reduce((sum, s) => sum + (s.bookedCount ?? 0), 0);
-    const needsGuide = schedules.filter(s => !s.guide).length;
+    const needsGuide = schedules.filter(s => {
+      const required = s.guidesRequired ?? 1;
+      const assigned = s.guidesAssigned ?? 0;
+      return assigned < required;
+    }).length;
     return {
       count: schedules.length,
       totalBooked,
@@ -841,17 +851,11 @@ function DayView({
                           <div className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
                             {schedule.tour?.name ?? "Unknown Tour"}
                           </div>
-                          {schedule.guide ? (
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
-                              <User className="h-3.5 w-3.5" />
-                              {schedule.guide.firstName} {schedule.guide.lastName}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5 text-sm text-warning mt-1">
-                              <AlertCircle className="h-3.5 w-3.5" />
-                              Needs guide assignment
-                            </div>
-                          )}
+                          <div className="mt-1" onClick={(e) => e.preventDefault()}>
+                            <QuickGuideAssign
+                              scheduleId={schedule.id}
+                            />
+                          </div>
                         </div>
                       </div>
 

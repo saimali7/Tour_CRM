@@ -3,9 +3,7 @@ import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { tours } from "./tours";
-import { guides } from "./guides";
 import { bookings } from "./bookings";
-import { guideAssignments } from "./guide-operations";
 
 // Schedules - Specific tour instances (org-scoped)
 export const schedules = pgTable("schedules", {
@@ -21,9 +19,6 @@ export const schedules = pgTable("schedules", {
     .notNull()
     .references(() => tours.id, { onDelete: "cascade" }),
 
-  // Assigned guide (optional)
-  guideId: text("guide_id").references(() => guides.id, { onDelete: "set null" }),
-
   // Date and time
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
@@ -31,6 +26,10 @@ export const schedules = pgTable("schedules", {
   // Capacity (can override tour defaults)
   maxParticipants: integer("max_participants").notNull(),
   bookedCount: integer("booked_count").default(0), // Denormalized for quick availability checks
+
+  // Guide capacity tracking (calculated from bookedCount / tour.guestsPerGuide)
+  guidesRequired: integer("guides_required").notNull().default(0), // How many guides needed based on bookings
+  guidesAssigned: integer("guides_assigned").notNull().default(0), // Count of unique confirmed guide assignments across bookings
 
   // Pricing (can override tour base price)
   price: numeric("price", { precision: 10, scale: 2 }),
@@ -53,7 +52,6 @@ export const schedules = pgTable("schedules", {
 }, (table) => ({
   orgIdx: index("schedules_org_idx").on(table.organizationId),
   tourIdx: index("schedules_tour_idx").on(table.tourId),
-  guideIdx: index("schedules_guide_idx").on(table.guideId),
   startsAtIdx: index("schedules_starts_at_idx").on(table.startsAt),
   statusIdx: index("schedules_status_idx").on(table.status),
   orgStartsAtIdx: index("schedules_org_starts_at_idx").on(table.organizationId, table.startsAt),
@@ -69,12 +67,9 @@ export const schedulesRelations = relations(schedules, ({ one, many }) => ({
     fields: [schedules.tourId],
     references: [tours.id],
   }),
-  guide: one(guides, {
-    fields: [schedules.guideId],
-    references: [guides.id],
-  }),
   bookings: many(bookings),
-  assignments: many(guideAssignments),
+  // Note: optionAvailability relation defined in booking-options.ts to avoid circular deps
+  // Note: guide assignments are now at booking level, not schedule level
 }));
 
 // Types

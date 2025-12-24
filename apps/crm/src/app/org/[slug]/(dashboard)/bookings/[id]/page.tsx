@@ -28,6 +28,9 @@ import {
   AlertTriangle,
   MapPin,
   ExternalLink,
+  UserPlus,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -50,6 +53,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { QuickGuideAssignSheet } from "@/components/scheduling/quick-guide-assign-sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -132,6 +136,7 @@ export default function BookingDetailPage() {
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [paymentLinkUrl, setPaymentLinkUrl] = useState("");
+  const [showAssignGuideSheet, setShowAssignGuideSheet] = useState(false);
   const confirmModal = useConfirmModal();
 
   const { data: booking, isLoading, error } = trpc.booking.getById.useQuery({ id: bookingId });
@@ -291,6 +296,17 @@ export default function BookingDetailPage() {
     },
   });
 
+  const cancelAssignmentMutation = trpc.guideAssignment.cancelAssignment.useMutation({
+    onSuccess: () => {
+      utils.guideAssignment.getAssignmentsForBooking.invalidate({ bookingId });
+      utils.booking.getById.invalidate({ id: bookingId });
+      toast.success("Guide assignment removed");
+    },
+    onError: (error) => {
+      toast.error(`Failed to remove assignment: ${error.message}`);
+    },
+  });
+
   // Query for available schedules (same tour)
   const { data: availableSchedules } = trpc.schedule.list.useQuery(
     {
@@ -322,6 +338,18 @@ export default function BookingDetailPage() {
   const { data: balanceInfo } = trpc.payment.getBookingBalance.useQuery(
     { bookingId },
     { enabled: !!booking }
+  );
+
+  // Query for guide assignments
+  const { data: guideAssignments, isLoading: isLoadingAssignments } = trpc.guideAssignment.getAssignmentsForBooking.useQuery(
+    { bookingId },
+    { enabled: !!booking }
+  );
+
+  // Query for available guides (for assignment dialog)
+  const { data: availableGuides } = trpc.guide.list.useQuery(
+    { filters: { status: "active" } },
+    { enabled: showAssignGuideSheet }
   );
 
   // Calculate urgency/time context
@@ -532,6 +560,19 @@ export default function BookingDetailPage() {
 
   const handleSendPaymentLink = () => {
     sendPaymentLinkEmailMutation.mutate({ bookingId });
+  };
+
+  const handleRemoveAssignment = async (assignmentId: string, guideName: string) => {
+    const confirmed = await confirmModal.confirm({
+      title: "Remove Guide Assignment",
+      description: `Are you sure you want to remove ${guideName} from this booking?`,
+      confirmLabel: "Remove",
+      variant: "destructive",
+    });
+
+    if (confirmed) {
+      cancelAssignmentMutation.mutate({ id: assignmentId });
+    }
   };
 
   if (isLoading) {
@@ -950,6 +991,88 @@ export default function BookingDetailPage() {
             )}
           </CollapsibleSection>
 
+          {/* Guide Assignment - Collapsible */}
+          <CollapsibleSection
+            title="Guide Assignment"
+            count={guideAssignments?.length || 0}
+            defaultOpen={true}
+          >
+            <div className="space-y-4">
+              {/* Assigned Guides */}
+              {guideAssignments && guideAssignments.length > 0 ? (
+                <div className="space-y-2">
+                  {guideAssignments.map((assignment) => (
+                    <div
+                      key={assignment.id}
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary font-medium text-sm">
+                            {assignment.guide?.firstName?.charAt(0) ?? ""}
+                            {assignment.guide?.lastName?.charAt(0) ?? ""}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground text-sm">
+                            {assignment.guide?.firstName} {assignment.guide?.lastName}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {assignment.guide?.email && (
+                              <span>{assignment.guide.email}</span>
+                            )}
+                            {assignment.status && (
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                                  assignment.status === "confirmed"
+                                    ? "bg-success/10 text-success-foreground"
+                                    : assignment.status === "pending"
+                                    ? "bg-warning/10 text-warning-foreground"
+                                    : "bg-destructive/10 text-destructive-foreground"
+                                }`}
+                              >
+                                {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {booking.status !== "completed" && booking.status !== "cancelled" && (
+                        <button
+                          onClick={() => handleRemoveAssignment(
+                            assignment.id,
+                            `${assignment.guide?.firstName} ${assignment.guide?.lastName}`
+                          )}
+                          disabled={cancelAssignmentMutation.isPending}
+                          className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                          aria-label={`Remove ${assignment.guide?.firstName} ${assignment.guide?.lastName}`}
+                        >
+                          <UserX className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  <UserPlus className="h-8 w-8 mx-auto mb-2 opacity-50" aria-hidden="true" />
+                  <p className="text-sm">No guide assigned to this booking</p>
+                </div>
+              )}
+
+              {/* Assign Guide Button */}
+              {booking.status !== "completed" && booking.status !== "cancelled" && (
+                <button
+                  onClick={() => setShowAssignGuideSheet(true)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-dashed border-border px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <UserPlus className="h-4 w-4" aria-hidden="true" />
+                  Assign Guide
+                </button>
+              )}
+            </div>
+          </CollapsibleSection>
+
           {/* Special Requests - Only if present */}
           {(booking.specialRequests ||
             booking.dietaryRequirements ||
@@ -1149,6 +1272,15 @@ export default function BookingDetailPage() {
               Booking Info
             </h2>
             <dl className="space-y-2 text-sm">
+              {/* Booking Option */}
+              {booking.pricingSnapshot && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Option</dt>
+                  <dd className="font-medium">
+                    {(booking.pricingSnapshot as { optionName?: string })?.optionName || "Standard Experience"}
+                  </dd>
+                </div>
+              )}
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Source</dt>
                 <dd className="font-medium">
@@ -1821,6 +1953,34 @@ export default function BookingDetailPage() {
 
       {/* Confirm Modal */}
       {confirmModal.ConfirmModal}
+
+      {/* Assign Guide Sheet */}
+      <QuickGuideAssignSheet
+        open={showAssignGuideSheet}
+        onOpenChange={setShowAssignGuideSheet}
+        bookingId={bookingId}
+        scheduleInfo={booking.schedule ? {
+          id: booking.schedule.id,
+          tourName: booking.tour?.name || "Tour",
+          date: formatShortDate(booking.schedule.startsAt),
+          time: formatTime(booking.schedule.startsAt),
+        } : undefined}
+        availableGuides={availableGuides?.data
+          ?.filter((guide) => !guideAssignments?.some((a) => a.guideId === guide.id))
+          .map((guide) => ({
+            id: guide.id,
+            firstName: guide.firstName,
+            lastName: guide.lastName,
+            email: guide.email,
+            phone: guide.phone,
+            status: guide.status as "active" | "inactive" | "pending",
+          })) || []
+        }
+        onSuccess={() => {
+          utils.guideAssignment.invalidate();
+          utils.booking.invalidate();
+        }}
+      />
     </div>
   );
 }

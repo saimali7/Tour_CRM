@@ -36,6 +36,9 @@ import { CheckInService } from "./check-in-service";
 import { DepositService } from "./deposit-service";
 // Phase 7: Operations Excellence
 import { GoalService } from "./goal-service";
+// Booking System v2: Customer-first booking with options
+import { BookingOptionService } from "./booking-option-service";
+import { AvailabilityService } from "./availability-service";
 
 export interface Services {
   tour: TourService;
@@ -75,6 +78,9 @@ export interface Services {
   deposit: DepositService;
   // Phase 7: Operations Excellence
   goal: GoalService;
+  // Booking System v2: Customer-first booking
+  bookingOption: BookingOptionService;
+  availability: AvailabilityService;
 }
 
 /**
@@ -126,6 +132,9 @@ export function createServices(ctx: ServiceContext): Services {
     deposit: new DepositService(ctx),
     // Phase 7: Operations Excellence
     goal: new GoalService(ctx),
+    // Booking System v2: Customer-first booking
+    bookingOption: new BookingOptionService(ctx),
+    availability: new AvailabilityService(ctx),
   };
 }
 
@@ -173,6 +182,23 @@ export type {
   GoalWithProgress,
   GoalFilters,
 } from "./goal-service";
+// Booking System v2: Customer-first booking
+export { BookingOptionService } from "./booking-option-service";
+export { AvailabilityService } from "./availability-service";
+export type {
+  CreateBookingOptionInput,
+  UpdateBookingOptionInput,
+} from "./booking-option-service";
+export type {
+  CheckAvailabilityInput,
+  CheckAvailabilityResponse,
+  CalculatedOption,
+  TimeSlot,
+  SchedulingInfo,
+  BadgeType,
+} from "./availability-service";
+// Pricing Calculator utilities (stateless)
+export * from "./pricing-calculator-service";
 
 // Export types
 export * from "./types";

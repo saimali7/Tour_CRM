@@ -21,10 +21,24 @@ export const participantSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+// Pricing snapshot for booking (preserves pricing at time of booking)
+export const pricingSnapshotSchema = z.object({
+  optionId: z.string().optional(),
+  optionName: z.string().optional(),
+  pricingModel: z.any().optional(),
+  experienceMode: z.enum(["join", "book", "charter"]).optional(),
+  priceBreakdown: z.string().optional(),
+}).optional();
+
 // Create booking validation
 export const createBookingSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
   scheduleId: z.string().min(1, "Schedule is required"),
+  bookingOptionId: z.string().optional(), // Link to booking option
+  guestAdults: z.number().int().min(0).optional(), // New guest tracking
+  guestChildren: z.number().int().min(0).optional(),
+  guestInfants: z.number().int().min(0).optional(),
+  pricingSnapshot: pricingSnapshotSchema, // Preserve pricing at booking time
   adultCount: z
     .number()
     .int("Adult count must be a whole number")

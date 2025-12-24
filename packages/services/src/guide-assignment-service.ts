@@ -1,10 +1,14 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, lt, gt, ne, sql, inArray } from "drizzle-orm";
 import {
   guideAssignments,
   schedules,
+  bookings,
   guides,
   type GuideAssignment,
   type GuideAssignmentStatus,
+  type Booking,
+  type Schedule,
+  type Guide,
 } from "@tour/database";
 import type { tours } from "@tour/database";
 import { BaseService } from "./base-service";
@@ -21,39 +25,99 @@ export interface GuideAssignmentFilters {
 }
 
 export interface GuideAssignmentWithRelations extends GuideAssignment {
-  schedule?: (typeof schedules.$inferSelect & {
-    tour?: typeof tours.$inferSelect;
+  booking?: (Booking & {
+    schedule?: (Schedule & {
+      tour?: typeof tours.$inferSelect;
+    }) | null;
   }) | null;
-  guide?: typeof guides.$inferSelect | null;
+  guide?: Guide | null;
 }
 
 export interface CreateGuideAssignmentInput {
-  scheduleId: string;
+  bookingId: string;
   guideId: string;
+  notes?: string;
+}
+
+export interface CreateOutsourcedGuideAssignmentInput {
+  bookingId: string;
+  outsourcedGuideName: string;
+  outsourcedGuideContact?: string;
   notes?: string;
 }
 
 /**
  * Guide Assignment Service
- * Manages the assignment workflow of guides to schedules
+ * Manages the assignment workflow of guides to bookings
+ *
+ * Model: Guides are assigned to individual bookings, but can handle
+ * multiple bookings on the same schedule (shared guide pool).
+ * The schedule's guidesAssigned count tracks unique confirmed guides
+ * across all its bookings.
  */
 export class GuideAssignmentService extends BaseService {
   /**
-   * Get all assignments for a specific schedule
+   * Get all assignments for a specific booking
    */
-  async getAssignmentsForSchedule(
-    scheduleId: string
+  async getAssignmentsForBooking(
+    bookingId: string
   ): Promise<GuideAssignmentWithRelations[]> {
     return this.db.query.guideAssignments.findMany({
       where: and(
-        eq(guideAssignments.scheduleId, scheduleId),
+        eq(guideAssignments.bookingId, bookingId),
         eq(guideAssignments.organizationId, this.organizationId)
       ),
       with: {
         guide: true,
-        schedule: {
+        booking: {
           with: {
-            tour: true,
+            schedule: {
+              with: {
+                tour: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: (assignments, { desc }) => [desc(assignments.assignedAt)],
+    });
+  }
+
+  /**
+   * Get all assignments for a specific schedule (across all its bookings)
+   */
+  async getAssignmentsForSchedule(
+    scheduleId: string
+  ): Promise<GuideAssignmentWithRelations[]> {
+    // First get all booking IDs for this schedule
+    const scheduleBookings = await this.db.query.bookings.findMany({
+      where: and(
+        eq(bookings.scheduleId, scheduleId),
+        eq(bookings.organizationId, this.organizationId)
+      ),
+      columns: { id: true },
+    });
+
+    if (scheduleBookings.length === 0) {
+      return [];
+    }
+
+    const bookingIds = scheduleBookings.map((b) => b.id);
+
+    return this.db.query.guideAssignments.findMany({
+      where: and(
+        inArray(guideAssignments.bookingId, bookingIds),
+        eq(guideAssignments.organizationId, this.organizationId)
+      ),
+      with: {
+        guide: true,
+        booking: {
+          with: {
+            schedule: {
+              with: {
+                tour: true,
+              },
+            },
           },
         },
       },
@@ -77,26 +141,30 @@ export class GuideAssignmentService extends BaseService {
       conditions.push(eq(guideAssignments.status, filters.status));
     }
 
-    // For date range filtering, we need to join with schedules
     const assignments = await this.db.query.guideAssignments.findMany({
       where: and(...conditions),
       with: {
         guide: true,
-        schedule: {
+        booking: {
           with: {
-            tour: true,
+            schedule: {
+              with: {
+                tour: true,
+              },
+            },
           },
         },
       },
       orderBy: (assignments, { asc }) => [asc(assignments.assignedAt)],
-    });
+    }) as GuideAssignmentWithRelations[];
 
-    // Filter by date range if provided
+    // Filter by date range if provided (based on schedule start time)
     if (filters.dateRange) {
       return assignments.filter((assignment) => {
-        if (!assignment.schedule) return false;
+        const schedule = assignment.booking?.schedule;
+        if (!schedule) return false;
 
-        const startsAt = assignment.schedule.startsAt;
+        const startsAt = schedule.startsAt;
 
         if (filters.dateRange?.from && startsAt < filters.dateRange.from) {
           return false;
@@ -114,23 +182,27 @@ export class GuideAssignmentService extends BaseService {
   }
 
   /**
-   * Get a specific assignment by schedule and guide
+   * Get a specific assignment by booking and guide
    */
   async getAssignment(
-    scheduleId: string,
+    bookingId: string,
     guideId: string
   ): Promise<GuideAssignmentWithRelations> {
     const assignment = await this.db.query.guideAssignments.findFirst({
       where: and(
-        eq(guideAssignments.scheduleId, scheduleId),
+        eq(guideAssignments.bookingId, bookingId),
         eq(guideAssignments.guideId, guideId),
         eq(guideAssignments.organizationId, this.organizationId)
       ),
       with: {
         guide: true,
-        schedule: {
+        booking: {
           with: {
-            tour: true,
+            schedule: {
+              with: {
+                tour: true,
+              },
+            },
           },
         },
       },
@@ -139,7 +211,7 @@ export class GuideAssignmentService extends BaseService {
     if (!assignment) {
       throw new NotFoundError(
         "Guide assignment",
-        `scheduleId=${scheduleId}, guideId=${guideId}`
+        `bookingId=${bookingId}, guideId=${guideId}`
       );
     }
 
@@ -157,13 +229,17 @@ export class GuideAssignmentService extends BaseService {
       ),
       with: {
         guide: true,
-        schedule: {
+        booking: {
           with: {
-            tour: true,
+            schedule: {
+              with: {
+                tour: true,
+              },
+            },
           },
         },
       },
-    });
+    }) as GuideAssignmentWithRelations | undefined;
 
     if (!assignment) {
       throw new NotFoundError("Guide assignment", id);
@@ -178,16 +254,28 @@ export class GuideAssignmentService extends BaseService {
   async createAssignment(
     input: CreateGuideAssignmentInput
   ): Promise<GuideAssignment> {
-    // Verify schedule exists and belongs to organization
+    // Verify booking exists and belongs to organization
+    const booking = await this.db.query.bookings.findFirst({
+      where: and(
+        eq(bookings.id, input.bookingId),
+        eq(bookings.organizationId, this.organizationId)
+      ),
+    });
+
+    if (!booking) {
+      throw new NotFoundError("Booking", input.bookingId);
+    }
+
+    // Get the schedule for this booking
     const schedule = await this.db.query.schedules.findFirst({
       where: and(
-        eq(schedules.id, input.scheduleId),
+        eq(schedules.id, booking.scheduleId),
         eq(schedules.organizationId, this.organizationId)
       ),
     });
 
     if (!schedule) {
-      throw new NotFoundError("Schedule", input.scheduleId);
+      throw new ValidationError("Booking has no associated schedule");
     }
 
     // Verify guide exists and belongs to organization
@@ -202,10 +290,10 @@ export class GuideAssignmentService extends BaseService {
       throw new NotFoundError("Guide", input.guideId);
     }
 
-    // Check if assignment already exists
+    // Check if assignment already exists for this booking-guide pair
     const existing = await this.db.query.guideAssignments.findFirst({
       where: and(
-        eq(guideAssignments.scheduleId, input.scheduleId),
+        eq(guideAssignments.bookingId, input.bookingId),
         eq(guideAssignments.guideId, input.guideId),
         eq(guideAssignments.organizationId, this.organizationId)
       ),
@@ -213,16 +301,16 @@ export class GuideAssignmentService extends BaseService {
 
     if (existing) {
       throw new ConflictError(
-        `Guide is already assigned to this schedule with status: ${existing.status}`
+        `Guide is already assigned to this booking with status: ${existing.status}`
       );
     }
 
-    // Check for scheduling conflicts
+    // Check for scheduling conflicts (guide assigned to another schedule at same time)
     const hasConflict = await this.hasConflict(
       input.guideId,
       schedule.startsAt,
       schedule.endsAt,
-      input.scheduleId
+      booking.scheduleId
     );
 
     if (hasConflict) {
@@ -235,7 +323,7 @@ export class GuideAssignmentService extends BaseService {
       .insert(guideAssignments)
       .values({
         organizationId: this.organizationId,
-        scheduleId: input.scheduleId,
+        bookingId: input.bookingId,
         guideId: input.guideId,
         status: "pending",
         notes: input.notes,
@@ -252,7 +340,7 @@ export class GuideAssignmentService extends BaseService {
 
   /**
    * Confirm an assignment (guide accepts)
-   * Updates status to 'confirmed' and sets schedule.guideId
+   * Updates status to 'confirmed' and syncs schedule's guidesAssigned count
    */
   async confirmAssignment(id: string): Promise<GuideAssignment> {
     const assignment = await this.getById(id);
@@ -265,22 +353,25 @@ export class GuideAssignmentService extends BaseService {
       throw new ValidationError("Cannot confirm a declined assignment");
     }
 
-    if (!assignment.schedule) {
-      throw new Error("Assignment schedule not found");
+    const schedule = assignment.booking?.schedule;
+    if (!schedule) {
+      throw new Error("Assignment booking/schedule not found");
     }
 
-    // Check for conflicts again (in case something changed)
-    const hasConflict = await this.hasConflict(
-      assignment.guideId,
-      assignment.schedule.startsAt,
-      assignment.schedule.endsAt,
-      assignment.scheduleId
-    );
-
-    if (hasConflict) {
-      throw new ConflictError(
-        "Guide has a conflicting schedule during this time"
+    // Check for conflicts only for insourced guides (outsourced guides don't have guideId)
+    if (assignment.guideId) {
+      const hasConflict = await this.hasConflict(
+        assignment.guideId,
+        schedule.startsAt,
+        schedule.endsAt,
+        schedule.id
       );
+
+      if (hasConflict) {
+        throw new ConflictError(
+          "Guide has a conflicting schedule during this time"
+        );
+      }
     }
 
     // Update assignment status
@@ -303,21 +394,88 @@ export class GuideAssignmentService extends BaseService {
       throw new NotFoundError("Guide assignment", id);
     }
 
-    // Update schedule's guideId
+    // Sync the guidesAssigned count for the schedule
+    await this.syncGuidesAssignedCount(schedule.id);
+
+    return updated;
+  }
+
+  /**
+   * Sync guidesAssigned count on schedule from confirmed assignments
+   * Counts UNIQUE guides with confirmed assignments across all bookings for this schedule
+   * Includes both insourced guides (by guideId) and outsourced guides (by name)
+   */
+  private async syncGuidesAssignedCount(scheduleId: string): Promise<void> {
+    // Get all bookings for this schedule
+    const scheduleBookings = await this.db.query.bookings.findMany({
+      where: and(
+        eq(bookings.scheduleId, scheduleId),
+        eq(bookings.organizationId, this.organizationId)
+      ),
+      columns: { id: true },
+    });
+
+    if (scheduleBookings.length === 0) {
+      // No bookings, set guidesAssigned to 0
+      await this.db
+        .update(schedules)
+        .set({
+          guidesAssigned: 0,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schedules.id, scheduleId),
+            eq(schedules.organizationId, this.organizationId)
+          )
+        );
+      return;
+    }
+
+    const bookingIds = scheduleBookings.map((b) => b.id);
+
+    // Count unique confirmed insourced guides (by guideId)
+    const insourcedResult = await this.db
+      .select({ count: sql<number>`count(distinct ${guideAssignments.guideId})::int` })
+      .from(guideAssignments)
+      .where(
+        and(
+          inArray(guideAssignments.bookingId, bookingIds),
+          eq(guideAssignments.organizationId, this.organizationId),
+          eq(guideAssignments.status, "confirmed"),
+          sql`${guideAssignments.guideId} is not null`
+        )
+      );
+
+    // Count unique confirmed outsourced guides (by name)
+    const outsourcedResult = await this.db
+      .select({ count: sql<number>`count(distinct ${guideAssignments.outsourcedGuideName})::int` })
+      .from(guideAssignments)
+      .where(
+        and(
+          inArray(guideAssignments.bookingId, bookingIds),
+          eq(guideAssignments.organizationId, this.organizationId),
+          eq(guideAssignments.status, "confirmed"),
+          sql`${guideAssignments.outsourcedGuideName} is not null`
+        )
+      );
+
+    const insourcedCount = insourcedResult[0]?.count ?? 0;
+    const outsourcedCount = outsourcedResult[0]?.count ?? 0;
+    const guidesAssigned = insourcedCount + outsourcedCount;
+
     await this.db
       .update(schedules)
       .set({
-        guideId: assignment.guideId,
+        guidesAssigned,
         updatedAt: new Date(),
       })
       .where(
         and(
-          eq(schedules.id, assignment.scheduleId),
+          eq(schedules.id, scheduleId),
           eq(schedules.organizationId, this.organizationId)
         )
       );
-
-    return updated;
   }
 
   /**
@@ -365,26 +523,12 @@ export class GuideAssignmentService extends BaseService {
 
   /**
    * Cancel an assignment (admin cancels)
-   * Deletes the assignment and clears schedule.guideId if it was confirmed
+   * Deletes the assignment and syncs guidesAssigned if it was confirmed
    */
   async cancelAssignment(id: string): Promise<void> {
     const assignment = await this.getById(id);
-
-    // If assignment was confirmed, clear the schedule's guideId
-    if (assignment.status === "confirmed") {
-      await this.db
-        .update(schedules)
-        .set({
-          guideId: null,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schedules.id, assignment.scheduleId),
-            eq(schedules.organizationId, this.organizationId)
-          )
-        );
-    }
+    const wasConfirmed = assignment.status === "confirmed";
+    const scheduleId = assignment.booking?.scheduleId;
 
     // Delete the assignment
     await this.db
@@ -395,6 +539,11 @@ export class GuideAssignmentService extends BaseService {
           eq(guideAssignments.organizationId, this.organizationId)
         )
       );
+
+    // Sync the guidesAssigned count if was confirmed
+    if (wasConfirmed && scheduleId) {
+      await this.syncGuidesAssignedCount(scheduleId);
+    }
   }
 
   /**
@@ -421,6 +570,8 @@ export class GuideAssignmentService extends BaseService {
 
   /**
    * Check if a guide has a scheduling conflict
+   * A guide can be assigned to multiple bookings on the SAME schedule (no conflict),
+   * but cannot be assigned to overlapping DIFFERENT schedules.
    */
   async hasConflict(
     guideId: string,
@@ -440,38 +591,51 @@ export class GuideAssignmentService extends BaseService {
       throw new NotFoundError("Guide", guideId);
     }
 
-    const conditions = [
-      eq(schedules.organizationId, this.organizationId),
-      eq(schedules.guideId, guideId),
-      eq(schedules.status, "scheduled"),
-      sql`(${schedules.startsAt}, ${schedules.endsAt}) OVERLAPS (${startsAt}, ${endsAt})`,
-    ];
+    // Find all confirmed assignments for this guide
+    const confirmedAssignments = await this.db.query.guideAssignments.findMany({
+      where: and(
+        eq(guideAssignments.guideId, guideId),
+        eq(guideAssignments.organizationId, this.organizationId),
+        eq(guideAssignments.status, "confirmed")
+      ),
+      with: {
+        booking: {
+          with: {
+            schedule: true,
+          },
+        },
+      },
+    }) as GuideAssignmentWithRelations[];
 
-    if (excludeScheduleId) {
-      conditions.push(sql`${schedules.id} != ${excludeScheduleId}`);
+    // Check if any confirmed assignment is for an overlapping schedule
+    for (const assignment of confirmedAssignments) {
+      const schedule = assignment.booking?.schedule;
+      if (!schedule) continue;
+
+      // Skip if same schedule (guide can handle multiple bookings on same schedule)
+      if (excludeScheduleId && schedule.id === excludeScheduleId) continue;
+
+      // Check for time overlap: startA < endB AND endA > startB
+      if (schedule.startsAt < endsAt && schedule.endsAt > startsAt) {
+        return true;
+      }
     }
 
-    const conflicting = await this.db
-      .select({ id: schedules.id })
-      .from(schedules)
-      .where(and(...conditions))
-      .limit(1);
-
-    return conflicting.length > 0;
+    return false;
   }
 
   /**
-   * Assign a guide to a schedule (full flow)
+   * Assign a guide to a booking (full flow)
    * Creates assignment and optionally auto-confirms it
    */
-  async assignGuideToSchedule(
-    scheduleId: string,
+  async assignGuideToBooking(
+    bookingId: string,
     guideId: string,
     options: { autoConfirm?: boolean; notes?: string } = {}
   ): Promise<GuideAssignment> {
     // Create the assignment
     const assignment = await this.createAssignment({
-      scheduleId,
+      bookingId,
       guideId,
       notes: options.notes,
     });
@@ -485,18 +649,92 @@ export class GuideAssignmentService extends BaseService {
   }
 
   /**
-   * Reassign a schedule to a new guide
+   * Assign an outsourced guide to a booking
+   * Creates assignment with outsourced guide info instead of guideId
+   * Outsourced guides are external/freelance guides not in the system
+   */
+  async assignOutsourcedGuideToBooking(
+    input: CreateOutsourcedGuideAssignmentInput,
+    options: { autoConfirm?: boolean } = {}
+  ): Promise<GuideAssignment> {
+    // Verify booking exists and belongs to organization
+    const booking = await this.db.query.bookings.findFirst({
+      where: and(
+        eq(bookings.id, input.bookingId),
+        eq(bookings.organizationId, this.organizationId)
+      ),
+    });
+
+    if (!booking) {
+      throw new NotFoundError("Booking", input.bookingId);
+    }
+
+    // Get the schedule for this booking
+    const schedule = await this.db.query.schedules.findFirst({
+      where: and(
+        eq(schedules.id, booking.scheduleId),
+        eq(schedules.organizationId, this.organizationId)
+      ),
+    });
+
+    if (!schedule) {
+      throw new ValidationError("Booking has no associated schedule");
+    }
+
+    // Check if outsourced guide with same name already assigned to this booking
+    const existing = await this.db.query.guideAssignments.findFirst({
+      where: and(
+        eq(guideAssignments.bookingId, input.bookingId),
+        eq(guideAssignments.outsourcedGuideName, input.outsourcedGuideName),
+        eq(guideAssignments.organizationId, this.organizationId)
+      ),
+    });
+
+    if (existing) {
+      throw new ConflictError(
+        `Outsourced guide "${input.outsourcedGuideName}" is already assigned to this booking`
+      );
+    }
+
+    // Create the assignment for outsourced guide (no guideId)
+    const [assignment] = await this.db
+      .insert(guideAssignments)
+      .values({
+        organizationId: this.organizationId,
+        bookingId: input.bookingId,
+        guideId: null, // Outsourced guides don't have a system guideId
+        outsourcedGuideName: input.outsourcedGuideName,
+        outsourcedGuideContact: input.outsourcedGuideContact,
+        status: options.autoConfirm ? "confirmed" : "pending",
+        notes: input.notes,
+        assignedAt: new Date(),
+        confirmedAt: options.autoConfirm ? new Date() : null,
+      })
+      .returning();
+
+    if (!assignment) {
+      throw new Error("Failed to create outsourced guide assignment");
+    }
+
+    // Sync the guidesAssigned count for the schedule if auto-confirmed
+    if (options.autoConfirm) {
+      await this.syncGuidesAssignedCount(schedule.id);
+    }
+
+    return assignment;
+  }
+
+  /**
+   * Reassign a booking to a new guide
    * Cancels old assignment and creates new one
    */
-  async reassignSchedule(
-    scheduleId: string,
+  async reassignBooking(
+    bookingId: string,
     newGuideId: string,
     options: { autoConfirm?: boolean; notes?: string } = {}
   ): Promise<GuideAssignment> {
-    // Find existing confirmed assignment for this schedule
-    const existingAssignments = await this.getAssignmentsForSchedule(
-      scheduleId
-    );
+    // Find existing confirmed assignment for this booking
+    const existingAssignments = await this.getAssignmentsForBooking(bookingId);
 
     const confirmedAssignment = existingAssignments.find(
       (a) => a.status === "confirmed"
@@ -508,7 +746,7 @@ export class GuideAssignmentService extends BaseService {
     }
 
     // Create new assignment
-    return this.assignGuideToSchedule(scheduleId, newGuideId, options);
+    return this.assignGuideToBooking(bookingId, newGuideId, options);
   }
 
   /**
@@ -531,7 +769,7 @@ export class GuideAssignmentService extends BaseService {
   }
 
   /**
-   * Get all assignments for upcoming schedules
+   * Get all confirmed assignments for upcoming schedules
    */
   async getUpcomingAssignments(
     guideId: string,
@@ -547,22 +785,47 @@ export class GuideAssignmentService extends BaseService {
       ),
       with: {
         guide: true,
-        schedule: {
+        booking: {
           with: {
-            tour: true,
+            schedule: {
+              with: {
+                tour: true,
+              },
+            },
           },
         },
       },
       orderBy: (assignments, { asc }) => [asc(assignments.assignedAt)],
-    });
+    }) as GuideAssignmentWithRelations[];
 
     // Filter for upcoming schedules and limit
     return assignments
-      .filter((a) => a.schedule && a.schedule.startsAt > now)
+      .filter((a) => {
+        const schedule = a.booking?.schedule;
+        return schedule && schedule.startsAt > now;
+      })
       .sort((a, b) => {
-        if (!a.schedule || !b.schedule) return 0;
-        return a.schedule.startsAt.getTime() - b.schedule.startsAt.getTime();
+        const scheduleA = a.booking?.schedule;
+        const scheduleB = b.booking?.schedule;
+        if (!scheduleA || !scheduleB) return 0;
+        return scheduleA.startsAt.getTime() - scheduleB.startsAt.getTime();
       })
       .slice(0, limit);
+  }
+
+  /**
+   * Get unique confirmed guides for a schedule
+   */
+  async getConfirmedGuidesForSchedule(scheduleId: string): Promise<Guide[]> {
+    const assignments = await this.getAssignmentsForSchedule(scheduleId);
+
+    const confirmedGuides = new Map<string, Guide>();
+    for (const assignment of assignments) {
+      if (assignment.status === "confirmed" && assignment.guide) {
+        confirmedGuides.set(assignment.guide.id, assignment.guide);
+      }
+    }
+
+    return Array.from(confirmedGuides.values());
   }
 }

@@ -14,7 +14,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import {
   Sheet,
@@ -32,15 +31,12 @@ interface ScheduleWithDetails {
   status: string;
   bookedCount: number | null;
   maxParticipants: number;
+  guidesRequired: number;
+  guidesAssigned: number;
   tour?: {
     id: string;
     name: string;
   };
-  guide?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  } | null;
 }
 
 function getCalendarDateRange(date: Date): { from: Date; to: Date } {
@@ -89,7 +85,7 @@ export default function CalendarPage() {
     const totalSchedules = thisMonth.length;
     const totalBooked = thisMonth.reduce((sum, s) => sum + (s.bookedCount ?? 0), 0);
     const totalCapacity = thisMonth.reduce((sum, s) => sum + s.maxParticipants, 0);
-    const needsGuide = thisMonth.filter(s => !s.guide).length;
+    const needsGuide = thisMonth.filter(s => s.guidesAssigned < s.guidesRequired).length;
     return { totalSchedules, totalBooked, totalCapacity, needsGuide };
   }, [schedules, selectedDate]);
 
@@ -113,7 +109,11 @@ export default function CalendarPage() {
           {/* Tour Filter */}
           <Select value={tourFilter} onValueChange={setTourFilter}>
             <SelectTrigger className="w-[160px] h-9">
-              <SelectValue placeholder="All Tours" />
+              <span className="truncate block text-left">
+                {tourFilter === "all"
+                  ? "All Tours"
+                  : toursData?.data.find(t => t.id === tourFilter)?.name ?? "All Tours"}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Tours</SelectItem>
@@ -220,26 +220,22 @@ function SchedulePanel({ schedule, orgSlug }: SchedulePanelProps) {
         </div>
       </div>
 
-      {/* Guide */}
+      {/* Guide Status */}
       <div>
-        <h3 className="text-sm font-medium mb-2">Guide</h3>
-        {schedule.guide ? (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-              {schedule.guide.firstName[0]}
-            </div>
-            <div>
-              <p className="text-sm font-medium">
-                {schedule.guide.firstName} {schedule.guide.lastName}
-              </p>
-              <p className="text-xs text-muted-foreground">Assigned</p>
-            </div>
+        <h3 className="text-sm font-medium mb-2">Guides</h3>
+        <div className="p-3 rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Assigned</span>
+            <Badge variant={schedule.guidesAssigned >= schedule.guidesRequired ? "default" : "secondary"}>
+              {schedule.guidesAssigned} / {schedule.guidesRequired}
+            </Badge>
           </div>
-        ) : (
-          <Button variant="outline" size="sm" className="w-full">
-            Assign Guide
-          </Button>
-        )}
+          {schedule.guidesAssigned < schedule.guidesRequired && (
+            <p className="text-xs text-warning mt-1">
+              Needs {schedule.guidesRequired - schedule.guidesAssigned} more guide{schedule.guidesRequired - schedule.guidesAssigned > 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Guests */}

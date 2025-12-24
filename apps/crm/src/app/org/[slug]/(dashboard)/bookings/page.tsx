@@ -53,7 +53,7 @@ import { TableSkeleton } from "@/components/ui/skeleton";
 import { NoBookingsEmpty, NoResultsEmpty } from "@/components/ui/empty-state";
 import { BulkRescheduleModal } from "@/components/bookings/bulk-reschedule-modal";
 import { BulkEmailModal } from "@/components/bookings/bulk-email-modal";
-import { UnifiedBookingSheet } from "@/components/bookings/unified-booking-sheet";
+import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 import { BookingMobileCard, BookingMobileCardSkeleton } from "@/components/bookings/booking-mobile-card";
 import { useIsMobile } from "@/hooks/use-media-query";
 
@@ -96,28 +96,18 @@ export default function BookingsPage() {
   const [bulkCancelReason, setBulkCancelReason] = useState("");
   const [showBulkRescheduleModal, setShowBulkRescheduleModal] = useState(false);
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
-  const [showQuickBook, setShowQuickBook] = useState(false);
+  const { openQuickBooking } = useQuickBookingContext();
 
   // Auto-open quick booking from URL param (e.g., from command palette or dashboard)
   useEffect(() => {
     if (searchParams.get("phone") === "1" || searchParams.get("quick") === "1") {
-      setShowQuickBook(true);
+      openQuickBooking();
       // Remove the query param to prevent re-opening on refresh
       router.replace(`/org/${slug}/bookings`, { scroll: false });
     }
-  }, [searchParams, router, slug]);
+  }, [searchParams, router, slug, openQuickBooking]);
 
-  // Keyboard shortcuts: Cmd+B to open quick booking
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
-        e.preventDefault();
-        setShowQuickBook(true);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  // Keyboard shortcut Cmd+B is handled by QuickBookingProvider
 
   // Toggle filters visibility
   const [showFilters, setShowFilters] = useState(false);
@@ -338,7 +328,7 @@ export default function BookingsPage() {
           )}
           {/* Mobile Quick Book button */}
           <button
-            onClick={() => setShowQuickBook(true)}
+            onClick={() => openQuickBooking()}
             className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-target"
             aria-label="Quick book"
           >
@@ -348,7 +338,7 @@ export default function BookingsPage() {
 
         {/* Desktop Quick Book button */}
         <button
-          onClick={() => setShowQuickBook(true)}
+          onClick={() => openQuickBooking()}
           className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Zap className="h-4 w-4" />
@@ -461,7 +451,7 @@ export default function BookingsPage() {
           {search ? (
             <NoResultsEmpty searchTerm={search} />
           ) : (
-            <NoBookingsEmpty orgSlug={slug} onCreateBooking={() => setShowQuickBook(true)} />
+            <NoBookingsEmpty orgSlug={slug} onCreateBooking={() => openQuickBooking()} />
           )}
         </div>
       ) : isMobile ? (
@@ -775,13 +765,6 @@ export default function BookingsPage() {
         onSuccess={() => {
           selection.clearSelection();
         }}
-      />
-
-      {/* Quick Book Sheet */}
-      <UnifiedBookingSheet
-        open={showQuickBook}
-        onOpenChange={setShowQuickBook}
-        orgSlug={slug}
       />
     </div>
   );

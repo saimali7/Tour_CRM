@@ -38,6 +38,7 @@ export interface CreateTourInput {
   durationMinutes: number;
   minParticipants?: number;
   maxParticipants: number;
+  guestsPerGuide?: number;
   basePrice: string;
   currency?: string;
   meetingPoint?: string;
@@ -300,6 +301,7 @@ export class TourService extends BaseService {
         durationMinutes: input.durationMinutes,
         minParticipants: input.minParticipants,
         maxParticipants: input.maxParticipants,
+        guestsPerGuide: input.guestsPerGuide,
         basePrice: input.basePrice,
         currency: input.currency,
         meetingPoint: input.meetingPoint,

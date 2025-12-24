@@ -21,6 +21,7 @@ import {
   ValidationError,
 } from "./types";
 import { bookingLogger } from "./lib/logger";
+import { ScheduleService } from "./schedule-service";
 
 export interface BookingFilters {
   status?: BookingStatus;
@@ -59,9 +60,22 @@ export interface BookingWithRelations extends Booking {
   participants?: BookingParticipant[];
 }
 
+export interface PricingSnapshot {
+  optionId?: string;
+  optionName?: string;
+  pricingModel?: unknown;
+  experienceMode?: "join" | "book" | "charter";
+  priceBreakdown?: string;
+}
+
 export interface CreateBookingInput {
   customerId: string;
   scheduleId: string;
+  bookingOptionId?: string;
+  guestAdults?: number;
+  guestChildren?: number;
+  guestInfants?: number;
+  pricingSnapshot?: PricingSnapshot;
   adultCount: number;
   childCount?: number;
   infantCount?: number;
@@ -100,6 +114,23 @@ export interface UpdateBookingInput {
 }
 
 export class BookingService extends BaseService {
+  /**
+   * Helper to recalculate guide requirements after booking changes
+   */
+  private async recalculateGuideRequirements(scheduleId: string): Promise<void> {
+    try {
+      const scheduleService = new ScheduleService(this.ctx);
+      await scheduleService.recalculateGuideRequirements(scheduleId);
+    } catch (error) {
+      // Log but don't fail the booking operation
+      bookingLogger.warn({
+        organizationId: this.organizationId,
+        scheduleId,
+        error: error instanceof Error ? error.message : "Unknown error",
+      }, "Failed to recalculate guide requirements");
+    }
+  }
+
   async getAll(
     filters: BookingFilters = {},
     pagination: PaginationOptions = {},
@@ -388,6 +419,11 @@ export class BookingService extends BaseService {
           referenceNumber,
           customerId: input.customerId,
           scheduleId: input.scheduleId,
+          bookingOptionId: input.bookingOptionId,
+          guestAdults: input.guestAdults ?? input.adultCount,
+          guestChildren: input.guestChildren ?? input.childCount ?? 0,
+          guestInfants: input.guestInfants ?? input.infantCount ?? 0,
+          pricingSnapshot: input.pricingSnapshot,
           adultCount: input.adultCount,
           childCount: input.childCount || 0,
           infantCount: input.infantCount || 0,
@@ -472,6 +508,9 @@ export class BookingService extends BaseService {
       source: input.source || "manual",
     }, "Booking created successfully");
 
+    // Recalculate guide requirements after booking creation
+    await this.recalculateGuideRequirements(input.scheduleId);
+
     return this.getById(bookingId);
   }
 
@@ -539,6 +578,15 @@ export class BookingService extends BaseService {
 
     if (!updated) {
       throw new NotFoundError("Booking", id);
+    }
+
+    // Recalculate guide requirements if participant counts changed
+    if (
+      input.adultCount !== undefined ||
+      input.childCount !== undefined ||
+      input.infantCount !== undefined
+    ) {
+      await this.recalculateGuideRequirements(booking.scheduleId);
     }
 
     return this.getById(updated.id);
@@ -618,6 +666,9 @@ export class BookingService extends BaseService {
     if (!updated) {
       throw new NotFoundError("Booking", id);
     }
+
+    // Recalculate guide requirements after cancellation
+    await this.recalculateGuideRequirements(booking.scheduleId);
 
     return this.getById(updated.id);
   }
@@ -772,6 +823,12 @@ export class BookingService extends BaseService {
     if (!updated) {
       throw new NotFoundError("Booking", id);
     }
+
+    // Recalculate guide requirements for both old and new schedules
+    await Promise.all([
+      this.recalculateGuideRequirements(booking.scheduleId),
+      this.recalculateGuideRequirements(newScheduleId),
+    ]);
 
     return this.getById(updated.id);
   }
@@ -1158,6 +1215,14 @@ export class BookingService extends BaseService {
         ids: cancellableIds,
         reason,
       }, "Bulk cancelled bookings");
+
+      // Recalculate guide requirements for all affected schedules
+      const affectedScheduleIds = [...scheduleUpdates.keys()];
+      await Promise.all(
+        affectedScheduleIds.map((scheduleId) =>
+          this.recalculateGuideRequirements(scheduleId)
+        )
+      );
 
       return { cancelled: cancellableIds, errors };
     }

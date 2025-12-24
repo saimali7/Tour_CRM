@@ -70,7 +70,7 @@ export function ToursDayView({ orgSlug, selectedDate }: ToursDayViewProps) {
     const totalCapacity = schedules.reduce((sum, s) => sum + s.maxParticipants, 0);
     const totalBooked = schedules.reduce((sum, s) => sum + (s.bookedCount ?? 0), 0);
     const spotsRemaining = totalCapacity - totalBooked;
-    const needsGuide = schedules.filter((s) => !s.guide).length;
+    const needsGuide = schedules.filter((s) => (s.guidesRequired ?? 0) > 0 && (s.guidesAssigned ?? 0) < (s.guidesRequired ?? 0)).length;
     const utilizationPercent = totalCapacity > 0 ? Math.round((totalBooked / totalCapacity) * 100) : 0;
 
     return { totalSchedules, totalCapacity, totalBooked, spotsRemaining, needsGuide, utilizationPercent };
@@ -204,17 +204,17 @@ export function ToursDayView({ orgSlug, selectedDate }: ToursDayViewProps) {
                           <div className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
                             {schedule.tour?.name ?? "Unknown Tour"}
                           </div>
-                          {schedule.guide ? (
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+                          {(schedule.guidesAssigned ?? 0) > 0 ? (
+                            <div className="flex items-center gap-1.5 text-sm text-success mt-1">
                               <User className="h-3.5 w-3.5" />
-                              {schedule.guide.firstName} {schedule.guide.lastName}
+                              {schedule.guidesAssigned}/{schedule.guidesRequired} guides
                             </div>
-                          ) : (
+                          ) : (schedule.guidesRequired ?? 0) > 0 ? (
                             <div className="flex items-center gap-1.5 text-sm text-warning mt-1">
                               <User className="h-3.5 w-3.5" />
-                              Needs guide assignment
+                              Needs {schedule.guidesRequired} guide{schedule.guidesRequired !== 1 ? 's' : ''}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
 

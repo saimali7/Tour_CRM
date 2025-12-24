@@ -165,30 +165,39 @@ export function SchedulePreview({ scheduleId }: SchedulePreviewProps) {
         </div>
       </ContextPanelSection>
 
-      {/* Guide Section */}
-      <ContextPanelSection title="Guide">
-        {schedule.guide ? (
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-              <Flag className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
-                {schedule.guide.firstName} {schedule.guide.lastName}
-              </p>
-              {schedule.guide.email && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {schedule.guide.email}
-                </p>
+      {/* Guide Staffing Section */}
+      <ContextPanelSection title="Guide Staffing">
+        {(() => {
+          const needsGuides = schedule.guidesAssigned < schedule.guidesRequired;
+          const guideStatus = needsGuides
+            ? `Needs ${schedule.guidesRequired - schedule.guidesAssigned} more guide(s)`
+            : 'Fully staffed';
+
+          return (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">
+                    {schedule.guidesAssigned} / {schedule.guidesRequired} guides
+                  </span>
+                </div>
+                <span className={cn(
+                  "text-xs font-medium",
+                  needsGuides ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"
+                )}>
+                  {guideStatus}
+                </span>
+              </div>
+              {needsGuides && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <AlertCircle className="h-3 w-3 text-amber-500" />
+                  <span>Additional guides needed</span>
+                </div>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertCircle className="h-4 w-4 text-amber-500" />
-            <span>No guide assigned</span>
-          </div>
-        )}
+          );
+        })()}
       </ContextPanelSection>
 
       {/* Meeting Point */}

@@ -1,10 +1,11 @@
-import { eq, and, gte, lte, desc, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, desc, inArray, sql } from "drizzle-orm";
 import {
   schedules,
   tours,
   guides,
   bookings,
   customers,
+  guideAssignments,
   type BookingParticipant,
 } from "@tour/database";
 import { BaseService } from "./base-service";
@@ -61,13 +62,14 @@ export interface ScheduleManifest {
     slug: string;
     durationMinutes: number;
   };
-  guide: {
+  // All confirmed guides assigned to bookings on this schedule
+  guides: Array<{
     id: string;
     firstName: string;
     lastName: string;
     email: string;
     phone: string | null;
-  } | null;
+  }>;
   bookings: ManifestBooking[];
   summary: {
     totalBookings: number;
@@ -106,7 +108,8 @@ export interface DateManifestSummary {
     startsAt: Date;
     endsAt: Date;
     tourName: string;
-    guideName: string | null;
+    guidesRequired: number;
+    guidesAssigned: number;
     totalParticipants: number;
     bookedCount: number;
   }>;
@@ -123,7 +126,7 @@ export class ManifestService extends BaseService {
    * Returns all confirmed bookings with participant details
    */
   async getManifestForSchedule(scheduleId: string): Promise<ScheduleManifest> {
-    // Get schedule with tour and guide info
+    // Get schedule with tour info
     const scheduleResult = await this.db
       .select({
         schedule: schedules,
@@ -133,17 +136,9 @@ export class ManifestService extends BaseService {
           slug: tours.slug,
           durationMinutes: tours.durationMinutes,
         },
-        guide: {
-          id: guides.id,
-          firstName: guides.firstName,
-          lastName: guides.lastName,
-          email: guides.email,
-          phone: guides.phone,
-        },
       })
       .from(schedules)
       .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .leftJoin(guides, eq(schedules.guideId, guides.id))
       .where(
         and(
           eq(schedules.id, scheduleId),
@@ -238,6 +233,51 @@ export class ManifestService extends BaseService {
       participants: participantsByBooking[result.booking.id] || [],
     }));
 
+    // Get all confirmed guides for this schedule (via assignments on bookings)
+    let confirmedGuides: Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string | null;
+    }> = [];
+
+    if (bookingIds.length > 0) {
+      const guideResults = await this.db
+        .select({
+          guideId: guideAssignments.guideId,
+          firstName: guides.firstName,
+          lastName: guides.lastName,
+          email: guides.email,
+          phone: guides.phone,
+        })
+        .from(guideAssignments)
+        .innerJoin(guides, eq(guideAssignments.guideId, guides.id))
+        .where(
+          and(
+            inArray(guideAssignments.bookingId, bookingIds),
+            eq(guideAssignments.organizationId, this.organizationId),
+            eq(guideAssignments.status, "confirmed"),
+            sql`${guideAssignments.guideId} is not null`
+          )
+        );
+
+      // Deduplicate guides by ID (filter out nulls which shouldn't exist due to innerJoin)
+      const guideMap = new Map<string, { guideId: string; firstName: string; lastName: string; email: string; phone: string | null }>();
+      for (const guide of guideResults) {
+        if (guide.guideId) {
+          guideMap.set(guide.guideId, { ...guide, guideId: guide.guideId });
+        }
+      }
+      confirmedGuides = Array.from(guideMap.values()).map((g) => ({
+        id: g.guideId,
+        firstName: g.firstName,
+        lastName: g.lastName,
+        email: g.email,
+        phone: g.phone,
+      }));
+    }
+
     // Calculate summary
     const totalBookings = manifestBookings.length;
     const totalParticipants = manifestBookings.reduce(
@@ -260,7 +300,7 @@ export class ManifestService extends BaseService {
         bookedCount: row.schedule.bookedCount || 0,
       },
       tour: row.tour!,
-      guide: row.guide?.id ? row.guide : null,
+      guides: confirmedGuides,
       bookings: manifestBookings,
       summary: {
         totalBookings,
@@ -296,7 +336,42 @@ export class ManifestService extends BaseService {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Get all schedules for this guide on this date
+    // Get schedules where this guide has confirmed assignments (via bookings)
+    const assignmentScheduleIds = await this.db
+      .select({ scheduleId: bookings.scheduleId })
+      .from(guideAssignments)
+      .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
+      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
+      .where(
+        and(
+          eq(guideAssignments.guideId, guideId),
+          eq(guideAssignments.organizationId, this.organizationId),
+          eq(guideAssignments.status, "confirmed"),
+          gte(schedules.startsAt, startOfDay),
+          lte(schedules.startsAt, endOfDay)
+        )
+      );
+
+    const scheduleIds = [...new Set(assignmentScheduleIds.map((a) => a.scheduleId))];
+
+    if (scheduleIds.length === 0) {
+      return {
+        guide: {
+          id: guide.id,
+          firstName: guide.firstName,
+          lastName: guide.lastName,
+          email: guide.email,
+          phone: guide.phone,
+        },
+        schedules: [],
+        summary: {
+          totalSchedules: 0,
+          totalParticipants: 0,
+        },
+      };
+    }
+
+    // Get the schedules with tour info
     const scheduleResults = await this.db
       .select({
         schedule: schedules,
@@ -309,10 +384,8 @@ export class ManifestService extends BaseService {
       .leftJoin(tours, eq(schedules.tourId, tours.id))
       .where(
         and(
-          eq(schedules.guideId, guideId),
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, startOfDay),
-          lte(schedules.startsAt, endOfDay)
+          inArray(schedules.id, scheduleIds),
+          eq(schedules.organizationId, this.organizationId)
         )
       )
       .orderBy(schedules.startsAt);
@@ -366,15 +439,9 @@ export class ManifestService extends BaseService {
           id: tours.id,
           name: tours.name,
         },
-        guide: {
-          id: guides.id,
-          firstName: guides.firstName,
-          lastName: guides.lastName,
-        },
       })
       .from(schedules)
       .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .leftJoin(guides, eq(schedules.guideId, guides.id))
       .where(
         and(
           eq(schedules.organizationId, this.organizationId),
@@ -413,9 +480,9 @@ export class ManifestService extends BaseService {
       startsAt: result.schedule.startsAt,
       endsAt: result.schedule.endsAt,
       tourName: result.tour?.name || "Unknown Tour",
-      guideName: result.guide?.id
-        ? `${result.guide.firstName} ${result.guide.lastName}`
-        : null,
+      // Use guide capacity counts instead of single guide name
+      guidesRequired: result.schedule.guidesRequired ?? 0,
+      guidesAssigned: result.schedule.guidesAssigned ?? 0,
       totalParticipants: result.schedule.bookedCount || 0,
       bookedCount: result.schedule.bookedCount || 0,
     }));

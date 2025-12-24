@@ -33,3 +33,6 @@ export * from "./add-ons";
 
 // Phase 7: Operations Excellence - Goals
 export * from "./goals";
+
+// Booking System v2: Customer-first booking with options
+export * from "./booking-options";

@@ -165,19 +165,24 @@ export function TourSchedulePreview({
                 </span>
               </div>
 
-              {/* Guide */}
+              {/* Guide Status */}
               <div className="w-32 flex-shrink-0">
-                {schedule.guide ? (
-                  <div className="flex items-center gap-1.5 text-sm">
-                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                {(schedule.guidesAssigned ?? 0) > 0 ? (
+                  <div className="flex items-center gap-1.5 text-sm text-success">
+                    <User className="h-3.5 w-3.5" />
                     <span className="truncate">
-                      {schedule.guide.firstName} {schedule.guide.lastName?.[0]}.
+                      {schedule.guidesAssigned}/{schedule.guidesRequired} guides
                     </span>
                   </div>
-                ) : (
+                ) : (schedule.guidesRequired ?? 0) > 0 ? (
                   <span className="text-sm text-warning flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
-                    Needs guide
+                    Needs guides
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" />
+                    No guides
                   </span>
                 )}
               </div>

@@ -1,7 +1,7 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
 import { createServices } from "@tour/services";
-import { eq, and, gte, lte, db, schedules, bookings, organizations } from "@tour/database";
+import { eq, and, gte, lte, db, schedules, bookings, organizations, guideAssignments } from "@tour/database";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
 /**
@@ -336,32 +336,68 @@ export const sendGuideDailyManifest = inngest.createFunction(
             ),
             with: {
               tour: true,
-              guide: true,
+              bookings: {
+                with: {
+                  guideAssignments: {
+                    where: eq(guideAssignments.status, "confirmed"),
+                    with: {
+                      guide: true,
+                    },
+                  },
+                },
+              },
             },
           });
 
-          // Group schedules by guide
+          // Group schedules by guide (via booking assignments)
           const schedulesByGuide = new Map<
             string,
             Array<typeof todaysSchedules[number]>
           >();
 
           for (const schedule of todaysSchedules) {
-            if (!schedule.guide) continue; // Skip schedules without assigned guides
-
-            const guideId = schedule.guide.id;
-            if (!schedulesByGuide.has(guideId)) {
-              schedulesByGuide.set(guideId, []);
+            // Get all unique guides assigned to bookings in this schedule
+            const guideIds = new Set<string>();
+            for (const booking of schedule.bookings) {
+              // Use type assertion since the relation is defined dynamically
+              const bookingWithAssignments = booking as typeof booking & {
+                guideAssignments: Array<{ guideId: string; guide: { id: string; firstName: string; lastName: string; email: string } }>;
+              };
+              for (const assignment of bookingWithAssignments.guideAssignments) {
+                guideIds.add(assignment.guideId);
+              }
             }
 
-            schedulesByGuide.get(guideId)!.push(schedule);
+            // Add this schedule to each assigned guide's list
+            for (const guideId of guideIds) {
+              if (!schedulesByGuide.has(guideId)) {
+                schedulesByGuide.set(guideId, []);
+              }
+              schedulesByGuide.get(guideId)!.push(schedule);
+            }
           }
 
           // Send manifest email to each guide
           const emailResults = [];
 
           for (const [guideId, guideSchedules] of schedulesByGuide) {
-            const guide = guideSchedules[0]?.guide;
+            // Get guide info from first assignment we find
+            let guide = null;
+            for (const gs of guideSchedules) {
+              for (const booking of gs.bookings) {
+                // Use type assertion since the relation is defined dynamically
+                const bookingWithAssignments = booking as typeof booking & {
+                  guideAssignments: Array<{ guideId: string; guide: { id: string; firstName: string; lastName: string; email: string } }>;
+                };
+                const assignment = bookingWithAssignments.guideAssignments.find((a) => a.guideId === guideId);
+                if (assignment?.guide) {
+                  guide = assignment.guide;
+                  break;
+                }
+              }
+              if (guide) break;
+            }
+
             if (!guide) continue;
 
             // Get participant counts for each schedule

@@ -18,11 +18,11 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { ScheduleGuideAssignment } from "@/components/schedules/schedule-guide-assignment";
 import { ScheduleManifest } from "@/components/schedules/schedule-manifest";
+import { QuickGuideAssign } from "@/components/guides/QuickGuideAssign";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { UnifiedBookingSheet } from "@/components/bookings/unified-booking-sheet";
+import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 
 type Tab = "details" | "bookings" | "manifest";
 
@@ -32,7 +32,7 @@ export default function ScheduleDetailPage() {
   const slug = params.slug as string;
   const scheduleId = params.id as string;
   const [activeTab, setActiveTab] = useState<Tab>("details");
-  const [showQuickBook, setShowQuickBook] = useState(false);
+  const { openQuickBooking } = useQuickBookingContext();
 
   const { data: schedule, isLoading, error } = trpc.schedule.getById.useQuery({ id: scheduleId });
   const { data: scheduleBookings } = trpc.booking.getForSchedule.useQuery(
@@ -109,7 +109,8 @@ export default function ScheduleDetailPage() {
   };
 
   const handleAddBooking = () => {
-    setShowQuickBook(true);
+    // Pass scheduleId to open classic mode (schedule already selected)
+    openQuickBooking({ scheduleId });
   };
 
   const booked = schedule.bookedCount ?? 0;
@@ -156,11 +157,11 @@ export default function ScheduleDetailPage() {
             </Button>
           )}
           <Link
-            href={`/org/${slug}/tours/${schedule.tourId}?tab=schedules` as Route}
+            href={`/org/${slug}/availability/${schedule.id}/edit` as Route}
             className="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
           >
             <Edit className="h-4 w-4" />
-            Edit in Tour
+            Edit Schedule
           </Link>
         </div>
       </div>
@@ -293,37 +294,22 @@ export default function ScheduleDetailPage() {
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "p-2 rounded-lg",
-                  schedule.guide ? "bg-success/10" : "bg-warning/10"
+                  schedule.guidesAssigned >= schedule.guidesRequired ? "bg-success/10" : "bg-warning/10"
                 )}>
                   <User className={cn(
                     "h-5 w-5",
-                    schedule.guide ? "text-success" : "text-warning"
+                    schedule.guidesAssigned >= schedule.guidesRequired ? "text-success" : "text-warning"
                   )} />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Guide</p>
-                  <p className={cn(
-                    "font-semibold",
-                    schedule.guide ? "text-foreground" : "text-warning"
-                  )}>
-                    {schedule.guide
-                      ? `${schedule.guide.firstName} ${schedule.guide.lastName}`
-                      : "Not assigned"}
+                  <p className="text-sm text-muted-foreground">Guides</p>
+                  <p className="font-semibold text-foreground">
+                    {schedule.guidesAssigned}/{schedule.guidesRequired}
                   </p>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Guide Assignment */}
-          {schedule.tour && (
-            <ScheduleGuideAssignment
-              scheduleId={schedule.id}
-              tourId={schedule.tour.id}
-              startsAt={schedule.startsAt}
-              endsAt={schedule.endsAt}
-            />
-          )}
 
           {/* Tour Info */}
           {schedule.tour && (
@@ -467,14 +453,6 @@ export default function ScheduleDetailPage() {
       )}
 
       {activeTab === "manifest" && <ScheduleManifest scheduleId={scheduleId} />}
-
-      {/* Unified Booking Sheet */}
-      <UnifiedBookingSheet
-        open={showQuickBook}
-        onOpenChange={setShowQuickBook}
-        orgSlug={slug}
-        preselectedScheduleId={scheduleId}
-      />
     </div>
   );
 }

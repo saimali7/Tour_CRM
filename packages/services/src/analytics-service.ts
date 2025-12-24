@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, sql, desc, count } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, count, isNotNull } from "drizzle-orm";
 import {
   bookings,
   schedules,
@@ -113,10 +113,14 @@ export interface TodaysOperations {
     tourName: string;
     startsAt: Date;
     endsAt: Date;
-    guideName: string | null;
     bookedCount: number;
     maxParticipants: number;
     status: string;
+    guidesRequired: number;
+    guidesAssigned: number;
+    needsMoreGuides: boolean;
+    guideDeficit: number;
+    /** @deprecated Use needsMoreGuides instead */
     hasUnconfirmedGuide: boolean;
   }>;
 }
@@ -731,25 +735,36 @@ export class AnalyticsService extends BaseService {
     const scheduledTours = Number(statsQuery[0]?.scheduledTours || 0);
     const totalParticipants = Number(statsQuery[0]?.totalParticipants || 0);
 
-    // Count unique guides working today
-    const guidesQuery = await this.db
-      .select({
-        guideCount: sql<number>`COUNT(DISTINCT ${guideAssignments.guideId})`,
-      })
-      .from(guideAssignments)
-      .leftJoin(schedules, eq(guideAssignments.scheduleId, schedules.id))
-      .where(
-        and(
-          eq(guideAssignments.organizationId, this.organizationId),
-          gte(schedules.startsAt, today),
-          lte(schedules.startsAt, tomorrow),
-          eq(guideAssignments.status, "confirmed")
-        )
-      );
-
-    const guidesWorking = Number(guidesQuery[0]?.guideCount || 0);
+    // Count unique guides working today by joining through bookings
+    // Use try-catch to handle cases where guide_assignments table may have incomplete data
+    let guidesWorking = 0;
+    try {
+      const guidesQuery = await this.db
+        .select({
+          guideCount: sql<number>`COUNT(DISTINCT ${guideAssignments.guideId})`,
+        })
+        .from(guideAssignments)
+        .leftJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
+        .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
+        .where(
+          and(
+            eq(guideAssignments.organizationId, this.organizationId),
+            isNotNull(guideAssignments.bookingId),
+            isNotNull(schedules.startsAt),
+            gte(schedules.startsAt, today),
+            lte(schedules.startsAt, tomorrow),
+            eq(guideAssignments.status, "confirmed")
+          )
+        );
+      guidesWorking = Number(guidesQuery[0]?.guideCount || 0);
+    } catch (error) {
+      // Log error but continue - guides count is non-critical
+      console.error("Failed to get guides working count:", error);
+      guidesWorking = 0;
+    }
 
     // Get upcoming schedules for next 24 hours
+    // Now we use denormalized guidesAssigned count instead of joining
     const now = new Date();
     const next24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
@@ -762,14 +777,11 @@ export class AnalyticsService extends BaseService {
         bookedCount: schedules.bookedCount,
         maxParticipants: schedules.maxParticipants,
         status: schedules.status,
-        guideFirstName: guides.firstName,
-        guideLastName: guides.lastName,
-        assignmentStatus: guideAssignments.status,
+        guidesRequired: schedules.guidesRequired,
+        guidesAssigned: schedules.guidesAssigned,
       })
       .from(schedules)
       .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .leftJoin(guideAssignments, eq(schedules.id, guideAssignments.scheduleId))
-      .leftJoin(guides, eq(guideAssignments.guideId, guides.id))
       .where(
         and(
           eq(schedules.organizationId, this.organizationId),
@@ -781,19 +793,29 @@ export class AnalyticsService extends BaseService {
       .orderBy(schedules.startsAt)
       .limit(10);
 
-    const upcomingSchedules = upcomingQuery.map(row => ({
-      scheduleId: row.scheduleId,
-      tourName: row.tourName || "Unknown",
-      startsAt: row.startsAt,
-      endsAt: row.endsAt,
-      guideName: row.guideFirstName && row.guideLastName
-        ? `${row.guideFirstName} ${row.guideLastName}`
-        : null,
-      bookedCount: Number(row.bookedCount || 0),
-      maxParticipants: Number(row.maxParticipants),
-      status: row.status,
-      hasUnconfirmedGuide: row.assignmentStatus !== "confirmed" && row.assignmentStatus !== null,
-    }));
+    // Map results to output format - now using denormalized guidesAssigned count
+    const upcomingSchedules = upcomingQuery.map(row => {
+      const guidesRequired = Number(row.guidesRequired || 0);
+      const guidesAssigned = Number(row.guidesAssigned || 0);
+      const needsMoreGuides = guidesAssigned < guidesRequired;
+      const guideDeficit = Math.max(0, guidesRequired - guidesAssigned);
+
+      return {
+        scheduleId: row.scheduleId,
+        tourName: row.tourName || "Unknown",
+        startsAt: row.startsAt,
+        endsAt: row.endsAt,
+        bookedCount: Number(row.bookedCount || 0),
+        maxParticipants: Number(row.maxParticipants),
+        status: row.status,
+        guidesRequired,
+        guidesAssigned,
+        needsMoreGuides,
+        guideDeficit,
+        // Backwards compatibility
+        hasUnconfirmedGuide: needsMoreGuides,
+      };
+    });
 
     return {
       scheduledTours,
@@ -1211,20 +1233,20 @@ export class AnalyticsService extends BaseService {
       });
     }
 
-    // 4. Unassigned guides for upcoming tours
+    // 4. Tours needing more guides (guidesAssigned < guidesRequired)
     const unassignedSchedules = await this.db
       .select({
         count: count(),
       })
       .from(schedules)
-      .leftJoin(guideAssignments, eq(schedules.id, guideAssignments.scheduleId))
       .where(
         and(
           eq(schedules.organizationId, this.organizationId),
           eq(schedules.status, "scheduled"),
           gte(schedules.startsAt, now),
           lte(schedules.startsAt, sevenDaysFromNow),
-          sql`${guideAssignments.id} IS NULL`
+          sql`${schedules.guidesAssigned} < ${schedules.guidesRequired}`,
+          sql`${schedules.guidesRequired} > 0` // Only count schedules that need guides
         )
       );
 

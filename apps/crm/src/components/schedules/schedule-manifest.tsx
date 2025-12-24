@@ -119,8 +119,9 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
   };
 
   const handleEmailGuide = () => {
-    if (manifest?.guide) {
-      window.location.href = `mailto:${manifest.guide.email}?subject=Manifest for ${manifest.tour.name} - ${format(new Date(manifest.schedule.startsAt), "MMMM d, yyyy")}`;
+    if (manifest?.guides && manifest.guides.length > 0) {
+      const emails = manifest.guides.map(g => g.email).filter(Boolean).join(',');
+      window.location.href = `mailto:${emails}?subject=Manifest for ${manifest.tour.name} - ${format(new Date(manifest.schedule.startsAt), "MMMM d, yyyy")}`;
     }
   };
 
@@ -175,13 +176,13 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
             <Printer className="h-4 w-4" />
             Print Manifest
           </button>
-          {manifest.guide && (
+          {manifest.guides.length > 0 && (
             <button
               onClick={handleEmailGuide}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
             >
               <Mail className="h-4 w-4" />
-              Email to Guide
+              Email to Guide{manifest.guides.length > 1 ? 's' : ''}
             </button>
           )}
         </div>
@@ -287,26 +288,30 @@ export function ScheduleManifest({ scheduleId }: ScheduleManifestProps) {
         </div>
 
         {/* Guide Info */}
-        {manifest.guide && (
+        {manifest.guides.length > 0 && (
           <div className="border-t border-border pt-4">
-            <h3 className="text-sm font-semibold text-foreground mb-2">Assigned Guide</h3>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">
-                  {manifest.guide.firstName} {manifest.guide.lastName}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">{manifest.guide.email}</span>
-              </div>
-              {manifest.guide.phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{manifest.guide.phone}</span>
+            <h3 className="text-sm font-semibold text-foreground mb-2">Assigned Guide{manifest.guides.length > 1 ? 's' : ''}</h3>
+            <div className="space-y-3">
+              {manifest.guides.map((guide) => (
+                <div key={guide.id} className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-foreground">
+                      {guide.firstName} {guide.lastName}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">{guide.email}</span>
+                  </div>
+                  {guide.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{guide.phone}</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
           </div>
         )}

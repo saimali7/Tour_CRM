@@ -28,6 +28,11 @@ const baseTourSchema = z.object({
     .number()
     .int("Maximum participants must be a whole number")
     .min(1, "Must allow at least 1 participant"),
+  guestsPerGuide: z
+    .number()
+    .int("Guests per guide must be a whole number")
+    .min(1, "Must have at least 1 guest per guide")
+    .default(6),
   basePrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
   currency: z.string().length(3, "Currency must be 3 characters").default("USD"),
   status: tourStatusSchema.default("draft"),

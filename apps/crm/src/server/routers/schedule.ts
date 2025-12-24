@@ -9,7 +9,6 @@ const dateRangeSchema = z.object({
 
 const scheduleFilterSchema = z.object({
   tourId: z.string().optional(),
-  guideId: z.string().optional(),
   status: z.enum(["scheduled", "in_progress", "completed", "cancelled"]).optional(),
   dateRange: dateRangeSchema.optional(),
   hasAvailability: z.boolean().optional(),
@@ -29,7 +28,6 @@ const priceStringSchema = z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid
 
 const createScheduleSchema = z.object({
   tourId: z.string().max(100),
-  guideId: z.string().max(100).optional(),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date().optional(),
   maxParticipants: z.number().min(1).max(1000).optional(),
@@ -44,7 +42,6 @@ const createScheduleSchema = z.object({
 
 const bulkCreateSchema = z.object({
   tourId: z.string().max(100),
-  guideId: z.string().max(100).optional(),
   dates: z.array(z.coerce.date()).max(365), // Max 1 year of dates
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
   maxParticipants: z.number().min(1).max(1000).optional(),
@@ -53,7 +50,6 @@ const bulkCreateSchema = z.object({
 
 const autoGenerateSchema = z.object({
   tourId: z.string().max(100),
-  guideId: z.string().max(100).optional(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   daysOfWeek: z.array(z.number().min(0).max(6)).max(7),

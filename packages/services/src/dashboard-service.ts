@@ -1,3 +1,5 @@
+import { eq, and, gte, lte, sql, desc, isNull, isNotNull } from "drizzle-orm";
+import { bookings, schedules, tours, customers } from "@tour/database";
 import { BaseService } from "./base-service";
 import { type DateRangeFilter } from "./types";
 import { AnalyticsService } from "./analytics-service";
@@ -18,10 +20,14 @@ export interface OperationsDashboard {
     tourName: string;
     startsAt: Date;
     endsAt: Date;
-    guideName: string | null;
     bookedCount: number;
     maxParticipants: number;
     status: string;
+    guidesRequired: number;
+    guidesAssigned: number;
+    needsMoreGuides: boolean;
+    guideDeficit: number;
+    /** @deprecated Use needsMoreGuides instead */
     hasUnconfirmedGuide: boolean;
   }>;
   alerts: Alert[];
@@ -108,12 +114,15 @@ export class DashboardService extends BaseService {
     // Generate alerts based on current data
     const alerts: Alert[] = [];
 
-    // Alert for schedules with unconfirmed guides
+    // Alert for schedules needing more guides
     for (const schedule of upcomingSchedules) {
-      if (schedule.hasUnconfirmedGuide) {
+      if (schedule.needsMoreGuides) {
+        const guideMessage = schedule.guideDeficit === 1
+          ? `Needs 1 more guide`
+          : `Needs ${schedule.guideDeficit} more guides`;
         alerts.push({
           type: "warning",
-          message: `Guide not confirmed for ${schedule.tourName} at ${schedule.startsAt.toLocaleTimeString()}`,
+          message: `${guideMessage} for ${schedule.tourName} at ${schedule.startsAt.toLocaleTimeString()}`,
           entityType: "schedule",
           entityId: schedule.scheduleId,
           actionLabel: "Assign Guide",
@@ -322,9 +331,9 @@ export class DashboardService extends BaseService {
       this.analytics.getBookingStats({ from: today, to: tomorrow }),
     ]);
 
-    // Count pending guide assignments in upcoming schedules
+    // Count schedules that need more guides
     const pendingAssignments = operations.upcomingSchedules.filter(
-      s => s.hasUnconfirmedGuide
+      s => s.needsMoreGuides
     ).length;
 
     return {
@@ -335,4 +344,226 @@ export class DashboardService extends BaseService {
       todayRevenue: revenue.totalRevenue,
     };
   }
+
+  /**
+   * Get bookings for a specific date range
+   * Core method used by getTodayBookings and getTomorrowBookings
+   */
+  private async getBookingsForDateRange(startDate: Date, endDate: Date): Promise<TodayBooking[]> {
+    const result = await this.db
+      .select({
+        bookingId: bookings.id,
+        referenceNumber: bookings.referenceNumber,
+        status: bookings.status,
+        paymentStatus: bookings.paymentStatus,
+        adultCount: bookings.adultCount,
+        childCount: bookings.childCount,
+        infantCount: bookings.infantCount,
+        total: bookings.total,
+        customerFirstName: customers.firstName,
+        customerLastName: customers.lastName,
+        customerEmail: customers.email,
+        customerPhone: customers.phone,
+        tourName: tours.name,
+        tourId: tours.id,
+        scheduleId: schedules.id,
+        startsAt: schedules.startsAt,
+        endsAt: schedules.endsAt,
+        guidesRequired: schedules.guidesRequired,
+        guidesAssigned: schedules.guidesAssigned,
+      })
+      .from(bookings)
+      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
+      .innerJoin(tours, eq(schedules.tourId, tours.id))
+      .innerJoin(customers, eq(bookings.customerId, customers.id))
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          gte(schedules.startsAt, startDate),
+          lte(schedules.startsAt, endDate),
+          sql`${bookings.status} NOT IN ('cancelled')`
+        )
+      )
+      .orderBy(schedules.startsAt, desc(bookings.createdAt));
+
+    return result.map(row => ({
+      bookingId: row.bookingId,
+      referenceNumber: row.referenceNumber,
+      status: row.status as "pending" | "confirmed" | "completed" | "no_show",
+      paymentStatus: row.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed",
+      participants: (row.adultCount || 0) + (row.childCount || 0) + (row.infantCount || 0),
+      total: row.total,
+      customer: {
+        firstName: row.customerFirstName,
+        lastName: row.customerLastName,
+        email: row.customerEmail,
+        phone: row.customerPhone,
+      },
+      tour: {
+        id: row.tourId,
+        name: row.tourName || "Unknown",
+      },
+      schedule: {
+        id: row.scheduleId,
+        startsAt: row.startsAt,
+        endsAt: row.endsAt,
+        guidesRequired: row.guidesRequired ?? 0,
+        guidesAssigned: row.guidesAssigned ?? 0,
+      },
+    }));
+  }
+
+  /**
+   * Get today's bookings - actual customers with bookings for today
+   */
+  async getTodayBookings(): Promise<TodayBooking[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return this.getBookingsForDateRange(today, tomorrow);
+  }
+
+  /**
+   * Get tomorrow's bookings - preview for preparation
+   */
+  async getTomorrowBookings(): Promise<TodayBooking[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(tomorrow);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    return this.getBookingsForDateRange(tomorrow, dayAfter);
+  }
+
+  /**
+   * Get comprehensive tomorrow preview - everything needed to plan for tomorrow
+   */
+  async getTomorrowPreview(): Promise<TomorrowPreview> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(tomorrow);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+
+    // Get all bookings for tomorrow
+    const bookings = await this.getBookingsForDateRange(tomorrow, dayAfter);
+
+    // Get schedules for tomorrow (to check guide assignments)
+    const schedulesResult = await this.db
+      .select({
+        scheduleId: schedules.id,
+        tourName: tours.name,
+        startsAt: schedules.startsAt,
+        endsAt: schedules.endsAt,
+        bookedCount: schedules.bookedCount,
+        maxParticipants: schedules.maxParticipants,
+        guidesRequired: schedules.guidesRequired,
+        guidesAssigned: schedules.guidesAssigned,
+      })
+      .from(schedules)
+      .innerJoin(tours, eq(schedules.tourId, tours.id))
+      .where(
+        and(
+          eq(schedules.organizationId, this.organizationId),
+          gte(schedules.startsAt, tomorrow),
+          lte(schedules.startsAt, dayAfter),
+          sql`${schedules.status} != 'cancelled'`
+        )
+      )
+      .orderBy(schedules.startsAt);
+
+    // Filter to only schedules with bookings
+    const schedulesWithBookings = schedulesResult.filter(s => (s.bookedCount ?? 0) > 0);
+
+    // Find schedules needing more guides (guidesAssigned < guidesRequired)
+    const schedulesNeedingGuides = schedulesWithBookings
+      .filter(s => (s.guidesAssigned ?? 0) < (s.guidesRequired ?? 0))
+      .map(s => ({
+        scheduleId: s.scheduleId,
+        tourName: s.tourName || "Unknown",
+        startsAt: s.startsAt,
+        bookedCount: s.bookedCount ?? 0,
+        maxParticipants: s.maxParticipants,
+        guidesRequired: s.guidesRequired ?? 0,
+        guidesAssigned: s.guidesAssigned ?? 0,
+        guideDeficit: Math.max(0, (s.guidesRequired ?? 0) - (s.guidesAssigned ?? 0)),
+      }));
+
+    // Calculate stats
+    const totalBookings = bookings.length;
+    const totalGuests = bookings.reduce((sum, b) => sum + b.participants, 0);
+    const expectedRevenue = bookings.reduce((sum, b) => sum + parseFloat(b.total), 0);
+
+    // Bookings needing attention
+    const pendingConfirmation = bookings.filter(b => b.status === "pending");
+    const unpaidBookings = bookings.filter(b => b.paymentStatus === "pending" || b.paymentStatus === "partial");
+
+    return {
+      date: tomorrow,
+      stats: {
+        totalBookings,
+        totalGuests,
+        expectedRevenue: expectedRevenue.toFixed(2),
+        schedulesWithBookings: schedulesWithBookings.length,
+      },
+      schedulesNeedingGuides,
+      pendingConfirmation,
+      unpaidBookings,
+      allBookings: bookings,
+    };
+  }
+}
+
+// Interface for tomorrow's preview
+export interface TomorrowPreview {
+  date: Date;
+  stats: {
+    totalBookings: number;
+    totalGuests: number;
+    expectedRevenue: string;
+    schedulesWithBookings: number;
+  };
+  schedulesNeedingGuides: Array<{
+    scheduleId: string;
+    tourName: string;
+    startsAt: Date;
+    bookedCount: number;
+    maxParticipants: number;
+    guidesRequired: number;
+    guidesAssigned: number;
+    guideDeficit: number;
+  }>;
+  pendingConfirmation: TodayBooking[];
+  unpaidBookings: TodayBooking[];
+  allBookings: TodayBooking[];
+}
+
+// Interface for today's bookings
+export interface TodayBooking {
+  bookingId: string;
+  referenceNumber: string;
+  status: "pending" | "confirmed" | "completed" | "no_show";
+  paymentStatus: "pending" | "partial" | "paid" | "refunded" | "failed";
+  participants: number;
+  total: string;
+  customer: {
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    phone: string | null;
+  };
+  tour: {
+    id: string;
+    name: string;
+  };
+  schedule: {
+    id: string;
+    startsAt: Date;
+    endsAt: Date;
+    guidesRequired: number;
+    guidesAssigned: number;
+  };
 }

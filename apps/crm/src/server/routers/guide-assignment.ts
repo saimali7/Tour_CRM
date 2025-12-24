@@ -5,8 +5,15 @@ import { createServices } from "@tour/services";
 const guideAssignmentStatusSchema = z.enum(["pending", "confirmed", "declined"]);
 
 const createGuideAssignmentInputSchema = z.object({
-  scheduleId: z.string(),
+  bookingId: z.string(),
   guideId: z.string(),
+  notes: z.string().optional(),
+});
+
+const createOutsourcedGuideAssignmentInputSchema = z.object({
+  bookingId: z.string(),
+  outsourcedGuideName: z.string().min(1, "Guide name is required"),
+  outsourcedGuideContact: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -21,12 +28,23 @@ const guideAssignmentFiltersSchema = z.object({
 });
 
 export const guideAssignmentRouter = createRouter({
+  // Get all guide assignments for a schedule (via bookings)
   getAssignmentsForSchedule: protectedProcedure
     .input(z.object({ scheduleId: z.string() }))
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.guideAssignment.getAssignmentsForSchedule(
         input.scheduleId
+      );
+    }),
+
+  // Get all guide assignments for a booking
+  getAssignmentsForBooking: protectedProcedure
+    .input(z.object({ bookingId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.guideAssignment.getAssignmentsForBooking(
+        input.bookingId
       );
     }),
 
@@ -45,19 +63,28 @@ export const guideAssignmentRouter = createRouter({
       );
     }),
 
+  // Get assignment by booking and guide
   getAssignment: protectedProcedure
     .input(
       z.object({
-        scheduleId: z.string(),
+        bookingId: z.string(),
         guideId: z.string(),
       })
     )
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.guideAssignment.getAssignment(
-        input.scheduleId,
+        input.bookingId,
         input.guideId
       );
+    }),
+
+  // Get assignment by ID
+  getAssignmentById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.guideAssignment.getById(input.id);
     }),
 
   createAssignment: adminProcedure
@@ -103,10 +130,11 @@ export const guideAssignmentRouter = createRouter({
       );
     }),
 
-  assignGuideToSchedule: adminProcedure
+  // Assign guide to a booking
+  assignGuideToBooking: adminProcedure
     .input(
       z.object({
-        scheduleId: z.string(),
+        bookingId: z.string(),
         guideId: z.string(),
         options: z
           .object({
@@ -118,18 +146,48 @@ export const guideAssignmentRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.assignGuideToSchedule(
-        input.scheduleId,
+      return services.guideAssignment.assignGuideToBooking(
+        input.bookingId,
         input.guideId,
         input.options
       );
     }),
 
-  reassignSchedule: adminProcedure
+  // Assign outsourced (external) guide to a booking
+  assignOutsourcedGuideToBooking: adminProcedure
     .input(
       z.object({
-        scheduleId: z.string(),
+        bookingId: z.string(),
+        outsourcedGuideName: z.string().min(1, "Guide name is required"),
+        outsourcedGuideContact: z.string().optional(),
+        notes: z.string().optional(),
+        options: z
+          .object({
+            autoConfirm: z.boolean().optional(),
+          })
+          .optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.guideAssignment.assignOutsourcedGuideToBooking(
+        {
+          bookingId: input.bookingId,
+          outsourcedGuideName: input.outsourcedGuideName,
+          outsourcedGuideContact: input.outsourcedGuideContact,
+          notes: input.notes,
+        },
+        input.options
+      );
+    }),
+
+  // Reassign guide on a booking (cancel old, create new)
+  reassignBooking: adminProcedure
+    .input(
+      z.object({
+        bookingId: z.string(),
         newGuideId: z.string(),
+        oldGuideId: z.string().optional(),
         options: z
           .object({
             autoConfirm: z.boolean().optional(),
@@ -140,8 +198,8 @@ export const guideAssignmentRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.reassignSchedule(
-        input.scheduleId,
+      return services.guideAssignment.reassignBooking(
+        input.bookingId,
         input.newGuideId,
         input.options
       );

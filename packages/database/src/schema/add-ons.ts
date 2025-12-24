@@ -64,6 +64,53 @@ export const addOnProducts = pgTable("add_on_products", {
   categoryIdx: index("add_on_products_category_idx").on(table.category),
 }));
 
+// ==========================================
+// Add-On Pricing Types (for JSONB)
+// ==========================================
+
+export interface AddOnFixedPricing {
+  type: "fixed";
+  price: { amount: number; currency: string };
+}
+
+export interface AddOnPerPersonPricing {
+  type: "per_person";
+  pricePerPerson: { amount: number; currency: string };
+}
+
+export interface AddOnPerAdultPricing {
+  type: "per_adult";
+  pricePerAdult: { amount: number; currency: string };
+}
+
+export interface AddOnPerParticipantPricing {
+  type: "per_participant";
+  tiers: Array<{
+    name: string;                    // "Adult", "Child"
+    price: { amount: number; currency: string };
+    ageMin?: number;
+    ageMax?: number;
+  }>;
+}
+
+export interface AddOnPerBookingPricing {
+  type: "per_booking";
+  price: { amount: number; currency: string };
+}
+
+export interface AddOnPerUnitPricing {
+  type: "per_unit";
+  pricePerUnit: { amount: number; currency: string };
+}
+
+export type AddOnPricingStructure =
+  | AddOnFixedPricing
+  | AddOnPerPersonPricing
+  | AddOnPerAdultPricing
+  | AddOnPerParticipantPricing
+  | AddOnPerBookingPricing
+  | AddOnPerUnitPricing;
+
 // Tour add-ons - Which add-ons are available for which tours
 export const tourAddOns = pgTable("tour_add_ons", {
   id: text("id").primaryKey().$defaultFn(createId),
@@ -86,6 +133,24 @@ export const tourAddOns = pgTable("tour_add_ons", {
   // Tour-specific pricing (optional override)
   priceOverride: numeric("price_override", { precision: 10, scale: 2 }),
 
+  // NEW: Flexible pricing structure (JSONB - overrides product pricing if set)
+  pricingStructure: jsonb("pricing_structure").$type<AddOnPricingStructure>(),
+
+  // NEW: Which booking options this add-on applies to (null = all options)
+  applicableOptions: jsonb("applicable_options").$type<string[]>(),
+
+  // NEW: Dependencies - add-on IDs that must be selected first
+  requires: jsonb("requires").$type<string[]>(),
+
+  // NEW: Exclusions - add-on IDs that can't be combined with this
+  excludes: jsonb("excludes").$type<string[]>(),
+
+  // NEW: Auto-included in certain booking options
+  includedIn: jsonb("included_in").$type<string[]>(),
+
+  // NEW: Deadline for selection (hours before tour starts)
+  deadlineHours: integer("deadline_hours"),
+
   // Configuration
   isRequired: boolean("is_required").default(false), // Must be purchased
   isRecommended: boolean("is_recommended").default(false), // Highlighted in UI
@@ -93,6 +158,7 @@ export const tourAddOns = pgTable("tour_add_ons", {
 
   // Timestamps
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   tourIdx: index("tour_add_ons_tour_idx").on(table.tourId),
   addOnIdx: index("tour_add_ons_add_on_idx").on(table.addOnProductId),

@@ -294,18 +294,6 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
                                   <Users className="h-3.5 w-3.5" />
                                   {schedule.availableSpots} spots left
                                 </span>
-                                {schedule.guideName && (
-                                  <span className="flex items-center gap-1">
-                                    <User className="h-3.5 w-3.5" />
-                                    {schedule.guideName}
-                                  </span>
-                                )}
-                                {!schedule.guideName && (
-                                  <span className="text-warning flex items-center gap-1">
-                                    <User className="h-3.5 w-3.5" />
-                                    Needs guide
-                                  </span>
-                                )}
                               </div>
                             </div>
 

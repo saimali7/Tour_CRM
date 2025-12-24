@@ -2,8 +2,9 @@ import { eq, and, desc, asc, gte, lte, sql, count, inArray } from "drizzle-orm";
 import {
   schedules,
   tours,
-  guides,
+  bookings,
   guideAssignments,
+  guides,
   type Schedule,
   type ScheduleStatus,
   type GuideAssignmentStatus,
@@ -20,7 +21,6 @@ import {
 
 export interface ScheduleFilters {
   tourId?: string;
-  guideId?: string;
   status?: ScheduleStatus;
   dateRange?: DateRangeFilter;
   hasAvailability?: boolean;
@@ -36,17 +36,10 @@ export interface ScheduleWithRelations extends Schedule {
     durationMinutes: number;
     basePrice: string;
   };
-  guide?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  } | null;
 }
 
 export interface CreateScheduleInput {
   tourId: string;
-  guideId?: string;
   startsAt: Date;
   endsAt?: Date;
   maxParticipants?: number;
@@ -63,7 +56,6 @@ export interface UpdateScheduleInput extends Partial<Omit<CreateScheduleInput, "
 
 export interface BulkCreateScheduleInput {
   tourId: string;
-  guideId?: string;
   dates: Date[];
   startTime: string;
   maxParticipants?: number;
@@ -72,7 +64,6 @@ export interface BulkCreateScheduleInput {
 
 export interface AutoGenerateScheduleInput {
   tourId: string;
-  guideId?: string;
   startDate: Date;
   endDate: Date;
   daysOfWeek: number[]; // 0=Sunday, 1=Monday, etc.
@@ -114,7 +105,6 @@ export interface AvailableScheduleResult {
   totalCapacity: number;
   bookedCount: number;
   price: string | null;
-  guideName: string | null;
 }
 
 // Today's schedules with assignments for morning briefing
@@ -158,9 +148,6 @@ export class ScheduleService extends BaseService {
     if (filters.tourId) {
       conditions.push(eq(schedules.tourId, filters.tourId));
     }
-    if (filters.guideId) {
-      conditions.push(eq(schedules.guideId, filters.guideId));
-    }
     if (filters.status) {
       conditions.push(eq(schedules.status, filters.status));
     }
@@ -192,16 +179,9 @@ export class ScheduleService extends BaseService {
             durationMinutes: tours.durationMinutes,
             basePrice: tours.basePrice,
           },
-          guide: {
-            id: guides.id,
-            firstName: guides.firstName,
-            lastName: guides.lastName,
-            email: guides.email,
-          },
         })
         .from(schedules)
         .leftJoin(tours, eq(schedules.tourId, tours.id))
-        .leftJoin(guides, eq(schedules.guideId, guides.id))
         .where(and(...conditions))
         .orderBy(orderBy)
         .limit(limit)
@@ -217,7 +197,6 @@ export class ScheduleService extends BaseService {
     const formattedData = data.map((row) => ({
       ...row.schedule,
       tour: row.tour?.id ? row.tour : undefined,
-      guide: row.guide?.id ? row.guide : null,
     }));
 
     return {
@@ -237,16 +216,9 @@ export class ScheduleService extends BaseService {
           durationMinutes: tours.durationMinutes,
           basePrice: tours.basePrice,
         },
-        guide: {
-          id: guides.id,
-          firstName: guides.firstName,
-          lastName: guides.lastName,
-          email: guides.email,
-        },
       })
       .from(schedules)
       .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .leftJoin(guides, eq(schedules.guideId, guides.id))
       .where(
         and(eq(schedules.id, id), eq(schedules.organizationId, this.organizationId))
       )
@@ -260,7 +232,6 @@ export class ScheduleService extends BaseService {
     return {
       ...row.schedule,
       tour: row.tour?.id ? row.tour : undefined,
-      guide: row.guide?.id ? row.guide : null,
     };
   }
 
@@ -276,19 +247,6 @@ export class ScheduleService extends BaseService {
       throw new NotFoundError("Tour", input.tourId);
     }
 
-    if (input.guideId) {
-      const guide = await this.db.query.guides.findFirst({
-        where: and(
-          eq(guides.id, input.guideId),
-          eq(guides.organizationId, this.organizationId)
-        ),
-      });
-
-      if (!guide) {
-        throw new NotFoundError("Guide", input.guideId);
-      }
-    }
-
     const endsAt =
       input.endsAt ||
       new Date(input.startsAt.getTime() + tour.durationMinutes * 60 * 1000);
@@ -298,7 +256,6 @@ export class ScheduleService extends BaseService {
       .values({
         organizationId: this.organizationId,
         tourId: input.tourId,
-        guideId: input.guideId,
         startsAt: input.startsAt,
         endsAt,
         maxParticipants: input.maxParticipants || tour.maxParticipants,
@@ -310,6 +267,8 @@ export class ScheduleService extends BaseService {
         internalNotes: input.internalNotes,
         publicNotes: input.publicNotes,
         bookedCount: 0,
+        guidesRequired: 0,
+        guidesAssigned: 0,
       })
       .returning();
 
@@ -347,7 +306,6 @@ export class ScheduleService extends BaseService {
       return {
         organizationId: this.organizationId,
         tourId: input.tourId,
-        guideId: input.guideId,
         startsAt,
         endsAt,
         maxParticipants: input.maxParticipants || tour.maxParticipants,
@@ -355,6 +313,8 @@ export class ScheduleService extends BaseService {
         currency: tour.currency,
         status: "scheduled" as const,
         bookedCount: 0,
+        guidesRequired: 0,
+        guidesAssigned: 0,
       };
     });
 
@@ -368,19 +328,6 @@ export class ScheduleService extends BaseService {
 
   async update(id: string, input: UpdateScheduleInput): Promise<Schedule> {
     await this.getById(id);
-
-    if (input.guideId) {
-      const guide = await this.db.query.guides.findFirst({
-        where: and(
-          eq(guides.id, input.guideId),
-          eq(guides.organizationId, this.organizationId)
-        ),
-      });
-
-      if (!guide) {
-        throw new NotFoundError("Guide", input.guideId);
-      }
-    }
 
     const [schedule] = await this.db
       .update(schedules)
@@ -446,20 +393,73 @@ export class ScheduleService extends BaseService {
       .orderBy(asc(schedules.startsAt));
   }
 
+  /**
+   * Get schedules where the guide has confirmed assignments (via bookings)
+   */
   async getForGuide(
     guideId: string,
     dateRange?: DateRangeFilter
   ): Promise<ScheduleWithRelations[]> {
-    const result = await this.getAll(
-      {
-        guideId,
-        dateRange,
-        status: "scheduled",
+    // Find all confirmed assignments for this guide
+    const confirmedAssignments = await this.db.query.guideAssignments.findMany({
+      where: and(
+        eq(guideAssignments.guideId, guideId),
+        eq(guideAssignments.organizationId, this.organizationId),
+        eq(guideAssignments.status, "confirmed")
+      ),
+      with: {
+        booking: {
+          columns: { scheduleId: true },
+        },
       },
-      { limit: 100 }
-    );
+    });
 
-    return result.data;
+    // Get unique schedule IDs
+    const scheduleIds = [...new Set(
+      confirmedAssignments
+        .map((a) => a.booking?.scheduleId)
+        .filter((id): id is string => !!id)
+    )];
+
+    if (scheduleIds.length === 0) {
+      return [];
+    }
+
+    // Build conditions
+    const conditions = [
+      eq(schedules.organizationId, this.organizationId),
+      inArray(schedules.id, scheduleIds),
+      eq(schedules.status, "scheduled"),
+    ];
+
+    if (dateRange?.from) {
+      conditions.push(gte(schedules.startsAt, dateRange.from));
+    }
+    if (dateRange?.to) {
+      conditions.push(lte(schedules.startsAt, dateRange.to));
+    }
+
+    const result = await this.db
+      .select({
+        schedule: schedules,
+        tour: {
+          id: tours.id,
+          name: tours.name,
+          slug: tours.slug,
+          durationMinutes: tours.durationMinutes,
+          basePrice: tours.basePrice,
+        },
+      })
+      .from(schedules)
+      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .where(and(...conditions))
+      .orderBy(asc(schedules.startsAt))
+      .limit(100);
+
+    return result.map((row) => ({
+      ...row.schedule,
+      tour: row.tour?.id ? row.tour : undefined,
+    }));
   }
 
   async checkAvailability(
@@ -732,19 +732,6 @@ export class ScheduleService extends BaseService {
       throw new NotFoundError("Tour", input.tourId);
     }
 
-    if (input.guideId) {
-      const guide = await this.db.query.guides.findFirst({
-        where: and(
-          eq(guides.id, input.guideId),
-          eq(guides.organizationId, this.organizationId)
-        ),
-      });
-
-      if (!guide) {
-        throw new NotFoundError("Guide", input.guideId);
-      }
-    }
-
     // Generate all dates between start and end that match the days of week
     const dates: Date[] = [];
     const currentDate = new Date(input.startDate);
@@ -765,7 +752,6 @@ export class ScheduleService extends BaseService {
     const schedulesToCreate: Array<{
       organizationId: string;
       tourId: string;
-      guideId?: string;
       startsAt: Date;
       endsAt: Date;
       maxParticipants: number;
@@ -773,6 +759,8 @@ export class ScheduleService extends BaseService {
       currency: string | null;
       status: "scheduled";
       bookedCount: number;
+      guidesRequired: number;
+      guidesAssigned: number;
     }> = [];
 
     let skipped = 0;
@@ -828,7 +816,6 @@ export class ScheduleService extends BaseService {
         schedulesToCreate.push({
           organizationId: this.organizationId,
           tourId: input.tourId,
-          guideId: input.guideId,
           startsAt,
           endsAt,
           maxParticipants: input.maxParticipants || tour.maxParticipants,
@@ -836,6 +823,8 @@ export class ScheduleService extends BaseService {
           currency: tour.currency,
           status: "scheduled" as const,
           bookedCount: 0,
+          guidesRequired: 0,
+          guidesAssigned: 0,
         });
       }
     }
@@ -1044,12 +1033,9 @@ export class ScheduleService extends BaseService {
         maxParticipants: schedules.maxParticipants,
         bookedCount: schedules.bookedCount,
         price: schedules.price,
-        guideFirstName: guides.firstName,
-        guideLastName: guides.lastName,
       })
       .from(schedules)
       .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .leftJoin(guides, eq(schedules.guideId, guides.id))
       .where(and(...conditions))
       .orderBy(
         // Order by exact date match first, then by time
@@ -1068,15 +1054,13 @@ export class ScheduleService extends BaseService {
       totalCapacity: row.maxParticipants,
       bookedCount: row.bookedCount ?? 0,
       price: row.price,
-      guideName: row.guideFirstName
-        ? `${row.guideFirstName} ${row.guideLastName || ""}`.trim()
-        : null,
     }));
   }
 
   /**
    * Get today's schedules with guide assignments for morning briefing
    * Includes tour info and all guide assignments with their status
+   * Now gets assignments via bookings (booking-level assignment model)
    */
   async getTodaysSchedules(): Promise<TodayScheduleWithAssignments[]> {
     const now = new Date();
@@ -1125,30 +1109,67 @@ export class ScheduleService extends BaseService {
     // Get schedule IDs
     const scheduleIds = scheduleResults.map((r) => r.schedule.id);
 
-    // Get all assignments for these schedules
-    const assignmentResults = await this.db
+    // Get all bookings for these schedules
+    const scheduleBookings = await this.db
       .select({
-        assignment: {
-          id: guideAssignments.id,
-          scheduleId: guideAssignments.scheduleId,
-          status: guideAssignments.status,
-        },
-        guide: {
-          id: guides.id,
-          firstName: guides.firstName,
-          lastName: guides.lastName,
-        },
+        id: bookings.id,
+        scheduleId: bookings.scheduleId,
       })
-      .from(guideAssignments)
-      .leftJoin(guides, eq(guideAssignments.guideId, guides.id))
+      .from(bookings)
       .where(
         and(
-          eq(guideAssignments.organizationId, this.organizationId),
-          inArray(guideAssignments.scheduleId, scheduleIds)
+          eq(bookings.organizationId, this.organizationId),
+          inArray(bookings.scheduleId, scheduleIds)
         )
       );
 
-    // Group assignments by schedule ID
+    // Map booking IDs to schedule IDs
+    const bookingToSchedule = new Map<string, string>();
+    const bookingIds: string[] = [];
+    for (const booking of scheduleBookings) {
+      bookingToSchedule.set(booking.id, booking.scheduleId);
+      bookingIds.push(booking.id);
+    }
+
+    // Get all assignments for these bookings
+    let assignmentResults: Array<{
+      assignment: {
+        id: string;
+        bookingId: string;
+        status: string;
+      };
+      guide: {
+        id: string;
+        firstName: string;
+        lastName: string | null;
+      } | null;
+    }> = [];
+
+    if (bookingIds.length > 0) {
+      assignmentResults = await this.db
+        .select({
+          assignment: {
+            id: guideAssignments.id,
+            bookingId: guideAssignments.bookingId,
+            status: guideAssignments.status,
+          },
+          guide: {
+            id: guides.id,
+            firstName: guides.firstName,
+            lastName: guides.lastName,
+          },
+        })
+        .from(guideAssignments)
+        .leftJoin(guides, eq(guideAssignments.guideId, guides.id))
+        .where(
+          and(
+            eq(guideAssignments.organizationId, this.organizationId),
+            inArray(guideAssignments.bookingId, bookingIds)
+          )
+        );
+    }
+
+    // Group assignments by schedule ID (via booking)
     const assignmentsBySchedule = new Map<
       string,
       Array<{
@@ -1159,7 +1180,9 @@ export class ScheduleService extends BaseService {
     >();
 
     for (const row of assignmentResults) {
-      const scheduleId = row.assignment.scheduleId;
+      const scheduleId = bookingToSchedule.get(row.assignment.bookingId);
+      if (!scheduleId) continue;
+
       if (!assignmentsBySchedule.has(scheduleId)) {
         assignmentsBySchedule.set(scheduleId, []);
       }
@@ -1196,5 +1219,149 @@ export class ScheduleService extends BaseService {
         : undefined,
       assignments: assignmentsBySchedule.get(row.schedule.id) ?? [],
     }));
+  }
+
+  /**
+   * Recalculate guides required for a schedule based on booked count and tour's guestsPerGuide.
+   * Formula: Math.ceil(bookedCount / guestsPerGuide), minimum 0 if no bookings
+   *
+   * Called after:
+   * - Booking created
+   * - Booking cancelled
+   * - Booking participants changed
+   */
+  async recalculateGuideRequirements(scheduleId: string): Promise<{ guidesRequired: number }> {
+    // Get schedule with its tour's guestsPerGuide setting
+    const result = await this.db
+      .select({
+        schedule: schedules,
+        guestsPerGuide: tours.guestsPerGuide,
+      })
+      .from(schedules)
+      .innerJoin(tours, eq(schedules.tourId, tours.id))
+      .where(
+        and(
+          eq(schedules.id, scheduleId),
+          eq(schedules.organizationId, this.organizationId)
+        )
+      )
+      .limit(1);
+
+    if (result.length === 0) {
+      throw new NotFoundError("Schedule", scheduleId);
+    }
+
+    const { schedule, guestsPerGuide } = result[0]!;
+    const bookedCount = schedule.bookedCount ?? 0;
+
+    // Calculate guides required: ceil(bookedCount / guestsPerGuide)
+    // If no bookings, no guides required
+    const guidesRequired = bookedCount > 0
+      ? Math.ceil(bookedCount / (guestsPerGuide ?? 6))
+      : 0;
+
+    // Update the schedule
+    await this.db
+      .update(schedules)
+      .set({
+        guidesRequired,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schedules.id, scheduleId),
+          eq(schedules.organizationId, this.organizationId)
+        )
+      );
+
+    return { guidesRequired };
+  }
+
+  /**
+   * Sync guidesAssigned count on schedule from confirmed assignments
+   * Counts UNIQUE guides with confirmed assignments across all bookings for this schedule
+   * Called after guide assignment confirm/cancel.
+   */
+  async syncGuidesAssignedCount(scheduleId: string): Promise<{ guidesAssigned: number }> {
+    // Get all bookings for this schedule
+    const scheduleBookings = await this.db.query.bookings.findMany({
+      where: and(
+        eq(bookings.scheduleId, scheduleId),
+        eq(bookings.organizationId, this.organizationId)
+      ),
+      columns: { id: true },
+    });
+
+    if (scheduleBookings.length === 0) {
+      // No bookings, set guidesAssigned to 0
+      await this.db
+        .update(schedules)
+        .set({
+          guidesAssigned: 0,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schedules.id, scheduleId),
+            eq(schedules.organizationId, this.organizationId)
+          )
+        );
+      return { guidesAssigned: 0 };
+    }
+
+    const bookingIds = scheduleBookings.map((b) => b.id);
+
+    // Count unique confirmed guides across all bookings for this schedule
+    const result = await this.db
+      .select({ count: sql<number>`count(distinct ${guideAssignments.guideId})::int` })
+      .from(guideAssignments)
+      .where(
+        and(
+          inArray(guideAssignments.bookingId, bookingIds),
+          eq(guideAssignments.organizationId, this.organizationId),
+          eq(guideAssignments.status, "confirmed")
+        )
+      );
+
+    const guidesAssigned = result[0]?.count ?? 0;
+
+    // Update the schedule
+    await this.db
+      .update(schedules)
+      .set({
+        guidesAssigned,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schedules.id, scheduleId),
+          eq(schedules.organizationId, this.organizationId)
+        )
+      );
+
+    return { guidesAssigned };
+  }
+
+  /**
+   * Get guide staffing status for a schedule
+   */
+  async getGuideStaffingStatus(scheduleId: string): Promise<{
+    guidesRequired: number;
+    guidesAssigned: number;
+    deficit: number;
+    isFullyStaffed: boolean;
+  }> {
+    const schedule = await this.getById(scheduleId);
+
+    const guidesRequired = schedule.guidesRequired ?? 0;
+    const guidesAssigned = schedule.guidesAssigned ?? 0;
+    const deficit = Math.max(0, guidesRequired - guidesAssigned);
+
+    return {
+      guidesRequired,
+      guidesAssigned,
+      deficit,
+      isFullyStaffed: deficit === 0,
+    };
   }
 }

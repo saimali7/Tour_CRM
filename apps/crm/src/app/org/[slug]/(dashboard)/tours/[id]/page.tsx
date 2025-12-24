@@ -4,18 +4,17 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { Route } from "next";
-import { LayoutDashboard, FileText, Calendar, DollarSign, Users } from "lucide-react";
+import { LayoutDashboard, FileText, Calendar, DollarSign } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TourPageHeader } from "@/components/tours/tour-page-header";
 import { TourOverviewTab } from "@/components/tours/tour-overview-tab";
 import { TourDetailsTab } from "@/components/tours/tour-details-tab";
-import { TourPricingTab } from "@/components/tours/tour-pricing-tab";
-import { TourGuideQualifications } from "@/components/tours/tour-guide-qualifications";
+import { TourBookingOptionsTab } from "@/components/tours/tour-booking-options-tab";
 import { TourScheduleManager } from "@/components/tours/tour-schedule-manager";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { toast } from "sonner";
 
-type TabValue = "overview" | "details" | "schedules" | "pricing" | "guides";
+type TabValue = "overview" | "details" | "schedules" | "pricing";
 
 export default function TourDetailPage() {
   const params = useParams();
@@ -193,14 +192,7 @@ export default function TourDetailPage() {
             className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
           >
             <DollarSign className="h-4 w-4" />
-            Pricing
-          </TabsTrigger>
-          <TabsTrigger
-            value="guides"
-            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
-          >
-            <Users className="h-4 w-4" />
-            Guides
+            Pricing & Options
           </TabsTrigger>
         </TabsList>
 
@@ -232,14 +224,9 @@ export default function TourDetailPage() {
           />
         </TabsContent>
 
-        {/* Pricing Tab */}
+        {/* Pricing & Options Tab */}
         <TabsContent value="pricing">
-          <TourPricingTab tourId={tourId} />
-        </TabsContent>
-
-        {/* Guides Tab */}
-        <TabsContent value="guides">
-          <TourGuideQualifications tourId={tourId} />
+          <TourBookingOptionsTab tourId={tourId} />
         </TabsContent>
       </Tabs>
 

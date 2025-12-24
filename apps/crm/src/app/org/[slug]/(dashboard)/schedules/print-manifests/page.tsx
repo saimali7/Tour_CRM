@@ -171,21 +171,25 @@ export default function PrintManifestsPage() {
                 )}
 
                 {/* Guide Info */}
-                {manifest.guide && (
+                {manifest.guides.length > 0 && (
                   <div className="mt-4 p-3 bg-primary/5 print:bg-gray-100 rounded-lg">
                     <p className="text-sm font-medium text-muted-foreground print:text-gray-600 mb-1">
-                      Assigned Guide
+                      Assigned Guide{manifest.guides.length > 1 ? 's' : ''}
                     </p>
-                    <div className="flex items-center gap-4">
-                      <span className="font-medium text-foreground print:text-black">
-                        {manifest.guide.firstName} {manifest.guide.lastName}
-                      </span>
-                      {manifest.guide.phone && (
-                        <span className="flex items-center gap-1 text-sm text-muted-foreground print:text-gray-600">
-                          <Phone className="h-3 w-3" />
-                          {manifest.guide.phone}
-                        </span>
-                      )}
+                    <div className="space-y-2">
+                      {manifest.guides.map((guide) => (
+                        <div key={guide.id} className="flex items-center gap-4">
+                          <span className="font-medium text-foreground print:text-black">
+                            {guide.firstName} {guide.lastName}
+                          </span>
+                          {guide.phone && (
+                            <span className="flex items-center gap-1 text-sm text-muted-foreground print:text-gray-600">
+                              <Phone className="h-3 w-3" />
+                              {guide.phone}
+                            </span>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

@@ -216,7 +216,7 @@ function ScheduleCard({
   const percentage = max > 0 ? Math.min(100, (booked / max) * 100) : 0;
   const capacityStatus = getCapacityStatus(booked, max);
   const isFull = percentage >= 100;
-  const needsGuide = booked > 0 && !schedule.guide;
+  const needsGuide = false; // Guide assignments are now at booking level
 
   return (
     <div className={cn(
@@ -257,16 +257,6 @@ function ScheduleCard({
                 ${parseFloat(schedule.price).toFixed(0)}
               </span>
             )}
-          </div>
-
-          {/* Guide Assignment - prominent for booked schedules */}
-          <div className="mt-2">
-            <QuickGuideAssign
-              schedule={schedule}
-              guides={guides}
-              onAssign={onAssignGuide}
-              isAssigning={isAssigning}
-            />
           </div>
         </div>
 
@@ -389,32 +379,14 @@ export function DayView({ schedules, orgSlug, selectedDate, onQuickBook }: DayVi
   });
   const guides = guidesData?.data ?? [];
 
-  // Update schedule guide mutation (use schedule update directly)
-  const updateScheduleMutation = trpc.schedule.update.useMutation({
-    onSuccess: () => {
-      utils.schedule.list.invalidate();
-      toast.success("Guide updated");
-    },
-    onError: (error: { message?: string }) => {
-      toast.error(error.message || "Failed to update guide");
-    },
-  });
-
-  const handleAssignGuide = (scheduleId: string, guideId: string | null) => {
-    updateScheduleMutation.mutate({
-      id: scheduleId,
-      data: { guideId: guideId ?? undefined },
-    });
-  };
-
-  const isAssigning = updateScheduleMutation.isPending;
+  const isAssigning = false;
 
   // Calculate day summary
   const totalCapacity = schedules.reduce((sum, s) => sum + s.maxParticipants, 0);
   const totalBooked = schedules.reduce((sum, s) => sum + (s.bookedCount ?? 0), 0);
   const totalAvailable = totalCapacity - totalBooked;
   const utilizationRate = totalCapacity > 0 ? Math.round((totalBooked / totalCapacity) * 100) : 0;
-  const needsGuideCount = schedules.filter((s) => (s.bookedCount ?? 0) > 0 && !s.guide).length;
+  const needsGuideCount = 0; // Guide assignments are now at booking level
 
   if (!hasSchedules) {
     return (
@@ -437,20 +409,6 @@ export function DayView({ schedules, orgSlug, selectedDate, onQuickBook }: DayVi
 
   return (
     <div className="space-y-6">
-      {/* Alert for tours needing guides */}
-      {needsGuideCount > 0 && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-warning/10 border border-warning/30">
-          <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0" />
-          <div className="flex-1">
-            <p className="font-medium text-warning">
-              {needsGuideCount} tour{needsGuideCount > 1 ? "s" : ""} with bookings need guide assignment
-            </p>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Click on "Assign Guide" below each tour to assign a guide
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Time Sections */}
       <div className="space-y-6">
@@ -460,7 +418,7 @@ export function DayView({ schedules, orgSlug, selectedDate, onQuickBook }: DayVi
           orgSlug={orgSlug}
           guides={guides}
           onQuickBook={onQuickBook}
-          onAssignGuide={handleAssignGuide}
+          onAssignGuide={() => {}}
           isAssigning={isAssigning}
         />
         <TimeSection
@@ -469,7 +427,7 @@ export function DayView({ schedules, orgSlug, selectedDate, onQuickBook }: DayVi
           orgSlug={orgSlug}
           guides={guides}
           onQuickBook={onQuickBook}
-          onAssignGuide={handleAssignGuide}
+          onAssignGuide={() => {}}
           isAssigning={isAssigning}
         />
         <TimeSection
@@ -478,7 +436,7 @@ export function DayView({ schedules, orgSlug, selectedDate, onQuickBook }: DayVi
           orgSlug={orgSlug}
           guides={guides}
           onQuickBook={onQuickBook}
-          onAssignGuide={handleAssignGuide}
+          onAssignGuide={() => {}}
           isAssigning={isAssigning}
         />
       </div>
@@ -499,14 +457,6 @@ export function DayView({ schedules, orgSlug, selectedDate, onQuickBook }: DayVi
             <span className="text-success font-medium">
               <strong>{totalAvailable}</strong> spots available
             </span>
-            {needsGuideCount > 0 && (
-              <>
-                <span className="text-muted-foreground">|</span>
-                <span className="text-warning font-medium">
-                  <strong>{needsGuideCount}</strong> need guides
-                </span>
-              </>
-            )}
           </div>
         </div>
       </div>

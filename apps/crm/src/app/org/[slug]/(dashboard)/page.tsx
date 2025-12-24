@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   AlertTriangle,
@@ -36,9 +36,12 @@ import {
   isWithinInterval,
   addHours,
 } from "date-fns";
-import { UnifiedBookingSheet } from "@/components/bookings/unified-booking-sheet";
-import { PriorityScheduleList } from "@/components/dashboard";
+import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 import { ActionCards } from "@/components/dashboard/action-cards";
+import { UnassignedToursPanel } from "@/components/dashboard/UnassignedToursPanel";
+import { BookingsNeedingGuides } from "@/components/dashboard/BookingsNeedingGuides";
+import { TodayBookings } from "@/components/dashboard/TodayBookings";
+import { TomorrowPreview } from "@/components/dashboard/TomorrowPreview";
 
 // =============================================================================
 // TYPES
@@ -116,7 +119,7 @@ function getTourStatus(
 export default function DashboardPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const [showQuickBook, setShowQuickBook] = useState(false);
+  const { openQuickBooking } = useQuickBookingContext();
 
   // Memoize date range to prevent infinite re-renders
   const dateRange = useMemo(() => ({
@@ -142,6 +145,18 @@ export default function DashboardPage() {
 
   // Fetch booking stats for action cards
   const { data: bookingStats } = trpc.booking.getStats.useQuery({});
+
+  // Fetch today's actual bookings (customers who booked for today)
+  const { data: todayBookings, isLoading: bookingsLoading } =
+    trpc.dashboard.getTodayBookings.useQuery(undefined, {
+      refetchInterval: 30000,
+    });
+
+  // Fetch comprehensive tomorrow preview (stats, issues, bookings)
+  const { data: tomorrowPreview } =
+    trpc.dashboard.getTomorrowPreview.useQuery(undefined, {
+      refetchInterval: 60000,
+    });
 
   const isLoading = opsLoading || bizLoading;
 
@@ -193,26 +208,20 @@ export default function DashboardPage() {
     };
   }, [operationsData]);
 
-  // Stats for today - use actual displayed tours count for consistency
+  // Stats for today - use ACTUAL BOOKINGS, not empty schedules
   const stats = useMemo(() => {
-    if (!operationsData) return null;
+    if (!todayBookings) return null;
 
-    // Count today's tours from what we actually display (live + upcoming today)
-    const todayTourCount = todaySchedules.length + liveSchedules.length;
-
-    // Sum participants from today's actual tours
-    const todayGuests = [...todaySchedules, ...liveSchedules].reduce(
-      (sum, s) => sum + s.bookedCount,
-      0
-    );
+    // Count from actual bookings (real customers)
+    const bookingCount = todayBookings.length;
+    const guestCount = todayBookings.reduce((sum, b) => sum + b.participants, 0);
 
     return {
-      tours: todayTourCount,
-      guests: todayGuests,
-      guides: operationsData.todaysOperations.guidesWorking,
-      alerts: alerts.filter((a) => a.type === "critical").length,
+      bookings: bookingCount,
+      guests: guestCount,
+      guides: operationsData?.todaysOperations.guidesWorking || 0,
     };
-  }, [operationsData, alerts, todaySchedules, liveSchedules]);
+  }, [todayBookings, operationsData]);
 
   // Revenue metrics
   const revenueMetrics = useMemo(() => {
@@ -301,7 +310,7 @@ export default function DashboardPage() {
           </div>
           {/* Desktop button */}
           <button
-            onClick={() => setShowQuickBook(true)}
+            onClick={() => openQuickBooking()}
             className="hidden sm:inline-flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97]"
           >
             <Zap className="h-3.5 w-3.5" />
@@ -309,7 +318,7 @@ export default function DashboardPage() {
           </button>
           {/* Mobile button */}
           <button
-            onClick={() => setShowQuickBook(true)}
+            onClick={() => openQuickBooking()}
             className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97] touch-target"
             aria-label="Quick book"
           >
@@ -369,12 +378,10 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Bottom row: Stats + Status - Responsive */}
+        {/* Bottom row: Stats from ACTUAL BOOKINGS */}
         <div className="flex flex-wrap items-center gap-3 sm:gap-6 py-2 px-3 rounded-lg bg-muted/40 border border-border/50">
-          {/* Today's Operations */}
-          {isLoading ? (
+          {bookingsLoading ? (
             <div className="flex items-center gap-3">
-              <div className="h-4 w-16 skeleton rounded" />
               <div className="h-4 w-16 skeleton rounded" />
               <div className="h-4 w-16 skeleton rounded" />
             </div>
@@ -383,8 +390,8 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm">
                 <span className="flex items-center gap-1 sm:gap-1.5">
                   <Calendar className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-muted-foreground" />
-                  <span className="font-semibold tabular-nums">{stats.tours}</span>
-                  <span className="text-muted-foreground hidden sm:inline">tours</span>
+                  <span className="font-semibold tabular-nums">{stats.bookings}</span>
+                  <span className="text-muted-foreground hidden sm:inline">bookings</span>
                 </span>
                 <span className="text-border">·</span>
                 <span className="flex items-center gap-1 sm:gap-1.5">
@@ -392,30 +399,19 @@ export default function DashboardPage() {
                   <span className="font-semibold tabular-nums">{stats.guests}</span>
                   <span className="text-muted-foreground hidden sm:inline">guests</span>
                 </span>
-                <span className="text-border hidden sm:inline">·</span>
-                <span className="hidden sm:flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-semibold tabular-nums">{stats.guides}</span>
-                  <span className="text-muted-foreground">guides</span>
-                </span>
               </div>
             )
           )}
 
-          {/* Divider - hidden on very small screens */}
-          <div className="hidden sm:block h-4 w-px bg-border" />
-
-          {/* Status Indicator */}
-          {alerts.length > 0 ? (
-            <span className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
-              <span className="font-medium">{alerts.length} alert{alerts.length !== 1 && 's'}</span>
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
-              <span className="font-medium">All clear</span>
-            </span>
+          {/* Status based on pending bookings */}
+          {stats && stats.bookings > 0 && (
+            <>
+              <div className="hidden sm:block h-4 w-px bg-border" />
+              <span className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
+                <span className="font-medium">Ready</span>
+              </span>
+            </>
           )}
         </div>
       </header>
@@ -435,9 +431,38 @@ export default function DashboardPage() {
       )}
 
       {/* ================================================================
-          LIVE NOW (if any tours are happening)
+          NEEDS GUIDE - Bookings that need guide assignment
           ================================================================ */}
-      {liveSchedules.length > 0 && (
+      {!bookingsLoading && todayBookings && (
+        <BookingsNeedingGuides
+          bookings={todayBookings
+            .filter(b => b.schedule.guidesAssigned < b.schedule.guidesRequired)
+            .map(b => ({
+              bookingId: b.bookingId,
+              referenceNumber: b.referenceNumber,
+              participants: b.participants,
+              customer: {
+                firstName: b.customer.firstName,
+                lastName: b.customer.lastName,
+              },
+              tour: b.tour,
+              schedule: {
+                id: b.schedule.id,
+                startsAt: b.schedule.startsAt,
+                endsAt: b.schedule.endsAt,
+              },
+              guidesRequired: b.schedule.guidesRequired,
+              guidesAssigned: b.schedule.guidesAssigned,
+            }))}
+          orgSlug={slug}
+          maxItems={5}
+        />
+      )}
+
+      {/* ================================================================
+          LIVE NOW - Only show tours WITH bookings that are happening now
+          ================================================================ */}
+      {liveSchedules.filter(s => s.bookedCount > 0).length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-3">
             <div className="relative flex h-2.5 w-2.5">
@@ -449,12 +474,12 @@ export default function DashboardPage() {
             </h2>
           </div>
           <div className="rounded-xl border-2 border-primary/20 bg-primary/5 overflow-hidden">
-            {liveSchedules.map((schedule, idx) => (
+            {liveSchedules.filter(s => s.bookedCount > 0).map((schedule, idx, arr) => (
               <LiveTourRow
                 key={schedule.scheduleId}
                 schedule={schedule}
                 slug={slug}
-                isLast={idx === liveSchedules.length - 1}
+                isLast={idx === arr.length - 1}
               />
             ))}
           </div>
@@ -462,26 +487,16 @@ export default function DashboardPage() {
       )}
 
       {/* ================================================================
-          TODAY'S SCHEDULE
+          TODAY'S BOOKINGS - Actual customers for today
           ================================================================ */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5" />
-            Today&apos;s Schedule
-          </h2>
-          {todaySchedules.length > 0 && (
-            <Link
-              href={`/org/${slug}/calendar` as Route}
-              className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 hover:gap-1.5 transition-all"
-            >
-              View calendar
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-          )}
-        </div>
-
-        {isLoading ? (
+      {bookingsLoading ? (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <Users className="h-3.5 w-3.5" />
+              Today&apos;s Bookings
+            </h2>
+          </div>
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
               <div
@@ -491,21 +506,24 @@ export default function DashboardPage() {
               />
             ))}
           </div>
-        ) : todaySchedules.length === 0 && liveSchedules.length === 0 ? (
-          <EmptySchedule slug={slug} />
-        ) : (
-          <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
-            {todaySchedules.map((schedule, idx) => (
-              <ScheduleRow
-                key={schedule.scheduleId}
-                schedule={schedule}
-                slug={slug}
-                index={idx}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+        </section>
+      ) : (
+        <TodayBookings
+          bookings={todayBookings || []}
+          orgSlug={slug}
+          maxItems={8}
+        />
+      )}
+
+      {/* ================================================================
+          TOMORROW'S PREVIEW - Comprehensive planning section
+          ================================================================ */}
+      {tomorrowPreview && (
+        <TomorrowPreview
+          data={tomorrowPreview}
+          orgSlug={slug}
+        />
+      )}
 
       {/* ================================================================
           RECENT ACTIVITY
@@ -531,23 +549,6 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* ================================================================
-          NEEDS ATTENTION (Priority-sorted schedules)
-          ================================================================ */}
-      <PriorityScheduleList
-        schedules={upcomingSchedules}
-        slug={slug}
-        maxItems={5}
-        title="Needs Attention"
-        emptyMessage="All upcoming tours have healthy booking levels"
-      />
-
-      {/* Unified Booking Sheet */}
-      <UnifiedBookingSheet
-        open={showQuickBook}
-        onOpenChange={setShowQuickBook}
-        orgSlug={slug}
-      />
     </div>
   );
 }

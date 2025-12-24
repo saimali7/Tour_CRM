@@ -11,6 +11,7 @@ import {
   User,
   Users,
   ExternalLink,
+  Layers,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -182,6 +183,31 @@ export function BookingQuickView({
           <p className="text-sm text-muted-foreground">No schedule data</p>
         )}
       </div>
+
+      {/* Booking Option */}
+      {booking.pricingSnapshot && (
+        <div className="border rounded-lg p-4 space-y-3">
+          <h4 className="text-sm font-medium flex items-center gap-2">
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            Booking Option
+          </h4>
+          <div className="space-y-2">
+            <p className="font-medium">
+              {(booking.pricingSnapshot as { optionName?: string })?.optionName || "Standard Experience"}
+            </p>
+            {(booking.pricingSnapshot as { experienceMode?: string })?.experienceMode && (
+              <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground capitalize">
+                {(booking.pricingSnapshot as { experienceMode?: string }).experienceMode}
+              </span>
+            )}
+            {(booking.pricingSnapshot as { priceBreakdown?: string })?.priceBreakdown && (
+              <p className="text-sm text-muted-foreground font-mono">
+                {(booking.pricingSnapshot as { priceBreakdown?: string }).priceBreakdown}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Participants */}
       <div className="border rounded-lg p-4 space-y-3">

@@ -27,7 +27,27 @@ export const bookings = pgTable("bookings", {
     .notNull()
     .references(() => schedules.id, { onDelete: "restrict" }),
 
-  // Participants
+  // Booking Option (nullable for backward compatibility)
+  bookingOptionId: text("booking_option_id"),
+
+  // Guest breakdown (new customer-first approach)
+  guestAdults: integer("guest_adults"),
+  guestChildren: integer("guest_children"),
+  guestInfants: integer("guest_infants"),
+
+  // Unit booking tracking (for per_unit pricing)
+  unitsBooked: integer("units_booked"),
+
+  // Pricing snapshot (JSONB - preserves exact pricing at time of booking)
+  pricingSnapshot: jsonb("pricing_snapshot").$type<{
+    optionId?: string;
+    optionName?: string;
+    pricingModel?: unknown;
+    experienceMode?: "join" | "book" | "charter";
+    priceBreakdown?: string;
+  }>(),
+
+  // Legacy Participants (kept for backward compatibility)
   adultCount: integer("adult_count").notNull().default(1),
   childCount: integer("child_count").default(0),
   infantCount: integer("infant_count").default(0),
@@ -85,6 +105,7 @@ export const bookings = pgTable("bookings", {
   statusIdx: index("bookings_status_idx").on(table.status),
   createdAtIdx: index("bookings_created_at_idx").on(table.createdAt),
   orgStatusCreatedIdx: index("bookings_org_status_created_idx").on(table.organizationId, table.status, table.createdAt),
+  optionIdx: index("bookings_option_idx").on(table.bookingOptionId),
 }));
 
 // Booking participants - Individual people on a booking
@@ -144,6 +165,7 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   }),
   participants: many(bookingParticipants),
   // Note: payments relation added in payments.ts to avoid circular dependencies
+  // Note: guideAssignments relation needs to be defined elsewhere to avoid circular import
 }));
 
 export const bookingParticipantsRelations = relations(bookingParticipants, ({ one }) => ({

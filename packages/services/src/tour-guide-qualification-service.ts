@@ -4,6 +4,8 @@ import {
   tours,
   guides,
   schedules,
+  bookings,
+  guideAssignments,
   type TourGuideQualification,
   type Guide,
   type Tour,
@@ -339,15 +341,15 @@ export class TourGuideQualificationService extends BaseService {
       return [];
     }
 
-    // Check availability for each guide
+    // Check availability for each guide via confirmed assignments
     const guideIds = activeQualifiedGuides.map((q) => q.guideId);
 
-    // Find conflicting schedules
+    // Find guides with confirmed assignments on overlapping schedules
     const conflictConditions = [
-      eq(schedules.organizationId, this.organizationId),
+      eq(guideAssignments.organizationId, this.organizationId),
+      eq(guideAssignments.status, "confirmed"),
+      inArray(guideAssignments.guideId, guideIds),
       eq(schedules.status, "scheduled"),
-      isNotNull(schedules.guideId),
-      inArray(schedules.guideId, guideIds),
       sql`(${schedules.startsAt}, ${schedules.endsAt}) OVERLAPS (${startsAt}, ${endsAt})`,
     ];
 
@@ -355,14 +357,14 @@ export class TourGuideQualificationService extends BaseService {
       conflictConditions.push(sql`${schedules.id} != ${excludeScheduleId}`);
     }
 
-    const conflictingSchedules = await this.db
-      .select({ guideId: schedules.guideId })
-      .from(schedules)
+    const busyGuides = await this.db
+      .select({ guideId: guideAssignments.guideId })
+      .from(guideAssignments)
+      .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
+      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
       .where(and(...conflictConditions));
 
-    const busyGuideIds = new Set(
-      conflictingSchedules.map((s) => s.guideId).filter(Boolean)
-    );
+    const busyGuideIds = new Set(busyGuides.map((b) => b.guideId));
 
     // Map to response with availability flag
     return activeQualifiedGuides.map((q) => ({

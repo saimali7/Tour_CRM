@@ -1,81 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { User, AlertTriangle, Check, X, Loader2, UserCheck, UserX } from "lucide-react";
-import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { AlertTriangle, Check, Loader2, UserCheck, User, UserX, Info } from "lucide-react";
+import { useConfirmModal } from "@/components/ui/confirm-modal";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ScheduleGuideAssignmentProps {
   scheduleId: string;
-  tourId: string;
-  startsAt: Date;
-  endsAt: Date;
   onAssignmentChange?: () => void;
 }
 
 export function ScheduleGuideAssignment({
   scheduleId,
-  tourId,
-  startsAt,
-  endsAt,
   onAssignmentChange,
 }: ScheduleGuideAssignmentProps) {
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [selectedGuideId, setSelectedGuideId] = useState<string>("");
   const confirmModal = useConfirmModal();
-
   const utils = trpc.useUtils();
 
-  // Get current assignments for this schedule
+  // Get schedule data for staffing information
+  const { data: schedule, isLoading: loadingSchedule } = trpc.schedule.getById.useQuery(
+    { id: scheduleId },
+    { enabled: !!scheduleId }
+  );
+
+  // Get current assignments for this schedule (read-only display)
   const { data: assignments, isLoading: loadingAssignments } =
     trpc.guideAssignment.getAssignmentsForSchedule.useQuery({
       scheduleId,
     });
 
-  // Get qualified guides for this schedule
-  const { data: qualifiedGuides, isLoading: loadingGuides } =
-    trpc.tourGuideQualification.getQualifiedGuidesForScheduling.useQuery({
-      tourId,
-      startsAt,
-      endsAt,
-      excludeScheduleId: scheduleId,
-    });
-
-  // Find confirmed assignment
-  const confirmedAssignment = assignments?.find((a) => a.status === "confirmed");
-  const pendingAssignment = assignments?.find((a) => a.status === "pending");
-  const declinedAssignments = assignments?.filter((a) => a.status === "declined");
-
-  // Mutations
-  const assignMutation = trpc.guideAssignment.assignGuideToSchedule.useMutation({
-    onSuccess: () => {
-      utils.guideAssignment.getAssignmentsForSchedule.invalidate({ scheduleId });
-      utils.schedule.getById.invalidate({ id: scheduleId });
-      toast.success("Guide assigned successfully");
-      setIsAssigning(false);
-      setSelectedGuideId("");
-      onAssignmentChange?.();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to assign guide");
-    },
-  });
-
-  const reassignMutation = trpc.guideAssignment.reassignSchedule.useMutation({
-    onSuccess: () => {
-      utils.guideAssignment.getAssignmentsForSchedule.invalidate({ scheduleId });
-      utils.schedule.getById.invalidate({ id: scheduleId });
-      toast.success("Guide reassigned successfully");
-      setIsAssigning(false);
-      setSelectedGuideId("");
-      onAssignmentChange?.();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to reassign guide");
-    },
-  });
-
+  // Cancel assignment mutation (only mutation we keep)
   const cancelMutation = trpc.guideAssignment.cancelAssignment.useMutation({
     onSuccess: () => {
       utils.guideAssignment.getAssignmentsForSchedule.invalidate({ scheduleId });
@@ -88,278 +43,238 @@ export function ScheduleGuideAssignment({
     },
   });
 
-  const handleAssign = () => {
-    if (!selectedGuideId) return;
+  // Group assignments by status
+  const confirmedAssignments = assignments?.filter((a) => a.status === "confirmed") || [];
+  const pendingAssignments = assignments?.filter((a) => a.status === "pending") || [];
+  const declinedAssignments = assignments?.filter((a) => a.status === "declined") || [];
 
-    if (confirmedAssignment) {
-      // Reassign to new guide
-      reassignMutation.mutate({
-        scheduleId,
-        newGuideId: selectedGuideId,
-        options: { autoConfirm: true },
-      });
-    } else {
-      // Assign new guide
-      assignMutation.mutate({
-        scheduleId,
-        guideId: selectedGuideId,
-        options: { autoConfirm: true },
-      });
-    }
-  };
+  // Staffing information
+  const guidesRequired = schedule?.guidesRequired || 0;
+  const guidesAssigned = schedule?.guidesAssigned || 0;
+  const needsMoreGuides = guidesAssigned < guidesRequired;
 
-  const handleCancel = async () => {
-    if (!confirmedAssignment) return;
-
+  const handleCancelAssignment = async (assignmentId: string, guideName: string) => {
     const confirmed = await confirmModal.confirm({
       title: "Cancel Guide Assignment",
-      description: "This will remove the guide from this schedule. The guide will be notified of the cancellation.",
+      description: `This will remove ${guideName} from this schedule. The guide will be notified of the cancellation.`,
       confirmLabel: "Cancel Assignment",
       variant: "destructive",
     });
 
     if (confirmed) {
-      cancelMutation.mutate({ id: confirmedAssignment.id });
+      cancelMutation.mutate({ id: assignmentId });
     }
   };
 
-  const isLoading = loadingAssignments || loadingGuides;
-  const isMutating =
-    assignMutation.isPending || reassignMutation.isPending || cancelMutation.isPending;
+  const isLoading = loadingAssignments || loadingSchedule;
+  const isMutating = cancelMutation.isPending;
 
   if (isLoading) {
     return (
       <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center gap-3">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <span className="text-muted-foreground">Loading guide assignment...</span>
+          <span className="text-muted-foreground">Loading guide assignments...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-card rounded-lg border border-border p-6">
-      <h2 className="text-lg font-semibold text-foreground mb-4">Guide Assignment</h2>
+    <div className="bg-card rounded-lg border border-border p-6 space-y-4">
+      {/* Header */}
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">Guide Staffing</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {guidesAssigned} of {guidesRequired} guides assigned
+        </p>
+      </div>
 
-      {/* Current Assignment Display */}
-      {confirmedAssignment?.guide ? (
-        <div className="mb-4">
-          <div className="flex items-start justify-between gap-4 p-4 bg-success/10 border border-success rounded-lg">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="p-2 bg-success/20 rounded-lg">
-                <UserCheck className="h-5 w-5 text-success" />
+      {/* Staffing Status Banner */}
+      <div className={cn(
+        "p-4 rounded-lg border",
+        needsMoreGuides
+          ? "bg-amber-500/10 border-amber-500/20"
+          : "bg-emerald-500/10 border-emerald-500/20"
+      )}>
+        <div className="flex items-start gap-3">
+          {needsMoreGuides ? (
+            <>
+              <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Needs {guidesRequired - guidesAssigned} more guide{guidesRequired - guidesAssigned !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assign guides through individual booking details pages
+                </p>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
+            </>
+          ) : (
+            <>
+              <Check className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Fully staffed</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  All required guides are assigned
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Info Box - How to assign guides */}
+      <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+        <div className="flex items-start gap-3">
+          <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-foreground">How to assign guides</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Guide assignments are managed at the booking level. To assign a guide, go to each booking's detail page and assign guides there. The assignments will automatically aggregate here.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Current Assignments List */}
+      {(confirmedAssignments.length > 0 || pendingAssignments.length > 0 || declinedAssignments.length > 0) && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Current Assignments
+          </h3>
+
+          {/* Confirmed Assignments */}
+          {confirmedAssignments.map((assignment) => (
+            <div
+              key={assignment.id}
+              className="flex items-start gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg"
+            >
+              <div className="p-2 bg-emerald-500/20 rounded-lg flex-shrink-0">
+                <UserCheck className="h-5 w-5 text-emerald-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <p className="font-medium text-foreground">
-                    {confirmedAssignment.guide.firstName} {confirmedAssignment.guide.lastName}
+                    {assignment.guide?.firstName} {assignment.guide?.lastName}
                   </p>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium status-confirmed">
                     Confirmed
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">{confirmedAssignment.guide.email}</p>
-                {confirmedAssignment.notes && (
-                  <p className="text-sm text-muted-foreground mt-2 italic">{confirmedAssignment.notes}</p>
+                <p className="text-sm text-muted-foreground">{assignment.guide?.email}</p>
+                {assignment.booking && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Booking: {assignment.booking.id.slice(0, 8)}...
+                  </p>
+                )}
+                {assignment.notes && (
+                  <p className="text-sm text-muted-foreground mt-2 italic">{assignment.notes}</p>
                 )}
               </div>
+              <button
+                onClick={() => handleCancelAssignment(
+                  assignment.id,
+                  `${assignment.guide?.firstName} ${assignment.guide?.lastName}`
+                )}
+                disabled={isMutating}
+                className="text-xs text-destructive hover:text-destructive/80 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              >
+                Remove
+              </button>
             </div>
-            <button
-              onClick={() => setIsAssigning(!isAssigning)}
-              className="text-sm text-primary hover:text-primary/80 font-medium"
-              disabled={isMutating}
-            >
-              {isAssigning ? "Cancel" : "Reassign"}
-            </button>
-          </div>
-        </div>
-      ) : pendingAssignment?.guide ? (
-        <div className="mb-4">
-          <div className="flex items-start gap-3 p-4 bg-warning/10 border border-warning rounded-lg">
-            <div className="p-2 bg-warning/20 rounded-lg">
-              <User className="h-5 w-5 text-warning" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-medium text-foreground">
-                  {pendingAssignment.guide.firstName} {pendingAssignment.guide.lastName}
-                </p>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium status-pending">
-                  Pending
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">{pendingAssignment.guide.email}</p>
-              {pendingAssignment.notes && (
-                <p className="text-sm text-muted-foreground mt-2 italic">{pendingAssignment.notes}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="mb-4">
-          <div className="flex items-center gap-3 p-4 bg-muted border border-border rounded-lg">
-            <div className="p-2 bg-accent rounded-lg">
-              <User className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium text-foreground">No guide assigned</p>
-              <p className="text-sm text-muted-foreground">Assign a qualified guide to this schedule</p>
-            </div>
-            <button
-              onClick={() => setIsAssigning(true)}
-              className="text-sm text-primary hover:text-primary/80 font-medium"
-              disabled={isMutating}
-            >
-              Assign Guide
-            </button>
-          </div>
-        </div>
-      )}
+          ))}
 
-      {/* Declined Assignments */}
-      {declinedAssignments && declinedAssignments.length > 0 && (
-        <div className="mb-4 space-y-2">
-          <p className="text-sm font-medium text-foreground">Previously Declined:</p>
-          {declinedAssignments.map((assignment) => (
+          {/* Pending Assignments */}
+          {pendingAssignments.map((assignment) => (
             <div
               key={assignment.id}
-              className="flex items-start gap-3 p-3 bg-destructive/10 border border-destructive rounded-lg"
+              className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg"
             >
-              <div className="p-1.5 bg-destructive/20 rounded">
-                <UserX className="h-4 w-4 text-destructive" />
+              <div className="p-2 bg-amber-500/20 rounded-lg flex-shrink-0">
+                <User className="h-5 w-5 text-amber-500" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  {assignment.guide?.firstName} {assignment.guide?.lastName}
-                </p>
-                {assignment.declineReason && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Reason: {assignment.declineReason}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <p className="font-medium text-foreground">
+                    {assignment.guide?.firstName} {assignment.guide?.lastName}
+                  </p>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium status-pending">
+                    Pending
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">{assignment.guide?.email}</p>
+                {assignment.booking && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Booking: {assignment.booking.id.slice(0, 8)}...
                   </p>
                 )}
               </div>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium status-cancelled">
-                Declined
-              </span>
+              <button
+                onClick={() => handleCancelAssignment(
+                  assignment.id,
+                  `${assignment.guide?.firstName} ${assignment.guide?.lastName}`
+                )}
+                disabled={isMutating}
+                className="text-xs text-destructive hover:text-destructive/80 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              >
+                Cancel
+              </button>
             </div>
           ))}
+
+          {/* Declined Assignments */}
+          {declinedAssignments.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Previously Declined
+              </p>
+              {declinedAssignments.map((assignment) => (
+                <div
+                  key={assignment.id}
+                  className="flex items-start gap-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg"
+                >
+                  <div className="p-1.5 bg-destructive/20 rounded flex-shrink-0">
+                    <UserX className="h-4 w-4 text-destructive" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      {assignment.guide?.firstName} {assignment.guide?.lastName}
+                    </p>
+                    {assignment.booking && (
+                      <p className="text-xs text-muted-foreground">
+                        Booking: {assignment.booking.id.slice(0, 8)}...
+                      </p>
+                    )}
+                    {assignment.declineReason && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Reason: {assignment.declineReason}
+                      </p>
+                    )}
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium status-cancelled flex-shrink-0">
+                    Declined
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Assignment Form */}
-      {isAssigning && (
-        <div className="space-y-4 pt-4 border-t border-border">
-          <div>
-            <label htmlFor="guide-select" className="block text-sm font-medium text-foreground mb-2">
-              Select Guide
-            </label>
-            <select
-              id="guide-select"
-              value={selectedGuideId}
-              onChange={(e) => setSelectedGuideId(e.target.value)}
-              className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              disabled={isMutating}
-            >
-              <option value="">Choose a guide...</option>
-              {qualifiedGuides?.map((guide) => (
-                <option
-                  key={guide.id}
-                  value={guide.id}
-                  disabled={!guide.isAvailable}
-                  className={!guide.isAvailable ? "text-muted-foreground" : ""}
-                >
-                  {guide.firstName} {guide.lastName}
-                  {guide.isPrimary ? " (Primary)" : ""}
-                  {!guide.isAvailable ? " - Conflict" : ""}
-                </option>
-              ))}
-            </select>
-            {qualifiedGuides && qualifiedGuides.length === 0 && (
-              <p className="text-sm text-warning mt-2 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                No qualified guides available for this tour
-              </p>
-            )}
-          </div>
-
-          {/* Guide Availability Info */}
-          {selectedGuideId && qualifiedGuides && (
-            <div>
-              {(() => {
-                const selectedGuide = qualifiedGuides.find((g) => g.id === selectedGuideId);
-                if (!selectedGuide) return null;
-
-                if (!selectedGuide.isAvailable) {
-                  return (
-                    <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning rounded-lg">
-                      <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Schedule Conflict Warning
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          This guide has a conflicting schedule during this time. Proceeding will
-                          create a double booking.
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="flex items-start gap-2 p-3 bg-success/10 border border-success rounded-lg">
-                    <Check className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Available</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        This guide is available for the selected time slot.
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* Error Display */}
-          {(assignMutation.error || reassignMutation.error) && (
-            <div className="p-3 bg-destructive/10 border border-destructive rounded-lg">
-              <p className="text-sm text-destructive">
-                {assignMutation.error?.message || reassignMutation.error?.message}
-              </p>
-            </div>
-          )}
-
-          {/* Action Buttons */}
+      {/* No assignments message */}
+      {confirmedAssignments.length === 0 && pendingAssignments.length === 0 && declinedAssignments.length === 0 && (
+        <div className="p-4 bg-muted border border-border rounded-lg">
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleAssign}
-              disabled={!selectedGuideId || isMutating}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isMutating && <Loader2 className="h-4 w-4 animate-spin" />}
-              {confirmedAssignment ? "Reassign Guide" : "Assign Guide"}
-            </button>
-            <button
-              onClick={() => {
-                setIsAssigning(false);
-                setSelectedGuideId("");
-              }}
-              disabled={isMutating}
-              className="px-4 py-2 text-foreground border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Cancel
-            </button>
-            {confirmedAssignment && (
-              <button
-                onClick={handleCancel}
-                disabled={isMutating}
-                className="ml-auto px-4 py-2 text-destructive border border-destructive rounded-lg hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Remove Assignment
-              </button>
-            )}
+            <div className="p-2 bg-accent rounded-lg">
+              <User className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">No guide assignments yet</p>
+              <p className="text-sm text-muted-foreground">
+                Assign guides through individual booking pages
+              </p>
+            </div>
           </div>
         </div>
       )}

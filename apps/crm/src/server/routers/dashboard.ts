@@ -25,4 +25,22 @@ export const dashboardRouter = createRouter({
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.dashboard.getBusinessDashboard(input.dateRange);
     }),
+
+  // Today's Bookings - Actual customers with bookings for today
+  getTodayBookings: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.dashboard.getTodayBookings();
+  }),
+
+  // Tomorrow's Bookings - Preview for preparation
+  getTomorrowBookings: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.dashboard.getTomorrowBookings();
+  }),
+
+  // Tomorrow's Preview - Comprehensive planning data
+  getTomorrowPreview: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.dashboard.getTomorrowPreview();
+  }),
 });

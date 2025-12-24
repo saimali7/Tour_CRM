@@ -39,6 +39,9 @@ import { checkInRouter } from "./check-in";
 import { depositRouter } from "./deposit";
 // Phase 7: Operations Excellence
 import { goalRouter } from "./goal";
+// Booking System v2: Customer-first booking
+import { bookingOptionsRouter } from "./booking-options";
+import { availabilityRouter } from "./availability";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -82,6 +85,9 @@ export const appRouter = createRouter({
   deposit: depositRouter,
   // Phase 7: Operations Excellence
   goal: goalRouter,
+  // Booking System v2: Customer-first booking
+  bookingOptions: bookingOptionsRouter,
+  availability: availabilityRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -5,6 +5,7 @@ import { organizations } from "./organizations";
 import { guides } from "./guides";
 import { tours } from "./tours";
 import { schedules } from "./schedules";
+import { bookings } from "./bookings";
 
 // Guide Availability - Weekly recurring availability pattern (org-scoped)
 export const guideAvailability = pgTable("guide_availability", {
@@ -111,7 +112,8 @@ export const tourGuideQualifications = pgTable("tour_guide_qualifications", {
   tourGuideUnique: unique().on(table.tourId, table.guideId), // One qualification per tour-guide pair
 }));
 
-// Guide Assignments - Assignment of guides to specific schedules with confirmation status (org-scoped)
+// Guide Assignments - Assignment of guides to specific bookings with confirmation status (org-scoped)
+// Supports both insourced (system guides) and outsourced (external guides tracked by name only)
 export const guideAssignments = pgTable("guide_assignments", {
   id: text("id").primaryKey().$defaultFn(createId),
 
@@ -120,15 +122,20 @@ export const guideAssignments = pgTable("guide_assignments", {
     .notNull()
     .references(() => organizations.id, { onDelete: "cascade" }),
 
-  // Schedule reference
-  scheduleId: text("schedule_id")
+  // Booking reference (guide is assigned to a booking)
+  bookingId: text("booking_id")
     .notNull()
-    .references(() => schedules.id, { onDelete: "cascade" }),
+    .references(() => bookings.id, { onDelete: "cascade" }),
 
-  // Guide reference
+  // Guide reference (nullable - for insourced/system guides only)
+  // When guideId is set, this is an insourced guide assignment
   guideId: text("guide_id")
-    .notNull()
     .references(() => guides.id, { onDelete: "cascade" }),
+
+  // Outsourced guide fields (for external/freelance guides not in the system)
+  // When outsourcedGuideName is set, this is an outsourced guide assignment
+  outsourcedGuideName: text("outsourced_guide_name"),
+  outsourcedGuideContact: text("outsourced_guide_contact"), // Phone or email
 
   // Assignment status
   status: text("status").$type<GuideAssignmentStatus>().notNull().default("pending"),
@@ -149,10 +156,10 @@ export const guideAssignments = pgTable("guide_assignments", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   orgIdx: index("guide_assignments_org_idx").on(table.organizationId),
-  scheduleIdx: index("guide_assignments_schedule_idx").on(table.scheduleId),
+  bookingIdx: index("guide_assignments_booking_idx").on(table.bookingId),
   guideIdx: index("guide_assignments_guide_idx").on(table.guideId),
   statusIdx: index("guide_assignments_status_idx").on(table.status),
-  scheduleGuideUnique: unique().on(table.scheduleId, table.guideId), // One assignment per schedule-guide pair
+  // Note: unique constraint removed since we now support outsourced guides without guideId
 }));
 
 // Relations
@@ -198,14 +205,19 @@ export const guideAssignmentsRelations = relations(guideAssignments, ({ one }) =
     fields: [guideAssignments.organizationId],
     references: [organizations.id],
   }),
-  schedule: one(schedules, {
-    fields: [guideAssignments.scheduleId],
-    references: [schedules.id],
+  booking: one(bookings, {
+    fields: [guideAssignments.bookingId],
+    references: [bookings.id],
   }),
   guide: one(guides, {
     fields: [guideAssignments.guideId],
     references: [guides.id],
   }),
+}));
+
+// Add the many relation to bookings (avoids circular dependency if defined here)
+export const bookingsGuideAssignmentsRelations = relations(bookings, ({ many }) => ({
+  guideAssignments: many(guideAssignments),
 }));
 
 // Types
