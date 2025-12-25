@@ -13,7 +13,6 @@ import {
   BarChart3,
   Settings,
   Search,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import type { Route } from "next";
@@ -32,7 +31,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: "Dashboard", href: "", icon: LayoutDashboard, shortcut: "1" },
-  { name: "Zero-Friction", href: "/zero-friction", icon: Zap, shortcut: "8" },
   { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "2" },
   { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "3" },
   { name: "Tours", href: "/tours", icon: Map, shortcut: "4" },
