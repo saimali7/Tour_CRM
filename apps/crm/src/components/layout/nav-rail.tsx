@@ -13,15 +13,11 @@ import {
   BarChart3,
   Settings,
   Search,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import type { Route } from "next";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useEffect } from "react";
 import { NotificationCenter } from "@/components/notification-center";
@@ -36,6 +32,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: "Dashboard", href: "", icon: LayoutDashboard, shortcut: "1" },
+  { name: "Zero-Friction", href: "/zero-friction", icon: Zap, shortcut: "8" },
   { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "2" },
   { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "3" },
   { name: "Tours", href: "/tours", icon: Map, shortcut: "4" },
@@ -55,8 +52,7 @@ export function NavRail({ orgSlug, orgName, userButton }: NavRailProps) {
   const router = useRouter();
   const basePath = `/org/${orgSlug}`;
   const settingsPath = `${basePath}/settings` as Route;
-  const isSettingsActive =
-    pathname === settingsPath || pathname.startsWith(`${settingsPath}/`);
+  const isSettingsActive = pathname === settingsPath || pathname.startsWith(`${settingsPath}/`);
 
   // Keyboard navigation
   useEffect(() => {
