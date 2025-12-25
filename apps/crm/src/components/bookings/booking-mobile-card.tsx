@@ -134,7 +134,7 @@ export function BookingMobileCard({
                 e.preventDefault();
                 onConfirm(booking.id);
               }}
-              className="p-2 rounded-md text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors touch-target"
+              className="p-2 rounded-md text-emerald-500 hover:bg-accent transition-colors touch-target"
               aria-label="Confirm booking"
             >
               <CheckCircle className="h-5 w-5" />

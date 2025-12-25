@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, count, gte, lte, ilike, or, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, gte, lte, ilike, or, inArray, isNotNull } from "drizzle-orm";
 import {
   bookings,
   bookingParticipants,
@@ -22,6 +22,7 @@ import {
 } from "./types";
 import { bookingLogger } from "./lib/logger";
 import { ScheduleService } from "./schedule-service";
+import { TourAvailabilityService } from "./tour-availability-service";
 
 export interface BookingFilters {
   status?: BookingStatus;
@@ -31,6 +32,7 @@ export interface BookingFilters {
   scheduleId?: string;
   tourId?: string;
   dateRange?: DateRangeFilter;
+  scheduleDateRange?: DateRangeFilter; // Filter by schedule start date
   search?: string;
 }
 
@@ -68,9 +70,34 @@ export interface PricingSnapshot {
   priceBreakdown?: string;
 }
 
+/**
+ * CreateBookingInput supports two booking models:
+ *
+ * 1. **Schedule-based (legacy)**: Provide `scheduleId`
+ *    - Booking is linked to a pre-created schedule
+ *    - Capacity tracked via schedule.bookedCount
+ *    - tourId, bookingDate, bookingTime auto-populated from schedule (dual-write)
+ *
+ * 2. **Availability-based (new)**: Provide `tourId`, `bookingDate`, `bookingTime`
+ *    - No schedule record needed
+ *    - Capacity computed dynamically by counting bookings
+ *    - Validated against TourAvailabilityService
+ *
+ * During migration, you can provide either or both. If scheduleId is provided,
+ * the schedule-based flow is used and new fields are back-filled. If only
+ * tourId+date+time is provided, the availability-based flow is used.
+ */
 export interface CreateBookingInput {
   customerId: string;
-  scheduleId: string;
+
+  // Schedule-based model (legacy) - optional during migration
+  scheduleId?: string;
+
+  // Availability-based model (new) - required if no scheduleId
+  tourId?: string;
+  bookingDate?: Date;
+  bookingTime?: string; // "HH:MM" format
+
   bookingOptionId?: string;
   guestAdults?: number;
   guestChildren?: number;
@@ -157,13 +184,21 @@ export class BookingService extends BaseService {
       conditions.push(eq(bookings.scheduleId, filters.scheduleId));
     }
     if (filters.tourId) {
-      conditions.push(eq(schedules.tourId, filters.tourId));
+      // Filter by tourId - works for both schedule-based and availability-based bookings
+      conditions.push(eq(bookings.tourId, filters.tourId));
     }
     if (filters.dateRange?.from) {
       conditions.push(gte(bookings.createdAt, filters.dateRange.from));
     }
     if (filters.dateRange?.to) {
       conditions.push(lte(bookings.createdAt, filters.dateRange.to));
+    }
+    // Filter by schedule start date (for calendar view)
+    if (filters.scheduleDateRange?.from) {
+      conditions.push(gte(schedules.startsAt, filters.scheduleDateRange.from));
+    }
+    if (filters.scheduleDateRange?.to) {
+      conditions.push(lte(schedules.startsAt, filters.scheduleDateRange.to));
     }
     if (filters.search) {
       conditions.push(
@@ -181,6 +216,10 @@ export class BookingService extends BaseService {
         ? asc(bookings[sort.field])
         : desc(bookings[sort.field]);
 
+    // We use two left joins for tour:
+    // 1. Via schedule (for legacy schedule-based bookings where scheduleId is set)
+    // 2. Via bookings.tourId directly (for new availability-based bookings)
+    // COALESCE picks the first non-null value
     const [data, countResult] = await Promise.all([
       this.db
         .select({
@@ -198,18 +237,21 @@ export class BookingService extends BaseService {
             endsAt: schedules.endsAt,
             status: schedules.status,
           },
-          tour: {
-            id: tours.id,
-            name: tours.name,
-            slug: tours.slug,
-            meetingPoint: tours.meetingPoint,
-            meetingPointDetails: tours.meetingPointDetails,
+          scheduleTour: {
+            id: sql<string>`${tours.id}`.as("schedule_tour_id"),
+            name: sql<string>`${tours.name}`.as("schedule_tour_name"),
+            slug: sql<string>`${tours.slug}`.as("schedule_tour_slug"),
+            meetingPoint: sql<string | null>`${tours.meetingPoint}`.as("schedule_tour_mp"),
+            meetingPointDetails: sql<string | null>`${tours.meetingPointDetails}`.as("schedule_tour_mpd"),
           },
         })
         .from(bookings)
         .leftJoin(customers, eq(bookings.customerId, customers.id))
         .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-        .leftJoin(tours, eq(schedules.tourId, tours.id))
+        .leftJoin(tours, or(
+          eq(schedules.tourId, tours.id),
+          and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id))
+        ))
         .where(and(...conditions))
         .orderBy(orderBy)
         .limit(limit)
@@ -217,7 +259,6 @@ export class BookingService extends BaseService {
       this.db
         .select({ total: count() })
         .from(bookings)
-        .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
         .leftJoin(customers, eq(bookings.customerId, customers.id))
         .where(and(...conditions)),
     ]);
@@ -228,7 +269,13 @@ export class BookingService extends BaseService {
       ...row.booking,
       customer: row.customer?.id ? row.customer : undefined,
       schedule: row.schedule?.id ? row.schedule : undefined,
-      tour: row.tour?.id ? row.tour : undefined,
+      tour: row.scheduleTour?.id ? {
+        id: row.scheduleTour.id,
+        name: row.scheduleTour.name,
+        slug: row.scheduleTour.slug,
+        meetingPoint: row.scheduleTour.meetingPoint,
+        meetingPointDetails: row.scheduleTour.meetingPointDetails,
+      } : undefined,
     }));
 
     return {
@@ -265,7 +312,11 @@ export class BookingService extends BaseService {
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
       .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      // Join tour via schedule OR directly via booking.tourId
+      .leftJoin(tours, or(
+        eq(schedules.tourId, tours.id),
+        and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id))
+      ))
       .where(
         and(
           eq(bookings.id, id),
@@ -323,7 +374,11 @@ export class BookingService extends BaseService {
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
       .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      // Join tour via schedule OR directly via booking.tourId
+      .leftJoin(tours, or(
+        eq(schedules.tourId, tours.id),
+        and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id))
+      ))
       .where(
         and(
           eq(bookings.referenceNumber, referenceNumber),
@@ -345,7 +400,29 @@ export class BookingService extends BaseService {
     };
   }
 
+  /**
+   * Create a booking - supports both schedule-based and availability-based models.
+   *
+   * During migration, both models are supported:
+   * - Schedule-based: Provide scheduleId → capacity tracked via schedule.bookedCount
+   * - Availability-based: Provide tourId + bookingDate + bookingTime → capacity computed dynamically
+   *
+   * If scheduleId is provided, the new fields (tourId, bookingDate, bookingTime) are also
+   * populated from the schedule data for forward compatibility (dual-write).
+   */
   async create(input: CreateBookingInput): Promise<BookingWithRelations> {
+    // Determine which booking model to use
+    const useScheduleModel = !!input.scheduleId;
+    const useAvailabilityModel = !!(input.tourId && input.bookingDate && input.bookingTime);
+
+    // Validate: must have at least one complete set
+    if (!useScheduleModel && !useAvailabilityModel) {
+      throw new ValidationError(
+        "Must provide either scheduleId (legacy) or tourId + bookingDate + bookingTime (new model)"
+      );
+    }
+
+    // Validate customer
     const customer = await this.db.query.customers.findFirst({
       where: and(
         eq(customers.id, input.customerId),
@@ -357,43 +434,111 @@ export class BookingService extends BaseService {
       throw new NotFoundError("Customer", input.customerId);
     }
 
-    const scheduleResult = await this.db
-      .select({
-        schedule: schedules,
-        tour: tours,
-      })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          eq(schedules.id, input.scheduleId),
-          eq(schedules.organizationId, this.organizationId)
-        )
-      )
-      .limit(1);
-
-    const scheduleRow = scheduleResult[0];
-    if (!scheduleRow) {
-      throw new NotFoundError("Schedule", input.scheduleId);
-    }
-
-    const { schedule: sched, tour } = scheduleRow;
-
-    if (sched.status === "cancelled") {
-      throw new ValidationError("Cannot book a cancelled schedule");
-    }
-
     const totalParticipants =
       input.adultCount + (input.childCount || 0) + (input.infantCount || 0);
-    const availableSpots = sched.maxParticipants - (sched.bookedCount || 0);
 
-    if (totalParticipants > availableSpots) {
-      throw new ValidationError(
-        `Not enough availability. Only ${availableSpots} spots remaining.`
-      );
+    // Variables to be populated by either model
+    let scheduleId: string | undefined = input.scheduleId;
+    let tourId: string;
+    let bookingDate: Date;
+    let bookingTime: string;
+    let pricePerPerson: number;
+    let currency: string;
+    let tour: typeof tours.$inferSelect | null = null;
+
+    if (useScheduleModel) {
+      // ========== SCHEDULE-BASED MODEL (LEGACY) ==========
+      // Fetch schedule and tour info
+      const scheduleResult = await this.db
+        .select({
+          schedule: schedules,
+          tour: tours,
+        })
+        .from(schedules)
+        .leftJoin(tours, eq(schedules.tourId, tours.id))
+        .where(
+          and(
+            eq(schedules.id, input.scheduleId!),
+            eq(schedules.organizationId, this.organizationId)
+          )
+        )
+        .limit(1);
+
+      const scheduleRow = scheduleResult[0];
+      if (!scheduleRow) {
+        throw new NotFoundError("Schedule", input.scheduleId!);
+      }
+
+      const { schedule: sched, tour: scheduleTour } = scheduleRow;
+      tour = scheduleTour;
+
+      if (sched.status === "cancelled") {
+        throw new ValidationError("Cannot book a cancelled schedule");
+      }
+
+      const availableSpots = sched.maxParticipants - (sched.bookedCount || 0);
+      if (totalParticipants > availableSpots) {
+        throw new ValidationError(
+          `Not enough availability. Only ${availableSpots} spots remaining.`
+        );
+      }
+
+      // Extract tourId, date, and time from schedule for dual-write
+      tourId = sched.tourId;
+      bookingDate = new Date(sched.startsAt);
+      bookingDate.setHours(0, 0, 0, 0); // Normalize to start of day
+      bookingTime = this.extractTimeFromDate(sched.startsAt);
+
+      pricePerPerson = parseFloat(sched.price || scheduleTour?.basePrice || "0");
+      currency = sched.currency || scheduleTour?.currency || "USD";
+
+    } else {
+      // ========== AVAILABILITY-BASED MODEL (NEW) ==========
+      // Validate tour exists
+      const tourResult = await this.db.query.tours.findFirst({
+        where: and(
+          eq(tours.id, input.tourId!),
+          eq(tours.organizationId, this.organizationId)
+        ),
+      });
+
+      if (!tourResult) {
+        throw new NotFoundError("Tour", input.tourId!);
+      }
+
+      tour = tourResult;
+      tourId = input.tourId!;
+      bookingDate = input.bookingDate!;
+      bookingTime = input.bookingTime!;
+
+      // Check availability via TourAvailabilityService
+      const availabilityService = new TourAvailabilityService(this.ctx);
+      const availability = await availabilityService.checkSlotAvailability({
+        tourId,
+        date: bookingDate,
+        time: bookingTime,
+        requestedSpots: totalParticipants,
+      });
+
+      if (!availability.available) {
+        const reasons: Record<string, string> = {
+          blackout: "Tour is not operating on this date (blackout)",
+          not_operating: "Tour does not operate on this date",
+          sold_out: "This tour is sold out",
+          insufficient_capacity: `Not enough availability. Only ${availability.spotsRemaining} spots remaining.`,
+          past_date: "Cannot book a date in the past",
+        };
+        throw new ValidationError(
+          reasons[availability.reason || ""] || "Slot is not available"
+        );
+      }
+
+      pricePerPerson = parseFloat(tourResult.basePrice || "0");
+      currency = tourResult.currency || "USD";
+      scheduleId = undefined; // No schedule for availability-based bookings
     }
 
-    const pricePerPerson = parseFloat(sched.price || tour?.basePrice || "0");
+    // Calculate pricing
     const subtotal =
       input.subtotal || (pricePerPerson * input.adultCount).toFixed(2);
     const discount = input.discount || "0";
@@ -409,16 +554,21 @@ export class BookingService extends BaseService {
     const referenceNumber = this.generateReferenceNumber("BK");
 
     // Use a transaction to ensure all-or-nothing semantics
-    // This prevents orphaned records if any operation fails
     const bookingId = await this.db.transaction(async (tx) => {
-      // 1. Insert the booking
+      // 1. Insert the booking with both old and new fields
       const [booking] = await tx
         .insert(bookings)
         .values({
           organizationId: this.organizationId,
           referenceNumber,
           customerId: input.customerId,
-          scheduleId: input.scheduleId,
+          // Legacy field (nullable for availability-based bookings)
+          scheduleId: scheduleId,
+          // New fields for availability-based model
+          tourId: tourId,
+          bookingDate: bookingDate,
+          bookingTime: bookingTime,
+          // Rest of the fields
           bookingOptionId: input.bookingOptionId,
           guestAdults: input.guestAdults ?? input.adultCount,
           guestChildren: input.guestChildren ?? input.childCount ?? 0,
@@ -432,7 +582,7 @@ export class BookingService extends BaseService {
           discount,
           tax,
           total,
-          currency: sched.currency || tour?.currency || "USD",
+          currency,
           status: "pending",
           paymentStatus: "pending",
           source: input.source || "manual",
@@ -466,33 +616,37 @@ export class BookingService extends BaseService {
         );
       }
 
-      // 3. Atomic update with capacity check to prevent race conditions
-      const updateResult = await tx
-        .update(schedules)
-        .set({
-          bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants}`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schedules.id, input.scheduleId),
-            eq(schedules.organizationId, this.organizationId),
-            // Atomic capacity check - only update if there's room
-            sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants} <= ${schedules.maxParticipants}`
+      // 3. For schedule-based bookings, update schedule bookedCount with atomic capacity check
+      if (useScheduleModel && scheduleId) {
+        const updateResult = await tx
+          .update(schedules)
+          .set({
+            bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants}`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schedules.id, scheduleId),
+              eq(schedules.organizationId, this.organizationId),
+              // Atomic capacity check - only update if there's room
+              sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants} <= ${schedules.maxParticipants}`
+            )
           )
-        )
-        .returning();
+          .returning();
 
-      // If no rows updated, capacity was exceeded (race condition caught)
-      // The transaction will automatically rollback all previous operations
-      if (updateResult.length === 0) {
-        bookingLogger.warn({
-          organizationId: this.organizationId,
-          scheduleId: input.scheduleId,
-          requestedParticipants: totalParticipants,
-        }, "Booking failed: capacity exceeded during transaction");
-        throw new ValidationError("Schedule capacity exceeded. Please try again with fewer participants.");
+        // If no rows updated, capacity was exceeded (race condition caught)
+        if (updateResult.length === 0) {
+          bookingLogger.warn({
+            organizationId: this.organizationId,
+            scheduleId,
+            requestedParticipants: totalParticipants,
+          }, "Booking failed: capacity exceeded during transaction");
+          throw new ValidationError("Schedule capacity exceeded. Please try again with fewer participants.");
+        }
       }
+
+      // For availability-based bookings, no schedule update needed.
+      // Capacity is computed dynamically by counting bookings.
 
       return booking.id;
     });
@@ -502,16 +656,31 @@ export class BookingService extends BaseService {
       bookingId,
       referenceNumber,
       customerId: input.customerId,
-      scheduleId: input.scheduleId,
+      scheduleId: scheduleId || null,
+      tourId,
+      bookingDate: bookingDate.toISOString().split("T")[0],
+      bookingTime,
       totalParticipants,
       total,
       source: input.source || "manual",
+      model: useScheduleModel ? "schedule" : "availability",
     }, "Booking created successfully");
 
-    // Recalculate guide requirements after booking creation
-    await this.recalculateGuideRequirements(input.scheduleId);
+    // Recalculate guide requirements after booking creation (schedule-based only)
+    if (scheduleId) {
+      await this.recalculateGuideRequirements(scheduleId);
+    }
 
     return this.getById(bookingId);
+  }
+
+  /**
+   * Extract time (HH:MM) from a Date object
+   */
+  private extractTimeFromDate(date: Date): string {
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
   }
 
   async update(id: string, input: UpdateBookingInput): Promise<BookingWithRelations> {
@@ -531,7 +700,7 @@ export class BookingService extends BaseService {
       const oldTotal = booking.totalParticipants;
       const diff = newTotal - oldTotal;
 
-      if (diff !== 0) {
+      if (diff !== 0 && booking.scheduleId) {
         if (diff > 0 && booking.schedule) {
           const schedule = await this.db.query.schedules.findFirst({
             where: eq(schedules.id, booking.scheduleId),
@@ -582,9 +751,10 @@ export class BookingService extends BaseService {
 
     // Recalculate guide requirements if participant counts changed
     if (
-      input.adultCount !== undefined ||
-      input.childCount !== undefined ||
-      input.infantCount !== undefined
+      booking.scheduleId &&
+      (input.adultCount !== undefined ||
+       input.childCount !== undefined ||
+       input.infantCount !== undefined)
     ) {
       await this.recalculateGuideRequirements(booking.scheduleId);
     }
@@ -634,18 +804,21 @@ export class BookingService extends BaseService {
       throw new ValidationError("Cannot cancel a completed booking");
     }
 
-    await this.db
-      .update(schedules)
-      .set({
-        bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(schedules.id, booking.scheduleId),
-          eq(schedules.organizationId, this.organizationId)
-        )
-      );
+    // Update schedule booked count if this booking has a schedule
+    if (booking.scheduleId) {
+      await this.db
+        .update(schedules)
+        .set({
+          bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schedules.id, booking.scheduleId),
+            eq(schedules.organizationId, this.organizationId)
+          )
+        );
+    }
 
     const [updated] = await this.db
       .update(bookings)
@@ -668,7 +841,9 @@ export class BookingService extends BaseService {
     }
 
     // Recalculate guide requirements after cancellation
-    await this.recalculateGuideRequirements(booking.scheduleId);
+    if (booking.scheduleId) {
+      await this.recalculateGuideRequirements(booking.scheduleId);
+    }
 
     return this.getById(updated.id);
   }
@@ -742,6 +917,9 @@ export class BookingService extends BaseService {
       );
     }
 
+    // Store old scheduleId for later updates
+    const oldScheduleId = booking.scheduleId;
+
     // Get new schedule
     const newScheduleResult = await this.db
       .select({
@@ -777,19 +955,21 @@ export class BookingService extends BaseService {
       );
     }
 
-    // Decrement old schedule's booked count
-    await this.db
-      .update(schedules)
-      .set({
-        bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(schedules.id, booking.scheduleId),
-          eq(schedules.organizationId, this.organizationId)
-        )
-      );
+    // Decrement old schedule's booked count (if there was one)
+    if (oldScheduleId) {
+      await this.db
+        .update(schedules)
+        .set({
+          bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schedules.id, oldScheduleId),
+            eq(schedules.organizationId, this.organizationId)
+          )
+        );
+    }
 
     // Increment new schedule's booked count
     await this.db
@@ -825,10 +1005,11 @@ export class BookingService extends BaseService {
     }
 
     // Recalculate guide requirements for both old and new schedules
-    await Promise.all([
-      this.recalculateGuideRequirements(booking.scheduleId),
-      this.recalculateGuideRequirements(newScheduleId),
-    ]);
+    const recalcPromises = [this.recalculateGuideRequirements(newScheduleId)];
+    if (oldScheduleId) {
+      recalcPromises.push(this.recalculateGuideRequirements(oldScheduleId));
+    }
+    await Promise.all(recalcPromises);
 
     return this.getById(updated.id);
   }
@@ -983,11 +1164,87 @@ export class BookingService extends BaseService {
     return result.data.filter(b => b.status !== "cancelled" && b.status !== "no_show");
   }
 
+  /**
+   * Get bookings for a "tour run" (availability-based virtual grouping)
+   * A tour run is a unique combination of tourId + date + time
+   */
+  async getForTourRun(
+    tourId: string,
+    date: Date,
+    time: string
+  ): Promise<BookingWithRelations[]> {
+    const dateStr = date.toISOString().split("T")[0];
+
+    const result = await this.db
+      .select({
+        booking: bookings,
+        customer: {
+          id: customers.id,
+          email: customers.email,
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+          phone: customers.phone,
+        },
+        tour: {
+          id: tours.id,
+          name: tours.name,
+          slug: tours.slug,
+          meetingPoint: tours.meetingPoint,
+          meetingPointDetails: tours.meetingPointDetails,
+        },
+      })
+      .from(bookings)
+      .leftJoin(customers, eq(bookings.customerId, customers.id))
+      .leftJoin(tours, eq(bookings.tourId, tours.id))
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          eq(bookings.tourId, tourId),
+          sql`${bookings.bookingDate}::text = ${dateStr}`,
+          eq(bookings.bookingTime, time),
+          // Include pending and confirmed, exclude cancelled/no_show/completed
+          inArray(bookings.status, ["pending", "confirmed"])
+        )
+      );
+
+    // Fetch participants for all bookings
+    const bookingIds = result.map(r => r.booking.id);
+    const allParticipants = bookingIds.length > 0
+      ? await this.db.query.bookingParticipants.findMany({
+          where: and(
+            inArray(bookingParticipants.bookingId, bookingIds),
+            eq(bookingParticipants.organizationId, this.organizationId)
+          ),
+        })
+      : [];
+
+    // Group participants by booking
+    const participantsByBooking = new Map<string, typeof allParticipants>();
+    for (const p of allParticipants) {
+      const existing = participantsByBooking.get(p.bookingId) || [];
+      existing.push(p);
+      participantsByBooking.set(p.bookingId, existing);
+    }
+
+    return result.map((row) => ({
+      ...row.booking,
+      customer: row.customer?.id ? row.customer : undefined,
+      schedule: undefined, // Tour runs don't have schedules
+      tour: row.tour?.id ? row.tour : undefined,
+      participants: participantsByBooking.get(row.booking.id) || [],
+    }));
+  }
+
+  /**
+   * Get today's confirmed bookings.
+   * Supports both schedule-based (schedules.startsAt) and availability-based (bookings.bookingDate) bookings.
+   */
   async getTodaysBookings(): Promise<BookingWithRelations[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayStr = today.toISOString().split("T")[0]; // YYYY-MM-DD
 
     const result = await this.db
       .select({
@@ -1016,16 +1273,32 @@ export class BookingService extends BaseService {
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
       .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      // Join tour via schedule OR directly via booking.tourId
+      .leftJoin(tours, or(
+        eq(schedules.tourId, tours.id),
+        and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id))
+      ))
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
           eq(bookings.status, "confirmed"),
-          gte(schedules.startsAt, today),
-          lte(schedules.startsAt, tomorrow)
+          // Match today's bookings via either:
+          // 1. Schedule-based: schedule.startsAt is today
+          // 2. Availability-based: booking.bookingDate is today
+          or(
+            and(
+              isNotNull(schedules.startsAt),
+              gte(schedules.startsAt, today),
+              lte(schedules.startsAt, tomorrow)
+            ),
+            sql`${bookings.bookingDate}::text = ${todayStr}`
+          )
         )
       )
-      .orderBy(asc(schedules.startsAt));
+      .orderBy(
+        // Sort by schedule.startsAt if available, else by bookingTime
+        sql`COALESCE(${schedules.startsAt}, (${bookings.bookingDate}::date + ${bookings.bookingTime}::time)::timestamp)`
+      );
 
     return result.map((row) => ({
       ...row.booking,
@@ -1141,7 +1414,7 @@ export class BookingService extends BaseService {
       );
 
     const foundIds = new Set(allBookings.map(b => b.id));
-    const cancellableBookings: Array<{ id: string; scheduleId: string; totalParticipants: number }> = [];
+    const cancellableBookings: Array<{ id: string; scheduleId: string | null; totalParticipants: number }> = [];
 
     // Check each ID for errors
     for (const id of ids) {
@@ -1173,8 +1446,10 @@ export class BookingService extends BaseService {
       // Group by schedule to update booked counts efficiently
       const scheduleUpdates = new Map<string, number>();
       for (const booking of cancellableBookings) {
-        const current = scheduleUpdates.get(booking.scheduleId) || 0;
-        scheduleUpdates.set(booking.scheduleId, current + booking.totalParticipants);
+        if (booking.scheduleId) {
+          const current = scheduleUpdates.get(booking.scheduleId) || 0;
+          scheduleUpdates.set(booking.scheduleId, current + booking.totalParticipants);
+        }
       }
 
       // Update each schedule's booked count (can't batch different decrements easily)
@@ -1324,5 +1599,525 @@ export class BookingService extends BaseService {
     }
 
     return { rescheduled, errors };
+  }
+
+  // ==========================================================================
+  // URGENCY-BASED GROUPING METHODS (for Needs Action / Inbox Zero UI)
+  // ==========================================================================
+
+  /**
+   * Urgency level based on tour time and booking status
+   */
+  private getBookingUrgency(booking: BookingWithRelations): "critical" | "high" | "medium" | "low" | "none" | "past" {
+    const now = new Date();
+    let tourDate: Date | null = null;
+
+    // Determine tour date from schedule or booking fields
+    if (booking.schedule?.startsAt) {
+      tourDate = new Date(booking.schedule.startsAt);
+    } else if (booking.bookingDate && booking.bookingTime) {
+      const parts = booking.bookingTime.split(":");
+      const hours = parseInt(parts[0] ?? "0", 10);
+      const minutes = parseInt(parts[1] ?? "0", 10);
+      tourDate = new Date(booking.bookingDate);
+      tourDate.setHours(hours, minutes, 0, 0);
+    }
+
+    if (!tourDate) return "none";
+
+    // Past tours
+    if (tourDate < now) return "past";
+
+    const hoursUntilTour = (tourDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hasStatusIssue = booking.status === "pending";
+    const hasPaymentIssue = booking.paymentStatus !== "paid" && booking.paymentStatus !== "refunded";
+    const hasIssue = hasStatusIssue || hasPaymentIssue;
+
+    if (!hasIssue) return "none";
+
+    // Critical: Tour is within 24 hours AND has issues
+    if (hoursUntilTour <= 24) return "critical";
+
+    // High: Tour is within 48 hours AND has issues
+    if (hoursUntilTour <= 48) return "high";
+
+    // Medium: Tour is within 7 days AND has issues
+    if (hoursUntilTour <= 168) return "medium";
+
+    // Low: Has issues but tour is far out
+    return "low";
+  }
+
+  /**
+   * Get all bookings grouped by urgency level for "Needs Action" view
+   */
+  async getGroupedByUrgency(): Promise<{
+    critical: BookingWithRelations[];
+    high: BookingWithRelations[];
+    medium: BookingWithRelations[];
+    low: BookingWithRelations[];
+    stats: {
+      needsAction: number;
+      critical: number;
+      pendingConfirmation: number;
+      unpaid: number;
+    };
+  }> {
+    const now = new Date();
+    const sevenDaysOut = new Date(now);
+    sevenDaysOut.setDate(sevenDaysOut.getDate() + 30); // Look 30 days out for issues
+
+    // Get all upcoming bookings that might need action
+    const result = await this.db
+      .select({
+        booking: bookings,
+        customer: {
+          id: customers.id,
+          email: customers.email,
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+          phone: customers.phone,
+        },
+        schedule: {
+          id: schedules.id,
+          startsAt: schedules.startsAt,
+          endsAt: schedules.endsAt,
+          status: schedules.status,
+        },
+        tour: {
+          id: tours.id,
+          name: tours.name,
+          slug: tours.slug,
+          meetingPoint: tours.meetingPoint,
+          meetingPointDetails: tours.meetingPointDetails,
+        },
+      })
+      .from(bookings)
+      .leftJoin(customers, eq(bookings.customerId, customers.id))
+      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
+      .leftJoin(tours, or(
+        eq(schedules.tourId, tours.id),
+        and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id))
+      ))
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          // Exclude cancelled and completed
+          or(
+            eq(bookings.status, "pending"),
+            eq(bookings.status, "confirmed")
+          ),
+          // Only upcoming tours (within 30 days)
+          or(
+            and(
+              isNotNull(schedules.startsAt),
+              gte(schedules.startsAt, now),
+              lte(schedules.startsAt, sevenDaysOut)
+            ),
+            and(
+              isNotNull(bookings.bookingDate),
+              gte(bookings.bookingDate, now),
+              lte(bookings.bookingDate, sevenDaysOut)
+            )
+          )
+        )
+      )
+      .orderBy(
+        // Sort by tour date (soonest first)
+        sql`COALESCE(${schedules.startsAt}, ${bookings.bookingDate}::timestamp)`
+      );
+
+    const bookingsWithRelations = result.map((row) => ({
+      ...row.booking,
+      customer: row.customer?.id ? row.customer : undefined,
+      schedule: row.schedule?.id ? row.schedule : undefined,
+      tour: row.tour?.id ? row.tour : undefined,
+    }));
+
+    // Group by urgency
+    const critical: BookingWithRelations[] = [];
+    const high: BookingWithRelations[] = [];
+    const medium: BookingWithRelations[] = [];
+    const low: BookingWithRelations[] = [];
+    let pendingConfirmation = 0;
+    let unpaid = 0;
+
+    for (const booking of bookingsWithRelations) {
+      const urgency = this.getBookingUrgency(booking);
+
+      // Track stats
+      if (booking.status === "pending") pendingConfirmation++;
+      if (booking.paymentStatus !== "paid" && booking.paymentStatus !== "refunded") unpaid++;
+
+      // Only include bookings that need action
+      if (urgency === "critical") critical.push(booking);
+      else if (urgency === "high") high.push(booking);
+      else if (urgency === "medium") medium.push(booking);
+      else if (urgency === "low") low.push(booking);
+      // Skip "none" and "past" - these don't need action
+    }
+
+    return {
+      critical,
+      high,
+      medium,
+      low,
+      stats: {
+        needsAction: critical.length + high.length + medium.length + low.length,
+        critical: critical.length,
+        pendingConfirmation,
+        unpaid,
+      },
+    };
+  }
+
+  /**
+   * Get bookings that need action, grouped by issue type
+   */
+  async getNeedsAction(): Promise<{
+    unconfirmed: BookingWithRelations[];
+    unpaid: BookingWithRelations[];
+    stats: {
+      total: number;
+      unconfirmed: number;
+      unpaid: number;
+    };
+  }> {
+    const now = new Date();
+
+    // Get all pending or unpaid bookings for upcoming tours
+    const result = await this.db
+      .select({
+        booking: bookings,
+        customer: {
+          id: customers.id,
+          email: customers.email,
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+          phone: customers.phone,
+        },
+        schedule: {
+          id: schedules.id,
+          startsAt: schedules.startsAt,
+          endsAt: schedules.endsAt,
+          status: schedules.status,
+        },
+        tour: {
+          id: tours.id,
+          name: tours.name,
+          slug: tours.slug,
+          meetingPoint: tours.meetingPoint,
+          meetingPointDetails: tours.meetingPointDetails,
+        },
+      })
+      .from(bookings)
+      .leftJoin(customers, eq(bookings.customerId, customers.id))
+      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
+      .leftJoin(tours, or(
+        eq(schedules.tourId, tours.id),
+        and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id))
+      ))
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          // Not cancelled or completed
+          or(
+            eq(bookings.status, "pending"),
+            eq(bookings.status, "confirmed")
+          ),
+          // Only upcoming tours
+          or(
+            and(isNotNull(schedules.startsAt), gte(schedules.startsAt, now)),
+            and(isNotNull(bookings.bookingDate), gte(bookings.bookingDate, now))
+          ),
+          // Has some issue (pending status OR unpaid)
+          or(
+            eq(bookings.status, "pending"),
+            and(
+              eq(bookings.status, "confirmed"),
+              or(
+                eq(bookings.paymentStatus, "pending"),
+                eq(bookings.paymentStatus, "partial"),
+                eq(bookings.paymentStatus, "failed")
+              )
+            )
+          )
+        )
+      )
+      .orderBy(
+        // Sort by tour date (soonest first)
+        sql`COALESCE(${schedules.startsAt}, ${bookings.bookingDate}::timestamp)`
+      );
+
+    const unconfirmed: BookingWithRelations[] = [];
+    const unpaid: BookingWithRelations[] = [];
+
+    for (const row of result) {
+      const booking: BookingWithRelations = {
+        ...row.booking,
+        customer: row.customer?.id ? row.customer : undefined,
+        schedule: row.schedule?.id ? row.schedule : undefined,
+        tour: row.tour?.id ? row.tour : undefined,
+      };
+
+      if (booking.status === "pending") {
+        unconfirmed.push(booking);
+      } else if (booking.paymentStatus !== "paid" && booking.paymentStatus !== "refunded") {
+        unpaid.push(booking);
+      }
+    }
+
+    return {
+      unconfirmed,
+      unpaid,
+      stats: {
+        total: unconfirmed.length + unpaid.length,
+        unconfirmed: unconfirmed.length,
+        unpaid: unpaid.length,
+      },
+    };
+  }
+
+  /**
+   * Get upcoming bookings grouped by day
+   */
+  async getUpcoming(days: number = 7): Promise<{
+    byDay: Array<{
+      date: string;
+      dayLabel: string;
+      bookings: BookingWithRelations[];
+      stats: { total: number; guests: number; revenue: number; needsAction: number };
+    }>;
+    stats: {
+      totalBookings: number;
+      totalGuests: number;
+      totalRevenue: number;
+      needsAction: number;
+    };
+  }> {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endDate = new Date(startOfToday);
+    endDate.setDate(endDate.getDate() + days);
+
+    const result = await this.db
+      .select({
+        booking: bookings,
+        customer: {
+          id: customers.id,
+          email: customers.email,
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+          phone: customers.phone,
+        },
+        schedule: {
+          id: schedules.id,
+          startsAt: schedules.startsAt,
+          endsAt: schedules.endsAt,
+          status: schedules.status,
+        },
+        tour: {
+          id: tours.id,
+          name: tours.name,
+          slug: tours.slug,
+          meetingPoint: tours.meetingPoint,
+          meetingPointDetails: tours.meetingPointDetails,
+        },
+      })
+      .from(bookings)
+      .leftJoin(customers, eq(bookings.customerId, customers.id))
+      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
+      .leftJoin(tours, or(
+        eq(schedules.tourId, tours.id),
+        and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id))
+      ))
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          // Not cancelled
+          or(
+            eq(bookings.status, "pending"),
+            eq(bookings.status, "confirmed")
+          ),
+          // Within date range
+          or(
+            and(
+              isNotNull(schedules.startsAt),
+              gte(schedules.startsAt, startOfToday),
+              lte(schedules.startsAt, endDate)
+            ),
+            and(
+              isNotNull(bookings.bookingDate),
+              gte(bookings.bookingDate, startOfToday),
+              lte(bookings.bookingDate, endDate)
+            )
+          )
+        )
+      )
+      .orderBy(
+        sql`COALESCE(${schedules.startsAt}, ${bookings.bookingDate}::timestamp)`
+      );
+
+    // Group by day
+    const dayMap = new Map<string, BookingWithRelations[]>();
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    for (const row of result) {
+      const booking: BookingWithRelations = {
+        ...row.booking,
+        customer: row.customer?.id ? row.customer : undefined,
+        schedule: row.schedule?.id ? row.schedule : undefined,
+        tour: row.tour?.id ? row.tour : undefined,
+      };
+
+      // Determine the tour date
+      let tourDate: Date;
+      if (booking.schedule?.startsAt) {
+        tourDate = new Date(booking.schedule.startsAt);
+      } else if (booking.bookingDate) {
+        tourDate = new Date(booking.bookingDate);
+      } else {
+        continue; // Skip if no date
+      }
+
+      const dateKey = tourDate.toISOString().split("T")[0] ?? "";
+      const existing = dayMap.get(dateKey) || [];
+      existing.push(booking);
+      dayMap.set(dateKey, existing);
+    }
+
+    // Convert to array with labels
+    const today = startOfToday.toISOString().split("T")[0];
+    const tomorrow = new Date(startOfToday);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+    let totalBookings = 0;
+    let totalGuests = 0;
+    let totalRevenue = 0;
+    let totalNeedsAction = 0;
+
+    const byDay = Array.from(dayMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([dateStr, dayBookings]) => {
+        const date = new Date(dateStr);
+        let dayLabel: string;
+
+        if (dateStr === today) {
+          dayLabel = "Today";
+        } else if (dateStr === tomorrowStr) {
+          dayLabel = "Tomorrow";
+        } else {
+          dayLabel = `${dayNames[date.getDay()]} ${monthNames[date.getMonth()]} ${date.getDate()}`;
+        }
+
+        const dayStats = {
+          total: dayBookings.length,
+          guests: dayBookings.reduce((sum, b) => sum + b.totalParticipants, 0),
+          revenue: dayBookings.reduce((sum, b) => sum + parseFloat(b.total || "0"), 0),
+          needsAction: dayBookings.filter(b =>
+            b.status === "pending" ||
+            (b.paymentStatus !== "paid" && b.paymentStatus !== "refunded")
+          ).length,
+        };
+
+        totalBookings += dayStats.total;
+        totalGuests += dayStats.guests;
+        totalRevenue += dayStats.revenue;
+        totalNeedsAction += dayStats.needsAction;
+
+        return {
+          date: dateStr,
+          dayLabel,
+          bookings: dayBookings,
+          stats: dayStats,
+        };
+      });
+
+    return {
+      byDay,
+      stats: {
+        totalBookings,
+        totalGuests,
+        totalRevenue,
+        needsAction: totalNeedsAction,
+      },
+    };
+  }
+
+  /**
+   * Get today's bookings with enhanced urgency info
+   */
+  async getTodayWithUrgency(): Promise<{
+    bookings: Array<BookingWithRelations & { urgency: "critical" | "high" | "medium" | "low" | "none" | "past"; timeUntil: string }>;
+    stats: {
+      total: number;
+      guests: number;
+      revenue: number;
+      confirmed: number;
+      pending: number;
+      paid: number;
+    };
+  }> {
+    const todaysBookings = await this.getTodaysBookings();
+    const now = new Date();
+
+    const enhanced = todaysBookings.map(booking => {
+      const urgency = this.getBookingUrgency(booking);
+
+      // Calculate time until tour
+      let timeUntil = "";
+      let tourDate: Date | null = null;
+
+      if (booking.schedule?.startsAt) {
+        tourDate = new Date(booking.schedule.startsAt);
+      } else if (booking.bookingDate && booking.bookingTime) {
+        const parts = booking.bookingTime.split(":");
+        const hours = parseInt(parts[0] ?? "0", 10);
+        const minutes = parseInt(parts[1] ?? "0", 10);
+        tourDate = new Date(booking.bookingDate);
+        tourDate.setHours(hours, minutes, 0, 0);
+      }
+
+      if (tourDate) {
+        const diffMs = tourDate.getTime() - now.getTime();
+        if (diffMs < 0) {
+          timeUntil = "Started";
+        } else {
+          const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+          const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          if (diffHours > 0) {
+            timeUntil = `In ${diffHours}h ${diffMins}m`;
+          } else {
+            timeUntil = `In ${diffMins}m`;
+          }
+        }
+      }
+
+      return { ...booking, urgency, timeUntil };
+    });
+
+    // Sort by tour time (soonest first)
+    enhanced.sort((a, b) => {
+      const aTime = a.schedule?.startsAt || a.bookingDate;
+      const bTime = b.schedule?.startsAt || b.bookingDate;
+      if (!aTime) return 1;
+      if (!bTime) return -1;
+      return new Date(aTime).getTime() - new Date(bTime).getTime();
+    });
+
+    return {
+      bookings: enhanced,
+      stats: {
+        total: enhanced.length,
+        guests: enhanced.reduce((sum, b) => sum + b.totalParticipants, 0),
+        revenue: enhanced.reduce((sum, b) => sum + parseFloat(b.total || "0"), 0),
+        confirmed: enhanced.filter(b => b.status === "confirmed").length,
+        pending: enhanced.filter(b => b.status === "pending").length,
+        paid: enhanced.filter(b => b.paymentStatus === "paid").length,
+      },
+    };
   }
 }

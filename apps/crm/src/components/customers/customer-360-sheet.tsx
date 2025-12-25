@@ -111,7 +111,7 @@ function InlineEditField({
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+          className="p-1 text-emerald-500 hover:bg-accent rounded transition-colors"
         >
           <Check className="h-3.5 w-3.5" />
         </button>
@@ -209,7 +209,7 @@ function TagAdder({
         />
         <button
           onClick={handleAdd}
-          className="p-0.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+          className="p-0.5 text-emerald-500 hover:bg-accent rounded transition-colors"
         >
           <Check className="h-3 w-3" />
         </button>

@@ -232,9 +232,9 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Analytics</h1>
+          <h1 className="text-lg font-semibold text-foreground">Insights</h1>
           <p className="text-muted-foreground">
-            Track performance and make data-driven decisions
+            Learn from your data and improve operations
           </p>
         </div>
 
@@ -308,8 +308,8 @@ export default function AnalyticsPage() {
             <span className="hidden sm:inline">Bookings</span>
           </TabsTrigger>
           <TabsTrigger value="capacity" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Capacity</span>
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Utilization</span>
           </TabsTrigger>
           <TabsTrigger value="customers" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
@@ -390,8 +390,11 @@ export default function AnalyticsPage() {
           />
         </TabsContent>
 
-        {/* Capacity Tab */}
+        {/* Utilization Tab */}
         <TabsContent value="capacity" className="space-y-6 mt-6 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+          <div className="text-sm text-muted-foreground mb-4">
+            Analyze capacity utilization patterns to optimize scheduling and pricing.
+          </div>
           <CapacityHeatmap orgSlug={slug} />
         </TabsContent>
 

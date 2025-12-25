@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
+  Zap,
   Calendar,
   ClipboardList,
-  Map,
+  Package,
   Users,
-  Flag,
-  BarChart3,
+  UsersRound,
+  TrendingUp,
   Settings,
   LucideIcon,
   ChevronsLeft,
@@ -36,16 +36,16 @@ interface NavItem {
   badge?: number;
 }
 
-// Flat navigation with keyboard shortcuts
+// Time-centric navigation with keyboard shortcuts
 // Icons chosen for instant recognition
 const navItems: NavItem[] = [
-  { name: "Dashboard", href: "", icon: LayoutDashboard, shortcut: "1" },
+  { name: "Today", href: "", icon: Zap, shortcut: "1" },
   { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "2" },
   { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "3" },
-  { name: "Tours", href: "/tours", icon: Map, shortcut: "4" },
+  { name: "Catalog", href: "/tours", icon: Package, shortcut: "4" },
   { name: "Customers", href: "/customers", icon: Users, shortcut: "5" },
-  { name: "Guides", href: "/guides", icon: Flag, shortcut: "6" },
-  { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "7" },
+  { name: "Team", href: "/guides", icon: UsersRound, shortcut: "6" },
+  { name: "Insights", href: "/analytics", icon: TrendingUp, shortcut: "7" },
 ];
 
 interface SidebarNavProps {

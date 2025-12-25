@@ -1,6 +1,7 @@
 export { StatCard } from "./StatCard";
 export { ActivityFeed } from "./ActivityFeed";
 export { TodaySchedule } from "./TodaySchedule";
+export { TodayTourRuns } from "./TodayTourRuns";
 export { MetricCard } from "./MetricCard";
 export { SimpleChart } from "./SimpleChart";
 export { ActionableAlert, AlertsPanel } from "./actionable-alert";

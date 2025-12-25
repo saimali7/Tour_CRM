@@ -17,6 +17,9 @@ import {
   DollarSign,
   Users,
   Percent,
+  Package,
+  CalendarClock,
+  Briefcase,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -262,31 +265,60 @@ export default function PromoCodesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Promo Codes</h1>
-          <p className="text-muted-foreground mt-1">Create and manage discount codes</p>
+      {/* Header: Catalog Title + Tabs + Create Code */}
+      <header className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-foreground">Catalog</h1>
+          <div className="flex items-center gap-3">
+            {saveSuccess && (
+              <div className="flex items-center gap-2 text-success bg-success/10 px-4 py-2 rounded-lg">
+                <CheckCircle className="h-4 w-4" />
+                <span className="text-sm">Success</span>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                resetForm();
+                setEditingId(null);
+                setShowModal(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Create Code
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          {saveSuccess && (
-            <div className="flex items-center gap-2 text-success bg-success/10 px-4 py-2 rounded-lg">
-              <CheckCircle className="h-4 w-4" />
-              <span className="text-sm">Success</span>
-            </div>
-          )}
-          <button
-            onClick={() => {
-              resetForm();
-              setEditingId(null);
-              setShowModal(true);
-            }}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+
+        {/* Catalog Tabs */}
+        <nav className="flex items-center gap-1 border-b border-border -mb-px">
+          <Link
+            href={`/org/${slug}/tours` as Route}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors -mb-px"
           >
-            <Plus className="h-4 w-4" />
-            Create Code
+            <Package className="h-4 w-4" />
+            Tours
+          </Link>
+          <Link
+            href={`/org/${slug}/services` as Route}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors -mb-px"
+          >
+            <Briefcase className="h-4 w-4" />
+            Services
+          </Link>
+          <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-foreground -mb-px">
+            <Tag className="h-4 w-4" />
+            Pricing
           </button>
-        </div>
-      </div>
+          <Link
+            href={`/org/${slug}/availability` as Route}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors -mb-px"
+          >
+            <CalendarClock className="h-4 w-4" />
+            Schedules
+          </Link>
+        </nav>
+      </header>
 
       {/* Stats */}
       {stats && (

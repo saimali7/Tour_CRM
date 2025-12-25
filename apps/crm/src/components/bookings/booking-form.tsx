@@ -12,7 +12,7 @@ interface BookingFormProps {
   booking?: {
     id: string;
     customerId: string;
-    scheduleId: string;
+    scheduleId: string | null;
     adultCount: number;
     childCount: number | null;
     infantCount: number | null;

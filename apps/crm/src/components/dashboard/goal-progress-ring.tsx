@@ -111,8 +111,8 @@ export function GoalProgressRing({ className, orgSlug }: GoalProgressRingProps) 
               className={cn(
                 "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
                 primaryGoal.isOnTrack
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
-                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
               )}
             >
               {primaryGoal.isOnTrack ? "On Track" : "Behind"}

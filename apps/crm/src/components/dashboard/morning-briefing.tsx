@@ -203,8 +203,8 @@ ${todaySchedules?.map((s) => `- ${format(new Date(s.startsAt), "h:mm a")} - ${s.
     return (
       <div className="card-info rounded-xl p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-            <Sun className="h-5 w-5 text-blue-700 dark:text-blue-400" />
+          <div className="p-2 bg-muted rounded-lg">
+            <Sun className="h-5 w-5 text-blue-500 dark:text-blue-400" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -227,8 +227,8 @@ ${todaySchedules?.map((s) => `- ${format(new Date(s.startsAt), "h:mm a")} - ${s.
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-            <Sun className="h-5 w-5 text-blue-700 dark:text-blue-400" />
+          <div className="p-2 bg-muted rounded-lg">
+            <Sun className="h-5 w-5 text-blue-500 dark:text-blue-400" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">

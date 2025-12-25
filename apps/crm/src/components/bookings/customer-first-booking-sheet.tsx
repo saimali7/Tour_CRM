@@ -130,15 +130,15 @@ function getBadgeIcon(badge?: string | null) {
 function getBadgeColor(badge?: string | null) {
   switch (badge) {
     case "BEST_VALUE":
-      return "bg-emerald-100 text-emerald-700";
+      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
     case "RECOMMENDED":
       return "bg-primary/10 text-primary";
     case "BEST_FOR_FAMILIES":
-      return "bg-pink-100 text-pink-700";
+      return "bg-pink-500/10 text-pink-600 dark:text-pink-400";
     case "LUXURY":
-      return "bg-amber-100 text-amber-700";
+      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
     case "SAVE_MONEY":
-      return "bg-green-100 text-green-700";
+      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
     default:
       return "bg-muted text-muted-foreground";
   }

@@ -329,42 +329,59 @@ export default function GuidesPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header: Title + Inline Stats + Add Guide */}
-      <header className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
-          <h1 className="text-lg font-semibold text-foreground">Guides</h1>
-          {/* Inline Stats */}
-          {stats && (
-            <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
-              <span>
-                <span className="font-medium text-foreground">{stats.total}</span> total
-              </span>
-              <span className="text-border">·</span>
-              <span>
-                <span className="font-medium text-emerald-600">{stats.active}</span> active
-              </span>
-              {stats.onLeave > 0 && (
-                <>
-                  <span className="text-border">·</span>
-                  <span>
-                    <span className="font-medium text-yellow-600">{stats.onLeave}</span> on leave
-                  </span>
-                </>
-              )}
-            </div>
-          )}
+      {/* Header: Team Title + Tabs + Add Guide */}
+      <header className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-6">
+            <h1 className="text-lg font-semibold text-foreground">Team</h1>
+            {/* Inline Stats */}
+            {stats && (
+              <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
+                <span>
+                  <span className="font-medium text-foreground">{stats.total}</span> total
+                </span>
+                <span className="text-border">·</span>
+                <span>
+                  <span className="font-medium text-emerald-600">{stats.active}</span> active
+                </span>
+                {stats.onLeave > 0 && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span>
+                      <span className="font-medium text-yellow-600">{stats.onLeave}</span> on leave
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <Link
+            href={`/org/${slug}/guides/new` as Route}
+            className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors group"
+          >
+            <Users className="h-4 w-4" />
+            Add Guide
+            <kbd className="hidden group-hover:inline-flex ml-1.5 px-1.5 py-0.5 text-[10px] font-mono bg-primary-foreground/20 rounded">
+              ⌘N
+            </kbd>
+          </Link>
         </div>
 
-        <Link
-          href={`/org/${slug}/guides/new` as Route}
-          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors group"
-        >
-          <Users className="h-4 w-4" />
-          Add Guide
-          <kbd className="hidden group-hover:inline-flex ml-1.5 px-1.5 py-0.5 text-[10px] font-mono bg-primary-foreground/20 rounded">
-            ⌘N
-          </kbd>
-        </Link>
+        {/* Team Tabs */}
+        <nav className="flex items-center gap-1 border-b border-border -mb-px">
+          <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-foreground -mb-px">
+            <Users className="h-4 w-4" />
+            Guides
+          </button>
+          <button
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground cursor-not-allowed opacity-50 -mb-px"
+            disabled
+            title="Coming soon"
+          >
+            Staff
+          </button>
+        </nav>
       </header>
 
       {/* Filters */}

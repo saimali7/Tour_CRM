@@ -28,6 +28,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { Customer360Sheet } from "@/components/customers/customer-360-sheet";
+import { AddCustomerSheet } from "@/components/customers/add-customer-sheet";
 import { CustomerMobileCard, CustomerMobileCardSkeleton } from "@/components/customers/customer-mobile-card";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useHotkeys, useKeyboardNavigation } from "@/hooks/use-keyboard-navigation";
@@ -106,6 +107,7 @@ export default function CustomersPage() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [visibleColumns, setVisibleColumns] = useLocalStorage<ColumnId[]>(
     "customers-visible-columns",
     DEFAULT_VISIBLE_COLUMNS
@@ -189,12 +191,13 @@ export default function CustomersPage() {
   // Global keyboard shortcuts
   useHotkeys({
     "/": () => searchInputRef.current?.focus(),
-    "n": () => router.push(`/org/${slug}/customers/new` as Route),
+    "n": () => setShowAddCustomer(true),
     "escape": () => {
       setSelectedCustomerId(null);
+      setShowAddCustomer(false);
       searchInputRef.current?.blur();
     },
-  }, { enabled: !selectedCustomerId });
+  }, { enabled: !selectedCustomerId && !showAddCustomer });
 
   const deleteMutation = trpc.customer.delete.useMutation({
     onSuccess: () => {
@@ -344,23 +347,23 @@ export default function CustomersPage() {
             </div>
           )}
           {/* Mobile Add button */}
-          <Link
-            href={`/org/${slug}/customers/new` as Route}
+          <button
+            onClick={() => setShowAddCustomer(true)}
             className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-target"
             aria-label="Add customer"
           >
             <UserPlus className="h-5 w-5" />
-          </Link>
+          </button>
         </div>
 
         {/* Desktop Add button */}
-        <Link
-          href={`/org/${slug}/customers/new` as Route}
+        <button
+          onClick={() => setShowAddCustomer(true)}
           className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <UserPlus className="h-4 w-4" />
           Add Customer
-        </Link>
+        </button>
       </header>
 
       {/* Mobile Stats Row */}
@@ -816,6 +819,16 @@ export default function CustomersPage() {
           onOpenChange={(open) => !open && setSelectedCustomerId(null)}
         />
       )}
+
+      {/* Add Customer Sheet */}
+      <AddCustomerSheet
+        open={showAddCustomer}
+        onOpenChange={setShowAddCustomer}
+        onSuccess={(customer) => {
+          // Optionally navigate to the new customer or show their 360 view
+          setSelectedCustomerId(customer.id);
+        }}
+      />
     </div>
   );
 }

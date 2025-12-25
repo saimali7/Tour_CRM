@@ -39,6 +39,14 @@ import { GoalService } from "./goal-service";
 // Booking System v2: Customer-first booking with options
 import { BookingOptionService } from "./booking-option-service";
 import { AvailabilityService } from "./availability-service";
+// Availability-based scheduling (replaces schedules)
+import { TourAvailabilityService } from "./tour-availability-service";
+import { TourRunService } from "./tour-run-service";
+// Product catalog
+import { ProductService } from "./product-service";
+import { CatalogService } from "./catalog-service";
+// Booking items (multi-product bookings)
+import { BookingItemService } from "./booking-item-service";
 
 export interface Services {
   tour: TourService;
@@ -81,6 +89,14 @@ export interface Services {
   // Booking System v2: Customer-first booking
   bookingOption: BookingOptionService;
   availability: AvailabilityService;
+  // Availability-based scheduling (replaces schedules)
+  tourAvailability: TourAvailabilityService;
+  tourRun: TourRunService;
+  // Product catalog
+  product: ProductService;
+  catalogService: CatalogService;
+  // Booking items (multi-product bookings)
+  bookingItem: BookingItemService;
 }
 
 /**
@@ -135,6 +151,14 @@ export function createServices(ctx: ServiceContext): Services {
     // Booking System v2: Customer-first booking
     bookingOption: new BookingOptionService(ctx),
     availability: new AvailabilityService(ctx),
+    // Availability-based scheduling (replaces schedules)
+    tourAvailability: new TourAvailabilityService(ctx),
+    tourRun: new TourRunService(ctx),
+    // Product catalog
+    product: new ProductService(ctx),
+    catalogService: new CatalogService(ctx),
+    // Booking items (multi-product bookings)
+    bookingItem: new BookingItemService(ctx),
   };
 }
 
@@ -185,6 +209,26 @@ export type {
 // Booking System v2: Customer-first booking
 export { BookingOptionService } from "./booking-option-service";
 export { AvailabilityService } from "./availability-service";
+// Availability-based scheduling (replaces schedules)
+export { TourAvailabilityService } from "./tour-availability-service";
+export { TourRunService } from "./tour-run-service";
+// Product catalog
+export { ProductService } from "./product-service";
+export { CatalogService } from "./catalog-service";
+// Booking items (multi-product bookings)
+export { BookingItemService } from "./booking-item-service";
+export type {
+  BookingItemWithProduct,
+  AddBookingItemInput,
+  UpdateBookingItemInput,
+} from "./booking-item-service";
+export type {
+  ServiceFilters,
+  ServiceSortField,
+  CatalogServiceWithProduct,
+  CreateCatalogServiceInput,
+  UpdateCatalogServiceInput,
+} from "./catalog-service";
 export type {
   CreateBookingOptionInput,
   UpdateBookingOptionInput,
@@ -197,12 +241,45 @@ export type {
   SchedulingInfo,
   BadgeType,
 } from "./availability-service";
+export type {
+  SlotAvailabilityCheck,
+  SlotAvailabilityResult,
+  DateSlot,
+  AvailableDate,
+  MonthAvailability,
+  CapacityHeatmapEntry,
+  DateRange,
+  TourAvailabilityConfig,
+  CreateAvailabilityWindowInput,
+  UpdateAvailabilityWindowInput,
+  CreateDepartureTimeInput,
+  UpdateDepartureTimeInput,
+  CreateBlackoutDateInput,
+} from "./tour-availability-service";
+export type {
+  TourRun,
+  TourRunBooking,
+  TourRunGuide,
+  TourRunManifest,
+  TourRunFilters,
+  TodayTourRunsResult,
+  // Note: ManifestBooking and ManifestParticipant exported from tour-run-service
+  // use different types than those from manifest-service for backwards compat
+  ManifestBooking as TourRunManifestBooking,
+  ManifestParticipant as TourRunManifestParticipant,
+} from "./tour-run-service";
 // Pricing Calculator utilities (stateless)
 export * from "./pricing-calculator-service";
 
 // Export types
 export * from "./types";
 export type { TourFilters, CreateTourInput, UpdateTourInput } from "./tour-service";
+export type {
+  ProductFilters,
+  ProductSortField,
+  CreateProductInput,
+  UpdateProductInput,
+} from "./product-service";
 export type {
   ScheduleFilters,
   ScheduleWithRelations,
@@ -295,6 +372,7 @@ export type {
 export type {
   ManifestParticipant,
   ManifestBooking,
+  ManifestBookingItem,
   ScheduleManifest,
   GuideManifestSummary,
   DateManifestSummary,

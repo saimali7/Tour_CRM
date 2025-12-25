@@ -133,31 +133,33 @@ function ActionCard({
 }: ActionCardData) {
   // shadcn-style: White background with colored left border accent
   // Uses CSS variables which respect the app's dark mode class
+  // Clean, professional icon styling - neutral backgrounds with semantic icon colors
+  // The icon color alone conveys meaning, avoiding garish colored backgrounds
   const variantStyles = {
     danger: {
       container: "bg-card border border-border",
-      icon: "bg-red-100 text-red-600",
+      icon: "bg-muted text-red-500 dark:text-red-400",
       value: "text-foreground",
       label: "text-muted-foreground",
       urgent: true,
     },
     warning: {
       container: "bg-card border border-border",
-      icon: "bg-amber-100 text-amber-600",
+      icon: "bg-muted text-amber-500 dark:text-amber-400",
       value: "text-foreground",
       label: "text-muted-foreground",
       urgent: false,
     },
     info: {
       container: "bg-card border border-border",
-      icon: "bg-blue-100 text-blue-600",
+      icon: "bg-muted text-blue-500 dark:text-blue-400",
       value: "text-foreground",
       label: "text-muted-foreground",
       urgent: false,
     },
     success: {
       container: "bg-card border border-border",
-      icon: "bg-emerald-100 text-emerald-600",
+      icon: "bg-muted text-emerald-500 dark:text-emerald-400",
       value: "text-foreground",
       label: "text-muted-foreground",
       urgent: false,

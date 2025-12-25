@@ -159,7 +159,7 @@ export default function CustomerDetailPage() {
     return "text-red-600";
   };
 
-  const handleRebook = (booking: { tourId?: string | null; scheduleId: string }) => {
+  const handleRebook = (booking: { tourId?: string | null; scheduleId?: string | null }) => {
     // Open booking sheet with customer pre-selected
     openQuickBooking({ customerId, tourId: booking.tourId ?? undefined });
   };

@@ -1,7 +1,7 @@
 "use client";
 
 import { trpc } from "@/lib/trpc";
-import { Edit, Trash2, Eye, Archive, Check, Copy, Plus, Calendar, Clock, Users, DollarSign, ChevronRight, MoreHorizontal, CalendarPlus, AlertTriangle, Loader2 } from "lucide-react";
+import { Edit, Trash2, Eye, Archive, Check, Copy, Plus, Calendar, Clock, Users, DollarSign, ChevronRight, MoreHorizontal, CalendarPlus, AlertTriangle, Loader2, Package, Tag, CalendarClock, Briefcase } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
@@ -122,27 +122,58 @@ export default function ToursPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header: Title + Inline Stats + Create Tour */}
-      <header className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
-          <h1 className="text-lg font-semibold text-foreground">Tours</h1>
-          {/* Inline Stats */}
-          {stats && (
-            <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
-              <span><span className="font-medium text-foreground">{stats.active}</span> active</span>
-              <span><span className="font-medium text-amber-600">{stats.draft}</span> draft</span>
-              <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
-            </div>
-          )}
+      {/* Header: Catalog Title + Tabs + Create Tour */}
+      <header className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-6">
+            <h1 className="text-lg font-semibold text-foreground">Catalog</h1>
+            {/* Inline Stats */}
+            {stats && (
+              <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
+                <span><span className="font-medium text-foreground">{stats.active}</span> active</span>
+                <span><span className="font-medium text-amber-600">{stats.draft}</span> draft</span>
+                <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
+              </div>
+            )}
+          </div>
+
+          <Link
+            href={`/org/${slug}/tours/new` as Route}
+            className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Create Tour
+          </Link>
         </div>
 
-        <Link
-          href={`/org/${slug}/tours/new` as Route}
-          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Create Tour
-        </Link>
+        {/* Catalog Tabs */}
+        <nav className="flex items-center gap-1 border-b border-border -mb-px">
+          <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-foreground -mb-px">
+            <Package className="h-4 w-4" />
+            Tours
+          </button>
+          <Link
+            href={`/org/${slug}/services` as Route}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors -mb-px"
+          >
+            <Briefcase className="h-4 w-4" />
+            Services
+          </Link>
+          <Link
+            href={`/org/${slug}/promo-codes` as Route}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors -mb-px"
+          >
+            <Tag className="h-4 w-4" />
+            Pricing
+          </Link>
+          <Link
+            href={`/org/${slug}/availability` as Route}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors -mb-px"
+          >
+            <CalendarClock className="h-4 w-4" />
+            Schedules
+          </Link>
+        </nav>
       </header>
 
       {/* Compact Filter Bar */}
@@ -165,14 +196,6 @@ export default function ToursPage() {
           ))}
         </div>
 
-        {/* Calendar Link */}
-        <Link
-          href={`/org/${slug}/calendar` as Route}
-          className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Calendar className="h-4 w-4" />
-          View Calendar
-        </Link>
       </div>
 
       {/* Tour Cards Grid */}

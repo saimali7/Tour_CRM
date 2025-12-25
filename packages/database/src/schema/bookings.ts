@@ -1,9 +1,10 @@
-import { pgTable, text, timestamp, integer, numeric, jsonb, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, numeric, jsonb, index, unique, date } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { customers } from "./customers";
 import { schedules } from "./schedules";
+import { tours } from "./tours";
 
 // Bookings - Customer reservations (org-scoped)
 export const bookings = pgTable("bookings", {
@@ -22,10 +23,21 @@ export const bookings = pgTable("bookings", {
     .notNull()
     .references(() => customers.id, { onDelete: "restrict" }),
 
-  // Schedule
+  // Schedule (DEPRECATED - use tourId, bookingDate, bookingTime instead)
+  // Made nullable for migration - will be removed after migration complete
   scheduleId: text("schedule_id")
-    .notNull()
     .references(() => schedules.id, { onDelete: "restrict" }),
+
+  // =========================================================================
+  // NEW AVAILABILITY-BASED BOOKING FIELDS
+  // =========================================================================
+  // Direct tour reference (replaces going through schedule)
+  tourId: text("tour_id")
+    .references(() => tours.id, { onDelete: "restrict" }),
+
+  // Booking date and time (replaces schedule.startsAt)
+  bookingDate: date("booking_date", { mode: "date" }),
+  bookingTime: text("booking_time"), // HH:MM format, e.g., "09:00"
 
   // Booking Option (nullable for backward compatibility)
   bookingOptionId: text("booking_option_id"),
@@ -106,6 +118,11 @@ export const bookings = pgTable("bookings", {
   createdAtIdx: index("bookings_created_at_idx").on(table.createdAt),
   orgStatusCreatedIdx: index("bookings_org_status_created_idx").on(table.organizationId, table.status, table.createdAt),
   optionIdx: index("bookings_option_idx").on(table.bookingOptionId),
+  // NEW: Indexes for availability-based booking model
+  tourIdx: index("bookings_tour_idx").on(table.tourId),
+  bookingDateIdx: index("bookings_booking_date_idx").on(table.bookingDate),
+  // Composite index for capacity computation (tour run lookups)
+  tourDateTimeIdx: index("bookings_tour_date_time_idx").on(table.organizationId, table.tourId, table.bookingDate, table.bookingTime),
 }));
 
 // Booking participants - Individual people on a booking
@@ -159,9 +176,15 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     fields: [bookings.customerId],
     references: [customers.id],
   }),
+  // DEPRECATED: Schedule relation (use tour instead)
   schedule: one(schedules, {
     fields: [bookings.scheduleId],
     references: [schedules.id],
+  }),
+  // NEW: Direct tour relation for availability-based model
+  tour: one(tours, {
+    fields: [bookings.tourId],
+    references: [tours.id],
   }),
   participants: many(bookingParticipants),
   // Note: payments relation added in payments.ts to avoid circular dependencies

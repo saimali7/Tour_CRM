@@ -215,9 +215,9 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
                       <div
                         className={cn(
                           "p-1.5 rounded-md",
-                          insight.type === "warning" && "bg-amber-100 dark:bg-amber-900/40",
-                          insight.type === "opportunity" && "bg-blue-100 dark:bg-blue-900/40",
-                          insight.type === "success" && "bg-emerald-100 dark:bg-emerald-900/40",
+                          insight.type === "warning" && "bg-muted",
+                          insight.type === "opportunity" && "bg-muted",
+                          insight.type === "success" && "bg-muted",
                           insight.type === "info" && "bg-muted"
                         )}
                       >

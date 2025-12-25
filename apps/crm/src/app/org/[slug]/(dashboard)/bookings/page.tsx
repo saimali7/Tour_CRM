@@ -11,8 +11,6 @@ import {
   Mail,
   RefreshCw,
   Zap,
-  Filter,
-  ChevronDown,
   Loader2,
 } from "lucide-react";
 import Link from "next/link";
@@ -57,6 +55,12 @@ import { useQuickBookingContext } from "@/components/bookings/quick-booking-prov
 import { BookingMobileCard, BookingMobileCardSkeleton } from "@/components/bookings/booking-mobile-card";
 import { useIsMobile } from "@/hooks/use-media-query";
 
+// New view-based components
+import { BookingViewTabs } from "@/components/bookings/booking-view-tabs";
+import { NeedsActionView, TodayView, UpcomingView } from "@/components/bookings/views";
+import { BookingPlanner } from "@/components/availability/booking-planner";
+
+type BookingView = "needs-action" | "upcoming" | "today" | "all" | "find-availability";
 type StatusFilter = "all" | "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 type PaymentFilter = "all" | "pending" | "partial" | "paid" | "refunded" | "failed";
 
@@ -84,6 +88,124 @@ export default function BookingsPage() {
   const router = useRouter();
   const slug = params.slug as string;
   const isMobile = useIsMobile();
+  const { openQuickBooking } = useQuickBookingContext();
+
+  // Get active view from URL or default to "all"
+  const viewParam = searchParams.get("view") as BookingView | null;
+  const activeView: BookingView = viewParam && ["needs-action", "upcoming", "today", "all", "find-availability"].includes(viewParam)
+    ? viewParam
+    : "all";
+
+  // Handle view change
+  const handleViewChange = useCallback((view: BookingView) => {
+    // View change is handled by BookingViewTabs via URL
+  }, []);
+
+  // Auto-open quick booking from URL param (e.g., from command palette or dashboard)
+  useEffect(() => {
+    if (searchParams.get("phone") === "1" || searchParams.get("quick") === "1") {
+      openQuickBooking();
+      // Remove the query param to prevent re-opening on refresh
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("phone");
+      params.delete("quick");
+      router.replace(`/org/${slug}/bookings${params.toString() ? `?${params.toString()}` : ""}` as Route, { scroll: false });
+    }
+  }, [searchParams, router, slug, openQuickBooking]);
+
+  // Fetch counts for tabs
+  const { data: urgencyData } = trpc.booking.getGroupedByUrgency.useQuery(undefined, {
+    staleTime: 30000, // 30 seconds
+  });
+
+  const { data: upcomingData } = trpc.booking.getUpcoming.useQuery({ days: 7 }, {
+    staleTime: 30000,
+  });
+
+  const { data: todayData } = trpc.booking.getTodayWithUrgency.useQuery(undefined, {
+    staleTime: 30000,
+  });
+
+  const tabCounts = useMemo(() => ({
+    needsAction: urgencyData?.stats.needsAction ?? 0,
+    upcoming: upcomingData?.stats.totalBookings ?? 0,
+    today: todayData?.stats.total ?? 0,
+  }), [urgencyData, upcomingData, todayData]);
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      {/* Header: Title + Quick Book */}
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <h1 className="text-lg font-semibold text-foreground">Bookings</h1>
+          {/* Inline summary for needs action view */}
+          {activeView === "needs-action" && urgencyData?.stats.critical && urgencyData.stats.critical > 0 && (
+            <span className="hidden sm:flex items-center gap-1.5 text-sm text-red-600 font-medium animate-pulse">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+              </span>
+              {urgencyData.stats.critical} critical
+            </span>
+          )}
+        </div>
+
+        {/* Quick Book buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openQuickBooking()}
+            className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-target"
+            aria-label="Quick book"
+          >
+            <Zap className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => openQuickBooking()}
+            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Zap className="h-4 w-4" />
+            Quick Book
+            <kbd className="hidden md:inline-flex text-primary-foreground/70 text-xs ml-1 px-1.5 py-0.5 rounded bg-primary-foreground/10 font-mono">⌘B</kbd>
+          </button>
+        </div>
+      </header>
+
+      {/* View Tabs */}
+      <BookingViewTabs
+        activeView={activeView}
+        onViewChange={handleViewChange}
+        counts={tabCounts}
+      />
+
+      {/* View Content */}
+      {activeView === "needs-action" && <NeedsActionView orgSlug={slug} />}
+      {activeView === "upcoming" && <UpcomingView orgSlug={slug} />}
+      {activeView === "today" && <TodayView orgSlug={slug} />}
+      {activeView === "all" && <AllBookingsView slug={slug} isMobile={isMobile} openQuickBooking={openQuickBooking} />}
+      {activeView === "find-availability" && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Search for available tour slots to help customers find the perfect time.
+          </p>
+          <BookingPlanner orgSlug={slug} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// ALL BOOKINGS VIEW (Original Table View)
+// =============================================================================
+
+interface AllBookingsViewProps {
+  slug: string;
+  isMobile: boolean;
+  openQuickBooking: () => void;
+}
+
+function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewProps) {
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
@@ -96,21 +218,7 @@ export default function BookingsPage() {
   const [bulkCancelReason, setBulkCancelReason] = useState("");
   const [showBulkRescheduleModal, setShowBulkRescheduleModal] = useState(false);
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
-  const { openQuickBooking } = useQuickBookingContext();
 
-  // Auto-open quick booking from URL param (e.g., from command palette or dashboard)
-  useEffect(() => {
-    if (searchParams.get("phone") === "1" || searchParams.get("quick") === "1") {
-      openQuickBooking();
-      // Remove the query param to prevent re-opening on refresh
-      router.replace(`/org/${slug}/bookings`, { scroll: false });
-    }
-  }, [searchParams, router, slug, openQuickBooking]);
-
-  // Keyboard shortcut Cmd+B is handled by QuickBookingProvider
-
-  // Toggle filters visibility
-  const [showFilters, setShowFilters] = useState(false);
   const hasActiveFilters = statusFilter !== "all" || paymentFilter !== "all" || search !== "";
 
   const { data, isLoading, error } = trpc.booking.list.useQuery({
@@ -136,6 +244,13 @@ export default function BookingsPage() {
     bulkCancel: bulkCancelMutationBase,
   } = useBookingOptimisticMutations();
 
+  // Selection hook - memoize getItemId to prevent recreation
+  const getItemId = useCallback((item: { id: string }) => item.id, []);
+  const selection = useTableSelection({
+    items: data?.data ?? [],
+    getItemId,
+  });
+
   // Wrap bulk mutations to handle selection clearing and dialog state
   const bulkConfirmMutation = {
     ...bulkConfirmMutationBase,
@@ -160,13 +275,6 @@ export default function BookingsPage() {
       });
     },
   };
-
-  // Selection hook - memoize getItemId to prevent recreation
-  const getItemId = useCallback((item: { id: string }) => item.id, []);
-  const selection = useTableSelection({
-    items: data?.data ?? [],
-    getItemId,
-  });
 
   // Bulk actions
   const bulkActions = useMemo(() => {
@@ -312,53 +420,20 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Header: Title + Stats + Quick Book - Responsive */}
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6">
-          <h1 className="text-lg font-semibold text-foreground">Bookings</h1>
-          {/* Inline Stats - Hidden on mobile */}
-          {stats && (
-            <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
-              <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
-              <span><span className="font-medium text-amber-600">{stats.pending}</span> pending</span>
-              <span><span className="font-medium text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span> revenue</span>
-              <span className="hidden lg:inline"><span className="font-medium text-foreground">{stats.participantCount}</span> guests</span>
-            </div>
-          )}
-          {/* Mobile Quick Book button */}
-          <button
-            onClick={() => openQuickBooking()}
-            className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-target"
-            aria-label="Quick book"
-          >
-            <Zap className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Desktop Quick Book button */}
-        <button
-          onClick={() => openQuickBooking()}
-          className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Zap className="h-4 w-4" />
-          Quick Book
-          <span className="hidden md:inline text-primary-foreground/70 text-xs ml-1">B</span>
-        </button>
-      </header>
-
-      {/* Mobile Stats Row */}
+    <div className="space-y-4">
+      {/* Stats Row */}
       {stats && (
-        <div className="sm:hidden flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
-          <div className="flex items-center gap-4 text-xs">
-            <span><span className="font-semibold text-foreground">{stats.total}</span> <span className="text-muted-foreground">total</span></span>
-            <span><span className="font-semibold text-amber-600">{stats.pending}</span> <span className="text-muted-foreground">pending</span></span>
-            <span className="font-semibold text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span>
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-5 text-sm text-muted-foreground">
+            <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
+            <span><span className="font-medium text-amber-600">{stats.pending}</span> pending</span>
+            <span><span className="font-medium text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span> revenue</span>
+            <span className="hidden lg:inline"><span className="font-medium text-foreground">{stats.participantCount}</span> guests</span>
           </div>
         </div>
       )}
 
-      {/* Filter Bar - Responsive */}
+      {/* Filter Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3" role="search" aria-label="Filter bookings">
         {/* Search */}
         <div className="relative flex-1">

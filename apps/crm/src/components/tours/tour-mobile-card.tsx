@@ -139,7 +139,7 @@ export function TourMobileCard({
               className={cn(
                 'flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
                 isActive
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                   : 'bg-muted text-muted-foreground'
               )}
             >

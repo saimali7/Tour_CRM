@@ -1084,9 +1084,9 @@ export function UnifiedBookingSheet({
                   <label className="text-sm font-medium text-foreground">Guests</label>
                   <span className={cn(
                     "text-xs font-medium px-2 py-1 rounded-full",
-                    availableSpots > 5 ? "bg-emerald-100 text-emerald-700" :
-                      availableSpots > 0 ? "bg-orange-100 text-orange-700" :
-                        "bg-red-100 text-red-700"
+                    availableSpots > 5 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                      availableSpots > 0 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" :
+                        "bg-red-500/10 text-red-600 dark:text-red-400"
                   )}>
                     {availableSpots} spots left
                   </span>

@@ -1127,8 +1127,10 @@ export class ScheduleService extends BaseService {
     const bookingToSchedule = new Map<string, string>();
     const bookingIds: string[] = [];
     for (const booking of scheduleBookings) {
-      bookingToSchedule.set(booking.id, booking.scheduleId);
-      bookingIds.push(booking.id);
+      if (booking.scheduleId) {
+        bookingToSchedule.set(booking.id, booking.scheduleId);
+        bookingIds.push(booking.id);
+      }
     }
 
     // Get all assignments for these bookings

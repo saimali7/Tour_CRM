@@ -5,8 +5,9 @@ export * from "./organizations";
 export * from "./users";
 export * from "./customers";
 export * from "./tours";
+export * from "./tour-availability"; // NEW: Availability-based scheduling
 export * from "./guides";
-export * from "./schedules";
+export * from "./schedules"; // DEPRECATED: Will be removed after migration
 export * from "./bookings";
 export * from "./activity-logs";
 export * from "./refunds";
@@ -36,3 +37,8 @@ export * from "./goals";
 
 // Booking System v2: Customer-first booking with options
 export * from "./booking-options";
+
+// Products & Services
+export * from "./products";
+export * from "./services";
+export * from "./booking-items";

@@ -295,8 +295,8 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
                       customers need attention
                     </p>
                   </div>
-                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                    <UserCheck className="h-5 w-5 text-blue-700 dark:text-blue-400" />
+                  <div className="p-2 rounded-lg bg-muted">
+                    <UserCheck className="h-5 w-5 text-blue-500 dark:text-blue-400" />
                   </div>
                 </div>
               </div>

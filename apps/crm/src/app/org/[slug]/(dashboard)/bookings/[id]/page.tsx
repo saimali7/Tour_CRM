@@ -54,6 +54,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { QuickGuideAssignSheet } from "@/components/scheduling/quick-guide-assign-sheet";
+import { BookingItemsSection } from "@/components/bookings/booking-items-section";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -990,6 +991,9 @@ export default function BookingDetailPage() {
               </div>
             )}
           </CollapsibleSection>
+
+          {/* Services & Add-ons */}
+          <BookingItemsSection bookingId={bookingId} isAdmin={true} />
 
           {/* Guide Assignment - Collapsible */}
           <CollapsibleSection

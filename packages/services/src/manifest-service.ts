@@ -4,6 +4,7 @@ import {
   tours,
   guides,
   bookings,
+  bookingItems,
   customers,
   guideAssignments,
   type BookingParticipant,
@@ -22,6 +23,17 @@ export interface ManifestParticipant {
   dietaryRequirements: string | null;
   accessibilityNeeds: string | null;
   notes: string | null;
+}
+
+export interface ManifestBookingItem {
+  id: string;
+  productName: string;
+  productType: "tour" | "service" | "good";
+  quantity: number;
+  participants: number | null;
+  unitPrice: string;
+  totalPrice: string;
+  status: string;
 }
 
 export interface ManifestBooking {
@@ -43,6 +55,7 @@ export interface ManifestBooking {
   total: string;
   currency: string;
   participants: ManifestParticipant[];
+  items: ManifestBookingItem[];
 }
 
 export interface ScheduleManifest {
@@ -209,6 +222,35 @@ export class ManifestService extends BaseService {
       return acc;
     }, {} as Record<string, ManifestParticipant[]>);
 
+    // Get booking items (services, add-ons) for all bookings
+    let itemsByBooking: Record<string, ManifestBookingItem[]> = {};
+    if (bookingIds.length > 0) {
+      const itemResults = await this.db.query.bookingItems.findMany({
+        where: (bi, { inArray, and, eq }) => and(
+          inArray(bi.bookingId, bookingIds),
+          eq(bi.organizationId, this.organizationId)
+        ),
+      });
+
+      // Group items by booking
+      itemsByBooking = itemResults.reduce((acc, item) => {
+        if (!acc[item.bookingId]) {
+          acc[item.bookingId] = [];
+        }
+        acc[item.bookingId]!.push({
+          id: item.id,
+          productName: item.productName,
+          productType: item.productType,
+          quantity: item.quantity,
+          participants: item.participants,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          status: item.status,
+        });
+        return acc;
+      }, {} as Record<string, ManifestBookingItem[]>);
+    }
+
     // Build manifest bookings
     const manifestBookings: ManifestBooking[] = bookingResults.map((result) => ({
       id: result.booking.id,
@@ -231,6 +273,7 @@ export class ManifestService extends BaseService {
       total: result.booking.total,
       currency: result.booking.currency,
       participants: participantsByBooking[result.booking.id] || [],
+      items: itemsByBooking[result.booking.id] || [],
     }));
 
     // Get all confirmed guides for this schedule (via assignments on bookings)
@@ -352,7 +395,7 @@ export class ManifestService extends BaseService {
         )
       );
 
-    const scheduleIds = [...new Set(assignmentScheduleIds.map((a) => a.scheduleId))];
+    const scheduleIds = [...new Set(assignmentScheduleIds.map((a) => a.scheduleId).filter((id): id is string => id !== null))];
 
     if (scheduleIds.length === 0) {
       return {

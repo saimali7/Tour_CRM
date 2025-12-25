@@ -42,6 +42,12 @@ import { goalRouter } from "./goal";
 // Booking System v2: Customer-first booking
 import { bookingOptionsRouter } from "./booking-options";
 import { availabilityRouter } from "./availability";
+// Availability-based scheduling (replaces schedules)
+import { tourRunRouter } from "./tour-run";
+// Products Platform
+import { productRouter } from "./product";
+import { catalogServiceRouter } from "./catalog-service";
+import { bookingItemRouter } from "./booking-item";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -88,6 +94,12 @@ export const appRouter = createRouter({
   // Booking System v2: Customer-first booking
   bookingOptions: bookingOptionsRouter,
   availability: availabilityRouter,
+  // Availability-based scheduling (replaces schedules)
+  tourRun: tourRunRouter,
+  // Products Platform
+  product: productRouter,
+  catalogService: catalogServiceRouter,
+  bookingItem: bookingItemRouter,
 });
 
 export type AppRouter = typeof appRouter;

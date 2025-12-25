@@ -214,13 +214,13 @@ export function TomorrowPreview({
 
       {/* All Clear Message - Only show when has content but no issues */}
       {hasContent && !hasIssues && (
-        <div className="flex items-center gap-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 px-4 py-3">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex items-center gap-3 rounded-lg bg-muted border border-border px-4 py-3">
+          <CheckCircle2 className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
           <div>
-            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+            <p className="text-sm font-medium text-foreground">
               All set for tomorrow
             </p>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+            <p className="text-xs text-muted-foreground">
               All guides assigned, bookings confirmed, payments received
             </p>
           </div>
@@ -313,24 +313,25 @@ function ActionCard({
   actionHref: string;
   orgSlug: string;
 }) {
+  // Clean alert colors - subtle backgrounds with semantic icon/border colors
   const colors = {
     critical: {
-      bg: "bg-red-50 dark:bg-red-950/30",
-      border: "border-red-200 dark:border-red-800",
-      icon: "text-red-600 dark:text-red-400",
-      text: "text-red-800 dark:text-red-200",
+      bg: "bg-card",
+      border: "border-red-500/30 dark:border-red-500/20",
+      icon: "text-red-500 dark:text-red-400",
+      text: "text-foreground",
     },
     warning: {
-      bg: "bg-amber-50 dark:bg-amber-950/30",
-      border: "border-amber-200 dark:border-amber-800",
-      icon: "text-amber-600 dark:text-amber-400",
-      text: "text-amber-800 dark:text-amber-200",
+      bg: "bg-card",
+      border: "border-amber-500/30 dark:border-amber-500/20",
+      icon: "text-amber-500 dark:text-amber-400",
+      text: "text-foreground",
     },
     info: {
-      bg: "bg-blue-50 dark:bg-blue-950/30",
-      border: "border-blue-200 dark:border-blue-800",
-      icon: "text-blue-600 dark:text-blue-400",
-      text: "text-blue-800 dark:text-blue-200",
+      bg: "bg-card",
+      border: "border-blue-500/30 dark:border-blue-500/20",
+      icon: "text-blue-500 dark:text-blue-400",
+      text: "text-foreground",
     },
   };
 
@@ -355,7 +356,7 @@ function ActionCard({
           <Link
             key={item.id}
             href={item.href as Route}
-            className="flex items-center justify-between px-4 py-2 hover:bg-white/50 dark:hover:bg-white/5 transition-colors"
+            className="flex items-center justify-between px-4 py-2 hover:bg-muted/50 transition-colors"
           >
             <div className="min-w-0">
               <p className="text-sm text-foreground truncate">{item.label}</p>

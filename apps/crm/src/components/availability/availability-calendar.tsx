@@ -34,6 +34,7 @@ interface AvailabilityCalendarProps {
   schedules: Schedule[];
   currentDate: Date;
   onDateChange: (date: Date) => void;
+  onDayClick?: (date: Date) => void;
   orgSlug: string;
 }
 
@@ -121,6 +122,7 @@ export function AvailabilityCalendar({
   schedules,
   currentDate,
   onDateChange,
+  onDayClick,
   orgSlug,
 }: AvailabilityCalendarProps) {
   const [view, setView] = useState<CalendarView>("month");
@@ -197,7 +199,11 @@ export function AvailabilityCalendar({
 
   const selectDate = (date: Date) => {
     onDateChange(date);
-    if (view === "month") {
+    // If onDayClick is provided, call it to show bookings panel
+    // Otherwise, switch to day view (legacy behavior)
+    if (onDayClick) {
+      onDayClick(date);
+    } else if (view === "month") {
       setView("day");
     }
   };

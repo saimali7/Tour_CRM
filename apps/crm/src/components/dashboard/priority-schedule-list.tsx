@@ -307,8 +307,8 @@ function EmptyState({
       )}
     >
       <div className="flex justify-center mb-3">
-        <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
-          <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+        <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+          <CheckCircle2 className="h-6 w-6 text-emerald-500 dark:text-emerald-400" />
         </div>
       </div>
       <p className="text-sm font-medium text-foreground mb-1">

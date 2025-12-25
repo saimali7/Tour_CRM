@@ -17,6 +17,7 @@ const bookingFilterSchema = z.object({
   scheduleId: z.string().optional(),
   tourId: z.string().optional(),
   dateRange: dateRangeSchema.optional(),
+  scheduleDateRange: dateRangeSchema.optional(), // Filter by schedule start date (for calendar view)
   search: z.string().optional(),
 });
 
@@ -392,6 +393,29 @@ export const bookingRouter = createRouter({
   getTodaysBookings: protectedProcedure.query(async ({ ctx }) => {
     const services = createServices({ organizationId: ctx.orgContext.organizationId });
     return services.booking.getTodaysBookings();
+  }),
+
+  // Urgency-based views for "Needs Action" UI
+  getGroupedByUrgency: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.booking.getGroupedByUrgency();
+  }),
+
+  getNeedsAction: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.booking.getNeedsAction();
+  }),
+
+  getUpcoming: protectedProcedure
+    .input(z.object({ days: z.number().min(1).max(30).default(7) }))
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.booking.getUpcoming(input.days);
+    }),
+
+  getTodayWithUrgency: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.booking.getTodayWithUrgency();
   }),
 
   // Payment operations

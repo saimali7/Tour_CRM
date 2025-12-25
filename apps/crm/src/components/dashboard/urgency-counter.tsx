@@ -157,10 +157,10 @@ export function UrgencyCounter({
               className={cn(
                 "p-1.5 rounded-lg",
                 isVeryCritical
-                  ? "bg-red-100 dark:bg-red-900/50"
+                  ? "bg-muted"
                   : isCritical
-                    ? "bg-amber-100 dark:bg-amber-900/50"
-                    : "bg-blue-100 dark:bg-blue-900/50"
+                    ? "bg-muted"
+                    : "bg-muted"
               )}
             >
               <Clock

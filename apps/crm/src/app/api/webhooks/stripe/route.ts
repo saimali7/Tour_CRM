@@ -197,13 +197,15 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
     ),
   });
 
-  // Get schedule and tour details
-  const schedule = await db.query.schedules.findFirst({
-    where: eq(schedules.id, booking.scheduleId),
-    with: {
-      tour: true,
-    },
-  });
+  // Get schedule and tour details (only if booking has scheduleId)
+  const schedule = booking.scheduleId
+    ? await db.query.schedules.findFirst({
+        where: eq(schedules.id, booking.scheduleId),
+        with: {
+          tour: true,
+        },
+      })
+    : null;
 
   // Send payment confirmation email via Inngest
   if (customer?.email) {

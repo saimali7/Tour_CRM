@@ -314,10 +314,6 @@ body {
   transition: background-color 150ms ease;
 }
 
-:root table tbody tr:hover {
-  background-color: hsl(220 14% 98%);
-}
-
 /* =============================================================================
    TYPOGRAPHY UTILITIES
    Following the typography scale from design principles

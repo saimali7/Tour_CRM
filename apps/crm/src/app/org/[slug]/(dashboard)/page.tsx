@@ -42,6 +42,8 @@ import { UnassignedToursPanel } from "@/components/dashboard/UnassignedToursPane
 import { BookingsNeedingGuides } from "@/components/dashboard/BookingsNeedingGuides";
 import { TodayBookings } from "@/components/dashboard/TodayBookings";
 import { TomorrowPreview } from "@/components/dashboard/TomorrowPreview";
+import { TodayTourRuns } from "@/components/dashboard/TodayTourRuns";
+import { MorningBriefing } from "@/components/dashboard/morning-briefing";
 
 // =============================================================================
 // TYPES
@@ -300,13 +302,15 @@ export default function DashboardPage() {
           COMPACT HEADER - Date, Stats, Metrics, Action
           ================================================================ */}
       <header className="space-y-3">
-        {/* Top row: Greeting + Quick Book - Responsive */}
+        {/* Top row: Today header + Quick Book - Responsive */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
             <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-              {format(new Date(), "EEEE, MMM d")}
+              Today
             </h1>
-            <span className="text-xs sm:text-sm text-muted-foreground font-medium">{greeting}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground font-medium">
+              {format(new Date(), "EEEE, MMM d")} · {greeting}
+            </span>
           </div>
           {/* Desktop button */}
           <button
@@ -326,95 +330,12 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Revenue Hero Card - shadcn style: white bg, colored border accent */}
-        {isLoading ? (
-          <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="h-3 w-20 skeleton rounded" />
-                <div className="h-8 w-28 skeleton rounded" />
-              </div>
-              <div className="text-right space-y-2">
-                <div className="h-3 w-16 skeleton rounded ml-auto" />
-                <div className="h-6 w-20 skeleton rounded" />
-              </div>
-            </div>
-          </div>
-        ) : revenueMetrics && (
-          <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  Today&apos;s Revenue
-                </p>
-                <p className="text-3xl font-bold text-foreground tabular-nums tracking-tight">
-                  {formatCurrency(revenueMetrics.todayRevenue)}
-                </p>
-                {revenueMetrics.todayChange !== 0 && (
-                  <p className={cn(
-                    "text-sm font-medium mt-1 flex items-center gap-1",
-                    revenueMetrics.todayChange > 0 ? "text-emerald-600" : "text-red-500"
-                  )}>
-                    {revenueMetrics.todayChange > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                    {revenueMetrics.todayChange > 0 && "+"}{revenueMetrics.todayChange.toFixed(0)}% vs yesterday
-                  </p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground mb-1">This Week</p>
-                <p className="text-xl font-semibold text-foreground tabular-nums">
-                  {formatCurrency(revenueMetrics.weekRevenue)}
-                </p>
-                {revenueMetrics.weekChange !== 0 && (
-                  <p className={cn(
-                    "text-xs font-medium mt-0.5",
-                    revenueMetrics.weekChange > 0 ? "text-emerald-600" : "text-red-500"
-                  )}>
-                    {revenueMetrics.weekChange > 0 && "+"}{revenueMetrics.weekChange.toFixed(0)}% vs last week
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Bottom row: Stats from ACTUAL BOOKINGS */}
-        <div className="flex flex-wrap items-center gap-3 sm:gap-6 py-2 px-3 rounded-lg bg-muted/40 border border-border/50">
-          {bookingsLoading ? (
-            <div className="flex items-center gap-3">
-              <div className="h-4 w-16 skeleton rounded" />
-              <div className="h-4 w-16 skeleton rounded" />
-            </div>
-          ) : (
-            stats && (
-              <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm">
-                <span className="flex items-center gap-1 sm:gap-1.5">
-                  <Calendar className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-muted-foreground" />
-                  <span className="font-semibold tabular-nums">{stats.bookings}</span>
-                  <span className="text-muted-foreground hidden sm:inline">bookings</span>
-                </span>
-                <span className="text-border">·</span>
-                <span className="flex items-center gap-1 sm:gap-1.5">
-                  <Users className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-muted-foreground" />
-                  <span className="font-semibold tabular-nums">{stats.guests}</span>
-                  <span className="text-muted-foreground hidden sm:inline">guests</span>
-                </span>
-              </div>
-            )
-          )}
-
-          {/* Status based on pending bookings */}
-          {stats && stats.bookings > 0 && (
-            <>
-              <div className="hidden sm:block h-4 w-px bg-border" />
-              <span className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
-                <span className="font-medium">Ready</span>
-              </span>
-            </>
-          )}
-        </div>
       </header>
+
+      {/* ================================================================
+          MORNING BRIEFING - Collapsible operations overview
+          ================================================================ */}
+      <MorningBriefing orgSlug={slug} />
 
       {/* ================================================================
           ACTION CARDS - Always show status cards
@@ -487,33 +408,16 @@ export default function DashboardPage() {
       )}
 
       {/* ================================================================
-          TODAY'S BOOKINGS - Actual customers for today
+          TODAY'S TOUR RUNS - Operations-centric view grouped by tour+time
           ================================================================ */}
-      {bookingsLoading ? (
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <Users className="h-3.5 w-3.5" />
-              Today&apos;s Bookings
-            </h2>
-          </div>
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-16 skeleton rounded-xl"
-                style={{ animationDelay: `${i * 100}ms` }}
-              />
-            ))}
-          </div>
-        </section>
-      ) : (
-        <TodayBookings
-          bookings={todayBookings || []}
-          orgSlug={slug}
-          maxItems={8}
-        />
-      )}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+            Today&apos;s Tour Runs
+          </h2>
+        </div>
+        <TodayTourRuns orgSlug={slug} />
+      </section>
 
       {/* ================================================================
           TOMORROW'S PREVIEW - Comprehensive planning section

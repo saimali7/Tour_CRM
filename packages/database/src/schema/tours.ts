@@ -7,6 +7,10 @@ import { organizations } from "./organizations";
 export const tours = pgTable("tours", {
   id: text("id").primaryKey().$defaultFn(createId),
 
+  // Product reference (master catalog) - nullable for migration
+  productId: text("product_id"),
+  // Will add FK reference after migration: .references(() => products.id)
+
   // Organization (tenant isolation)
   organizationId: text("organization_id")
     .notNull()
@@ -88,6 +92,7 @@ export const tours = pgTable("tours", {
   orgIdx: index("tours_org_idx").on(table.organizationId),
   statusIdx: index("tours_status_idx").on(table.status),
   publicIdx: index("tours_public_idx").on(table.isPublic),
+  productIdx: index("tours_product_idx").on(table.productId),
 }));
 
 // Tour Pricing Tiers - Different price categories (Adult, Child, Senior, etc.)

@@ -264,7 +264,7 @@ export class GuideService extends BaseService {
       .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
       .where(and(...assignmentConditions));
 
-    const scheduleIds = [...new Set(assignments.map((a) => a.scheduleId))];
+    const scheduleIds = [...new Set(assignments.map((a) => a.scheduleId).filter((id): id is string => id !== null))];
 
     if (scheduleIds.length === 0) {
       return [];

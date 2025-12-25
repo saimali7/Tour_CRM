@@ -91,7 +91,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b border-border transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      "border-b border-border transition-colors hover:bg-muted data-[state=selected]:bg-muted",
       className
     )}
     {...props}
@@ -320,9 +320,9 @@ const ActionButton = React.forwardRef<HTMLButtonElement, ActionButtonProps>(
       default:
         "text-muted-foreground hover:text-foreground hover:bg-accent",
       success:
-        "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/50",
+        "text-emerald-500 hover:text-emerald-600 hover:bg-accent dark:text-emerald-400 dark:hover:text-emerald-300",
       danger:
-        "text-destructive hover:text-destructive/80 hover:bg-destructive/10",
+        "text-destructive hover:text-destructive/80 hover:bg-accent",
     };
 
     const button = (

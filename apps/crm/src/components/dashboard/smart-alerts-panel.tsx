@@ -46,29 +46,29 @@ const typeConfig = {
   warning: {
     cardClass: "card-warning",
     icon: AlertTriangle,
-    iconColor: "text-amber-700 dark:text-amber-400",
-    badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     label: "Needs Attention",
   },
   opportunity: {
     cardClass: "card-info",
     icon: Zap,
-    iconColor: "text-blue-700 dark:text-blue-400",
-    badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+    iconColor: "text-blue-600 dark:text-blue-400",
+    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
     label: "Opportunity",
   },
   success: {
     cardClass: "card-success",
     icon: CheckCircle2,
-    iconColor: "text-emerald-700 dark:text-emerald-400",
-    badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
     label: "On Track",
   },
   info: {
     cardClass: "card-muted",
     icon: Info,
-    iconColor: "text-slate-700 dark:text-slate-400",
-    badge: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300",
+    iconColor: "text-muted-foreground",
+    badge: "bg-muted text-muted-foreground",
     label: "Info",
   },
 };
@@ -220,7 +220,7 @@ function AlertItem({ alert, index }: { alert: ProactiveInsight; index: number })
 
   return (
     <div
-      className="px-4 py-3 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+      className="px-4 py-3 hover:bg-muted/50 transition-colors"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -250,7 +250,7 @@ function AlertItem({ alert, index }: { alert: ProactiveInsight; index: number })
               href={alert.action.href as Route}
               className={cn(
                 "flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                "bg-white/50 dark:bg-black/20 hover:bg-white dark:hover:bg-black/30",
+                "bg-muted/50 hover:bg-muted",
                 "border border-inherit"
               )}
             >
@@ -267,8 +267,8 @@ function AlertItem({ alert, index }: { alert: ProactiveInsight; index: number })
 function AllClearState() {
   return (
     <div className="flex items-center gap-3 rounded-xl card-success px-4 py-4">
-      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-        <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+        <CheckCircle2 className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
       </div>
       <div>
         <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
