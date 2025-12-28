@@ -22,12 +22,20 @@ export default function GeneralSettingsPage() {
   const { data: organization, isLoading } = trpc.organization.get.useQuery();
   const utils = trpc.useUtils();
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const updateOrgMutation = trpc.organization.update.useMutation({
     onSuccess: () => {
       utils.organization.get.invalidate();
       setSaveSuccess(true);
+      setSaveError(null);
       setHasChanges(false);
       setTimeout(() => setSaveSuccess(false), 3000);
+    },
+    onError: (error) => {
+      console.error("Save failed:", error);
+      setSaveError(error.message);
+      setTimeout(() => setSaveError(null), 5000);
     },
   });
 
@@ -99,6 +107,13 @@ export default function GeneralSettingsPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Error Toast */}
+          {saveError && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
+              <span className="text-sm font-medium">{saveError}</span>
+            </div>
+          )}
+
           {/* Success Toast */}
           <div
             className={cn(
