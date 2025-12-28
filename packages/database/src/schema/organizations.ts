@@ -11,6 +11,7 @@ export const organizations = pgTable("organizations", {
 
   // Contact
   email: text("email").notNull(),
+  fromEmail: text("from_email"), // Email address used for sending transactional emails
   phone: text("phone"),
   website: text("website"),
 

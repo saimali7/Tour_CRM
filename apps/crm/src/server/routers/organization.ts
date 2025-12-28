@@ -15,6 +15,7 @@ export interface ServiceHealth {
 const updateOrganizationSchema = z.object({
   name: z.string().optional(),
   email: z.string().email().optional(),
+  fromEmail: z.string().email().optional(), // Email address for sending transactional emails
   phone: z.string().optional(),
   website: z.string().url().optional(),
   address: z.string().optional(),

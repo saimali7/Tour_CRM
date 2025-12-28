@@ -22,6 +22,7 @@ const DEFAULT_SETUP_PROGRESS: SetupProgress = {
 export interface UpdateOrganizationInput {
   name?: string;
   email?: string;
+  fromEmail?: string; // Email address for sending transactional emails
   phone?: string;
   website?: string;
   address?: string;
@@ -62,6 +63,7 @@ export class OrganizationService extends BaseService {
       .set({
         name: input.name,
         email: input.email,
+        fromEmail: input.fromEmail,
         phone: input.phone,
         website: input.website,
         address: input.address,

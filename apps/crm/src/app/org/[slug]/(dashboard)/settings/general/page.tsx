@@ -34,6 +34,7 @@ export default function GeneralSettingsPage() {
   const [businessForm, setBusinessForm] = useState({
     name: "",
     email: "",
+    fromEmail: "",
     phone: "",
     website: "",
     address: "",
@@ -50,6 +51,7 @@ export default function GeneralSettingsPage() {
       setBusinessForm({
         name: organization.name || "",
         email: organization.email || "",
+        fromEmail: organization.fromEmail || "",
         phone: organization.phone || "",
         website: organization.website || "",
         address: organization.address || "",
@@ -171,7 +173,7 @@ export default function GeneralSettingsPage() {
               <div className="space-y-2">
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                  Email
+                  Contact Email
                 </label>
                 <input
                   type="email"
@@ -180,6 +182,24 @@ export default function GeneralSettingsPage() {
                   className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   placeholder="contact@company.com"
                 />
+              </div>
+
+              {/* From Email for transactional emails */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                  Sender Email
+                </label>
+                <input
+                  type="email"
+                  value={businessForm.fromEmail}
+                  onChange={(e) => handleChange("fromEmail", e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="bookings@yourdomain.com"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used for sending booking confirmations, reminders, etc. Must be verified in Resend.
+                </p>
               </div>
 
               {/* Phone */}
