@@ -191,15 +191,18 @@ export class EmailService {
 
   constructor(org: OrganizationEmailConfig) {
     this.org = org;
-    // Require proper from email - example.com will be rejected by email providers
-    if (!org.fromEmail) {
-      throw new Error(
-        `Organization "${org.name}" must have a configured fromEmail address. ` +
-        `Set this in organization settings before sending emails.`
+    // Use configured fromEmail or fallback to Resend's default address for testing
+    // onboarding@resend.dev works without domain verification
+    this.fromEmail = org.fromEmail || "onboarding@resend.dev";
+    this.replyTo = org.replyToEmail || org.email || this.fromEmail;
+
+    // Log a warning in development if using fallback
+    if (!org.fromEmail && process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[EmailService] Organization "${org.name}" has no fromEmail configured. ` +
+        `Using onboarding@resend.dev fallback. Configure fromEmail in organization settings for production.`
       );
     }
-    this.fromEmail = org.fromEmail;
-    this.replyTo = org.replyToEmail || org.email || org.fromEmail;
   }
 
   /**
