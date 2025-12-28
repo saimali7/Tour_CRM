@@ -14,17 +14,17 @@ export interface ServiceHealth {
 
 const updateOrganizationSchema = z.object({
   name: z.string().optional(),
-  email: z.string().email().optional(),
-  fromEmail: z.string().email().optional(), // Email address for sending transactional emails
+  email: z.string().email().optional().or(z.literal("")),
+  fromEmail: z.string().email().optional().or(z.literal("")), // Email address for sending transactional emails
   phone: z.string().optional(),
-  website: z.string().url().optional(),
+  website: z.string().url().optional().or(z.literal("")),
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
   country: z.string().optional(),
   postalCode: z.string().optional(),
   timezone: z.string().optional(),
-  logoUrl: z.string().optional(),
+  logoUrl: z.string().url().optional().or(z.literal("")),
   primaryColor: z.string().optional(),
 });
 
