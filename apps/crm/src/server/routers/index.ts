@@ -46,8 +46,6 @@ import { availabilityRouter } from "./availability";
 import { tourRunRouter } from "./tour-run";
 // Products Platform
 import { productRouter } from "./product";
-import { catalogServiceRouter } from "./catalog-service";
-import { bookingItemRouter } from "./booking-item";
 
 export const appRouter = createRouter({
   tour: tourRouter,
@@ -98,8 +96,6 @@ export const appRouter = createRouter({
   tourRun: tourRunRouter,
   // Products Platform
   product: productRouter,
-  catalogService: catalogServiceRouter,
-  bookingItem: bookingItemRouter,
 });
 
 export type AppRouter = typeof appRouter;

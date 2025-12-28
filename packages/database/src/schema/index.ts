@@ -38,7 +38,5 @@ export * from "./goals";
 // Booking System v2: Customer-first booking with options
 export * from "./booking-options";
 
-// Products & Services
+// Products
 export * from "./products";
-export * from "./services";
-export * from "./booking-items";

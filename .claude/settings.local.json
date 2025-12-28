@@ -159,7 +159,15 @@
       "Bash(\"packages/services/src/tour-availability-service.ts\" )",
       "Bash(\"packages/services/src/tour-run-service.ts\" )",
       "Bash(\"packages/validators/src/product.ts\" )",
-      "Bash(\"packages/validators/src/service.ts\")"
+      "Bash(\"packages/validators/src/service.ts\")",
+      "Bash(xargs basename:*)",
+      "Bash(set -a)",
+      "Bash(source:*)",
+      "Bash(set:*)",
+      "Bash(timeout 60 npx drizzle-kit push:*)",
+      "Bash(script -q /dev/null bash -c 'echo -e \"\"\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\\\\n\"\" | npx drizzle-kit push 2>&1')",
+      "Bash(psql:*)",
+      "Bash(script -q /dev/null bash -c 'echo -e \"\"\\\\n\\\\n\\\\n\\\\n\\\\n\"\" | npx drizzle-kit push 2>&1')"
     ]
   }
 }

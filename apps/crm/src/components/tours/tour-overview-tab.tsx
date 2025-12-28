@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Users, DollarSign, MapPin, Calendar, Check, X, Star } from "lucide-react";
+import { Clock, Users, DollarSign, MapPin, Calendar, Check, X, Star, Package } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 interface TourOverviewTabProps {
@@ -21,6 +21,7 @@ interface TourOverviewTabProps {
     meetingPointDetails: string | null;
     includes: string[] | null;
     excludes: string[] | null;
+    productId?: string | null;
   };
 }
 
@@ -108,6 +109,19 @@ export function TourOverviewTab({ tour }: TourOverviewTabProps) {
           </div>
         </div>
       </div>
+
+      {/* Product Catalog Info */}
+      {tour.productId && (
+        <div className="bg-card rounded-lg border border-border p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Package className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-lg font-semibold text-foreground">Product Catalog</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            This tour is part of the unified product catalog. Product information is synced automatically.
+          </p>
+        </div>
+      )}
 
       {/* Description */}
       <div className="bg-card rounded-lg border border-border p-6">

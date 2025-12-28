@@ -42,8 +42,7 @@ import { UnassignedToursPanel } from "@/components/dashboard/UnassignedToursPane
 import { BookingsNeedingGuides } from "@/components/dashboard/BookingsNeedingGuides";
 import { TodayBookings } from "@/components/dashboard/TodayBookings";
 import { TomorrowPreview } from "@/components/dashboard/TomorrowPreview";
-import { TodayTourRuns } from "@/components/dashboard/TodayTourRuns";
-import { MorningBriefing } from "@/components/dashboard/morning-briefing";
+import { TodaysFocus } from "@/components/dashboard/TodaysFocus";
 
 // =============================================================================
 // TYPES
@@ -333,11 +332,6 @@ export default function DashboardPage() {
       </header>
 
       {/* ================================================================
-          MORNING BRIEFING - Collapsible operations overview
-          ================================================================ */}
-      <MorningBriefing orgSlug={slug} />
-
-      {/* ================================================================
           ACTION CARDS - Always show status cards
           ================================================================ */}
       {!isLoading && (
@@ -408,16 +402,9 @@ export default function DashboardPage() {
       )}
 
       {/* ================================================================
-          TODAY'S TOUR RUNS - Operations-centric view grouped by tour+time
+          TODAY'S FOCUS - All bookings and actions for today
           ================================================================ */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-            Today&apos;s Tour Runs
-          </h2>
-        </div>
-        <TodayTourRuns orgSlug={slug} />
-      </section>
+      <TodaysFocus orgSlug={slug} />
 
       {/* ================================================================
           TOMORROW'S PREVIEW - Comprehensive planning section

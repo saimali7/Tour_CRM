@@ -44,9 +44,6 @@ import { TourAvailabilityService } from "./tour-availability-service";
 import { TourRunService } from "./tour-run-service";
 // Product catalog
 import { ProductService } from "./product-service";
-import { CatalogService } from "./catalog-service";
-// Booking items (multi-product bookings)
-import { BookingItemService } from "./booking-item-service";
 
 export interface Services {
   tour: TourService;
@@ -94,9 +91,6 @@ export interface Services {
   tourRun: TourRunService;
   // Product catalog
   product: ProductService;
-  catalogService: CatalogService;
-  // Booking items (multi-product bookings)
-  bookingItem: BookingItemService;
 }
 
 /**
@@ -156,9 +150,6 @@ export function createServices(ctx: ServiceContext): Services {
     tourRun: new TourRunService(ctx),
     // Product catalog
     product: new ProductService(ctx),
-    catalogService: new CatalogService(ctx),
-    // Booking items (multi-product bookings)
-    bookingItem: new BookingItemService(ctx),
   };
 }
 
@@ -214,21 +205,6 @@ export { TourAvailabilityService } from "./tour-availability-service";
 export { TourRunService } from "./tour-run-service";
 // Product catalog
 export { ProductService } from "./product-service";
-export { CatalogService } from "./catalog-service";
-// Booking items (multi-product bookings)
-export { BookingItemService } from "./booking-item-service";
-export type {
-  BookingItemWithProduct,
-  AddBookingItemInput,
-  UpdateBookingItemInput,
-} from "./booking-item-service";
-export type {
-  ServiceFilters,
-  ServiceSortField,
-  CatalogServiceWithProduct,
-  CreateCatalogServiceInput,
-  UpdateCatalogServiceInput,
-} from "./catalog-service";
 export type {
   CreateBookingOptionInput,
   UpdateBookingOptionInput,
@@ -372,7 +348,6 @@ export type {
 export type {
   ManifestParticipant,
   ManifestBooking,
-  ManifestBookingItem,
   ScheduleManifest,
   GuideManifestSummary,
   DateManifestSummary,

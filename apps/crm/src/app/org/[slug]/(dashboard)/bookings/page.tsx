@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Zap,
   Loader2,
+  Search,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -57,10 +58,10 @@ import { useIsMobile } from "@/hooks/use-media-query";
 
 // New view-based components
 import { BookingViewTabs } from "@/components/bookings/booking-view-tabs";
-import { NeedsActionView, TodayView, UpcomingView } from "@/components/bookings/views";
+import { NeedsActionView } from "@/components/bookings/views";
 import { BookingPlanner } from "@/components/availability/booking-planner";
 
-type BookingView = "needs-action" | "upcoming" | "today" | "all" | "find-availability";
+type BookingView = "needs-action" | "all" | "find-availability";
 type StatusFilter = "all" | "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 type PaymentFilter = "all" | "pending" | "partial" | "paid" | "refunded" | "failed";
 
@@ -92,7 +93,7 @@ export default function BookingsPage() {
 
   // Get active view from URL or default to "all"
   const viewParam = searchParams.get("view") as BookingView | null;
-  const activeView: BookingView = viewParam && ["needs-action", "upcoming", "today", "all", "find-availability"].includes(viewParam)
+  const activeView: BookingView = viewParam && ["needs-action", "all", "find-availability"].includes(viewParam)
     ? viewParam
     : "all";
 
@@ -118,19 +119,11 @@ export default function BookingsPage() {
     staleTime: 30000, // 30 seconds
   });
 
-  const { data: upcomingData } = trpc.booking.getUpcoming.useQuery({ days: 7 }, {
-    staleTime: 30000,
-  });
-
-  const { data: todayData } = trpc.booking.getTodayWithUrgency.useQuery(undefined, {
-    staleTime: 30000,
-  });
-
   const tabCounts = useMemo(() => ({
     needsAction: urgencyData?.stats.needsAction ?? 0,
-    upcoming: upcomingData?.stats.totalBookings ?? 0,
-    today: todayData?.stats.total ?? 0,
-  }), [urgencyData, upcomingData, todayData]);
+    upcoming: 0,
+    today: 0,
+  }), [urgencyData]);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -179,8 +172,6 @@ export default function BookingsPage() {
 
       {/* View Content */}
       {activeView === "needs-action" && <NeedsActionView orgSlug={slug} />}
-      {activeView === "upcoming" && <UpcomingView orgSlug={slug} />}
-      {activeView === "today" && <TodayView orgSlug={slug} />}
       {activeView === "all" && <AllBookingsView slug={slug} isMobile={isMobile} openQuickBooking={openQuickBooking} />}
       {activeView === "find-availability" && (
         <div className="space-y-4">
@@ -204,11 +195,14 @@ interface AllBookingsViewProps {
   openQuickBooking: () => void;
 }
 
+type QuickDateFilter = "all" | "today" | "tomorrow" | "this-week";
+
 function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewProps) {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+  const [quickDateFilter, setQuickDateFilter] = useState<QuickDateFilter>("all");
   const [search, setSearch] = useState("");
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
@@ -219,7 +213,30 @@ function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewPr
   const [showBulkRescheduleModal, setShowBulkRescheduleModal] = useState(false);
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
 
-  const hasActiveFilters = statusFilter !== "all" || paymentFilter !== "all" || search !== "";
+  // Calculate date range based on quick filter
+  const scheduleDateRange = useMemo(() => {
+    if (quickDateFilter === "all") return undefined;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+    switch (quickDateFilter) {
+      case "today":
+        return { from: startOfToday, to: endOfToday };
+      case "tomorrow":
+        const startOfTomorrow = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+        const endOfTomorrow = new Date(startOfTomorrow.getTime() + 24 * 60 * 60 * 1000 - 1);
+        return { from: startOfTomorrow, to: endOfTomorrow };
+      case "this-week":
+        const endOfWeek = new Date(startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return { from: startOfToday, to: endOfWeek };
+      default:
+        return undefined;
+    }
+  }, [quickDateFilter]);
+
+  const hasActiveFilters = statusFilter !== "all" || paymentFilter !== "all" || search !== "" || quickDateFilter !== "all";
 
   const { data, isLoading, error } = trpc.booking.list.useQuery({
     pagination: { page, limit: 20 },
@@ -227,6 +244,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewPr
       status: statusFilter === "all" ? undefined : statusFilter,
       paymentStatus: paymentFilter === "all" ? undefined : paymentFilter,
       search: search || undefined,
+      scheduleDateRange,
     },
     sort: { field: "createdAt", direction: "desc" },
   });
@@ -421,91 +439,144 @@ function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewPr
 
   return (
     <div className="space-y-4">
-      {/* Stats Row */}
-      {stats && (
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-5 text-sm text-muted-foreground">
-            <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
-            <span><span className="font-medium text-amber-600">{stats.pending}</span> pending</span>
-            <span><span className="font-medium text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span> revenue</span>
-            <span className="hidden lg:inline"><span className="font-medium text-foreground">{stats.participantCount}</span> guests</span>
+      {/* Unified Filter Bar */}
+      <div className="rounded-xl border border-border bg-card p-3 space-y-3">
+        {/* Top Row: Search + Clear */}
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by name, email, phone, or reference..."
+              aria-label="Search bookings"
+              className="w-full h-10 pl-10 pr-8 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-        </div>
-      )}
 
-      {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3" role="search" aria-label="Filter bookings">
-        {/* Search */}
-        <div className="relative flex-1">
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search bookings..."
-            aria-label="Search bookings"
-            className="w-full h-10 sm:h-9 pl-3 pr-8 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-              aria-label="Clear search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Filter Dropdowns */}
-        <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as StatusFilter);
-              setPage(1);
-            }}
-            aria-label="Filter by status"
-            className="flex-1 sm:flex-none h-10 sm:h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.value === "all" ? "Status" : opt.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={paymentFilter}
-            onChange={(e) => {
-              setPaymentFilter(e.target.value as PaymentFilter);
-              setPage(1);
-            }}
-            aria-label="Filter by payment"
-            className="flex-1 sm:flex-none h-10 sm:h-9 px-3 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-          >
-            {PAYMENT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.value === "all" ? "Payment" : opt.label}
-              </option>
-            ))}
-          </select>
-
+          {/* Clear All Button */}
           {hasActiveFilters && (
             <button
               onClick={() => {
                 setSearch("");
                 setStatusFilter("all");
                 setPaymentFilter("all");
+                setQuickDateFilter("all");
                 setPage(1);
               }}
-              className="h-10 sm:h-9 px-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Clear filters"
+              className="h-10 px-4 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors flex items-center gap-2"
+              aria-label="Clear all filters"
             >
-              Clear
+              <X className="h-4 w-4" />
+              <span className="hidden sm:inline">Clear all</span>
             </button>
+          )}
+        </div>
+
+        {/* Bottom Row: Date Chips + Status/Payment Filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Date Quick Filters */}
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
+            {(["all", "today", "tomorrow", "this-week"] as const).map((filter) => {
+              const labels: Record<QuickDateFilter, string> = {
+                all: "All Time",
+                today: "Today",
+                tomorrow: "Tomorrow",
+                "this-week": "This Week",
+              };
+              const isActive = quickDateFilter === filter;
+              return (
+                <button
+                  key={filter}
+                  onClick={() => {
+                    setQuickDateFilter(filter);
+                    setPage(1);
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
+                    isActive
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {labels[filter]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Separator */}
+          <div className="hidden sm:block h-6 w-px bg-border" />
+
+          {/* Status & Payment Filters */}
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as StatusFilter);
+                setPage(1);
+              }}
+              aria-label="Filter by status"
+              className={cn(
+                "flex-1 sm:flex-none h-9 px-3 text-sm rounded-lg border transition-colors",
+                statusFilter !== "all"
+                  ? "border-primary bg-primary/5 text-foreground"
+                  : "border-input bg-background text-muted-foreground"
+              )}
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.value === "all" ? "Any Status" : opt.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={paymentFilter}
+              onChange={(e) => {
+                setPaymentFilter(e.target.value as PaymentFilter);
+                setPage(1);
+              }}
+              aria-label="Filter by payment"
+              className={cn(
+                "flex-1 sm:flex-none h-9 px-3 text-sm rounded-lg border transition-colors",
+                paymentFilter !== "all"
+                  ? "border-primary bg-primary/5 text-foreground"
+                  : "border-input bg-background text-muted-foreground"
+              )}
+            >
+              {PAYMENT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.value === "all" ? "Any Payment" : opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Stats (Desktop only) */}
+          {stats && (
+            <div className="hidden lg:flex items-center gap-4 ml-auto text-sm">
+              <span className="text-muted-foreground">
+                <span className="font-semibold text-foreground">{stats.total}</span> bookings
+              </span>
+              <span className="text-muted-foreground">
+                <span className="font-semibold text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span>
+              </span>
+            </div>
           )}
         </div>
       </div>

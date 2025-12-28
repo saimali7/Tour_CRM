@@ -8,6 +8,7 @@ import {
   Search,
   User,
   Users,
+  MapPin,
   Map,
   Plus,
   Loader2,
@@ -130,7 +131,7 @@ const navigationItems: NavigationItem[] = [
   {
     name: "Tours",
     href: "/tours",
-    icon: Map,
+    icon: MapPin,
     shortcut: "4",
     description: "Tour catalog",
   },

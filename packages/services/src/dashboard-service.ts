@@ -369,6 +369,7 @@ export class DashboardService extends BaseService {
         scheduleId: schedules.id,
         startsAt: schedules.startsAt,
         endsAt: schedules.endsAt,
+        maxParticipants: schedules.maxParticipants,
         guidesRequired: schedules.guidesRequired,
         guidesAssigned: schedules.guidesAssigned,
       })
@@ -407,6 +408,7 @@ export class DashboardService extends BaseService {
         id: row.scheduleId,
         startsAt: row.startsAt,
         endsAt: row.endsAt,
+        maxParticipants: row.maxParticipants ?? 0,
         guidesRequired: row.guidesRequired ?? 0,
         guidesAssigned: row.guidesAssigned ?? 0,
       },
@@ -563,6 +565,7 @@ export interface TodayBooking {
     id: string;
     startsAt: Date;
     endsAt: Date;
+    maxParticipants: number;
     guidesRequired: number;
     guidesAssigned: number;
   };

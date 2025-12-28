@@ -2,14 +2,16 @@ import { pgTable, text, timestamp, integer, boolean, jsonb, numeric, index, uniq
 import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
+import { products } from "./products";
 
 // Tours - Tour products (org-scoped)
 export const tours = pgTable("tours", {
   id: text("id").primaryKey().$defaultFn(createId),
 
-  // Product reference (master catalog) - nullable for migration
-  productId: text("product_id"),
-  // Will add FK reference after migration: .references(() => products.id)
+  // Product reference (master catalog) - 1:1 with products table
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
 
   // Organization (tenant isolation)
   organizationId: text("organization_id")
@@ -197,9 +199,21 @@ export const toursRelations = relations(tours, ({ one, many }) => ({
     fields: [tours.organizationId],
     references: [organizations.id],
   }),
+  product: one(products, {
+    fields: [tours.productId],
+    references: [products.id],
+  }),
   pricingTiers: many(tourPricingTiers),
   variants: many(tourVariants),
   // Note: bookingOptions relation defined in booking-options.ts to avoid circular deps
+}));
+
+// Add tours relation to products (defined here to avoid circular imports)
+export const productsToursRelation = relations(products, ({ one }) => ({
+  tour: one(tours, {
+    fields: [products.id],
+    references: [tours.productId],
+  }),
 }));
 
 export const tourPricingTiersRelations = relations(tourPricingTiers, ({ one }) => ({
@@ -230,6 +244,11 @@ export type PriceModifierType = "absolute" | "percentage" | "fixed_add";
 
 export type Tour = typeof tours.$inferSelect;
 export type NewTour = typeof tours.$inferInsert;
+
+// Combined type for tour with its product (for queries that join)
+export type TourWithProduct = Tour & {
+  product: typeof products.$inferSelect;
+};
 
 export type TourPricingTier = typeof tourPricingTiers.$inferSelect;
 export type NewTourPricingTier = typeof tourPricingTiers.$inferInsert;

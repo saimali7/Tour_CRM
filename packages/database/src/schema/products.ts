@@ -61,7 +61,8 @@ export const productsRelations = relations(products, ({ one }) => ({
     fields: [products.organizationId],
     references: [organizations.id],
   }),
-  // Note: tours relation will be added when productId is added to tours table
+  // Note: tours relation is defined in tours.ts to avoid circular imports
+  // Note: services relation is defined in services.ts to avoid circular imports
 }));
 
 // Types

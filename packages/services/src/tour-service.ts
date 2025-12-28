@@ -1,5 +1,18 @@
 import { eq, and, desc, asc, sql, count, ilike, or, inArray } from "drizzle-orm";
-import { tours, tourPricingTiers, tourVariants, schedules, type Tour, type TourStatus, type TourPricingTier, type TourVariant, type PriceModifierType } from "@tour/database";
+import {
+  tours,
+  tourPricingTiers,
+  tourVariants,
+  schedules,
+  products,
+  type Tour,
+  type TourStatus,
+  type TourPricingTier,
+  type TourVariant,
+  type PriceModifierType,
+  type Product,
+  type TourWithProduct,
+} from "@tour/database";
 import { BaseService } from "./base-service";
 import {
   type PaginationOptions,
@@ -273,79 +286,154 @@ export class TourService extends BaseService {
   }
 
   /**
-   * Create a new tour
+   * Create a new tour (with product in transaction)
    */
-  async create(input: CreateTourInput): Promise<Tour> {
+  async create(input: CreateTourInput): Promise<TourWithProduct> {
     const slug = input.slug || this.slugify(input.name);
 
-    // Check if slug already exists
-    const existing = await this.db.query.tours.findFirst({
+    // Check if slug already exists in products (unified catalog)
+    const existingProduct = await this.db.query.products.findFirst({
+      where: and(
+        eq(products.slug, slug),
+        eq(products.organizationId, this.organizationId)
+      ),
+    });
+
+    if (existingProduct) {
+      throw new ConflictError(`Product with slug "${slug}" already exists`);
+    }
+
+    // Also check tours for backward compat
+    const existingTour = await this.db.query.tours.findFirst({
       where: and(
         eq(tours.slug, slug),
         eq(tours.organizationId, this.organizationId)
       ),
     });
 
-    if (existing) {
+    if (existingTour) {
       throw new ConflictError(`Tour with slug "${slug}" already exists`);
     }
 
-    const [tour] = await this.db
-      .insert(tours)
-      .values({
-        organizationId: this.organizationId,
-        name: input.name,
-        slug,
-        description: input.description,
-        shortDescription: input.shortDescription,
-        durationMinutes: input.durationMinutes,
-        minParticipants: input.minParticipants,
-        maxParticipants: input.maxParticipants,
-        guestsPerGuide: input.guestsPerGuide,
-        basePrice: input.basePrice,
-        currency: input.currency,
-        meetingPoint: input.meetingPoint,
-        meetingPointDetails: input.meetingPointDetails,
-        meetingPointLat: input.meetingPointLat,
-        meetingPointLng: input.meetingPointLng,
-        coverImageUrl: input.coverImageUrl,
-        images: input.images,
-        category: input.category,
-        tags: input.tags,
-        includes: input.includes,
-        excludes: input.excludes,
-        requirements: input.requirements,
-        accessibility: input.accessibility,
-        cancellationPolicy: input.cancellationPolicy,
-        cancellationHours: input.cancellationHours,
-        minimumNoticeHours: input.minimumNoticeHours,
-        maximumAdvanceDays: input.maximumAdvanceDays,
-        allowSameDayBooking: input.allowSameDayBooking,
-        sameDayCutoffTime: input.sameDayCutoffTime,
-        status: input.status || "draft",
-        isPublic: input.isPublic,
-        metaTitle: input.metaTitle,
-        metaDescription: input.metaDescription,
-      })
-      .returning();
+    // Map tour status to product status
+    const productStatus = this.mapTourStatusToProductStatus(input.status || "draft");
 
-    if (!tour) {
-      throw new Error("Failed to create tour");
-    }
+    // Create product and tour in a transaction
+    return await this.db.transaction(async (tx) => {
+      // 1. Create product first (master catalog)
+      const [product] = await tx
+        .insert(products)
+        .values({
+          organizationId: this.organizationId,
+          type: "tour",
+          name: input.name,
+          slug,
+          description: input.description,
+          shortDescription: input.shortDescription,
+          status: productStatus,
+          visibility: input.isPublic ? "public" : "private",
+          basePrice: input.basePrice,
+          currency: input.currency || "USD",
+          featuredImage: input.coverImageUrl,
+          gallery: input.images || [],
+          metaTitle: input.metaTitle,
+          metaDescription: input.metaDescription,
+          tags: input.tags || [],
+        })
+        .returning();
 
-    return tour;
+      if (!product) {
+        throw new Error("Failed to create product");
+      }
+
+      // 2. Create tour with productId (extension table)
+      const [tour] = await tx
+        .insert(tours)
+        .values({
+          organizationId: this.organizationId,
+          productId: product.id, // Link to product
+          // Keep duplicate fields for backward compatibility
+          name: input.name,
+          slug,
+          description: input.description,
+          shortDescription: input.shortDescription,
+          durationMinutes: input.durationMinutes,
+          minParticipants: input.minParticipants,
+          maxParticipants: input.maxParticipants,
+          guestsPerGuide: input.guestsPerGuide,
+          basePrice: input.basePrice,
+          currency: input.currency,
+          meetingPoint: input.meetingPoint,
+          meetingPointDetails: input.meetingPointDetails,
+          meetingPointLat: input.meetingPointLat,
+          meetingPointLng: input.meetingPointLng,
+          coverImageUrl: input.coverImageUrl,
+          images: input.images,
+          category: input.category,
+          tags: input.tags,
+          includes: input.includes,
+          excludes: input.excludes,
+          requirements: input.requirements,
+          accessibility: input.accessibility,
+          cancellationPolicy: input.cancellationPolicy,
+          cancellationHours: input.cancellationHours,
+          minimumNoticeHours: input.minimumNoticeHours,
+          maximumAdvanceDays: input.maximumAdvanceDays,
+          allowSameDayBooking: input.allowSameDayBooking,
+          sameDayCutoffTime: input.sameDayCutoffTime,
+          status: input.status || "draft",
+          isPublic: input.isPublic,
+          metaTitle: input.metaTitle,
+          metaDescription: input.metaDescription,
+        })
+        .returning();
+
+      if (!tour) {
+        throw new Error("Failed to create tour");
+      }
+
+      return { ...tour, product };
+    });
   }
 
   /**
-   * Update a tour
+   * Map tour status to product status
+   */
+  private mapTourStatusToProductStatus(tourStatus: TourStatus): "draft" | "active" | "archived" {
+    switch (tourStatus) {
+      case "active":
+        return "active";
+      case "archived":
+        return "archived";
+      case "draft":
+      case "paused":
+      default:
+        return "draft";
+    }
+  }
+
+  /**
+   * Update a tour (syncs product fields too)
    */
   async update(id: string, input: UpdateTourInput): Promise<Tour> {
     // Ensure tour exists and belongs to org
-    await this.getById(id);
+    const existingTour = await this.getById(id);
 
-    // If updating slug, check for conflicts
+    // If updating slug, check for conflicts in both products and tours
     if (input.slug) {
-      const existing = await this.db.query.tours.findFirst({
+      const existingProduct = await this.db.query.products.findFirst({
+        where: and(
+          eq(products.slug, input.slug),
+          eq(products.organizationId, this.organizationId),
+          existingTour.productId ? sql`${products.id} != ${existingTour.productId}` : sql`1=1`
+        ),
+      });
+
+      if (existingProduct) {
+        throw new ConflictError(`Product with slug "${input.slug}" already exists`);
+      }
+
+      const existingTourSlug = await this.db.query.tours.findFirst({
         where: and(
           eq(tours.slug, input.slug),
           eq(tours.organizationId, this.organizationId),
@@ -353,11 +441,45 @@ export class TourService extends BaseService {
         ),
       });
 
-      if (existing) {
+      if (existingTourSlug) {
         throw new ConflictError(`Tour with slug "${input.slug}" already exists`);
       }
     }
 
+    // Update product if tour has one (sync common fields)
+    if (existingTour.productId) {
+      const productUpdates: Partial<Product> = {};
+
+      if (input.name !== undefined) productUpdates.name = input.name;
+      if (input.slug !== undefined) productUpdates.slug = input.slug;
+      if (input.description !== undefined) productUpdates.description = input.description;
+      if (input.shortDescription !== undefined) productUpdates.shortDescription = input.shortDescription;
+      if (input.basePrice !== undefined) productUpdates.basePrice = input.basePrice;
+      if (input.currency !== undefined) productUpdates.currency = input.currency;
+      if (input.coverImageUrl !== undefined) productUpdates.featuredImage = input.coverImageUrl;
+      if (input.images !== undefined) productUpdates.gallery = input.images;
+      if (input.metaTitle !== undefined) productUpdates.metaTitle = input.metaTitle;
+      if (input.metaDescription !== undefined) productUpdates.metaDescription = input.metaDescription;
+      if (input.tags !== undefined) productUpdates.tags = input.tags;
+      if (input.status !== undefined) {
+        productUpdates.status = this.mapTourStatusToProductStatus(input.status);
+      }
+      if (input.isPublic !== undefined) {
+        productUpdates.visibility = input.isPublic ? "public" : "private";
+      }
+
+      if (Object.keys(productUpdates).length > 0) {
+        await this.db
+          .update(products)
+          .set({
+            ...productUpdates,
+            updatedAt: new Date(),
+          })
+          .where(eq(products.id, existingTour.productId));
+      }
+    }
+
+    // Update tour (including duplicate fields for backward compat)
     const [tour] = await this.db
       .update(tours)
       .set({
@@ -375,14 +497,27 @@ export class TourService extends BaseService {
   }
 
   /**
-   * Delete a tour
+   * Delete a tour (and its product via cascade or explicit delete)
    */
   async delete(id: string): Promise<void> {
-    await this.getById(id);
+    const tour = await this.getById(id);
 
-    await this.db
-      .delete(tours)
-      .where(and(eq(tours.id, id), eq(tours.organizationId, this.organizationId)));
+    // If tour has a product, delete the product (tour cascades via FK)
+    // Otherwise, delete the tour directly (legacy case)
+    if (tour.productId) {
+      await this.db
+        .delete(products)
+        .where(
+          and(
+            eq(products.id, tour.productId),
+            eq(products.organizationId, this.organizationId)
+          )
+        );
+    } else {
+      await this.db
+        .delete(tours)
+        .where(and(eq(tours.id, id), eq(tours.organizationId, this.organizationId)));
+    }
   }
 
   /**
@@ -415,9 +550,9 @@ export class TourService extends BaseService {
   }
 
   /**
-   * Duplicate a tour
+   * Duplicate a tour (creates new product + tour)
    */
-  async duplicate(id: string, newName?: string): Promise<Tour> {
+  async duplicate(id: string, newName?: string): Promise<TourWithProduct> {
     const original = await this.getById(id);
 
     const name = newName || `${original.name} (Copy)`;

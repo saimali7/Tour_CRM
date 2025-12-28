@@ -1,10 +1,13 @@
 import { eq, and, desc, asc, sql, count, ilike, or, inArray } from "drizzle-orm";
 import {
   products,
+  tours,
+  schedules,
   type Product,
   type ProductType,
   type ProductStatus,
-  type ProductVisibility
+  type ProductVisibility,
+  type Tour,
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import {
@@ -45,6 +48,25 @@ export interface CreateProductInput {
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {}
+
+// Unified product with type-specific extensions
+export interface TourScheduleStats {
+  upcomingCount: number;
+  totalCapacity: number;
+  totalBooked: number;
+  utilizationPercent: number;
+  nextScheduleDate: Date | null;
+}
+
+export interface UnifiedProduct extends Product {
+  // Tour-specific data (when type === "tour")
+  tour?: {
+    id: string;
+    durationMinutes: number;
+    maxParticipants: number;
+    scheduleStats: TourScheduleStats;
+  } | null;
+}
 
 export class ProductService extends BaseService {
   /**
@@ -105,6 +127,167 @@ export class ProductService extends BaseService {
 
     return {
       data,
+      ...this.paginationMeta(total, page, limit),
+    };
+  }
+
+  /**
+   * Get all products with their type-specific extensions (tours with schedule stats, services with config)
+   * This is the main query for the unified Products page
+   */
+  async getAllWithExtensions(
+    filters: ProductFilters = {},
+    pagination: PaginationOptions = {},
+    sort: SortOptions<ProductSortField> = { field: "createdAt", direction: "desc" }
+  ): Promise<PaginatedResult<UnifiedProduct>> {
+    const { page = 1, limit = 20 } = pagination;
+    const offset = (page - 1) * limit;
+
+    const conditions = [eq(products.organizationId, this.organizationId)];
+
+    if (filters.type) {
+      conditions.push(eq(products.type, filters.type));
+    }
+    if (filters.status) {
+      conditions.push(eq(products.status, filters.status));
+    }
+    if (filters.visibility) {
+      conditions.push(eq(products.visibility, filters.visibility));
+    }
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(products.name, `%${filters.search}%`),
+          ilike(products.description, `%${filters.search}%`)
+        )!
+      );
+    }
+    if (filters.tags && filters.tags.length > 0) {
+      conditions.push(sql`${products.tags} && ${filters.tags}`);
+    }
+
+    const orderBy =
+      sort.direction === "asc" ? asc(products[sort.field]) : desc(products[sort.field]);
+
+    // Get paginated products
+    const [productsResult, countResult] = await Promise.all([
+      this.db
+        .select()
+        .from(products)
+        .where(and(...conditions))
+        .orderBy(orderBy)
+        .limit(limit)
+        .offset(offset),
+      this.db
+        .select({ total: count() })
+        .from(products)
+        .where(and(...conditions)),
+    ]);
+
+    const total = countResult[0]?.total ?? 0;
+
+    if (productsResult.length === 0) {
+      return {
+        data: [],
+        ...this.paginationMeta(total, page, limit),
+      };
+    }
+
+    const productIds = productsResult.map(p => p.id);
+
+    // Fetch tours for tour-type products
+    const tourProducts = productsResult.filter(p => p.type === "tour");
+    let toursMap = new Map<string, Tour>();
+    let scheduleStatsMap = new Map<string, TourScheduleStats>();
+
+    if (tourProducts.length > 0) {
+      // Get tours by productId
+      const toursResult = await this.db
+        .select()
+        .from(tours)
+        .where(
+          and(
+            inArray(tours.productId, tourProducts.map(p => p.id)),
+            eq(tours.organizationId, this.organizationId)
+          )
+        );
+
+      toursMap = new Map(toursResult.map(t => [t.productId, t]));
+
+      // Get schedule stats for tours
+      if (toursResult.length > 0) {
+        const tourIds = toursResult.map(t => t.id);
+        const now = new Date().toISOString();
+
+        const scheduleStats = await this.db
+          .select({
+            tourId: schedules.tourId,
+            upcomingCount: sql<number>`COUNT(*)::int`,
+            totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)::int`,
+            totalBooked: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)::int`,
+            nextScheduleDate: sql<Date | null>`MIN(${schedules.startsAt})`,
+          })
+          .from(schedules)
+          .where(
+            and(
+              inArray(schedules.tourId, tourIds),
+              eq(schedules.organizationId, this.organizationId),
+              sql`${schedules.startsAt} > ${now}`,
+              sql`${schedules.status} != 'cancelled'`
+            )
+          )
+          .groupBy(schedules.tourId);
+
+        scheduleStatsMap = new Map(
+          scheduleStats.map(s => {
+            const upcomingCount = Number(s.upcomingCount) || 0;
+            const totalCapacity = Number(s.totalCapacity) || 0;
+            const totalBooked = Number(s.totalBooked) || 0;
+            const utilizationPercent = totalCapacity > 0
+              ? Math.round((totalBooked / totalCapacity) * 100)
+              : 0;
+
+            return [s.tourId, {
+              upcomingCount,
+              totalCapacity,
+              totalBooked,
+              utilizationPercent,
+              nextScheduleDate: s.nextScheduleDate,
+            }];
+          })
+        );
+      }
+    }
+
+    // Transform to unified products
+    const unifiedProducts: UnifiedProduct[] = productsResult.map(product => {
+      const unified: UnifiedProduct = { ...product };
+
+      if (product.type === "tour") {
+        const tour = toursMap.get(product.id);
+        if (tour) {
+          const stats = scheduleStatsMap.get(tour.id) || {
+            upcomingCount: 0,
+            totalCapacity: 0,
+            totalBooked: 0,
+            utilizationPercent: 0,
+            nextScheduleDate: null,
+          };
+
+          unified.tour = {
+            id: tour.id,
+            durationMinutes: tour.durationMinutes,
+            maxParticipants: tour.maxParticipants,
+            scheduleStats: stats,
+          };
+        }
+      }
+
+      return unified;
+    });
+
+    return {
+      data: unifiedProducts,
       ...this.paginationMeta(total, page, limit),
     };
   }
@@ -286,15 +469,13 @@ export class ProductService extends BaseService {
    */
   async getStats(): Promise<{
     total: number;
-    byType: { tour: number; service: number; good: number };
+    byType: { tour: number };
     byStatus: { draft: number; active: number; archived: number };
   }> {
     const statsResult = await this.db
       .select({
         total: count(),
         tourCount: sql<number>`COUNT(*) FILTER (WHERE ${products.type} = 'tour')`,
-        serviceCount: sql<number>`COUNT(*) FILTER (WHERE ${products.type} = 'service')`,
-        goodCount: sql<number>`COUNT(*) FILTER (WHERE ${products.type} = 'good')`,
         draftCount: sql<number>`COUNT(*) FILTER (WHERE ${products.status} = 'draft')`,
         activeCount: sql<number>`COUNT(*) FILTER (WHERE ${products.status} = 'active')`,
         archivedCount: sql<number>`COUNT(*) FILTER (WHERE ${products.status} = 'archived')`,
@@ -308,8 +489,6 @@ export class ProductService extends BaseService {
       total: stats?.total ?? 0,
       byType: {
         tour: Number(stats?.tourCount ?? 0),
-        service: Number(stats?.serviceCount ?? 0),
-        good: Number(stats?.goodCount ?? 0),
       },
       byStatus: {
         draft: Number(stats?.draftCount ?? 0),

@@ -131,6 +131,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <Comp
           className={cn(buttonVariants({ variant, size, className }))}
           ref={ref}
+          suppressHydrationWarning
           {...props}
         >
           {children}
@@ -148,6 +149,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={isDisabled}
         aria-busy={loading}
+        suppressHydrationWarning
         {...props}
       >
         {loading ? (

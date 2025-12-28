@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   Calendar,
   ClipboardList,
-  Map,
+  MapPin,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -24,7 +24,7 @@ const navItems: NavItem[] = [
   { name: 'Home', href: '', icon: LayoutDashboard },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Bookings', href: '/bookings', icon: ClipboardList },
-  { name: 'Tours', href: '/tours', icon: Map },
+  { name: 'Tours', href: '/tours', icon: MapPin },
   { name: 'Customers', href: '/customers', icon: Users },
 ];
 

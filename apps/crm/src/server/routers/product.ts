@@ -65,6 +65,24 @@ export const productRouter = createRouter({
       );
     }),
 
+  // Unified products with type-specific extensions (tours with schedule stats, services with config)
+  listWithExtensions: protectedProcedure
+    .input(
+      z.object({
+        filters: productFilterSchema.optional(),
+        pagination: paginationSchema.optional(),
+        sort: sortSchema.optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.product.getAllWithExtensions(
+        input.filters,
+        input.pagination,
+        input.sort
+      );
+    }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {

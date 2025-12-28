@@ -256,11 +256,19 @@ export class BookingService extends BaseService {
         .orderBy(orderBy)
         .limit(limit)
         .offset(offset),
-      this.db
-        .select({ total: count() })
-        .from(bookings)
-        .leftJoin(customers, eq(bookings.customerId, customers.id))
-        .where(and(...conditions)),
+      // Count query needs to join schedules if filtering by scheduleDateRange
+      filters.scheduleDateRange
+        ? this.db
+            .select({ total: count() })
+            .from(bookings)
+            .leftJoin(customers, eq(bookings.customerId, customers.id))
+            .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
+            .where(and(...conditions))
+        : this.db
+            .select({ total: count() })
+            .from(bookings)
+            .leftJoin(customers, eq(bookings.customerId, customers.id))
+            .where(and(...conditions)),
     ]);
 
     const total = countResult[0]?.total ?? 0;

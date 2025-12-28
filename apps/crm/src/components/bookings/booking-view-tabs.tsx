@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
-type BookingView = "needs-action" | "upcoming" | "today" | "all" | "find-availability";
+type BookingView = "needs-action" | "all" | "find-availability";
 
 export interface BookingViewTabsProps {
   activeView: BookingView;
@@ -26,9 +26,7 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   { id: "all", label: "All Bookings", shortcut: "1" },
   { id: "needs-action", label: "Needs Action", shortcut: "2" },
-  { id: "upcoming", label: "Upcoming", shortcut: "3" },
-  { id: "today", label: "Today", shortcut: "4" },
-  { id: "find-availability", label: "Find Availability", shortcut: "5" },
+  { id: "find-availability", label: "Find Availability", shortcut: "3" },
 ];
 
 export function BookingViewTabs({
@@ -53,13 +51,11 @@ export function BookingViewTabs({
         return;
       }
 
-      // Handle numeric keys 1-5
+      // Handle numeric keys 1-3
       const keyMap: Record<string, BookingView> = {
         "1": "all",
         "2": "needs-action",
-        "3": "upcoming",
-        "4": "today",
-        "5": "find-availability",
+        "3": "find-availability",
       };
 
       const view = keyMap[e.key];
@@ -87,10 +83,6 @@ export function BookingViewTabs({
     switch (view) {
       case "needs-action":
         return counts.needsAction;
-      case "upcoming":
-        return counts.upcoming;
-      case "today":
-        return counts.today;
       default:
         return undefined;
     }

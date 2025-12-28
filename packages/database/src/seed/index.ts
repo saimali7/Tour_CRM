@@ -83,116 +83,165 @@ async function seed() {
 }
 
 async function seedOrgData(orgId: string) {
-  // Create test tours
+  // Create test tours (with products first per new hierarchy)
   console.log("Creating test tours...");
-  const tours = await db
-    .insert(schema.tours)
-    .values([
-      {
+
+  // Define tour data
+  const tourData = [
+    {
+      name: "Golden Gate Bridge Walking Tour",
+      slug: "golden-gate-walking-tour",
+      description:
+        "Experience the iconic Golden Gate Bridge up close on this guided walking tour. Learn about the engineering marvel and history of San Francisco's most famous landmark.",
+      shortDescription:
+        "A scenic walk across the Golden Gate Bridge with expert commentary.",
+      durationMinutes: 120,
+      minParticipants: 1,
+      maxParticipants: 15,
+      basePrice: "49.00",
+      currency: "USD",
+      meetingPoint: "Golden Gate Bridge Welcome Center",
+      meetingPointDetails:
+        "Meet at the statue near the main entrance. Look for the guide with the orange umbrella.",
+      category: "Walking Tour",
+      tags: ["outdoor", "sightseeing", "photography", "family-friendly"],
+      includes: [
+        "Expert guide",
+        "Historical commentary",
+        "Photo opportunities",
+        "Bottled water",
+      ],
+      excludes: ["Transportation to/from meeting point", "Gratuities"],
+      requirements: [
+        "Comfortable walking shoes",
+        "Weather-appropriate clothing",
+        "Camera recommended",
+      ],
+      status: "active" as const,
+      isPublic: true,
+    },
+    {
+      name: "Alcatraz Night Tour",
+      slug: "alcatraz-night-tour",
+      description:
+        "Visit the legendary Alcatraz Island as the sun sets over San Francisco Bay. This evening tour offers a unique atmosphere and smaller crowds.",
+      shortDescription:
+        "An evening tour of Alcatraz Island with dramatic views and stories.",
+      durationMinutes: 180,
+      minParticipants: 1,
+      maxParticipants: 30,
+      basePrice: "89.00",
+      currency: "USD",
+      meetingPoint: "Pier 33, Alcatraz Landing",
+      meetingPointDetails:
+        "Check in at the ticket booth 30 minutes before departure.",
+      category: "Historical Tour",
+      tags: ["historical", "island", "evening", "popular"],
+      includes: [
+        "Ferry transportation",
+        "Audio guide",
+        "Access to cellhouse",
+        "Expert guide presentation",
+      ],
+      excludes: ["Food and drinks", "Gratuities"],
+      requirements: [
+        "Warm layers (it gets cold)",
+        "Comfortable walking shoes",
+        "Valid ID required",
+      ],
+      status: "active" as const,
+      isPublic: true,
+    },
+    {
+      name: "San Francisco Food Tour",
+      slug: "sf-food-tour",
+      description:
+        "Taste your way through San Francisco's diverse culinary scene. Visit local favorites in the Mission, North Beach, and Chinatown neighborhoods.",
+      shortDescription:
+        "A culinary adventure through SF's best food neighborhoods.",
+      durationMinutes: 240,
+      minParticipants: 2,
+      maxParticipants: 12,
+      basePrice: "129.00",
+      currency: "USD",
+      meetingPoint: "Ferry Building Marketplace",
+      meetingPointDetails:
+        "Meet inside, near the coffee shop to the left of the main entrance.",
+      category: "Food & Drink",
+      tags: ["food", "culinary", "walking", "local-favorites"],
+      includes: [
+        "8+ food tastings",
+        "Local guide",
+        "Food history and stories",
+        "Neighborhood walking tour",
+      ],
+      excludes: ["Additional drinks", "Gratuities", "Transportation"],
+      requirements: [
+        "Come hungry!",
+        "Comfortable walking shoes",
+        "Please inform us of dietary restrictions",
+      ],
+      status: "active" as const,
+      isPublic: true,
+    },
+  ];
+
+  // Create products and tours together
+  const tours = [];
+  for (const data of tourData) {
+    // Create product first
+    const [product] = await db
+      .insert(schema.products)
+      .values({
         id: createId(),
         organizationId: orgId,
-        name: "Golden Gate Bridge Walking Tour",
-        slug: "golden-gate-walking-tour",
-        description:
-          "Experience the iconic Golden Gate Bridge up close on this guided walking tour. Learn about the engineering marvel and history of San Francisco's most famous landmark.",
-        shortDescription:
-          "A scenic walk across the Golden Gate Bridge with expert commentary.",
-        durationMinutes: 120,
-        minParticipants: 1,
-        maxParticipants: 15,
-        basePrice: "49.00",
-        currency: "USD",
-        meetingPoint: "Golden Gate Bridge Welcome Center",
-        meetingPointDetails:
-          "Meet at the statue near the main entrance. Look for the guide with the orange umbrella.",
-        category: "Walking Tour",
-        tags: ["outdoor", "sightseeing", "photography", "family-friendly"],
-        includes: [
-          "Expert guide",
-          "Historical commentary",
-          "Photo opportunities",
-          "Bottled water",
-        ],
-        excludes: ["Transportation to/from meeting point", "Gratuities"],
-        requirements: [
-          "Comfortable walking shoes",
-          "Weather-appropriate clothing",
-          "Camera recommended",
-        ],
-        status: "active",
-        isPublic: true,
-      },
-      {
-        id: createId(),
-        organizationId: orgId,
-        name: "Alcatraz Night Tour",
-        slug: "alcatraz-night-tour",
-        description:
-          "Visit the legendary Alcatraz Island as the sun sets over San Francisco Bay. This evening tour offers a unique atmosphere and smaller crowds.",
-        shortDescription:
-          "An evening tour of Alcatraz Island with dramatic views and stories.",
-        durationMinutes: 180,
-        minParticipants: 1,
-        maxParticipants: 30,
-        basePrice: "89.00",
-        currency: "USD",
-        meetingPoint: "Pier 33, Alcatraz Landing",
-        meetingPointDetails:
-          "Check in at the ticket booth 30 minutes before departure.",
-        category: "Historical Tour",
-        tags: ["historical", "island", "evening", "popular"],
-        includes: [
-          "Ferry transportation",
-          "Audio guide",
-          "Access to cellhouse",
-          "Expert guide presentation",
-        ],
-        excludes: ["Food and drinks", "Gratuities"],
-        requirements: [
-          "Warm layers (it gets cold)",
-          "Comfortable walking shoes",
-          "Valid ID required",
-        ],
-        status: "active",
-        isPublic: true,
-      },
-      {
-        id: createId(),
-        organizationId: orgId,
-        name: "San Francisco Food Tour",
-        slug: "sf-food-tour",
-        description:
-          "Taste your way through San Francisco's diverse culinary scene. Visit local favorites in the Mission, North Beach, and Chinatown neighborhoods.",
-        shortDescription:
-          "A culinary adventure through SF's best food neighborhoods.",
-        durationMinutes: 240,
-        minParticipants: 2,
-        maxParticipants: 12,
-        basePrice: "129.00",
-        currency: "USD",
-        meetingPoint: "Ferry Building Marketplace",
-        meetingPointDetails:
-          "Meet inside, near the coffee shop to the left of the main entrance.",
-        category: "Food & Drink",
-        tags: ["food", "culinary", "walking", "local-favorites"],
-        includes: [
-          "8+ food tastings",
-          "Local guide",
-          "Food history and stories",
-          "Neighborhood walking tour",
-        ],
-        excludes: ["Additional drinks", "Gratuities", "Transportation"],
-        requirements: [
-          "Come hungry!",
-          "Comfortable walking shoes",
-          "Please inform us of dietary restrictions",
-        ],
-        status: "active",
-        isPublic: true,
-      },
-    ])
-    .onConflictDoNothing()
-    .returning();
+        type: "tour",
+        name: data.name,
+        slug: data.slug,
+        description: data.description,
+        shortDescription: data.shortDescription,
+        status: data.status,
+        visibility: data.isPublic ? "public" : "private",
+        basePrice: data.basePrice,
+        currency: data.currency,
+        tags: data.tags,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (product) {
+      // Create tour with productId
+      const [tour] = await db
+        .insert(schema.tours)
+        .values({
+          id: createId(),
+          organizationId: orgId,
+          productId: product.id,
+          name: data.name,
+          slug: data.slug,
+          description: data.description,
+          shortDescription: data.shortDescription,
+          durationMinutes: data.durationMinutes,
+          minParticipants: data.minParticipants,
+          maxParticipants: data.maxParticipants,
+          basePrice: data.basePrice,
+          currency: data.currency,
+          meetingPoint: data.meetingPoint,
+          meetingPointDetails: data.meetingPointDetails,
+          category: data.category,
+          tags: data.tags,
+          includes: data.includes,
+          excludes: data.excludes,
+          requirements: data.requirements,
+          status: data.status,
+          isPublic: data.isPublic,
+        })
+        .onConflictDoNothing()
+        .returning();
+
+      if (tour) tours.push(tour);
+    }
+  }
 
   console.log(`  ✓ Created ${tours.length} tours\n`);
 
@@ -352,17 +401,18 @@ async function seedOrgData(orgId: string) {
   const paymentsToCreate = [];
   const participantsToCreate = [];
 
-  // Get tomorrow's schedules for bookings
+  // Get today's and tomorrow's schedules for bookings
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
   const schedulesForBookings = createdSchedules.filter((s) => {
     const scheduleDate = new Date(s.startsAt);
-    return scheduleDate.getDate() === tomorrow.getDate();
+    // Include both today and tomorrow
+    return scheduleDate.getDate() === today.getDate() || scheduleDate.getDate() === tomorrow.getDate();
   });
 
-  // Create 3-8 bookings per schedule
-  for (const schedule of schedulesForBookings.slice(0, 3)) {
+  // Create 3-8 bookings per schedule (use up to 6 schedules for more demo data)
+  for (const schedule of schedulesForBookings.slice(0, 6)) {
     const numBookings = Math.floor(Math.random() * 5) + 3;
 
     for (let i = 0; i < numBookings; i++) {

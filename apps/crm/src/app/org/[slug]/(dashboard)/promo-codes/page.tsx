@@ -18,7 +18,6 @@ import {
   Users,
   Percent,
   Package,
-  CalendarClock,
   Briefcase,
 } from "lucide-react";
 import Link from "next/link";
@@ -265,10 +264,10 @@ export default function PromoCodesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header: Catalog Title + Tabs + Create Code */}
+      {/* Header: Products Title + Tabs + Create Code */}
       <header className="space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-foreground">Catalog</h1>
+          <h1 className="text-lg font-semibold text-foreground">Products</h1>
           <div className="flex items-center gap-3">
             {saveSuccess && (
               <div className="flex items-center gap-2 text-success bg-success/10 px-4 py-2 rounded-lg">
@@ -290,7 +289,7 @@ export default function PromoCodesPage() {
           </div>
         </div>
 
-        {/* Catalog Tabs */}
+        {/* Product Type Tabs */}
         <nav className="flex items-center gap-1 border-b border-border -mb-px">
           <Link
             href={`/org/${slug}/tours` as Route}
@@ -310,13 +309,6 @@ export default function PromoCodesPage() {
             <Tag className="h-4 w-4" />
             Pricing
           </button>
-          <Link
-            href={`/org/${slug}/availability` as Route}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors -mb-px"
-          >
-            <CalendarClock className="h-4 w-4" />
-            Schedules
-          </Link>
         </nav>
       </header>
 

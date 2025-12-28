@@ -153,6 +153,7 @@ export default function TourDetailPage() {
           name: tour.name,
           slug: tour.slug,
           status: tour.status,
+          productId: tour.productId,
         }}
         orgSlug={slug}
         onPublish={() => publishMutation.mutate({ id: tourId })}

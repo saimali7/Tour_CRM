@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MoreVertical, Archive, Pause, Play, Trash2, Copy } from "lucide-react";
+import { ArrowLeft, MoreVertical, Archive, Pause, Play, Trash2, Copy, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ interface TourPageHeaderProps {
     name: string;
     slug: string | null;
     status: "draft" | "active" | "paused" | "archived";
+    productId?: string | null;
   };
   orgSlug: string;
   onPublish?: () => void;
@@ -64,9 +65,17 @@ export function TourPageHeader({
               {tour.status}
             </span>
           </div>
-          {tour.slug && (
-            <p className="text-muted-foreground mt-1">{tour.slug}</p>
-          )}
+          <div className="flex items-center gap-3 mt-1">
+            {tour.slug && (
+              <p className="text-muted-foreground">{tour.slug}</p>
+            )}
+            {tour.productId && (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Package className="h-3 w-3" />
+                Linked to Product
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
