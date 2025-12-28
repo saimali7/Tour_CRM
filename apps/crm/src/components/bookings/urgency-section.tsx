@@ -68,47 +68,57 @@ export function UrgencySection({
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
-      {/* Header Bar */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
+      {/* Header Bar - div wrapper with button inside to avoid button nesting */}
+      <div
         className={cn(
-          "w-full flex items-center gap-3 px-4 py-3 border-l-4 transition-all duration-150",
+          "flex items-center gap-3 px-4 py-3 border-l-4 transition-all duration-150",
           config.borderColor,
-          config.bgColor,
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          config.bgColor
         )}
-        aria-expanded={isExpanded}
-        aria-controls={`urgency-section-${urgency}`}
       >
-        {/* Icon */}
-        <Icon className={cn("h-5 w-5 flex-shrink-0", config.iconColor)} />
+        {/* Clickable expand/collapse area */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex-1 flex items-center gap-3 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+          aria-expanded={isExpanded}
+          aria-controls={`urgency-section-${urgency}`}
+        >
+          {/* Icon */}
+          <Icon className={cn("h-5 w-5 flex-shrink-0", config.iconColor)} />
 
-        {/* Title and Count */}
-        <div className="flex-1 flex items-center gap-2 min-w-0">
-          <h3 className="text-sm font-medium text-foreground">{title}</h3>
-          <Badge
+          {/* Title and Count */}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <h3 className="text-sm font-medium text-foreground">{title}</h3>
+            <Badge
+              className={cn(
+                "px-2 py-0.5 border-transparent",
+                config.badgeBg,
+                config.badgeText
+              )}
+            >
+              {count}
+            </Badge>
+          </div>
+
+          {/* Expand/Collapse Chevron */}
+          <ChevronDown
             className={cn(
-              "px-2 py-0.5 border-transparent",
-              config.badgeBg,
-              config.badgeText
+              "h-4 w-4 text-muted-foreground transition-transform duration-200 flex-shrink-0",
+              isExpanded && "rotate-180"
             )}
-          >
-            {count}
-          </Badge>
-        </div>
+            aria-hidden="true"
+          />
+        </button>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - outside the button to avoid nesting */}
         {actions && actions.length > 0 && (
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
             {actions.map((action, idx) => (
               <Button
                 key={idx}
                 size="sm"
                 variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  action.onClick();
-                }}
+                onClick={action.onClick}
                 disabled={action.loading}
                 className="h-7 px-3 text-xs"
               >
@@ -120,16 +130,7 @@ export function UrgencySection({
             ))}
           </div>
         )}
-
-        {/* Expand/Collapse Chevron */}
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 text-muted-foreground transition-transform duration-200 flex-shrink-0",
-            isExpanded && "rotate-180"
-          )}
-          aria-hidden="true"
-        />
-      </button>
+      </div>
 
       {/* Content */}
       <div
