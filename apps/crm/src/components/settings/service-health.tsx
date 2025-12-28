@@ -13,14 +13,16 @@ import {
   XCircle,
   AlertCircle,
   RefreshCw,
-  ExternalLink,
   Play,
   Loader2,
+  FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type ServiceStatus = "connected" | "not_configured" | "error";
 type ServiceName = "database" | "authentication" | "payments" | "email" | "automations" | "storage";
+type FunctionalTestService = "database" | "email" | "storage" | "payments" | "automations";
 
 interface ServiceHealth {
   name: string;
@@ -33,6 +35,7 @@ interface TestResult {
   success: boolean;
   message: string;
   latency?: number;
+  details?: Record<string, unknown>;
 }
 
 const serviceIcons: Record<string, typeof Database> = {
@@ -60,6 +63,14 @@ const serviceDescriptions: Record<string, string> = {
   email: "Resend transactional emails",
   automations: "Inngest background workflows",
   storage: "Supabase file storage",
+};
+
+const functionalTestDescriptions: Record<string, string> = {
+  database: "Tests CREATE, INSERT, SELECT, DELETE operations",
+  email: "Sends a real test email to verify delivery",
+  storage: "Tests upload, download, and delete operations",
+  payments: "Creates and cancels a test payment intent",
+  automations: "Sends a test event to Inngest",
 };
 
 function StatusBadge({ status }: { status: ServiceStatus }) {
@@ -91,18 +102,31 @@ function StatusBadge({ status }: { status: ServiceStatus }) {
 function ServiceCard({
   service,
   onTest,
+  onFunctionalTest,
   testResult,
-  isTesting
+  functionalTestResult,
+  isTesting,
+  isFunctionalTesting,
+  testEmail,
+  onTestEmailChange,
 }: {
   service: ServiceHealth;
   onTest: () => void;
+  onFunctionalTest: () => void;
   testResult?: TestResult;
+  functionalTestResult?: TestResult;
   isTesting: boolean;
+  isFunctionalTesting: boolean;
+  testEmail?: string;
+  onTestEmailChange?: (email: string) => void;
 }) {
   const Icon = serviceIcons[service.name] || Database;
   const label = serviceLabels[service.name] || service.name;
   const description = serviceDescriptions[service.name] || "";
   const canTest = service.status !== "not_configured";
+  const hasFunctionalTest = service.name !== "authentication";
+  const functionalDescription = functionalTestDescriptions[service.name];
+  const needsEmail = service.name === "email";
 
   return (
     <div
@@ -142,7 +166,7 @@ function ServiceCard({
             </p>
           )}
 
-          {/* Test Result */}
+          {/* Connection Test Result */}
           {testResult && (
             <div className={`mt-2 p-2 rounded text-xs ${
               testResult.success
@@ -151,9 +175,9 @@ function ServiceCard({
             }`}>
               <div className="flex items-center gap-1.5">
                 {testResult.success ? (
-                  <CheckCircle2 className="h-3 w-3" />
+                  <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
                 ) : (
-                  <XCircle className="h-3 w-3" />
+                  <XCircle className="h-3 w-3 flex-shrink-0" />
                 )}
                 <span className="font-medium">{testResult.message}</span>
                 {testResult.latency && (
@@ -163,13 +187,52 @@ function ServiceCard({
             </div>
           )}
 
-          {/* Test Button */}
-          <div className="mt-3">
+          {/* Functional Test Result */}
+          {functionalTestResult && (
+            <div className={`mt-2 p-2 rounded text-xs ${
+              functionalTestResult.success
+                ? "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                : "bg-destructive/10 text-destructive border border-destructive/20"
+            }`}>
+              <div className="flex items-center gap-1.5">
+                {functionalTestResult.success ? (
+                  <FlaskConical className="h-3 w-3 flex-shrink-0" />
+                ) : (
+                  <XCircle className="h-3 w-3 flex-shrink-0" />
+                )}
+                <span className="font-medium">{functionalTestResult.message}</span>
+                {functionalTestResult.latency && (
+                  <span className="text-muted-foreground ml-auto">{functionalTestResult.latency}ms</span>
+                )}
+              </div>
+              {functionalTestResult.details && (
+                <div className="mt-1.5 text-[10px] text-muted-foreground font-mono">
+                  {JSON.stringify(functionalTestResult.details)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Email input for email test */}
+          {needsEmail && hasFunctionalTest && canTest && (
+            <div className="mt-3">
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={testEmail || ""}
+                onChange={(e) => onTestEmailChange?.(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+          )}
+
+          {/* Test Buttons */}
+          <div className="mt-3 flex gap-2 flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={onTest}
-              disabled={!canTest || isTesting}
+              disabled={!canTest || isTesting || isFunctionalTesting}
               className="h-7 text-xs"
             >
               {isTesting ? (
@@ -180,11 +243,41 @@ function ServiceCard({
               ) : (
                 <>
                   <Play className="h-3 w-3 mr-1.5" />
-                  Test Connection
+                  Ping
                 </>
               )}
             </Button>
+
+            {hasFunctionalTest && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onFunctionalTest}
+                disabled={!canTest || isTesting || isFunctionalTesting || (needsEmail && !testEmail)}
+                className="h-7 text-xs"
+                title={functionalDescription}
+              >
+                {isFunctionalTesting ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <FlaskConical className="h-3 w-3 mr-1.5" />
+                    Full Test
+                  </>
+                )}
+              </Button>
+            )}
           </div>
+
+          {/* Functional test description */}
+          {hasFunctionalTest && functionalDescription && (
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Full Test: {functionalDescription}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -198,7 +291,10 @@ interface ServiceHealthPanelProps {
 
 export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPanelProps) {
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+  const [functionalTestResults, setFunctionalTestResults] = useState<Record<string, TestResult>>({});
   const [testingService, setTestingService] = useState<string | null>(null);
+  const [functionalTestingService, setFunctionalTestingService] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState("");
 
   const { data, isLoading, refetch, isRefetching } =
     trpc.organization.getServiceHealth.useQuery(undefined, {
@@ -223,6 +319,23 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
     },
   });
 
+  const functionalTestMutation = trpc.organization.functionalTestService.useMutation({
+    onSuccess: (result, variables) => {
+      setFunctionalTestResults(prev => ({
+        ...prev,
+        [variables.service]: result,
+      }));
+      setFunctionalTestingService(null);
+    },
+    onError: (error, variables) => {
+      setFunctionalTestResults(prev => ({
+        ...prev,
+        [variables.service]: { success: false, message: error.message },
+      }));
+      setFunctionalTestingService(null);
+    },
+  });
+
   const handleTest = (serviceName: string) => {
     setTestingService(serviceName);
     setTestResults(prev => {
@@ -233,11 +346,23 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
     testMutation.mutate({ service: serviceName as ServiceName });
   };
 
+  const handleFunctionalTest = (serviceName: string) => {
+    setFunctionalTestingService(serviceName);
+    setFunctionalTestResults(prev => {
+      const newResults = { ...prev };
+      delete newResults[serviceName];
+      return newResults;
+    });
+    functionalTestMutation.mutate({
+      service: serviceName as FunctionalTestService,
+      testEmail: serviceName === "email" ? testEmail : undefined,
+    });
+  };
+
   const handleTestAll = () => {
     if (!data) return;
     const testableServices = data.services.filter(s => s.status !== "not_configured");
     testableServices.forEach((service, index) => {
-      // Stagger tests to avoid overwhelming the server
       setTimeout(() => {
         handleTest(service.name);
       }, index * 500);
@@ -282,11 +407,11 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
             variant="outline"
             size="sm"
             onClick={handleTestAll}
-            disabled={testingService !== null}
+            disabled={testingService !== null || functionalTestingService !== null}
             className="h-8"
           >
             <Play className="h-3.5 w-3.5 mr-1.5" />
-            Test All
+            Ping All
           </Button>
           <button
             onClick={() => refetch()}
@@ -336,8 +461,13 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
             key={service.name}
             service={service}
             onTest={() => handleTest(service.name)}
+            onFunctionalTest={() => handleFunctionalTest(service.name)}
             testResult={testResults[service.name]}
+            functionalTestResult={functionalTestResults[service.name]}
             isTesting={testingService === service.name}
+            isFunctionalTesting={functionalTestingService === service.name}
+            testEmail={service.name === "email" ? testEmail : undefined}
+            onTestEmailChange={service.name === "email" ? setTestEmail : undefined}
           />
         ))}
       </div>
@@ -348,7 +478,7 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
           Last checked: {new Date(data.timestamp).toLocaleTimeString()}
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          Click &quot;Test Connection&quot; to verify each service is actually reachable.
+          <strong>Ping:</strong> Quick connection check | <strong>Full Test:</strong> End-to-end functional test
         </p>
       </div>
     </div>

@@ -405,4 +405,236 @@ export const organizationRouter = createRouter({
           return { success: false, message: "Unknown service" };
       }
     }),
+
+  // Functional test - actually exercises the service end-to-end
+  functionalTestService: adminProcedure
+    .input(z.object({
+      service: z.enum(["database", "email", "storage", "payments", "automations"]),
+      testEmail: z.string().email().optional(), // Required for email test
+    }))
+    .mutation(async ({ ctx, input }): Promise<{
+      success: boolean;
+      message: string;
+      details?: Record<string, unknown>;
+      latency?: number;
+    }> => {
+      const startTime = Date.now();
+      const orgId = ctx.orgContext.organizationId;
+
+      switch (input.service) {
+        case "database": {
+          // Test: Create, read, update, delete a test record
+          try {
+            const { db, sql } = await import("@tour/database");
+
+            // Test write
+            const testId = `test_${Date.now()}`;
+            await db.execute(sql`
+              CREATE TEMP TABLE IF NOT EXISTS _health_check (
+                id TEXT PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT NOW()
+              )
+            `);
+            await db.execute(sql`INSERT INTO _health_check (id) VALUES (${testId})`);
+
+            // Test read
+            const result = await db.execute(sql`SELECT * FROM _health_check WHERE id = ${testId}`);
+
+            // Test delete
+            await db.execute(sql`DELETE FROM _health_check WHERE id = ${testId}`);
+
+            return {
+              success: true,
+              message: "Database CRUD operations working",
+              details: { operations: ["CREATE", "INSERT", "SELECT", "DELETE"], rowsReturned: result.length },
+              latency: Date.now() - startTime,
+            };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Database test failed" };
+          }
+        }
+
+        case "email": {
+          // Test: Send an actual test email
+          if (!input.testEmail) {
+            return { success: false, message: "Test email address required" };
+          }
+          if (!process.env.RESEND_API_KEY) {
+            return { success: false, message: "Resend not configured" };
+          }
+          try {
+            const { Resend } = await import("resend");
+            const resend = new Resend(process.env.RESEND_API_KEY);
+
+            // Get org for fromEmail
+            const { db, eq, organizations } = await import("@tour/database");
+            const org = await db.query.organizations.findFirst({
+              where: eq(organizations.id, orgId),
+            });
+
+            const fromEmail = org?.fromEmail || "onboarding@resend.dev";
+
+            const { data, error } = await resend.emails.send({
+              from: fromEmail,
+              to: input.testEmail,
+              subject: "🧪 Test Email from Tour CRM",
+              html: `
+                <div style="font-family: sans-serif; padding: 20px;">
+                  <h2>Email Service Test</h2>
+                  <p>This is a test email from your Tour CRM system.</p>
+                  <p>If you received this, your email service is working correctly!</p>
+                  <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;" />
+                  <p style="color: #666; font-size: 12px;">
+                    Sent at: ${new Date().toISOString()}<br/>
+                    Organization: ${org?.name || "Unknown"}
+                  </p>
+                </div>
+              `,
+            });
+
+            if (error) {
+              return { success: false, message: error.message };
+            }
+
+            return {
+              success: true,
+              message: `Test email sent to ${input.testEmail}`,
+              details: { messageId: data?.id, from: fromEmail },
+              latency: Date.now() - startTime,
+            };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Email test failed" };
+          }
+        }
+
+        case "storage": {
+          // Test: Upload, download, delete a test file
+          if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            return { success: false, message: "Supabase storage not configured" };
+          }
+          try {
+            const { createClient } = await import("@supabase/supabase-js");
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+            const testFileName = `_health_check_${Date.now()}.txt`;
+            const testContent = `Health check at ${new Date().toISOString()}`;
+            const bucket = "tour-images";
+
+            // Upload test file
+            const { error: uploadError } = await supabase.storage
+              .from(bucket)
+              .upload(`${orgId}/_tests/${testFileName}`, testContent, {
+                contentType: "text/plain",
+              });
+
+            if (uploadError) {
+              // Bucket might not exist
+              if (uploadError.message.includes("not found")) {
+                return { success: false, message: `Bucket "${bucket}" not found. Create it in Supabase dashboard.` };
+              }
+              throw uploadError;
+            }
+
+            // Download and verify
+            const { data: downloadData, error: downloadError } = await supabase.storage
+              .from(bucket)
+              .download(`${orgId}/_tests/${testFileName}`);
+
+            if (downloadError) throw downloadError;
+
+            const downloadedContent = await downloadData.text();
+            const contentMatches = downloadedContent === testContent;
+
+            // Cleanup - delete test file
+            await supabase.storage
+              .from(bucket)
+              .remove([`${orgId}/_tests/${testFileName}`]);
+
+            return {
+              success: contentMatches,
+              message: contentMatches ? "Storage upload/download/delete working" : "Content mismatch after download",
+              details: { bucket, operations: ["upload", "download", "delete"], fileSize: testContent.length },
+              latency: Date.now() - startTime,
+            };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Storage test failed" };
+          }
+        }
+
+        case "payments": {
+          // Test: Create and cancel a test payment intent
+          if (!process.env.STRIPE_SECRET_KEY) {
+            return { success: false, message: "Stripe not configured" };
+          }
+          try {
+            const { default: Stripe } = await import("stripe");
+            const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+            const isTest = process.env.STRIPE_SECRET_KEY.startsWith("sk_test_");
+
+            if (!isTest) {
+              // Don't create real payment intents in live mode
+              const balance = await stripe.balance.retrieve();
+              return {
+                success: true,
+                message: "Stripe Live mode - skipping payment intent test",
+                details: { mode: "live", available: balance.available },
+                latency: Date.now() - startTime,
+              };
+            }
+
+            // Create a test payment intent
+            const paymentIntent = await stripe.paymentIntents.create({
+              amount: 100, // $1.00 in cents
+              currency: "usd",
+              metadata: { test: "true", orgId },
+              automatic_payment_methods: { enabled: true },
+            });
+
+            // Immediately cancel it
+            await stripe.paymentIntents.cancel(paymentIntent.id);
+
+            return {
+              success: true,
+              message: "Payment intent create/cancel working",
+              details: { mode: "test", paymentIntentId: paymentIntent.id, status: "canceled" },
+              latency: Date.now() - startTime,
+            };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Payment test failed" };
+          }
+        }
+
+        case "automations": {
+          // Test: Send a test event to Inngest
+          if (!process.env.INNGEST_EVENT_KEY) {
+            return { success: false, message: "Inngest event key not configured" };
+          }
+          try {
+            const { inngest } = await import("@/inngest");
+
+            // Send a test event
+            const result = await inngest.send({
+              name: "test/health-check",
+              data: {
+                organizationId: orgId,
+                timestamp: new Date().toISOString(),
+                test: true,
+              },
+            });
+
+            return {
+              success: true,
+              message: "Test event sent to Inngest",
+              details: { eventIds: result.ids },
+              latency: Date.now() - startTime,
+            };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Inngest test failed" };
+          }
+        }
+
+        default:
+          return { success: false, message: "Unknown service" };
+      }
+    }),
 });

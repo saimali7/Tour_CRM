@@ -243,10 +243,24 @@ type BookingEvents = {
   };
 };
 
+// Test/health check events
+type TestEvents = {
+  "test/health-check": {
+    data: {
+      organizationId: string;
+      timestamp: string;
+      test: boolean;
+    };
+  };
+};
+
+// Combined events
+type AllEvents = BookingEvents & TestEvents;
+
 // Create the Inngest client
 export const inngest = new Inngest({
   id: "tour-crm",
-  schemas: new EventSchemas().fromRecord<BookingEvents>(),
+  schemas: new EventSchemas().fromRecord<AllEvents>(),
 });
 
-export type { BookingEvents };
+export type { BookingEvents, TestEvents, AllEvents };
