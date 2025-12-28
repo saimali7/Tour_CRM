@@ -4,19 +4,12 @@ import { useState, useMemo } from "react";
 import {
   Users,
   CheckCircle2,
-  AlertCircle,
-  Eye,
   FileText,
   UserPlus,
   Loader2,
-  Clock,
   ChevronRight,
-  CreditCard,
-  AlertTriangle,
+  ChevronDown,
   Phone,
-  Mail,
-  DollarSign,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -46,33 +39,26 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
     };
   } | null>(null);
 
-  // Fetch today's tour runs (grouped by tour + time)
-  const { data: tourRunData, isLoading: tourRunsLoading } = trpc.tourRun.getToday.useQuery();
+  // Track which tour runs are expanded (collapsed by default)
+  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (key: string) => {
+    setExpandedRuns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   // Fetch today's actual bookings
-  const { data: todayBookings, isLoading: bookingsLoading } =
+  const { data: todayBookings, isLoading } =
     trpc.dashboard.getTodayBookings.useQuery(undefined, {
       refetchInterval: 30000,
     });
-
-  const isLoading = tourRunsLoading || bookingsLoading;
-
-  // Calculate actions needed
-  const actionsNeeded = useMemo(() => {
-    if (!todayBookings || !tourRunData) return { guides: 0, unpaid: 0, pending: 0, total: 0 };
-
-    const tourRuns = tourRunData.tourRuns || [];
-    const guidesNeeded = tourRuns.filter(r => r.guidesAssigned < r.guidesRequired).length;
-    const unpaidBookings = todayBookings.filter(b => b.paymentStatus !== "paid").length;
-    const pendingBookings = todayBookings.filter(b => b.status === "pending").length;
-
-    return {
-      guides: guidesNeeded,
-      unpaid: unpaidBookings,
-      pending: pendingBookings,
-      total: guidesNeeded + unpaidBookings + pendingBookings,
-    };
-  }, [todayBookings, tourRunData]);
 
   // Group bookings by tour run (tour + time)
   const groupedBookings = useMemo(() => {
@@ -119,135 +105,94 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
 
   if (isLoading) {
     return (
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-            <Zap className="h-4 w-4 text-primary" />
-            Today&apos;s Focus
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Today&apos;s Tours
           </h2>
         </div>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       </section>
     );
   }
 
   const hasBookings = todayBookings && todayBookings.length > 0;
-  const totalGuests = todayBookings?.reduce((sum, b) => sum + b.participants, 0) || 0;
-  const totalRevenue = todayBookings?.reduce((sum, b) => sum + parseFloat(b.total || "0"), 0) || 0;
 
   return (
-    <section className="space-y-4">
-      {/* Header with Summary */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-            <Zap className="h-4 w-4 text-primary" />
-            Today&apos;s Focus
-          </h2>
-          {hasBookings && (
-            <div className="hidden sm:flex items-center gap-3 text-sm text-muted-foreground">
-              <span><span className="font-semibold text-foreground">{todayBookings?.length}</span> bookings</span>
-              <span><span className="font-semibold text-foreground">{totalGuests}</span> guests</span>
-              <span className="text-primary font-semibold">${totalRevenue.toFixed(0)}</span>
-            </div>
-          )}
-        </div>
-        {actionsNeeded.total > 0 && (
-          <Badge variant="warning" className="gap-1.5">
-            <AlertTriangle className="h-3 w-3" />
-            {actionsNeeded.total} action{actionsNeeded.total !== 1 ? "s" : ""} needed
-          </Badge>
+    <section className="space-y-3">
+      {/* Compact Header - stats are now in MetricsBar at dashboard level */}
+      <div className="flex items-center gap-2">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Today&apos;s Tours
+        </h2>
+        {hasBookings && (
+          <span className="text-xs text-muted-foreground">
+            {groupedBookings.length} tour{groupedBookings.length !== 1 ? "s" : ""}
+          </span>
         )}
       </div>
 
-      {/* Actions Needed Bar */}
-      {actionsNeeded.total > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {actionsNeeded.guides > 0 && (
-            <Link
-              href={`/org/${orgSlug}/guides` as Route}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-            >
-              <UserPlus className="h-4 w-4" />
-              {actionsNeeded.guides} tour{actionsNeeded.guides !== 1 ? "s" : ""} need guide
-            </Link>
-          )}
-          {actionsNeeded.unpaid > 0 && (
-            <Link
-              href={`/org/${orgSlug}/bookings?view=needs-action` as Route}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-colors"
-            >
-              <CreditCard className="h-4 w-4" />
-              {actionsNeeded.unpaid} unpaid
-            </Link>
-          )}
-          {actionsNeeded.pending > 0 && (
-            <Link
-              href={`/org/${orgSlug}/bookings?view=needs-action` as Route}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors"
-            >
-              <AlertCircle className="h-4 w-4" />
-              {actionsNeeded.pending} pending confirmation
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* Empty State */}
+      {/* Empty State - Compressed following design principles */}
       {!hasBookings && (
-        <div className="text-center py-12 rounded-xl border border-dashed border-border bg-muted/20">
-          <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-            <Users className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="text-lg font-medium text-foreground">
-            No bookings for today
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Bookings will appear here when customers book tours.
-          </p>
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-dashed border-border bg-muted/30">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">No bookings for today</span>
         </div>
       )}
 
-      {/* Grouped by Tour Run */}
+      {/* Grouped by Tour Run - Compact spacing */}
       {hasBookings && groupedBookings.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {groupedBookings.map((group) => {
             const needsGuide = group.guidesAssigned < group.guidesRequired;
             const utilization = group.capacity > 0
               ? (group.totalGuests / group.capacity) * 100
               : 0;
 
+            const runKey = `${group.tourId}-${group.time}`;
+            const isExpanded = expandedRuns.has(runKey);
+
             return (
               <div
-                key={`${group.tourId}-${group.time}`}
+                key={runKey}
                 className="rounded-xl border border-border bg-card overflow-hidden"
               >
-                {/* Tour Run Header */}
-                <div className={cn(
-                  "flex items-center justify-between px-4 py-3 border-b",
-                  needsGuide ? "bg-destructive/5 border-destructive/20" : "bg-muted/30 border-border"
-                )}>
+                {/* Tour Run Header - Clickable to expand/collapse */}
+                <button
+                  onClick={() => toggleExpanded(runKey)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-4 py-3 text-left transition-colors",
+                    needsGuide ? "bg-destructive/5" : "bg-muted/30",
+                    "hover:bg-muted/50"
+                  )}
+                >
                   <div className="flex items-center gap-4">
+                    {/* Expand/Collapse indicator */}
+                    <ChevronDown className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      !isExpanded && "-rotate-90"
+                    )} />
+
                     {/* Time */}
                     <div className="text-center">
-                      <p className="text-lg font-bold text-foreground font-mono">{group.time}</p>
+                      <p className="text-base font-bold text-foreground font-mono">{group.time}</p>
                     </div>
 
                     {/* Tour Name + Capacity */}
                     <div>
-                      <Link
-                        href={`/org/${orgSlug}/tours/${group.tourId}` as Route}
-                        className="font-semibold text-foreground hover:text-primary transition-colors"
-                      >
+                      <span className="font-semibold text-foreground">
                         {group.tourName}
-                      </Link>
-                      <div className="flex items-center gap-3 mt-1">
+                      </span>
+                      <div className="flex items-center gap-3 mt-0.5">
                         <span className="text-sm text-muted-foreground">
                           {group.totalGuests}/{group.capacity} guests
                         </span>
-                        <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <span className="text-sm text-muted-foreground">
+                          · {group.bookings.length} booking{group.bookings.length !== 1 ? "s" : ""}
+                        </span>
+                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
                             className={cn(
                               "h-full rounded-full",
@@ -262,56 +207,72 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
                     </div>
                   </div>
 
-                  {/* Guide Status + Actions */}
-                  <div className="flex items-center gap-3">
+                  {/* Guide Status */}
+                  <div className="flex items-center gap-2">
                     {needsGuide ? (
-                      <button
-                        onClick={() => {
-                          const firstBooking = group.bookings[0];
-                          if (firstBooking) {
-                            setAssignState({
-                              isOpen: true,
-                              tourRun: {
-                                tourId: group.tourId,
-                                tourName: group.tourName,
-                                date: new Date(),
-                                time: group.time,
-                                bookingId: firstBooking.bookingId,
-                              },
-                            });
-                          }
-                        }}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                      >
-                        <UserPlus className="h-4 w-4" />
-                        Assign Guide
-                      </button>
+                      <span className="text-sm font-medium text-destructive">
+                        Needs guide
+                      </span>
                     ) : (
-                      <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
-                        <CheckCircle2 className="h-4 w-4" />
+                      <span className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
                         {group.guidesAssigned} guide{group.guidesAssigned !== 1 ? "s" : ""}
                       </span>
                     )}
-                    <Link
-                      href={`/org/${orgSlug}/tour-run?tourId=${group.tourId}&date=${new Date().toISOString().split("T")[0]}&time=${format(group.startsAt, "HH:mm")}` as Route}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                    >
-                      <FileText className="h-4 w-4" />
-                      Manifest
-                    </Link>
                   </div>
-                </div>
+                </button>
 
-                {/* Bookings List */}
-                <div className="divide-y divide-border">
-                  {group.bookings.map((booking) => (
-                    <BookingRow
-                      key={booking.bookingId}
-                      booking={booking}
-                      orgSlug={orgSlug}
-                    />
-                  ))}
-                </div>
+                {/* Expanded Content - Actions + Bookings */}
+                {isExpanded && (
+                  <>
+                    {/* Action buttons row */}
+                    <div className="flex items-center gap-2 px-4 py-2 border-t border-border bg-muted/20">
+                      {needsGuide && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const firstBooking = group.bookings[0];
+                            if (firstBooking) {
+                              setAssignState({
+                                isOpen: true,
+                                tourRun: {
+                                  tourId: group.tourId,
+                                  tourName: group.tourName,
+                                  date: new Date(),
+                                  time: group.time,
+                                  bookingId: firstBooking.bookingId,
+                                },
+                              });
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Assign Guide
+                        </button>
+                      )}
+                      <Link
+                        href={`/org/${orgSlug}/tour-run?tourId=${group.tourId}&date=${new Date().toISOString().split("T")[0]}&time=${format(group.startsAt, "HH:mm")}` as Route}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Manifest
+                      </Link>
+                    </div>
+
+                    {/* Bookings List */}
+                    <div className="divide-y divide-border border-t border-border">
+                      {group.bookings.map((booking) => (
+                        <BookingRow
+                          key={booking.bookingId}
+                          booking={booking}
+                          orgSlug={orgSlug}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             );
           })}

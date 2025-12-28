@@ -172,7 +172,7 @@ export function DayTourSection({
           </div>
         </div>
 
-        {/* Right side: Capacity + Actions */}
+        {/* Right side: Capacity + Expand indicator */}
         <div className="flex items-center gap-4 ml-4">
           {/* Capacity */}
           <div className="flex items-center gap-2">
@@ -187,35 +187,6 @@ export function DayTourSection({
             )}
           </div>
 
-          {/* Assign Guide Button */}
-          {needsGuide && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                // TODO: Open assign guide dialog
-              }}
-            >
-              Assign Guide
-            </Button>
-          )}
-
-          {/* Manifest Link */}
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Link
-              href={`/org/${orgSlug}/tour-run?scheduleId=${schedule.id}` as Route}
-            >
-              <FileText className="h-4 w-4 mr-1.5" />
-              Manifest
-            </Link>
-          </Button>
-
           {/* Expand/Collapse */}
           <ChevronDown
             className={cn(
@@ -225,6 +196,31 @@ export function DayTourSection({
           />
         </div>
       </button>
+
+      {/* Action Bar - Outside the button to avoid nesting issues */}
+      <div className="flex items-center gap-2 px-4 py-2 border-t border-border bg-muted/20">
+        {/* Assign Guide Button */}
+        {needsGuide && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // TODO: Open assign guide dialog
+            }}
+          >
+            Assign Guide
+          </Button>
+        )}
+
+        {/* Manifest Link */}
+        <Link
+          href={`/org/${orgSlug}/tour-run?scheduleId=${schedule.id}` as Route}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+        >
+          <FileText className="h-4 w-4" />
+          Manifest
+        </Link>
+      </div>
 
       {/* Bookings Table */}
       {isExpanded && (

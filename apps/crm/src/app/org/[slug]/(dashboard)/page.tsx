@@ -10,19 +10,13 @@ import {
   Zap,
   ArrowRight,
   Calendar,
-  Clock,
   DollarSign,
   TrendingUp,
   TrendingDown,
   Activity,
-  MapPin,
   User,
-  CreditCard,
   XCircle,
   PlayCircle,
-  Sun,
-  Cloud,
-  CloudRain,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -33,14 +27,11 @@ import {
   isToday,
   isTomorrow,
   differenceInMinutes,
-  isWithinInterval,
   addHours,
 } from "date-fns";
 import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
-import { ActionCards } from "@/components/dashboard/action-cards";
-import { UnassignedToursPanel } from "@/components/dashboard/UnassignedToursPanel";
-import { BookingsNeedingGuides } from "@/components/dashboard/BookingsNeedingGuides";
-import { TodayBookings } from "@/components/dashboard/TodayBookings";
+import { ActionBar } from "@/components/dashboard/action-bar";
+import { MetricsBar } from "@/components/dashboard/metrics-bar";
 import { TomorrowPreview } from "@/components/dashboard/TomorrowPreview";
 import { TodaysFocus } from "@/components/dashboard/TodaysFocus";
 
@@ -296,25 +287,26 @@ export default function DashboardPage() {
     currentHour < 12 ? "Good morning" : currentHour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-3 md:space-y-4">
       {/* ================================================================
-          COMPACT HEADER - Date, Stats, Metrics, Action
+          COMPACT HEADER - Single row with greeting, metrics, and action
+          Following Design Thinking: Tier 1 info at top, actions prominent
           ================================================================ */}
-      <header className="space-y-3">
-        {/* Top row: Today header + Quick Book - Responsive */}
+      <header className="space-y-2">
+        {/* Top row: Today header + Quick Book */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-              Today
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
+              {greeting}
             </h1>
-            <span className="text-xs sm:text-sm text-muted-foreground font-medium">
-              {format(new Date(), "EEEE, MMM d")} · {greeting}
+            <span className="text-xs text-muted-foreground font-medium">
+              {format(new Date(), "EEEE, MMM d")}
             </span>
           </div>
           {/* Desktop button */}
           <button
             onClick={() => openQuickBooking()}
-            className="hidden sm:inline-flex items-center gap-2 h-9 px-4 text-sm font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97]"
+            className="hidden sm:inline-flex items-center gap-2 h-8 px-3 text-sm font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97]"
           >
             <Zap className="h-3.5 w-3.5" />
             Quick Book
@@ -322,55 +314,35 @@ export default function DashboardPage() {
           {/* Mobile button */}
           <button
             onClick={() => openQuickBooking()}
-            className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97] touch-target"
+            className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97]"
             aria-label="Quick book"
           >
-            <Zap className="h-5 w-5" />
+            <Zap className="h-4 w-4" />
           </button>
         </div>
 
+        {/* Metrics Bar - Single row business health */}
+        {!bizLoading && revenueMetrics && (
+          <MetricsBar
+            todayRevenue={parseFloat(String(revenueMetrics.todayRevenue)) || 0}
+            todayChange={revenueMetrics.todayChange}
+            weekRevenue={parseFloat(String(revenueMetrics.weekRevenue)) || 0}
+            todayBookings={stats?.bookings || 0}
+            todayGuests={stats?.guests || 0}
+          />
+        )}
       </header>
 
       {/* ================================================================
-          ACTION CARDS - Always show status cards
+          ACTION BAR - Compact horizontal chips for pending actions
+          Following Design Thinking: "Actions not data"
           ================================================================ */}
       {!isLoading && (
-        <ActionCards
+        <ActionBar
+          unconfirmedBookings={actionCardsData.unconfirmedBookings}
           pendingPayments={actionCardsData.pendingPayments}
           toursNeedingGuides={actionCardsData.toursNeedingGuides}
-          toursWithGuides={actionCardsData.toursWithGuides}
-          unconfirmedBookings={actionCardsData.unconfirmedBookings}
           orgSlug={slug}
-          className=""
-        />
-      )}
-
-      {/* ================================================================
-          NEEDS GUIDE - Bookings that need guide assignment
-          ================================================================ */}
-      {!bookingsLoading && todayBookings && (
-        <BookingsNeedingGuides
-          bookings={todayBookings
-            .filter(b => b.schedule.guidesAssigned < b.schedule.guidesRequired)
-            .map(b => ({
-              bookingId: b.bookingId,
-              referenceNumber: b.referenceNumber,
-              participants: b.participants,
-              customer: {
-                firstName: b.customer.firstName,
-                lastName: b.customer.lastName,
-              },
-              tour: b.tour,
-              schedule: {
-                id: b.schedule.id,
-                startsAt: b.schedule.startsAt,
-                endsAt: b.schedule.endsAt,
-              },
-              guidesRequired: b.schedule.guidesRequired,
-              guidesAssigned: b.schedule.guidesAssigned,
-            }))}
-          orgSlug={slug}
-          maxItems={5}
         />
       )}
 
