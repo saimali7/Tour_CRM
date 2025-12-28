@@ -13,6 +13,12 @@ import {
   Zap,
   Loader2,
   Search,
+  DollarSign,
+  Clock,
+  CreditCard,
+  AlertCircle,
+  ChevronRight,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
@@ -126,41 +132,18 @@ export default function BookingsPage() {
   }), [urgencyData]);
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-4">
       {/* Header: Title + Quick Book */}
       <header className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold text-foreground">Bookings</h1>
-          {/* Inline summary for needs action view */}
-          {activeView === "needs-action" && urgencyData?.stats.critical && urgencyData.stats.critical > 0 && (
-            <span className="hidden sm:flex items-center gap-1.5 text-sm text-red-600 font-medium animate-pulse">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-              </span>
-              {urgencyData.stats.critical} critical
-            </span>
-          )}
-        </div>
-
-        {/* Quick Book buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => openQuickBooking()}
-            className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-target"
-            aria-label="Quick book"
-          >
-            <Zap className="h-5 w-5" />
-          </button>
-          <button
-            onClick={() => openQuickBooking()}
-            className="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Zap className="h-4 w-4" />
-            Quick Book
-            <kbd className="hidden md:inline-flex text-primary-foreground/70 text-xs ml-1 px-1.5 py-0.5 rounded bg-primary-foreground/10 font-mono">⌘B</kbd>
-          </button>
-        </div>
+        <h1 className="text-lg font-semibold text-foreground">Bookings</h1>
+        <button
+          onClick={() => openQuickBooking()}
+          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Zap className="h-4 w-4" />
+          <span className="hidden sm:inline">Quick Book</span>
+          <kbd className="hidden md:inline-flex text-primary-foreground/70 text-xs ml-1 px-1.5 py-0.5 rounded bg-primary-foreground/10 font-mono">⌘B</kbd>
+        </button>
       </header>
 
       {/* View Tabs */}
@@ -172,7 +155,7 @@ export default function BookingsPage() {
 
       {/* View Content */}
       {activeView === "needs-action" && <NeedsActionView orgSlug={slug} />}
-      {activeView === "all" && <AllBookingsView slug={slug} isMobile={isMobile} openQuickBooking={openQuickBooking} />}
+      {activeView === "all" && <AllBookingsView slug={slug} isMobile={isMobile} openQuickBooking={openQuickBooking} urgencyData={urgencyData} />}
       {activeView === "find-availability" && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
@@ -193,11 +176,20 @@ interface AllBookingsViewProps {
   slug: string;
   isMobile: boolean;
   openQuickBooking: () => void;
+  urgencyData?: {
+    stats: {
+      needsAction: number;
+      critical: number;
+      pendingConfirmation: number;
+      unpaid: number;
+      totalUnpaidAmount: string;
+    };
+  } | null;
 }
 
 type QuickDateFilter = "all" | "today" | "tomorrow" | "this-week";
 
-function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewProps) {
+function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllBookingsViewProps) {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -437,148 +429,187 @@ function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewPr
     );
   }
 
+  // Calculate action counts
+  const pendingConfirmCount = urgencyData?.stats.pendingConfirmation ?? 0;
+  const unpaidCount = urgencyData?.stats.unpaid ?? 0;
+  const hasActions = pendingConfirmCount > 0 || unpaidCount > 0;
+
   return (
-    <div className="space-y-4">
-      {/* Unified Filter Bar */}
-      <div className="rounded-xl border border-border bg-card p-3 space-y-3">
-        {/* Top Row: Search + Clear */}
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Search by name, email, phone, or reference..."
-              aria-label="Search bookings"
-              className="w-full h-10 pl-10 pr-8 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            />
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-                aria-label="Clear search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+    <div className="space-y-3">
+      {/* Metrics Bar - Single row of key stats */}
+      {stats && (
+        <div className="flex items-center gap-6 px-4 py-2.5 rounded-xl border border-border bg-card overflow-x-auto">
+          <div className="flex items-center gap-2 shrink-0">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-primary tabular-nums">
+              ${parseFloat(stats.revenue).toLocaleString()}
+            </span>
+            <span className="text-xs text-muted-foreground">revenue</span>
+          </div>
+          <div className="h-4 w-px bg-border shrink-0" />
+          <div className="flex items-center gap-2 shrink-0">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground tabular-nums">{stats.total}</span>
+            <span className="text-xs text-muted-foreground">bookings</span>
+          </div>
+          <div className="h-4 w-px bg-border shrink-0" />
+          <div className="flex items-center gap-2 shrink-0">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground tabular-nums">{stats.participantCount}</span>
+            <span className="text-xs text-muted-foreground">guests</span>
+          </div>
+        </div>
+      )}
+
+      {/* Action Bar - Quick actions for pending tasks */}
+      {hasActions && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <AlertCircle className="h-4 w-4" />
+            <span>{(pendingConfirmCount > 0 ? 1 : 0) + (unpaidCount > 0 ? 1 : 0)} actions</span>
           </div>
 
-          {/* Clear All Button */}
-          {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("all");
-                setPaymentFilter("all");
-                setQuickDateFilter("all");
-                setPage(1);
-              }}
-              className="h-10 px-4 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors flex items-center gap-2"
-              aria-label="Clear all filters"
+          {pendingConfirmCount > 0 && (
+            <Link
+              href={`/org/${slug}/bookings?view=needs-action` as Route}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/20 transition-colors"
             >
-              <X className="h-4 w-4" />
-              <span className="hidden sm:inline">Clear all</span>
+              <Clock className="h-3.5 w-3.5" />
+              <span>Confirm {pendingConfirmCount}</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
+
+          {unpaidCount > 0 && (
+            <Link
+              href={`/org/${slug}/bookings?view=needs-action` as Route}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm font-medium hover:bg-blue-500/20 transition-colors"
+            >
+              <CreditCard className="h-3.5 w-3.5" />
+              <span>Collect {unpaidCount} unpaid</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Compact Filter Bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search bookings..."
+            aria-label="Search bookings"
+            className="w-full h-9 pl-9 pr-8 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
 
-        {/* Bottom Row: Date Chips + Status/Payment Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Date Quick Filters */}
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50">
-            {(["all", "today", "tomorrow", "this-week"] as const).map((filter) => {
-              const labels: Record<QuickDateFilter, string> = {
-                all: "All Time",
-                today: "Today",
-                tomorrow: "Tomorrow",
-                "this-week": "This Week",
-              };
-              const isActive = quickDateFilter === filter;
-              return (
-                <button
-                  key={filter}
-                  onClick={() => {
-                    setQuickDateFilter(filter);
-                    setPage(1);
-                  }}
-                  className={cn(
-                    "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
-                    isActive
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {labels[filter]}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Separator */}
-          <div className="hidden sm:block h-6 w-px bg-border" />
-
-          {/* Status & Payment Filters */}
-          <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as StatusFilter);
-                setPage(1);
-              }}
-              aria-label="Filter by status"
-              className={cn(
-                "flex-1 sm:flex-none h-9 px-3 text-sm rounded-lg border transition-colors",
-                statusFilter !== "all"
-                  ? "border-primary bg-primary/5 text-foreground"
-                  : "border-input bg-background text-muted-foreground"
-              )}
-            >
-              {STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.value === "all" ? "Any Status" : opt.label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={paymentFilter}
-              onChange={(e) => {
-                setPaymentFilter(e.target.value as PaymentFilter);
-                setPage(1);
-              }}
-              aria-label="Filter by payment"
-              className={cn(
-                "flex-1 sm:flex-none h-9 px-3 text-sm rounded-lg border transition-colors",
-                paymentFilter !== "all"
-                  ? "border-primary bg-primary/5 text-foreground"
-                  : "border-input bg-background text-muted-foreground"
-              )}
-            >
-              {PAYMENT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.value === "all" ? "Any Payment" : opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Stats (Desktop only) */}
-          {stats && (
-            <div className="hidden lg:flex items-center gap-4 ml-auto text-sm">
-              <span className="text-muted-foreground">
-                <span className="font-semibold text-foreground">{stats.total}</span> bookings
-              </span>
-              <span className="text-muted-foreground">
-                <span className="font-semibold text-emerald-600">${parseFloat(stats.revenue).toLocaleString()}</span>
-              </span>
-            </div>
-          )}
+        {/* Date Quick Filters */}
+        <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-muted/50">
+          {(["all", "today", "tomorrow", "this-week"] as const).map((filter) => {
+            const labels: Record<QuickDateFilter, string> = {
+              all: "All",
+              today: "Today",
+              tomorrow: "Tomorrow",
+              "this-week": "Week",
+            };
+            const isActive = quickDateFilter === filter;
+            return (
+              <button
+                key={filter}
+                onClick={() => {
+                  setQuickDateFilter(filter);
+                  setPage(1);
+                }}
+                className={cn(
+                  "px-2.5 py-1 text-xs font-medium rounded-md transition-all",
+                  isActive
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {labels[filter]}
+              </button>
+            );
+          })}
         </div>
+
+        {/* Status Filter */}
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value as StatusFilter);
+            setPage(1);
+          }}
+          aria-label="Filter by status"
+          className={cn(
+            "h-9 px-2.5 text-xs rounded-lg border transition-colors",
+            statusFilter !== "all"
+              ? "border-primary bg-primary/5 text-foreground"
+              : "border-input bg-background text-muted-foreground"
+          )}
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.value === "all" ? "Status" : opt.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Payment Filter */}
+        <select
+          value={paymentFilter}
+          onChange={(e) => {
+            setPaymentFilter(e.target.value as PaymentFilter);
+            setPage(1);
+          }}
+          aria-label="Filter by payment"
+          className={cn(
+            "h-9 px-2.5 text-xs rounded-lg border transition-colors",
+            paymentFilter !== "all"
+              ? "border-primary bg-primary/5 text-foreground"
+              : "border-input bg-background text-muted-foreground"
+          )}
+        >
+          {PAYMENT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.value === "all" ? "Payment" : opt.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Clear All */}
+        {hasActiveFilters && (
+          <button
+            onClick={() => {
+              setSearch("");
+              setStatusFilter("all");
+              setPaymentFilter("all");
+              setQuickDateFilter("all");
+              setPage(1);
+            }}
+            className="h-9 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+            aria-label="Clear all filters"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Content: Mobile Cards or Desktop Table */}
@@ -625,7 +656,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewPr
                     onChange={selection.toggleAll}
                   />
                 </TableHead>
-                <TableHead>Reference / Customer</TableHead>
+                <TableHead>Customer</TableHead>
                 <TableHead>Tour / Schedule</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Payment</TableHead>
@@ -673,22 +704,17 @@ function AllBookingsView({ slug, isMobile, openQuickBooking }: AllBookingsViewPr
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
                       {/* Customer name - primary focus */}
-                      <div className="text-sm font-medium text-foreground">
+                      <span className="text-sm font-medium text-foreground">
                         {booking.customer
                           ? `${booking.customer.firstName} ${booking.customer.lastName}`
                           : "Unknown Customer"}
-                      </div>
-                      {/* Reference - de-emphasized */}
-                      <div className="text-[11px] font-mono text-muted-foreground/60 tracking-tight">
-                        {booking.referenceNumber}
-                      </div>
-                      {booking.customer?.email && (
-                        <div className="text-xs text-muted-foreground/70">
-                          {booking.customer.email}
-                        </div>
-                      )}
+                      </span>
+                      {/* Reference - inline, smaller */}
+                      <span className="text-[10px] font-mono text-muted-foreground/50">
+                        #{booking.referenceNumber}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell>
