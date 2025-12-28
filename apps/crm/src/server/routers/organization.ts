@@ -284,18 +284,19 @@ export const organizationRouter = createRouter({
       });
     }
 
-    // Redis Cache
-    if (process.env.REDIS_URL) {
+    // Supabase Storage
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       healthChecks.push({
-        name: "cache",
+        name: "storage",
         status: "connected",
-        message: "Redis configured",
+        message: "Supabase Storage configured",
+        details: { provider: "Supabase" },
       });
     } else {
       healthChecks.push({
-        name: "cache",
+        name: "storage",
         status: "not_configured",
-        message: "Using in-memory cache",
+        message: "File storage not configured",
       });
     }
 
@@ -305,4 +306,102 @@ export const organizationRouter = createRouter({
       timestamp: new Date().toISOString(),
     };
   }),
+
+  // Test individual service connection
+  testService: adminProcedure
+    .input(z.object({ service: z.enum(["database", "authentication", "payments", "email", "automations", "storage"]) }))
+    .mutation(async ({ input }): Promise<{ success: boolean; message: string; latency?: number }> => {
+      const startTime = Date.now();
+
+      switch (input.service) {
+        case "database": {
+          try {
+            const { db, sql } = await import("@tour/database");
+            await db.execute(sql`SELECT 1`);
+            return { success: true, message: "Database connected", latency: Date.now() - startTime };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Connection failed" };
+          }
+        }
+
+        case "authentication": {
+          const clerkEnabled = process.env.ENABLE_CLERK === "true";
+          if (!clerkEnabled) {
+            return { success: true, message: "Clerk disabled in dev mode" };
+          }
+          if (!process.env.CLERK_SECRET_KEY) {
+            return { success: false, message: "CLERK_SECRET_KEY not configured" };
+          }
+          try {
+            // Actually test Clerk API
+            const { clerkClient } = await import("@clerk/nextjs/server");
+            const client = await clerkClient();
+            await client.users.getCount();
+            return { success: true, message: "Clerk API connected", latency: Date.now() - startTime };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Clerk API error" };
+          }
+        }
+
+        case "payments": {
+          if (!process.env.STRIPE_SECRET_KEY) {
+            return { success: false, message: "Stripe not configured" };
+          }
+          try {
+            const { default: Stripe } = await import("stripe");
+            const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+            await stripe.balance.retrieve();
+            const isTest = process.env.STRIPE_SECRET_KEY.startsWith("sk_test_");
+            return { success: true, message: `Stripe connected (${isTest ? "Test" : "Live"})`, latency: Date.now() - startTime };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Stripe API error" };
+          }
+        }
+
+        case "email": {
+          if (!process.env.RESEND_API_KEY) {
+            return { success: false, message: "Resend not configured" };
+          }
+          try {
+            const { Resend } = await import("resend");
+            const resend = new Resend(process.env.RESEND_API_KEY);
+            // Get domains to verify API key works
+            await resend.domains.list();
+            return { success: true, message: "Resend API connected", latency: Date.now() - startTime };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Resend API error" };
+          }
+        }
+
+        case "automations": {
+          if (!process.env.INNGEST_EVENT_KEY) {
+            return { success: false, message: "Inngest event key not configured" };
+          }
+          if (!process.env.INNGEST_SIGNING_KEY) {
+            return { success: false, message: "Inngest signing key not configured" };
+          }
+          // Inngest doesn't have a simple ping endpoint, so we verify config is present
+          return { success: true, message: "Inngest configured (send test event to verify)", latency: Date.now() - startTime };
+        }
+
+        case "storage": {
+          if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            return { success: false, message: "Supabase storage not configured" };
+          }
+          try {
+            const { createClient } = await import("@supabase/supabase-js");
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+            // List buckets to verify connection
+            const { error } = await supabase.storage.listBuckets();
+            if (error) throw error;
+            return { success: true, message: "Supabase Storage connected", latency: Date.now() - startTime };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Storage API error" };
+          }
+        }
+
+        default:
+          return { success: false, message: "Unknown service" };
+      }
+    }),
 });

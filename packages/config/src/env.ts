@@ -20,6 +20,7 @@ export const serverEnvSchema = z.object({
 
   // Email (optional - degrades gracefully)
   RESEND_API_KEY: z.string().optional(),
+  RESEND_WEBHOOK_SECRET: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
 
   // Background Jobs (optional)

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import {
   Database,
@@ -7,15 +8,19 @@ import {
   CreditCard,
   Mail,
   Zap,
-  Server,
+  HardDrive,
   CheckCircle2,
   XCircle,
   AlertCircle,
   RefreshCw,
   ExternalLink,
+  Play,
+  Loader2,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type ServiceStatus = "connected" | "not_configured" | "error";
+type ServiceName = "database" | "authentication" | "payments" | "email" | "automations" | "storage";
 
 interface ServiceHealth {
   name: string;
@@ -24,13 +29,19 @@ interface ServiceHealth {
   details?: Record<string, unknown>;
 }
 
+interface TestResult {
+  success: boolean;
+  message: string;
+  latency?: number;
+}
+
 const serviceIcons: Record<string, typeof Database> = {
   database: Database,
   authentication: Shield,
   payments: CreditCard,
   email: Mail,
   automations: Zap,
-  cache: Server,
+  storage: HardDrive,
 };
 
 const serviceLabels: Record<string, string> = {
@@ -38,17 +49,17 @@ const serviceLabels: Record<string, string> = {
   authentication: "Authentication",
   payments: "Payments",
   email: "Email",
-  automations: "Automations",
-  cache: "Cache",
+  automations: "Background Jobs",
+  storage: "File Storage",
 };
 
 const serviceDescriptions: Record<string, string> = {
   database: "PostgreSQL database connection",
-  authentication: "User authentication service",
-  payments: "Stripe Connect for accepting payments",
-  email: "Transactional email delivery",
-  automations: "Background jobs and workflows",
-  cache: "Redis caching for performance",
+  authentication: "Clerk user authentication",
+  payments: "Stripe payment processing",
+  email: "Resend transactional emails",
+  automations: "Inngest background workflows",
+  storage: "Supabase file storage",
 };
 
 function StatusBadge({ status }: { status: ServiceStatus }) {
@@ -77,10 +88,21 @@ function StatusBadge({ status }: { status: ServiceStatus }) {
   }
 }
 
-function ServiceCard({ service }: { service: ServiceHealth }) {
-  const Icon = serviceIcons[service.name] || Server;
+function ServiceCard({
+  service,
+  onTest,
+  testResult,
+  isTesting
+}: {
+  service: ServiceHealth;
+  onTest: () => void;
+  testResult?: TestResult;
+  isTesting: boolean;
+}) {
+  const Icon = serviceIcons[service.name] || Database;
   const label = serviceLabels[service.name] || service.name;
   const description = serviceDescriptions[service.name] || "";
+  const canTest = service.status !== "not_configured";
 
   return (
     <div
@@ -119,6 +141,50 @@ function ServiceCard({ service }: { service: ServiceHealth }) {
               {service.message}
             </p>
           )}
+
+          {/* Test Result */}
+          {testResult && (
+            <div className={`mt-2 p-2 rounded text-xs ${
+              testResult.success
+                ? "bg-success/10 text-success border border-success/20"
+                : "bg-destructive/10 text-destructive border border-destructive/20"
+            }`}>
+              <div className="flex items-center gap-1.5">
+                {testResult.success ? (
+                  <CheckCircle2 className="h-3 w-3" />
+                ) : (
+                  <XCircle className="h-3 w-3" />
+                )}
+                <span className="font-medium">{testResult.message}</span>
+                {testResult.latency && (
+                  <span className="text-muted-foreground ml-auto">{testResult.latency}ms</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Test Button */}
+          <div className="mt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onTest}
+              disabled={!canTest || isTesting}
+              className="h-7 text-xs"
+            >
+              {isTesting ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <Play className="h-3 w-3 mr-1.5" />
+                  Test Connection
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -131,11 +197,52 @@ interface ServiceHealthPanelProps {
 }
 
 export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPanelProps) {
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+  const [testingService, setTestingService] = useState<string | null>(null);
+
   const { data, isLoading, refetch, isRefetching } =
     trpc.organization.getServiceHealth.useQuery(undefined, {
-      refetchInterval: isActive ? 60000 : false, // Only refresh when tab is active
+      refetchInterval: isActive ? 60000 : false,
       staleTime: 30000,
     });
+
+  const testMutation = trpc.organization.testService.useMutation({
+    onSuccess: (result, variables) => {
+      setTestResults(prev => ({
+        ...prev,
+        [variables.service]: result,
+      }));
+      setTestingService(null);
+    },
+    onError: (error, variables) => {
+      setTestResults(prev => ({
+        ...prev,
+        [variables.service]: { success: false, message: error.message },
+      }));
+      setTestingService(null);
+    },
+  });
+
+  const handleTest = (serviceName: string) => {
+    setTestingService(serviceName);
+    setTestResults(prev => {
+      const newResults = { ...prev };
+      delete newResults[serviceName];
+      return newResults;
+    });
+    testMutation.mutate({ service: serviceName as ServiceName });
+  };
+
+  const handleTestAll = () => {
+    if (!data) return;
+    const testableServices = data.services.filter(s => s.status !== "not_configured");
+    testableServices.forEach((service, index) => {
+      // Stagger tests to avoid overwhelming the server
+      setTimeout(() => {
+        handleTest(service.name);
+      }, index * 500);
+    });
+  };
 
   if (isLoading) {
     return (
@@ -171,6 +278,16 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
           <span className="text-xs text-muted-foreground">
             {data.environment === "production" ? "Production" : "Development"}
           </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestAll}
+            disabled={testingService !== null}
+            className="h-8"
+          >
+            <Play className="h-3.5 w-3.5 mr-1.5" />
+            Test All
+          </Button>
           <button
             onClick={() => refetch()}
             disabled={isRefetching}
@@ -215,7 +332,13 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
       {/* Service Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {data.services.map((service) => (
-          <ServiceCard key={service.name} service={service} />
+          <ServiceCard
+            key={service.name}
+            service={service}
+            onTest={() => handleTest(service.name)}
+            testResult={testResults[service.name]}
+            isTesting={testingService === service.name}
+          />
         ))}
       </div>
 
@@ -225,16 +348,7 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
           Last checked: {new Date(data.timestamp).toLocaleTimeString()}
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          Need help setting up services?{" "}
-          <a
-            href="https://github.com/your-repo/docs/DEPLOYMENT.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline inline-flex items-center gap-1"
-          >
-            View deployment guide
-            <ExternalLink className="h-3 w-3" />
-          </a>
+          Click &quot;Test Connection&quot; to verify each service is actually reachable.
         </p>
       </div>
     </div>
