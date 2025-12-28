@@ -169,7 +169,7 @@ export const bookingRouter = createRouter({
       return services.booking.update(input.id, input.data);
     }),
 
-  confirm: protectedProcedure
+  confirm: adminProcedure
     .input(z.object({ id: z.string(), sendConfirmationEmail: z.boolean().default(true) }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -234,14 +234,14 @@ export const bookingRouter = createRouter({
       return booking;
     }),
 
-  markNoShow: protectedProcedure
+  markNoShow: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.booking.markNoShow(input.id);
     }),
 
-  complete: protectedProcedure
+  complete: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });

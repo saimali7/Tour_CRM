@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, protectedProcedure } from "../trpc";
+import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 
 export const depositRouter = createRouter({
@@ -28,7 +28,7 @@ export const depositRouter = createRouter({
   // Payment Recording
   // ==========================================
 
-  recordDepositPayment: protectedProcedure
+  recordDepositPayment: adminProcedure
     .input(
       z.object({
         bookingId: z.string(),
@@ -45,7 +45,7 @@ export const depositRouter = createRouter({
       );
     }),
 
-  recordBalancePayment: protectedProcedure
+  recordBalancePayment: adminProcedure
     .input(
       z.object({
         bookingId: z.string(),

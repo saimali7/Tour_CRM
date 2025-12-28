@@ -191,8 +191,15 @@ export class EmailService {
 
   constructor(org: OrganizationEmailConfig) {
     this.org = org;
-    this.fromEmail = org.fromEmail || `${org.name} <noreply@updates.example.com>`;
-    this.replyTo = org.replyToEmail || org.email || "support@example.com";
+    // Require proper from email - example.com will be rejected by email providers
+    if (!org.fromEmail) {
+      throw new Error(
+        `Organization "${org.name}" must have a configured fromEmail address. ` +
+        `Set this in organization settings before sending emails.`
+      );
+    }
+    this.fromEmail = org.fromEmail;
+    this.replyTo = org.replyToEmail || org.email || org.fromEmail;
   }
 
   /**

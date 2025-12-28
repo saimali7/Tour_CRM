@@ -182,7 +182,6 @@ interface AllBookingsViewProps {
       critical: number;
       pendingConfirmation: number;
       unpaid: number;
-      totalUnpaidAmount: string;
     };
   } | null;
 }

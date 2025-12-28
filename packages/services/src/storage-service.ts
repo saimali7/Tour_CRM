@@ -136,6 +136,11 @@ export class StorageService {
    * Get a signed URL for private file access
    */
   async getSignedUrl(path: string, expiresIn: number = 3600): Promise<string> {
+    // Security: Ensure path belongs to this organization
+    if (!path.startsWith(`${this.organizationId}/`)) {
+      throw new Error("Cannot access files outside organization folder");
+    }
+
     const { data, error } = await this.supabase.storage
       .from(BUCKET_NAME)
       .createSignedUrl(path, expiresIn);

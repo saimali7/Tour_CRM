@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, protectedProcedure } from "../trpc";
+import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 import { stripe } from "@/lib/stripe";
 import { inngest } from "@/inngest";
@@ -62,7 +62,7 @@ export const refundRouter = createRouter({
       return services.refund.getStats(input?.dateRange);
     }),
 
-  create: protectedProcedure
+  create: adminProcedure
     .input(createRefundSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -103,7 +103,7 @@ export const refundRouter = createRouter({
       return refund;
     }),
 
-  process: protectedProcedure
+  process: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
@@ -257,14 +257,14 @@ export const refundRouter = createRouter({
       }
     }),
 
-  cancel: protectedProcedure
+  cancel: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.refund.cancel(input.id);
     }),
 
-  processManual: protectedProcedure
+  processManual: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
