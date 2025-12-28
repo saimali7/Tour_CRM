@@ -79,7 +79,7 @@ export function UrgencySection({
         {/* Clickable expand/collapse area */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex-1 flex items-center gap-3 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+          className="flex items-center gap-3 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
           aria-expanded={isExpanded}
           aria-controls={`urgency-section-${urgency}`}
         >
@@ -87,7 +87,7 @@ export function UrgencySection({
           <Icon className={cn("h-5 w-5 flex-shrink-0", config.iconColor)} />
 
           {/* Title and Count */}
-          <div className="flex-1 flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <h3 className="text-sm font-medium text-foreground">{title}</h3>
             <Badge
               className={cn(
@@ -109,6 +109,9 @@ export function UrgencySection({
             aria-hidden="true"
           />
         </button>
+
+        {/* Spacer to push action buttons to the right */}
+        <div className="flex-1" />
 
         {/* Action Buttons - outside the button to avoid nesting */}
         {actions && actions.length > 0 && (
