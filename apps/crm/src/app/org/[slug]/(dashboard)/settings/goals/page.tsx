@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useParams } from "next/navigation";
 import {
@@ -88,6 +89,9 @@ export default function GoalsSettingsPage() {
       utils.goal.list.invalidate();
       utils.goal.getActive.invalidate();
       utils.goal.getSummary.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete goal");
     },
   });
 

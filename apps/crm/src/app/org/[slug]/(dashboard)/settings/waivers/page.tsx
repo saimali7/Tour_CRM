@@ -2,6 +2,7 @@
 
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -45,6 +46,9 @@ export default function WaiversSettingsPage() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create waiver template");
+    },
   });
 
   const updateMutation = trpc.waiver.updateTemplate.useMutation({
@@ -55,6 +59,9 @@ export default function WaiversSettingsPage() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update waiver template");
+    },
   });
 
   const deleteMutation = trpc.waiver.deleteTemplate.useMutation({
@@ -62,6 +69,9 @@ export default function WaiversSettingsPage() {
       utils.waiver.listTemplates.invalidate();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete waiver template");
     },
   });
 

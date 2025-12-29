@@ -1,0 +1,40 @@
+import Link from "next/link";
+import type { Route } from "next";
+import { UserX, ArrowLeft, UserPlus } from "lucide-react";
+
+export default function CustomerNotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+      <div className="relative mb-8">
+        <div className="absolute inset-0 bg-blue-500/10 rounded-full blur-2xl" />
+        <div className="relative bg-gradient-to-br from-blue-500/20 to-blue-500/5 rounded-full p-8">
+          <UserX className="h-16 w-16 text-blue-500" strokeWidth={1.5} />
+        </div>
+      </div>
+
+      <h1 className="text-3xl font-bold text-foreground mb-3">
+        Customer not found
+      </h1>
+      <p className="text-muted-foreground text-center max-w-md mb-8">
+        This customer record may have been deleted or anonymized.
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Link
+          href={"../" as Route}
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          View All Customers
+        </Link>
+        <Link
+          href={"../?action=add" as Route}
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-border rounded-lg font-medium hover:bg-accent transition-colors"
+        >
+          <UserPlus className="h-4 w-4" />
+          Add New Customer
+        </Link>
+      </div>
+    </div>
+  );
+}

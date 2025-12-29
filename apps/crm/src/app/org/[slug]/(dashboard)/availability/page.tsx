@@ -23,6 +23,7 @@ import {
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
+import { NoSchedulesEmpty } from "@/components/ui/empty-state";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -343,15 +344,7 @@ export default function SchedulesPage() {
           </div>
         </div>
       ) : groupedSchedules.length === 0 ? (
-        <div className="rounded-lg border border-border bg-card p-12 text-center">
-          <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-medium text-foreground">No schedules found</h3>
-          <p className="mt-2 text-muted-foreground">
-            {statusFilter === "scheduled"
-              ? "No upcoming schedules match your filters."
-              : "No schedules match your filters."}
-          </p>
-        </div>
+        <NoSchedulesEmpty orgSlug={slug} />
       ) : (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           {/* Table Header */}

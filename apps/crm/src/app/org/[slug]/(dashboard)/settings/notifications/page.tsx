@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
   Bell,
@@ -220,6 +221,9 @@ export default function NotificationsSettingsPage() {
       setHasChanges(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to save notification settings");
     },
   });
 

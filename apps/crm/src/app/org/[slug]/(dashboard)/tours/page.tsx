@@ -14,6 +14,7 @@ import { TablePagination } from "@/components/ui/data-table";
 import { useConfirmModal } from "@/components/ui/confirm-modal";
 import { Button } from "@/components/ui/button";
 import { ProductCard, type UnifiedProduct } from "@/components/products/product-card";
+import { NoToursEmpty } from "@/components/ui/empty-state";
 
 type StatusFilter = "all" | "draft" | "active" | "archived";
 
@@ -243,19 +244,7 @@ export default function ToursPage() {
           ))}
         </div>
       ) : data?.data.length === 0 ? (
-        <div className="rounded-lg border border-border bg-card p-12 text-center">
-          <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">No tours found</h3>
-          <p className="text-sm text-muted-foreground mb-6">
-            Get started by creating your first tour.
-          </p>
-          <Button asChild>
-            <Link href={`/org/${slug}/tours/new` as Route}>
-              <MapPin className="h-4 w-4 mr-2" />
-              Add Tour
-            </Link>
-          </Button>
-        </div>
+        <NoToursEmpty orgSlug={slug} />
       ) : (
         <>
           {/* Tour Cards */}

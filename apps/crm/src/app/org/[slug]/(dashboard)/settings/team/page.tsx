@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
   UserPlus,
@@ -84,10 +85,12 @@ export default function TeamSettingsPage() {
 
   const updateRoleMutation = trpc.team.updateRole.useMutation({
     onSuccess: () => utils.team.list.invalidate(),
+    onError: (error) => toast.error(error.message || "Failed to update role"),
   });
 
   const removeMemberMutation = trpc.team.remove.useMutation({
     onSuccess: () => utils.team.list.invalidate(),
+    onError: (error) => toast.error(error.message || "Failed to remove member"),
   });
 
   return (

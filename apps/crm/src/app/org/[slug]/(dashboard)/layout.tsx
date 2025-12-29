@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getOrgContext } from "@/lib/auth";
 import { DashboardProviders } from "./providers";
 import { NavigationProgress } from "@/components/navigation-progress";
@@ -8,6 +9,33 @@ import { NavRail } from "@/components/layout/nav-rail";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { MobileHeader } from "./mobile-header";
 import { MobileNav } from "@/components/layout/mobile-nav";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+
+  try {
+    const { organization } = await getOrgContext(slug);
+    return {
+      title: {
+        template: `%s | ${organization.name}`,
+        default: organization.name,
+      },
+      description: `Tour operations dashboard for ${organization.name}`,
+    };
+  } catch {
+    return {
+      title: {
+        template: "%s | Tour CRM",
+        default: "Tour CRM",
+      },
+      description: "Tour operations management platform",
+    };
+  }
+}
 
 // Check if Clerk is enabled
 const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";

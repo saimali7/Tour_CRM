@@ -2,6 +2,7 @@
 
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   Save,
   Loader2,
@@ -58,6 +59,9 @@ export default function BookingSettingsPage() {
       setSaveSuccess(true);
       setHasChanges(false);
       setTimeout(() => setSaveSuccess(false), 3000);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to save booking settings");
     },
   });
 
