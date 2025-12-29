@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background with rounded corners -->
+  <rect width="180" height="180" rx="40" fill="url(#gradient)"/>
+  <!-- Compass/Navigation icon -->
+  <path d="M90 35L101 79L145 90L101 101L90 145L79 101L35 90L79 79L90 35Z" fill="white"/>
+  <!-- Center dot -->
+  <circle cx="90" cy="90" r="14" fill="url(#gradient)"/>
+</svg>
