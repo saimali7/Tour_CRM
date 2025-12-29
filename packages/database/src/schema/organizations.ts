@@ -23,6 +23,9 @@ export const organizations = pgTable("organizations", {
   postalCode: text("postal_code"),
   timezone: text("timezone").notNull().default("UTC"),
 
+  // Currency (ISO 4217 code)
+  currency: text("currency").notNull().default("AED"),
+
   // Branding
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").default("#0066FF"),
@@ -37,9 +40,6 @@ export const organizations = pgTable("organizations", {
 
   // Status
   status: text("status").$type<OrganizationStatus>().notNull().default("active"),
-
-  // Currency (ISO 4217 code)
-  currency: text("currency").notNull().default("AED"),
 
   // Feature flags (what this org can access)
   plan: text("plan").$type<OrganizationPlan>().notNull().default("free"),
