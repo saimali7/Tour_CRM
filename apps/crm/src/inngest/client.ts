@@ -243,6 +243,20 @@ type BookingEvents = {
   };
 };
 
+// Team events
+type TeamEvents = {
+  "team/member-invited": {
+    data: {
+      organizationId: string;
+      membershipId: string;
+      inviteeEmail: string;
+      inviteeName?: string;
+      inviterName: string;
+      role: string;
+    };
+  };
+};
+
 // Test/health check events
 type TestEvents = {
   "test/health-check": {
@@ -255,7 +269,7 @@ type TestEvents = {
 };
 
 // Combined events
-type AllEvents = BookingEvents & TestEvents;
+type AllEvents = BookingEvents & TeamEvents & TestEvents;
 
 // Create the Inngest client
 export const inngest = new Inngest({
@@ -263,4 +277,4 @@ export const inngest = new Inngest({
   schemas: new EventSchemas().fromRecord<AllEvents>(),
 });
 
-export type { BookingEvents, TestEvents, AllEvents };
+export type { BookingEvents, TeamEvents, TestEvents, AllEvents };

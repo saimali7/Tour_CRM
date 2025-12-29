@@ -42,6 +42,10 @@ export {
   sendPaymentFailedEmail,
 } from "./functions/payment-emails";
 
+export {
+  sendTeamInviteEmail,
+} from "./functions/team-notifications";
+
 // Aggregate all functions for the serve handler
 import {
   sendBookingCreatedEmail,
@@ -82,6 +86,10 @@ import {
   sendPaymentFailedEmail,
 } from "./functions/payment-emails";
 
+import {
+  sendTeamInviteEmail,
+} from "./functions/team-notifications";
+
 export const inngestFunctions = [
   // Booking emails
   sendBookingCreatedEmail,
@@ -110,4 +118,6 @@ export const inngestFunctions = [
   // Payment emails
   sendPaymentSucceededEmail,
   sendPaymentFailedEmail,
+  // Team notifications
+  sendTeamInviteEmail,
 ];
