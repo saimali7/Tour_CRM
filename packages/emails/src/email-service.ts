@@ -9,6 +9,7 @@ import { GuideReminderEmail } from "./templates/guide-reminder";
 import { GuideDailyManifestEmail } from "./templates/guide-daily-manifest";
 import { PaymentConfirmationEmail } from "./templates/payment-confirmation";
 import { PaymentLinkEmail } from "./templates/payment-link";
+import { TeamInviteEmail } from "./templates/team-invite";
 import * as React from "react";
 
 // Lazy initialize Resend client
@@ -182,6 +183,14 @@ export interface PaymentLinkEmailData {
   currency: string;
   paymentUrl: string;
   expiresAt?: string;
+}
+
+export interface TeamInviteEmailData {
+  inviteeEmail: string;
+  inviteeName?: string;
+  inviterName: string;
+  role: string;
+  acceptUrl: string;
 }
 
 export class EmailService {
@@ -592,6 +601,40 @@ export class EmailService {
           organizationName: this.org.name,
           organizationEmail: this.org.email,
           organizationPhone: this.org.phone,
+          logoUrl: this.org.logoUrl,
+        }),
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, messageId: result?.id };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Send team invite email
+   */
+  async sendTeamInvite(data: TeamInviteEmailData): Promise<EmailResult> {
+    try {
+      const { data: result, error } = await getResendClient().emails.send({
+        from: this.fromEmail,
+        to: data.inviteeEmail,
+        replyTo: this.replyTo,
+        subject: `You're invited to join ${this.org.name}`,
+        react: React.createElement(TeamInviteEmail, {
+          inviteeName: data.inviteeName,
+          inviterName: data.inviterName,
+          organizationName: this.org.name,
+          role: data.role,
+          acceptUrl: data.acceptUrl,
+          organizationEmail: this.org.email,
           logoUrl: this.org.logoUrl,
         }),
       });

@@ -4,6 +4,7 @@ import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { db, eq, and } from "@tour/database";
 import { organizationMembers, users } from "@tour/database/schema";
 import type { OrganizationRole } from "@tour/database";
+import { inngest } from "@/inngest/client";
 
 const roleSchema = z.enum(["owner", "admin", "manager", "support", "guide"]);
 
@@ -136,6 +137,37 @@ export const teamRouter = createRouter({
           status: "invited",
         })
         .returning();
+
+      if (!membership) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create membership",
+        });
+      }
+
+      // Send invite email via Inngest
+      const inviterName = ctx.orgContext.user.firstName
+        ? `${ctx.orgContext.user.firstName} ${ctx.orgContext.user.lastName || ""}`.trim()
+        : ctx.orgContext.user.email;
+
+      try {
+        await inngest.send({
+          name: "team/member-invited",
+          data: {
+            organizationId: ctx.orgContext.organizationId,
+            membershipId: membership.id,
+            inviteeEmail: input.email,
+            inviteeName: input.firstName
+              ? `${input.firstName} ${input.lastName || ""}`.trim()
+              : undefined,
+            inviterName,
+            role: input.role,
+          },
+        });
+      } catch (error) {
+        // Log but don't fail the invite - membership was created
+        console.error("Failed to send invite email event:", error);
+      }
 
       return {
         membership,
