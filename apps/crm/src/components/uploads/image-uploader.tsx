@@ -9,6 +9,7 @@ interface ImageUploaderProps {
   maxFiles?: number;
   folder?: string;
   className?: string;
+  orgSlug: string;
 }
 
 interface UploadResponse {
@@ -24,6 +25,7 @@ export function ImageUploader({
   maxFiles = 10,
   folder = "tours",
   className = "",
+  orgSlug,
 }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -49,6 +51,7 @@ export function ImageUploader({
         formData.append("files", file);
       });
       formData.append("folder", folder);
+      formData.append("orgSlug", orgSlug);
 
       const response = await fetch("/api/upload", {
         method: "POST",
@@ -71,7 +74,7 @@ export function ImageUploader({
     } finally {
       setUploading(false);
     }
-  }, [value, onChange, maxFiles, folder]);
+  }, [value, onChange, maxFiles, folder, orgSlug]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -219,6 +222,7 @@ interface SingleImageUploaderProps {
   folder?: string;
   className?: string;
   label?: string;
+  orgSlug: string;
 }
 
 export function SingleImageUploader({
@@ -227,6 +231,7 @@ export function SingleImageUploader({
   folder = "tours/covers",
   className = "",
   label = "Cover Image",
+  orgSlug,
 }: SingleImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -240,6 +245,7 @@ export function SingleImageUploader({
       const formData = new FormData();
       formData.append("files", file);
       formData.append("folder", folder);
+      formData.append("orgSlug", orgSlug);
 
       const response = await fetch("/api/upload", {
         method: "POST",
@@ -261,7 +267,7 @@ export function SingleImageUploader({
     } finally {
       setUploading(false);
     }
-  }, [folder, onChange]);
+  }, [folder, onChange, orgSlug]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

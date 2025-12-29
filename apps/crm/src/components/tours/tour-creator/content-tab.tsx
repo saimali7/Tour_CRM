@@ -16,9 +16,10 @@ import type { TourFormState } from "../tour-creator";
 interface ContentTabProps {
   formState: TourFormState;
   updateForm: (updates: Partial<TourFormState>) => void;
+  orgSlug: string;
 }
 
-export function ContentTab({ formState, updateForm }: ContentTabProps) {
+export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) {
   const [includeInput, setIncludeInput] = useState("");
   const [excludeInput, setExcludeInput] = useState("");
   const [requirementInput, setRequirementInput] = useState("");
@@ -323,6 +324,7 @@ export function ContentTab({ formState, updateForm }: ContentTabProps) {
               value={formState.coverImageUrl}
               onChange={(url) => updateForm({ coverImageUrl: url })}
               folder="tours/covers"
+              orgSlug={orgSlug}
             />
           </div>
 
@@ -337,6 +339,7 @@ export function ContentTab({ formState, updateForm }: ContentTabProps) {
               onChange={(urls) => updateForm({ images: urls })}
               maxFiles={10}
               folder="tours/gallery"
+              orgSlug={orgSlug}
             />
           </div>
         </div>
