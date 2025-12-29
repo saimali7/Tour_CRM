@@ -1281,6 +1281,47 @@ aws s3 ls s3://your-bucket/ --endpoint-url https://s3.us-west-000.backblazeb2.co
 
 ---
 
+## Known Issues & TODO
+
+### PgBouncer (Not Yet Working)
+
+PgBouncer is deployed in Coolify but not wired up to CRM. Currently using direct PostgreSQL connection.
+
+**Issues encountered (Dec 2024):**
+
+1. **Docker Networking**: Services deployed separately in Coolify are on different Docker networks by default. CRM couldn't resolve PgBouncer container name (`EAI_AGAIN` DNS error).
+
+2. **Authentication Mismatch**: PostgreSQL uses `scram-sha-256` by default. PgBouncer needs matching auth config:
+   ```
+   server login failed: wrong password type
+   ```
+
+**To fix later:**
+
+1. Enable "Connect To Predefined Network" on ALL services (PostgreSQL, PgBouncer, CRM, Redis, MinIO)
+
+2. Update PgBouncer compose with correct auth:
+   ```yaml
+   services:
+     pgbouncer:
+       image: edoburu/pgbouncer:v1.24.1-p1
+       environment:
+         - DATABASE_URL=postgresql://USER:PASS@POSTGRES_CONTAINER:5432/DB
+         - POOL_MODE=transaction
+         - MAX_CLIENT_CONN=100
+         - DEFAULT_POOL_SIZE=20
+         - AUTH_TYPE=scram-sha-256
+   ```
+
+3. Update CRM `DATABASE_URL` to point to PgBouncer:
+   ```
+   DATABASE_URL=postgresql://USER:PASS@pgbouncer-container:5432/DB
+   ```
+
+**When to prioritize**: When you have 50+ concurrent users or see PostgreSQL connection exhaustion errors.
+
+---
+
 ## Next Steps
 
 After reviewing this plan:
