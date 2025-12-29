@@ -285,13 +285,13 @@ export const organizationRouter = createRouter({
       });
     }
 
-    // Supabase Storage
-    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // S3/MinIO Storage
+    if (process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY) {
       healthChecks.push({
         name: "storage",
         status: "connected",
-        message: "Supabase Storage configured",
-        details: { provider: "Supabase" },
+        message: "S3 Storage configured",
+        details: { provider: "S3/MinIO", bucket: process.env.S3_BUCKET || "tour-images" },
       });
     } else {
       healthChecks.push({
@@ -448,16 +448,16 @@ export const organizationRouter = createRouter({
         }
 
         case "storage": {
-          if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-            return { success: false, message: "Supabase storage not configured" };
+          if (!process.env.S3_ENDPOINT || !process.env.S3_ACCESS_KEY || !process.env.S3_SECRET_KEY) {
+            return { success: false, message: "S3 storage not configured" };
           }
           try {
-            const { createClient } = await import("@supabase/supabase-js");
-            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-            // List buckets to verify connection
-            const { error } = await supabase.storage.listBuckets();
-            if (error) throw error;
-            return { success: true, message: "Supabase Storage connected", latency: Date.now() - startTime };
+            const { checkStorageHealth } = await import("@tour/services");
+            const result = await checkStorageHealth();
+            if (result.healthy) {
+              return { success: true, message: "S3 Storage connected", latency: result.latency || (Date.now() - startTime) };
+            }
+            return { success: false, message: result.message || "S3 connection failed" };
           } catch (error) {
             return { success: false, message: error instanceof Error ? error.message : "Storage API error" };
           }
@@ -609,52 +609,35 @@ export const organizationRouter = createRouter({
         }
 
         case "storage": {
-          // Test: Upload, download, delete a test file
-          if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-            return { success: false, message: "Supabase storage not configured" };
+          // Test: Upload and delete a test file using S3
+          if (!process.env.S3_ENDPOINT || !process.env.S3_ACCESS_KEY || !process.env.S3_SECRET_KEY) {
+            return { success: false, message: "S3 storage not configured" };
           }
           try {
-            const { createClient } = await import("@supabase/supabase-js");
-            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+            const { createStorageService } = await import("@tour/services");
+            const storage = createStorageService(orgId);
+            const bucket = process.env.S3_BUCKET || "tour-images";
 
             const testFileName = `_health_check_${Date.now()}.txt`;
             const testContent = `Health check at ${new Date().toISOString()}`;
-            const bucket = "tour-images";
 
             // Upload test file
-            const { error: uploadError } = await supabase.storage
-              .from(bucket)
-              .upload(`${orgId}/_tests/${testFileName}`, testContent, {
-                contentType: "text/plain",
-              });
+            const uploadResult = await storage.upload(
+              Buffer.from(testContent),
+              { folder: "_tests", filename: testFileName, contentType: "text/plain" }
+            );
 
-            if (uploadError) {
-              // Bucket might not exist
-              if (uploadError.message.includes("not found")) {
-                return { success: false, message: `Bucket "${bucket}" not found. Create it in Supabase dashboard.` };
-              }
-              throw uploadError;
+            if (!uploadResult.path) {
+              return { success: false, message: "Upload failed - no path returned" };
             }
 
-            // Download and verify
-            const { data: downloadData, error: downloadError } = await supabase.storage
-              .from(bucket)
-              .download(`${orgId}/_tests/${testFileName}`);
-
-            if (downloadError) throw downloadError;
-
-            const downloadedContent = await downloadData.text();
-            const contentMatches = downloadedContent === testContent;
-
             // Cleanup - delete test file
-            await supabase.storage
-              .from(bucket)
-              .remove([`${orgId}/_tests/${testFileName}`]);
+            await storage.delete(uploadResult.path);
 
             return {
-              success: contentMatches,
-              message: contentMatches ? "Storage upload/download/delete working" : "Content mismatch after download",
-              details: { bucket, operations: ["upload", "download", "delete"], fileSize: testContent.length },
+              success: true,
+              message: "S3 upload/delete working",
+              details: { bucket, operations: ["upload", "delete"], fileSize: testContent.length },
               latency: Date.now() - startTime,
             };
           } catch (error) {
