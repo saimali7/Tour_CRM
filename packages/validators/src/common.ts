@@ -16,10 +16,7 @@ export const slugSchema = z
 
 export const urlSchema = z.string().url("Invalid URL");
 
-export const currencyCodeSchema = z
-  .string()
-  .length(3, "Currency code must be 3 characters")
-  .toUpperCase();
+// Note: For currency validation, use currencyCodeSchema from ./currency which validates against actual supported currencies
 
 export const timezoneSchema = z.string().min(1, "Timezone is required");
 

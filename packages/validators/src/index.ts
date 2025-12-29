@@ -8,3 +8,7 @@ export * from "./customer";
 export * from "./booking-option";
 export * from "./product";
 export * from "./service";
+
+// Currency system
+export * from "./currency";
+export * from "./format-currency";

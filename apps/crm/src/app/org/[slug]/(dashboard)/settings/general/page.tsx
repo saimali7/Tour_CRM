@@ -12,8 +12,11 @@ import {
   Globe,
   MapPin,
   Clock,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CurrencySelector } from "@/components/settings/currency-selector";
+import { type CurrencyCode, getCurrencyConfig } from "@tour/validators";
 
 export default function GeneralSettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -51,6 +54,7 @@ export default function GeneralSettingsPage() {
     country: "",
     postalCode: "",
     timezone: "",
+    currency: "AED" as CurrencyCode,
   });
 
   // Initialize form when data loads
@@ -68,6 +72,7 @@ export default function GeneralSettingsPage() {
         country: organization.country || "",
         postalCode: organization.postalCode || "",
         timezone: organization.timezone || "",
+        currency: (organization.currency || "AED") as CurrencyCode,
       });
     }
   }, [organization]);
@@ -247,8 +252,8 @@ export default function GeneralSettingsPage() {
                 />
               </div>
 
-              {/* Timezone - Full Width */}
-              <div className="md:col-span-2 space-y-2">
+              {/* Timezone */}
+              <div className="space-y-2">
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                   <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                   Timezone
@@ -275,6 +280,24 @@ export default function GeneralSettingsPage() {
                   <option value="Australia/Sydney">Sydney (AEST)</option>
                   <option value="Australia/Melbourne">Melbourne (AEST)</option>
                 </select>
+              </div>
+
+              {/* Currency */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <Coins className="h-3.5 w-3.5 text-muted-foreground" />
+                  Currency
+                </label>
+                <CurrencySelector
+                  value={businessForm.currency}
+                  onValueChange={(value) => {
+                    setBusinessForm((prev) => ({ ...prev, currency: value }));
+                    setHasChanges(true);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Default currency for pricing and bookings. Supports 35+ currencies.
+                </p>
               </div>
             </div>
           </div>

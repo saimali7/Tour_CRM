@@ -23,6 +23,11 @@ export const organizations = pgTable("organizations", {
   postalCode: text("postal_code"),
   timezone: text("timezone").notNull().default("UTC"),
 
+  // Currency - ISO 4217 code (e.g., "AED", "USD", "EUR")
+  // Default is AED (UAE Dirham), can be changed during setup
+  // Once set and bookings exist, changing is discouraged (display-only impact)
+  currency: text("currency").notNull().default("AED"),
+
   // Branding
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").default("#0066FF"),

@@ -31,6 +31,7 @@ export interface UpdateOrganizationInput {
   country?: string;
   postalCode?: string;
   timezone?: string;
+  currency?: string; // ISO 4217 currency code
   logoUrl?: string;
   primaryColor?: string;
   settings?: Partial<OrganizationSettings>;
@@ -72,6 +73,7 @@ export class OrganizationService extends BaseService {
         country: input.country,
         postalCode: input.postalCode,
         timezone: input.timezone,
+        currency: input.currency,
         logoUrl: input.logoUrl,
         primaryColor: input.primaryColor,
         settings,
@@ -185,9 +187,43 @@ export class OrganizationService extends BaseService {
     return org.timezone;
   }
 
-  async getDefaultCurrency(): Promise<string> {
+  /**
+   * Get the organization's currency code
+   * Uses the dedicated column first, falls back to settings for backwards compatibility
+   */
+  async getCurrency(): Promise<string> {
     const org = await this.get();
-    return org.settings?.defaultCurrency || "AED";
+    // Use dedicated column first, fallback to settings, then default
+    return org.currency || org.settings?.defaultCurrency || "AED";
+  }
+
+  /**
+   * @deprecated Use getCurrency() instead
+   */
+  async getDefaultCurrency(): Promise<string> {
+    return this.getCurrency();
+  }
+
+  /**
+   * Update the organization's currency
+   * Note: This should only be changed during setup or with caution
+   * as it affects all new bookings/pricing display
+   */
+  async setCurrency(currency: string): Promise<Organization> {
+    const [updated] = await this.db
+      .update(organizations)
+      .set({
+        currency,
+        updatedAt: new Date(),
+      })
+      .where(eq(organizations.id, this.organizationId))
+      .returning();
+
+    if (!updated) {
+      throw new NotFoundError("Organization", this.organizationId);
+    }
+
+    return updated;
   }
 
   async getStatus(): Promise<OrganizationStatus> {

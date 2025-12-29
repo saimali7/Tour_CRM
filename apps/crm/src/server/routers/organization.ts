@@ -24,6 +24,7 @@ const updateOrganizationSchema = z.object({
   country: z.string().optional(),
   postalCode: z.string().optional(),
   timezone: z.string().optional(),
+  currency: z.string().optional(), // ISO 4217 currency code (e.g., "AED", "USD", "EUR")
   logoUrl: z.string().url().optional().or(z.literal("")),
   primaryColor: z.string().optional(),
 });
@@ -163,9 +164,15 @@ export const organizationRouter = createRouter({
     return services.organization.getTimezone();
   }),
 
+  getCurrency: protectedProcedure.query(async ({ ctx }) => {
+    const services = createServices({ organizationId: ctx.orgContext.organizationId });
+    return services.organization.getCurrency();
+  }),
+
+  /** @deprecated Use getCurrency instead */
   getDefaultCurrency: protectedProcedure.query(async ({ ctx }) => {
     const services = createServices({ organizationId: ctx.orgContext.organizationId });
-    return services.organization.getDefaultCurrency();
+    return services.organization.getCurrency();
   }),
 
   isActive: protectedProcedure.query(async ({ ctx }) => {

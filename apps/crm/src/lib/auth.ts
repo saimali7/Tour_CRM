@@ -72,6 +72,8 @@ export const getCurrentUser = cache(async () => {
     return null;
   }
 
+  // Use upsert to handle race conditions where multiple requests
+  // try to create the same user simultaneously
   const [newUser] = await db
     .insert(users)
     .values({
@@ -80,6 +82,16 @@ export const getCurrentUser = cache(async () => {
       firstName: clerkUser.firstName,
       lastName: clerkUser.lastName,
       avatarUrl: clerkUser.imageUrl,
+    })
+    .onConflictDoUpdate({
+      target: users.clerkId,
+      set: {
+        email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+        firstName: clerkUser.firstName,
+        lastName: clerkUser.lastName,
+        avatarUrl: clerkUser.imageUrl,
+        updatedAt: new Date(),
+      },
     })
     .returning();
 
