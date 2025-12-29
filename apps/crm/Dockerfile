@@ -88,10 +88,12 @@ COPY --from=builder /app/node_modules/postgres ./node_modules/postgres
 # Create startup script that runs migrations then starts app
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'set -e' >> /app/start.sh && \
-    echo 'echo "Running database migrations..."' >> /app/start.sh && \
-    echo 'cd /app/packages/database && npx drizzle-kit migrate 2>&1 || echo "Migration warning (may be OK if already applied)"' >> /app/start.sh && \
+    echo 'echo "=== Running database migrations ==="' >> /app/start.sh && \
+    echo 'cd /app/packages/database' >> /app/start.sh && \
+    echo 'echo "DATABASE_URL is set: $(test -n \"$DATABASE_URL\" && echo yes || echo NO)"' >> /app/start.sh && \
+    echo 'yes | npx drizzle-kit push 2>&1 && echo "=== Migrations complete ===" || { echo "=== Migration FAILED ==="; exit 1; }' >> /app/start.sh && \
     echo 'cd /app' >> /app/start.sh && \
-    echo 'echo "Starting application..."' >> /app/start.sh && \
+    echo 'echo "=== Starting application ==="' >> /app/start.sh && \
     echo 'exec node apps/crm/server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
 
