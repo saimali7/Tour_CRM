@@ -1,9 +1,24 @@
 import Link from "next/link";
-import { Compass, Home, ArrowLeft } from "lucide-react";
+import { Compass, Home } from "lucide-react";
 
 export default function GlobalNotFound() {
   return (
     <html lang="en">
+      <head>
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              @keyframes spin-slow {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+              .animate-spin-slow {
+                animation: spin-slow 20s linear infinite;
+              }
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="flex flex-col items-center justify-center px-4 py-16">
           <div className="relative mb-8">
@@ -34,16 +49,6 @@ export default function GlobalNotFound() {
             Error 404 — Page not found
           </p>
         </div>
-
-        <style jsx global>{`
-          @keyframes spin-slow {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-          .animate-spin-slow {
-            animation: spin-slow 20s linear infinite;
-          }
-        `}</style>
       </body>
     </html>
   );
