@@ -81,6 +81,16 @@ export const getCurrentUser = cache(async () => {
       lastName: clerkUser.lastName,
       avatarUrl: clerkUser.imageUrl,
     })
+    .onConflictDoUpdate({
+      target: users.clerkId,
+      set: {
+        email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+        firstName: clerkUser.firstName,
+        lastName: clerkUser.lastName,
+        avatarUrl: clerkUser.imageUrl,
+        updatedAt: new Date(),
+      },
+    })
     .returning();
 
   return newUser;

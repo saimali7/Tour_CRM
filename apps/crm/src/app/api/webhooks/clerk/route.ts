@@ -99,17 +99,7 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
     return;
   }
 
-  // Check if user already exists (in case of duplicate webhook)
-  const existingUser = await db.query.users.findFirst({
-    where: eq(users.clerkId, id),
-  });
-
-  if (existingUser) {
-    webhookLogger.info({ clerkUserId: id }, "User already exists in database (idempotent)");
-    return;
-  }
-
-  // Create new user
+  // Upsert user (handles race conditions and duplicate webhooks)
   const result = await db
     .insert(users)
     .values({
@@ -120,11 +110,22 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
       avatarUrl: image_url,
       phone: phone_numbers?.[0]?.phone_number,
     })
+    .onConflictDoUpdate({
+      target: users.clerkId,
+      set: {
+        email: primaryEmail,
+        firstName: first_name,
+        lastName: last_name,
+        avatarUrl: image_url,
+        phone: phone_numbers?.[0]?.phone_number,
+        updatedAt: new Date(),
+      },
+    })
     .returning();
 
   const newUser = result[0];
   if (newUser) {
-    webhookLogger.info({ userId: newUser.id, clerkUserId: id }, "Created user from Clerk");
+    webhookLogger.info({ userId: newUser.id, clerkUserId: id }, "Upserted user from Clerk");
   }
 }
 
