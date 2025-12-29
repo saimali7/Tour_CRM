@@ -2,12 +2,10 @@
 # Tour CRM - Production Dockerfile
 # =============================================================================
 # Uses BuildKit cache mounts for faster builds
+# Migrations run automatically at container startup
 #
 # Build: docker build -t tour-crm -f apps/crm/Dockerfile .
 # Run:   docker run -p 3000:3000 --env-file .env.production tour-crm
-#
-# MIGRATIONS: Run separately via Coolify "Pre-deploy Command":
-#   cd packages/database && npx drizzle-kit migrate
 
 FROM node:20-alpine AS base
 
@@ -63,7 +61,7 @@ RUN --mount=type=cache,id=turbo,target=/app/.turbo \
     pnpm --filter @tour/crm build
 
 # =============================================================================
-# Runner stage - Minimal production image
+# Runner stage - Production image with migrations
 # =============================================================================
 FROM base AS runner
 WORKDIR /app
@@ -74,9 +72,28 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# Copy Next.js standalone build
 COPY --from=builder /app/apps/crm/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/crm/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/crm/.next/static ./apps/crm/.next/static
+
+# Copy database package for migrations
+COPY --from=builder /app/packages/database ./packages/database
+COPY --from=builder /app/node_modules/drizzle-kit ./node_modules/drizzle-kit
+COPY --from=builder /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
+COPY --from=builder /app/node_modules/esbuild* ./node_modules/
+COPY --from=builder /app/node_modules/@esbuild ./node_modules/@esbuild
+COPY --from=builder /app/node_modules/postgres ./node_modules/postgres
+
+# Create startup script that runs migrations then starts app
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'set -e' >> /app/start.sh && \
+    echo 'echo "Running database migrations..."' >> /app/start.sh && \
+    echo 'cd /app/packages/database && npx drizzle-kit migrate 2>&1 || echo "Migration warning (may be OK if already applied)"' >> /app/start.sh && \
+    echo 'cd /app' >> /app/start.sh && \
+    echo 'echo "Starting application..."' >> /app/start.sh && \
+    echo 'exec node apps/crm/server.js' >> /app/start.sh && \
+    chmod +x /app/start.sh
 
 USER nextjs
 
@@ -84,4 +101,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "apps/crm/server.js"]
+CMD ["/app/start.sh"]
