@@ -7,7 +7,7 @@ import { z } from "zod";
 export const serverEnvSchema = z.object({
   // Database (required)
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  DIRECT_URL: z.string().optional(),
+  DIRECT_URL: z.string().optional(), // Direct connection for migrations (bypasses PgBouncer)
 
   // Auth (optional in dev - can run without Clerk)
   ENABLE_CLERK: z.enum(["true", "false"]).default("false"),
@@ -27,8 +27,16 @@ export const serverEnvSchema = z.object({
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
 
-  // Cache (optional)
+  // Cache (optional - Redis)
   REDIS_URL: z.string().optional(),
+
+  // Storage (optional - S3/MinIO)
+  S3_ENDPOINT: z.string().optional(), // e.g., http://minio:9000 or https://s3.amazonaws.com
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+  S3_BUCKET: z.string().optional(), // Default bucket name
+  S3_REGION: z.string().optional().default("us-east-1"), // Required by SDK, MinIO ignores
+  S3_PUBLIC_URL: z.string().optional(), // Public URL for serving files (via CDN)
 
   // Security
   JWT_SECRET: z.string().min(32).optional(),
@@ -77,11 +85,24 @@ export const env = {
   /** Check if Redis cache is configured */
   isRedisConfigured: () => !!process.env.REDIS_URL,
 
+  /** Check if S3/MinIO storage is configured */
+  isS3Configured: () => !!process.env.S3_ENDPOINT && !!process.env.S3_ACCESS_KEY && !!process.env.S3_SECRET_KEY,
+
   /** Get the app URL */
   getAppUrl: () => process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
 
   /** Get the web/booking URL */
   getWebUrl: () => process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3001",
+
+  /** Get S3/MinIO configuration */
+  getS3Config: () => ({
+    endpoint: process.env.S3_ENDPOINT,
+    accessKey: process.env.S3_ACCESS_KEY,
+    secretKey: process.env.S3_SECRET_KEY,
+    bucket: process.env.S3_BUCKET || "tour-images",
+    region: process.env.S3_REGION || "us-east-1",
+    publicUrl: process.env.S3_PUBLIC_URL,
+  }),
 };
 
 // =============================================================================

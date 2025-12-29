@@ -1,15 +1,25 @@
 # =============================================================================
 # Tour CRM - Production Docker Compose
 # =============================================================================
-# This file is designed for deployment with Coolify
+# Self-hosted infrastructure stack for Coolify deployment
+#
+# Components:
+#   - PostgreSQL 16: Primary database
+#   - PgBouncer: Connection pooling (apps connect here)
+#   - Redis: Session cache, rate limiting, query cache
+#   - MinIO: S3-compatible object storage
 #
 # Usage:
 #   docker-compose -f docker-compose.prod.yml up -d
+#
+# Connection URLs:
+#   - App → PgBouncer: postgresql://user:pass@pgbouncer:6432/db (transaction pooling)
+#   - Migrations → PostgreSQL: postgresql://user:pass@postgres:5432/db (direct)
 # =============================================================================
 
 services:
   # ===========================================================================
-  # PostgreSQL Database
+  # PostgreSQL Database (internal - apps should use PgBouncer)
   # ===========================================================================
   postgres:
     image: postgres:16-alpine
@@ -19,8 +29,29 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-tourcrm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tourcrm2024}
       POSTGRES_DB: ${POSTGRES_DB:-tour_platform}
-    ports:
-      - "5432:5432"
+      # Performance tuning for 16GB VPS
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "effective_cache_size=3GB"
+      - "-c"
+      - "work_mem=32MB"
+      - "-c"
+      - "maintenance_work_mem=256MB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "wal_buffers=32MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "random_page_cost=1.1"
+    # Port 5432 NOT exposed externally - only via internal network
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,6 +59,87 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - tour_network
+
+  # ===========================================================================
+  # PgBouncer - Connection Pooler (apps connect here)
+  # ===========================================================================
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: tour_pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tourcrm}:${POSTGRES_PASSWORD:-tourcrm2024}@postgres:5432/${POSTGRES_DB:-tour_platform}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 100
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 3
+      SERVER_LIFETIME: 3600
+      SERVER_IDLE_TIMEOUT: 600
+      AUTH_TYPE: scram-sha-256
+    ports:
+      - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tour_network
+
+  # ===========================================================================
+  # Redis - Cache, Sessions, Rate Limiting
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: tour_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:-tourcrm2024}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-tourcrm2024}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tour_network
+
+  # ===========================================================================
+  # MinIO - S3-Compatible Object Storage
+  # ===========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: tour_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tourcrm2024}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_CONSOLE_URL:-http://localhost:9001}
+    ports:
+      - "9000:9000"   # API endpoint
+      - "9001:9001"   # Console UI
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - tour_network
 
@@ -45,11 +157,26 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-tourcrm}:${POSTGRES_PASSWORD:-tourcrm2024}@postgres:5432/${POSTGRES_DB:-tour_platform}
+      # Database via PgBouncer (transaction pooling)
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-tourcrm}:${POSTGRES_PASSWORD:-tourcrm2024}@pgbouncer:6432/${POSTGRES_DB:-tour_platform}
+      # Direct connection for migrations only
       - DIRECT_URL=postgresql://${POSTGRES_USER:-tourcrm}:${POSTGRES_PASSWORD:-tourcrm2024}@postgres:5432/${POSTGRES_DB:-tour_platform}
+      # Redis cache
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-tourcrm2024}@redis:6379
+      # MinIO storage
+      - S3_ENDPOINT=http://minio:9000
+      - S3_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-tourcrm2024}
+      - S3_BUCKET=tour-images
+      - S3_PUBLIC_URL=${S3_PUBLIC_URL:-http://localhost:9000}
+      # App URL
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     depends_on:
-      postgres:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
@@ -62,26 +189,6 @@ services:
     labels:
       - "coolify.managed=true"
 
-  # ===========================================================================
-  # Redis Cache (Optional)
-  # ===========================================================================
-  redis:
-    image: redis:7-alpine
-    container_name: tour_redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-tourcrm2024}
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-tourcrm2024}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - tour_network
-
 networks:
   tour_network:
     driver: bridge
@@ -90,4 +197,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  minio_data:
     driver: local

@@ -36,6 +36,7 @@ pnpm dev --filter crm     # CRM only
 pnpm build && pnpm typecheck  # Before commit
 pnpm db:push              # Push schema
 pnpm db:studio            # Drizzle Studio
+docker-compose up -d      # Start local infrastructure (Postgres, Redis, MinIO)
 ```
 
 ## Stack
@@ -149,6 +150,38 @@ Phases 0-6 complete. Next: Phase 7 Operations Excellence.
 | Doc | Purpose |
 |-----|---------|
 | `docs/PROGRESS.md` | Implementation tracker (source of truth) |
+| `docs/INFRASTRUCTURE_PLAN.md` | Self-hosted infrastructure (Postgres, PgBouncer, Redis, MinIO) |
 | `docs/DESIGN_SYSTEM_V2.md` | Full design system |
 | `docs/ARCHITECTURE.md` | Domain model, schema |
 | `docs/DEPLOYMENT.md` | Production setup |
+
+## Infrastructure
+
+Self-hosted on Hostinger KVM 4 VPS ($20/mo) via Coolify:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         CRM Application                              │
+│                     (Next.js 15 + tRPC)                             │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │
+        ┌─────────────────────────┼─────────────────────────┐
+        ▼                         ▼                         ▼
+┌───────────────┐         ┌───────────────┐         ┌───────────────┐
+│   PgBouncer   │         │     Redis     │         │     MinIO     │
+│  (Pooling)    │         │    (Cache)    │         │   (Storage)   │
+│   :6432       │         │    :6379      │         │    :9000      │
+└───────┬───────┘         └───────────────┘         └───────────────┘
+        ▼
+┌───────────────┐
+│  PostgreSQL   │
+│    (Data)     │
+│    :5432      │
+└───────────────┘
+```
+
+Key files:
+- `docker-compose.yml` - Local development (Postgres, Redis, MinIO, Mailpit)
+- `docker-compose.prod.yml` - Production stack with PgBouncer
+- `scripts/backup-database.sh` - Backup script for VPS
+- `scripts/restore-database.sh` - Restore script

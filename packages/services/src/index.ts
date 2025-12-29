@@ -436,7 +436,30 @@ export type {
 } from "./waiver-service";
 
 // Storage service (separate from org-scoped services, created with createStorageService)
-export { StorageService, createStorageService, type UploadResult } from "./storage-service";
+export {
+  StorageService,
+  createStorageService,
+  isStorageConfigured,
+  checkStorageHealth,
+  type UploadResult,
+  type FileInfo,
+  type S3Config,
+} from "./storage-service";
+
+// Cache service (Redis-based caching)
+export {
+  CacheService,
+  createCacheService,
+  getCache,
+  isCacheConfigured,
+  checkCacheHealth,
+  orgCacheKey,
+  invalidateOrgCache,
+  invalidateOrgCacheType,
+  CachePrefix,
+  CacheTTL,
+  type CacheConfig,
+} from "./cache-service";
 
 // Logger utilities
 export {
