@@ -414,6 +414,7 @@ export function TourForm({
           onChange={(url) => setFormData((prev) => ({ ...prev, coverImageUrl: url }))}
           label="Cover Image"
           folder="tours/covers"
+          orgSlug={slug}
         />
 
         <div>
@@ -425,6 +426,7 @@ export function TourForm({
             onChange={(urls) => setFormData((prev) => ({ ...prev, images: urls }))}
             maxFiles={10}
             folder="tours/gallery"
+            orgSlug={slug}
           />
           <p className="text-xs text-muted-foreground mt-2">
             The first image will be used as the cover if no cover image is set

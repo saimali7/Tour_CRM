@@ -721,7 +721,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
             <PricingTab formState={formState} updateForm={updateForm} />
           )}
           {activeTab === "content" && (
-            <ContentTab formState={formState} updateForm={updateForm} />
+            <ContentTab formState={formState} updateForm={updateForm} orgSlug={slug} />
           )}
           {activeTab === "schedule" && (
             <ScheduleTab formState={formState} updateForm={updateForm} />

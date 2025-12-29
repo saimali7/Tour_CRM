@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { createStorageService } from "@tour/services";
 import { config } from "@tour/config";
+import { getOrgContext } from "@/lib/auth";
 
 /**
  * Allowed upload folders - whitelist to prevent path traversal attacks
@@ -26,23 +26,36 @@ function isAllowedFolder(folder: string): folder is AllowedFolder {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const { orgId } = await auth();
-    if (!orgId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
     // Get form data
     const formData = await request.formData();
     const files = formData.getAll("files") as File[];
     const rawFolder = (formData.get("folder") as string) || "images";
+    const orgSlug = formData.get("orgSlug") as string;
+
+    // Validate org slug is provided
+    if (!orgSlug) {
+      return NextResponse.json(
+        { error: "Organization slug is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate user has access to this organization
+    let orgContext;
+    try {
+      orgContext = await getOrgContext(orgSlug);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const organizationId = orgContext.organizationId;
 
     // SECURITY: Validate folder against whitelist to prevent path traversal
     if (!isAllowedFolder(rawFolder)) {
-      console.warn(`Upload rejected: Invalid folder "${rawFolder}" from org ${orgId}`);
+      console.warn(`Upload rejected: Invalid folder "${rawFolder}" from org ${organizationId}`);
       return NextResponse.json(
         {
           error: "Invalid upload folder",
@@ -88,7 +101,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Upload files
-    const storageService = createStorageService(orgId);
+    const storageService = createStorageService(organizationId);
     const results = await storageService.uploadMany(files, { folder });
 
     return NextResponse.json({
@@ -106,18 +119,31 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // Check authentication
-    const { orgId } = await auth();
-    if (!orgId) {
+    // Get request body
+    const body = await request.json();
+    const paths = body.paths as string[];
+    const orgSlug = body.orgSlug as string;
+
+    // Validate org slug is provided
+    if (!orgSlug) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: "Organization slug is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate user has access to this organization
+    let orgContext;
+    try {
+      orgContext = await getOrgContext(orgSlug);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unauthorized" },
         { status: 401 }
       );
     }
 
-    // Get paths to delete
-    const body = await request.json();
-    const paths = body.paths as string[];
+    const organizationId = orgContext.organizationId;
 
     if (!paths || paths.length === 0) {
       return NextResponse.json(
@@ -127,7 +153,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete files
-    const storageService = createStorageService(orgId);
+    const storageService = createStorageService(organizationId);
     await storageService.deleteMany(paths);
 
     return NextResponse.json({ success: true });
