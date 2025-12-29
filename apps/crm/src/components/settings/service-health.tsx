@@ -16,13 +16,16 @@ import {
   Play,
   Loader2,
   FlaskConical,
+  Server,
+  MessageSquare,
+  Bug,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type ServiceStatus = "connected" | "not_configured" | "error";
-type ServiceName = "database" | "authentication" | "payments" | "email" | "automations" | "storage";
-type FunctionalTestService = "database" | "email" | "storage" | "payments" | "automations";
+type ServiceName = "database" | "authentication" | "payments" | "email" | "automations" | "storage" | "cache" | "sms" | "monitoring";
+type FunctionalTestService = "database" | "email" | "storage" | "payments" | "automations" | "cache" | "sms";
 
 interface ServiceHealth {
   name: string;
@@ -45,6 +48,9 @@ const serviceIcons: Record<string, typeof Database> = {
   email: Mail,
   automations: Zap,
   storage: HardDrive,
+  cache: Server,
+  sms: MessageSquare,
+  monitoring: Bug,
 };
 
 const serviceLabels: Record<string, string> = {
@@ -54,6 +60,9 @@ const serviceLabels: Record<string, string> = {
   email: "Email",
   automations: "Background Jobs",
   storage: "File Storage",
+  cache: "Cache",
+  sms: "SMS",
+  monitoring: "Error Monitoring",
 };
 
 const serviceDescriptions: Record<string, string> = {
@@ -63,6 +72,9 @@ const serviceDescriptions: Record<string, string> = {
   email: "Resend transactional emails",
   automations: "Inngest background workflows",
   storage: "Supabase file storage",
+  cache: "Redis caching layer",
+  sms: "Twilio SMS notifications",
+  monitoring: "Sentry error tracking",
 };
 
 const functionalTestDescriptions: Record<string, string> = {
@@ -71,6 +83,8 @@ const functionalTestDescriptions: Record<string, string> = {
   storage: "Tests upload, download, and delete operations",
   payments: "Creates and cancels a test payment intent",
   automations: "Sends a test event to Inngest",
+  cache: "Tests SET, GET, DELETE operations",
+  sms: "Sends a test SMS to verify delivery",
 };
 
 function StatusBadge({ status }: { status: ServiceStatus }) {
@@ -109,6 +123,8 @@ function ServiceCard({
   isFunctionalTesting,
   testEmail,
   onTestEmailChange,
+  testPhone,
+  onTestPhoneChange,
 }: {
   service: ServiceHealth;
   onTest: () => void;
@@ -119,14 +135,17 @@ function ServiceCard({
   isFunctionalTesting: boolean;
   testEmail?: string;
   onTestEmailChange?: (email: string) => void;
+  testPhone?: string;
+  onTestPhoneChange?: (phone: string) => void;
 }) {
   const Icon = serviceIcons[service.name] || Database;
   const label = serviceLabels[service.name] || service.name;
   const description = serviceDescriptions[service.name] || "";
   const canTest = service.status !== "not_configured";
-  const hasFunctionalTest = service.name !== "authentication";
+  const hasFunctionalTest = service.name !== "authentication" && service.name !== "monitoring";
   const functionalDescription = functionalTestDescriptions[service.name];
   const needsEmail = service.name === "email";
+  const needsPhone = service.name === "sms";
 
   return (
     <div
@@ -226,6 +245,19 @@ function ServiceCard({
             </div>
           )}
 
+          {/* Phone input for SMS test */}
+          {needsPhone && hasFunctionalTest && canTest && (
+            <div className="mt-3">
+              <Input
+                type="tel"
+                placeholder="+1 555 123 4567"
+                value={testPhone || ""}
+                onChange={(e) => onTestPhoneChange?.(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+          )}
+
           {/* Test Buttons */}
           <div className="mt-3 flex gap-2 flex-wrap">
             <Button
@@ -253,7 +285,7 @@ function ServiceCard({
                 variant="default"
                 size="sm"
                 onClick={onFunctionalTest}
-                disabled={!canTest || isTesting || isFunctionalTesting || (needsEmail && !testEmail)}
+                disabled={!canTest || isTesting || isFunctionalTesting || (needsEmail && !testEmail) || (needsPhone && !testPhone)}
                 className="h-7 text-xs"
                 title={functionalDescription}
               >
@@ -295,6 +327,7 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
   const [testingService, setTestingService] = useState<string | null>(null);
   const [functionalTestingService, setFunctionalTestingService] = useState<string | null>(null);
   const [testEmail, setTestEmail] = useState("");
+  const [testPhone, setTestPhone] = useState("");
 
   const { data, isLoading, refetch, isRefetching } =
     trpc.organization.getServiceHealth.useQuery(undefined, {
@@ -356,6 +389,7 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
     functionalTestMutation.mutate({
       service: serviceName as FunctionalTestService,
       testEmail: serviceName === "email" ? testEmail : undefined,
+      testPhone: serviceName === "sms" ? testPhone : undefined,
     });
   };
 
@@ -468,6 +502,8 @@ export function ServiceHealthPanel({ orgSlug, isActive = true }: ServiceHealthPa
             isFunctionalTesting={functionalTestingService === service.name}
             testEmail={service.name === "email" ? testEmail : undefined}
             onTestEmailChange={service.name === "email" ? setTestEmail : undefined}
+            testPhone={service.name === "sms" ? testPhone : undefined}
+            onTestPhoneChange={service.name === "sms" ? setTestPhone : undefined}
           />
         ))}
       </div>

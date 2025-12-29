@@ -301,6 +301,68 @@ export const organizationRouter = createRouter({
       });
     }
 
+    // Redis Cache
+    if (process.env.REDIS_URL) {
+      try {
+        const Redis = (await import("ioredis")).default;
+        const redis = new Redis(process.env.REDIS_URL, { lazyConnect: true, connectTimeout: 5000 });
+        const startTime = Date.now();
+        await redis.ping();
+        await redis.quit();
+        healthChecks.push({
+          name: "cache",
+          status: "connected",
+          message: `Redis connected (${Date.now() - startTime}ms)`,
+          details: { provider: "Redis" },
+        });
+      } catch (error) {
+        healthChecks.push({
+          name: "cache",
+          status: "error",
+          message: error instanceof Error ? error.message : "Connection failed",
+        });
+      }
+    } else {
+      healthChecks.push({
+        name: "cache",
+        status: "not_configured",
+        message: "Redis not configured",
+      });
+    }
+
+    // Twilio SMS
+    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+      const isTest = process.env.TWILIO_ACCOUNT_SID.startsWith("AC") && process.env.TWILIO_ACCOUNT_SID.includes("test");
+      healthChecks.push({
+        name: "sms",
+        status: "connected",
+        message: `Twilio configured${isTest ? " (Test)" : ""}`,
+        details: { provider: "Twilio" },
+      });
+    } else {
+      healthChecks.push({
+        name: "sms",
+        status: "not_configured",
+        message: "SMS not configured",
+      });
+    }
+
+    // Sentry Monitoring
+    if (process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      healthChecks.push({
+        name: "monitoring",
+        status: "connected",
+        message: "Sentry configured",
+        details: { provider: "Sentry" },
+      });
+    } else {
+      healthChecks.push({
+        name: "monitoring",
+        status: "not_configured",
+        message: "Error monitoring not configured",
+      });
+    }
+
     return {
       services: healthChecks,
       environment: process.env.NODE_ENV || "development",
@@ -310,7 +372,7 @@ export const organizationRouter = createRouter({
 
   // Test individual service connection
   testService: adminProcedure
-    .input(z.object({ service: z.enum(["database", "authentication", "payments", "email", "automations", "storage"]) }))
+    .input(z.object({ service: z.enum(["database", "authentication", "payments", "email", "automations", "storage", "cache", "sms", "monitoring"]) }))
     .mutation(async ({ input }): Promise<{ success: boolean; message: string; latency?: number }> => {
       const startTime = Date.now();
 
@@ -401,6 +463,44 @@ export const organizationRouter = createRouter({
           }
         }
 
+        case "cache": {
+          if (!process.env.REDIS_URL) {
+            return { success: false, message: "Redis not configured" };
+          }
+          try {
+            const Redis = (await import("ioredis")).default;
+            const redis = new Redis(process.env.REDIS_URL, { lazyConnect: true, connectTimeout: 5000 });
+            await redis.ping();
+            await redis.quit();
+            return { success: true, message: "Redis connected", latency: Date.now() - startTime };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Redis connection failed" };
+          }
+        }
+
+        case "sms": {
+          if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+            return { success: false, message: "Twilio not configured" };
+          }
+          try {
+            const twilio = await import("twilio");
+            const client = twilio.default(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+            // Verify account by fetching account info
+            await client.api.accounts(process.env.TWILIO_ACCOUNT_SID).fetch();
+            return { success: true, message: "Twilio connected", latency: Date.now() - startTime };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Twilio API error" };
+          }
+        }
+
+        case "monitoring": {
+          if (!process.env.SENTRY_DSN && !process.env.NEXT_PUBLIC_SENTRY_DSN) {
+            return { success: false, message: "Sentry not configured" };
+          }
+          // Sentry doesn't have a ping API - just verify DSN is configured
+          return { success: true, message: "Sentry configured", latency: Date.now() - startTime };
+        }
+
         default:
           return { success: false, message: "Unknown service" };
       }
@@ -409,8 +509,9 @@ export const organizationRouter = createRouter({
   // Functional test - actually exercises the service end-to-end
   functionalTestService: adminProcedure
     .input(z.object({
-      service: z.enum(["database", "email", "storage", "payments", "automations"]),
+      service: z.enum(["database", "email", "storage", "payments", "automations", "cache", "sms"]),
       testEmail: z.string().email().optional(), // Required for email test
+      testPhone: z.string().optional(), // Required for SMS test
     }))
     .mutation(async ({ ctx, input }): Promise<{
       success: boolean;
@@ -630,6 +731,71 @@ export const organizationRouter = createRouter({
             };
           } catch (error) {
             return { success: false, message: error instanceof Error ? error.message : "Inngest test failed" };
+          }
+        }
+
+        case "cache": {
+          // Test: SET, GET, DELETE operations
+          if (!process.env.REDIS_URL) {
+            return { success: false, message: "Redis not configured" };
+          }
+          try {
+            const Redis = (await import("ioredis")).default;
+            const redis = new Redis(process.env.REDIS_URL, { lazyConnect: true, connectTimeout: 5000 });
+
+            const testKey = `_health_check:${orgId}:${Date.now()}`;
+            const testValue = `test_${Date.now()}`;
+
+            // SET
+            await redis.set(testKey, testValue, "EX", 60); // Expires in 60 seconds
+
+            // GET
+            const retrieved = await redis.get(testKey);
+
+            // DELETE
+            await redis.del(testKey);
+
+            await redis.quit();
+
+            const valueMatches = retrieved === testValue;
+            return {
+              success: valueMatches,
+              message: valueMatches ? "Redis SET/GET/DELETE working" : "Value mismatch after GET",
+              details: { operations: ["SET", "GET", "DELETE"] },
+              latency: Date.now() - startTime,
+            };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "Redis test failed" };
+          }
+        }
+
+        case "sms": {
+          // Test: Send a real SMS message
+          if (!input.testPhone) {
+            return { success: false, message: "Test phone number required" };
+          }
+          if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
+            return { success: false, message: "Twilio not fully configured (need SID, token, and phone number)" };
+          }
+          try {
+            const twilio = await import("twilio");
+            const client = twilio.default(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+            // Send test SMS
+            const message = await client.messages.create({
+              body: `🧪 Test SMS from Tour CRM - ${new Date().toLocaleTimeString()}`,
+              from: process.env.TWILIO_PHONE_NUMBER,
+              to: input.testPhone,
+            });
+
+            return {
+              success: true,
+              message: "Test SMS sent successfully",
+              details: { messageSid: message.sid, status: message.status, to: input.testPhone },
+              latency: Date.now() - startTime,
+            };
+          } catch (error) {
+            return { success: false, message: error instanceof Error ? error.message : "SMS test failed" };
           }
         }
 
