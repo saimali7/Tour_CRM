@@ -333,7 +333,7 @@ export class TourService extends BaseService {
           status: productStatus,
           visibility: input.isPublic ? "public" : "private",
           basePrice: input.basePrice,
-          currency: input.currency || "USD",
+          currency: input.currency || "AED",
           featuredImage: input.coverImageUrl,
           gallery: input.images || [],
           metaTitle: input.metaTitle,

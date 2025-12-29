@@ -34,7 +34,7 @@ const baseTourSchema = z.object({
     .min(1, "Must have at least 1 guest per guide")
     .default(6),
   basePrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
-  currency: z.string().length(3, "Currency must be 3 characters").default("USD"),
+  currency: z.string().length(3, "Currency must be 3 characters").default("AED"),
   status: tourStatusSchema.default("draft"),
   includes: z.array(z.string()).optional(),
   excludes: z.array(z.string()).optional(),

@@ -27,7 +27,7 @@ export const products = pgTable("products", {
 
   // Pricing (base - can be overridden by type-specific tables)
   basePrice: numeric("base_price", { precision: 10, scale: 2 }).notNull().default("0"),
-  currency: text("currency").default("USD"),
+  currency: text("currency").default("AED"),
   pricingDisplay: text("pricing_display"), // e.g., "$89/person", "$45 flat"
 
   // Media

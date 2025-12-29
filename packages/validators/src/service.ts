@@ -74,7 +74,7 @@ const baseServiceSchema = z.object({
     .max(500, "Short description must be less than 500 characters")
     .optional(),
   basePrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
-  currency: z.string().length(3, "Currency must be 3 characters").default("USD"),
+  currency: z.string().length(3, "Currency must be 3 characters").default("AED"),
   featuredImage: z.string().url("Invalid image URL").optional().or(z.literal("")),
   tags: z.array(z.string()).default([]),
 

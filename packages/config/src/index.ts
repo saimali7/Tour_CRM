@@ -14,7 +14,7 @@ export const config = {
 
   // Default settings (can be overridden per organization)
   defaults: {
-    currency: "USD",
+    currency: "AED",
     language: "en",
     timezone: "UTC",
     dateFormat: "MMMM d, yyyy",

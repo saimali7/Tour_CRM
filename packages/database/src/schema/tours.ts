@@ -36,7 +36,7 @@ export const tours = pgTable("tours", {
 
   // Pricing (base price, can be overridden per schedule)
   basePrice: numeric("base_price", { precision: 10, scale: 2 }).notNull(),
-  currency: text("currency").default("USD"),
+  currency: text("currency").default("AED"),
 
   // Location
   meetingPoint: text("meeting_point"),

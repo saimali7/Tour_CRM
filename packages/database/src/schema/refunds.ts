@@ -30,7 +30,7 @@ export const refunds = pgTable("refunds", {
 
   // Amount
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  currency: text("currency").notNull().default("USD"),
+  currency: text("currency").notNull().default("AED"),
 
   // Status
   status: text("status").$type<RefundStatus>().notNull().default("pending"),

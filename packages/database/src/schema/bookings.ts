@@ -70,7 +70,7 @@ export const bookings = pgTable("bookings", {
   discount: numeric("discount", { precision: 10, scale: 2 }).default("0"),
   tax: numeric("tax", { precision: 10, scale: 2 }).default("0"),
   total: numeric("total", { precision: 10, scale: 2 }).notNull(),
-  currency: text("currency").notNull().default("USD"),
+  currency: text("currency").notNull().default("AED"),
 
   // Payment
   paymentStatus: text("payment_status").$type<PaymentStatus>().notNull().default("pending"),

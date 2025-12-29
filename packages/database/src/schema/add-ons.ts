@@ -25,7 +25,7 @@ export const addOnProducts = pgTable("add_on_products", {
 
   // Pricing
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
-  currency: text("currency").default("USD"),
+  currency: text("currency").default("AED"),
 
   // Type
   type: text("type").$type<AddOnType>().notNull().default("per_booking"),

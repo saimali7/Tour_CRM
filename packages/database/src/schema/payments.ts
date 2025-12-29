@@ -23,7 +23,7 @@ export const payments = pgTable("payments", {
 
   // Amount
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  currency: text("currency").notNull().default("USD"),
+  currency: text("currency").notNull().default("AED"),
 
   // Payment method
   method: text("method").$type<PaymentMethod>().notNull(),

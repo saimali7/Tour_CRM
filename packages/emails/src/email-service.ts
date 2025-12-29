@@ -506,7 +506,7 @@ export class EmailService {
           tourDate: data.tourDate,
           tourTime: data.tourTime,
           refundAmount: data.refundAmount,
-          currency: data.currency || "USD",
+          currency: data.currency || "AED",
           refundReason: data.refundReason,
           organizationName: this.org.name,
           organizationEmail: this.org.email,

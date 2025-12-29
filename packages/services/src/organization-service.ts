@@ -187,7 +187,7 @@ export class OrganizationService extends BaseService {
 
   async getDefaultCurrency(): Promise<string> {
     const org = await this.get();
-    return org.settings?.defaultCurrency || "USD";
+    return org.settings?.defaultCurrency || "AED";
   }
 
   async getStatus(): Promise<OrganizationStatus> {

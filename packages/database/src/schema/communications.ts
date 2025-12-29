@@ -216,7 +216,7 @@ export const abandonedCarts = pgTable("abandoned_carts", {
   // Pricing at time of cart
   subtotal: numeric("subtotal", { precision: 10, scale: 2 }),
   total: numeric("total", { precision: 10, scale: 2 }),
-  currency: text("currency").default("USD"),
+  currency: text("currency").default("AED"),
 
   // Cart state
   lastStep: text("last_step").$type<AbandonedCartStep>().notNull(),

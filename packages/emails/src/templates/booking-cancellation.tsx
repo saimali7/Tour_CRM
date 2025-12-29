@@ -37,7 +37,7 @@ export const BookingCancellationEmail = ({
   tourDate = "January 15, 2025",
   tourTime = "10:00 AM",
   refundAmount,
-  currency = "USD",
+  currency = "AED",
   cancellationReason,
   organizationName = "Tour Company",
   organizationEmail = "info@tourcompany.com",

@@ -355,7 +355,7 @@ export class ProductService extends BaseService {
         status: input.status || "draft",
         visibility: input.visibility || "public",
         basePrice: input.basePrice,
-        currency: input.currency || "USD",
+        currency: input.currency || "AED",
         pricingDisplay: input.pricingDisplay,
         featuredImage: input.featuredImage,
         gallery: input.gallery || [],

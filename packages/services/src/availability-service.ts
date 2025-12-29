@@ -191,7 +191,7 @@ export class AvailabilityService extends BaseService {
             experienceMode: "join" as const,
             totalPrice: {
               amount: Math.round(totalPrice * 100),
-              currency: "USD",
+              currency: "AED",
             },
             priceBreakdown: `${totalGuests} × $${pricePerPerson.toFixed(2)}`,
             scheduling: {

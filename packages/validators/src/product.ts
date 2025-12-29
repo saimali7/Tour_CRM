@@ -32,7 +32,7 @@ export const createProductSchema = z.object({
   status: productStatusSchema.default("draft"),
   visibility: productVisibilitySchema.default("public"),
   basePrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
-  currency: z.string().length(3, "Currency must be 3 characters").default("USD"),
+  currency: z.string().length(3, "Currency must be 3 characters").default("AED"),
   pricingDisplay: z
     .string()
     .max(50, "Pricing display must be less than 50 characters")

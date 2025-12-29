@@ -28,7 +28,7 @@ export const customers = pgTable("customers", {
 
   // Preferences
   language: text("language").default("en"),
-  currency: text("currency").default("USD"),
+  currency: text("currency").default("AED"),
 
   // Notes and metadata
   notes: text("notes"),

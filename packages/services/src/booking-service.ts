@@ -498,7 +498,7 @@ export class BookingService extends BaseService {
       bookingTime = this.extractTimeFromDate(sched.startsAt);
 
       pricePerPerson = parseFloat(sched.price || scheduleTour?.basePrice || "0");
-      currency = sched.currency || scheduleTour?.currency || "USD";
+      currency = sched.currency || scheduleTour?.currency || "AED";
 
     } else {
       // ========== AVAILABILITY-BASED MODEL (NEW) ==========
@@ -542,7 +542,7 @@ export class BookingService extends BaseService {
       }
 
       pricePerPerson = parseFloat(tourResult.basePrice || "0");
-      currency = tourResult.currency || "USD";
+      currency = tourResult.currency || "AED";
       scheduleId = undefined; // No schedule for availability-based bookings
     }
 

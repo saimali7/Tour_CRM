@@ -306,7 +306,7 @@ export class ManifestService extends BaseService {
         totalBookings,
         totalParticipants,
         totalRevenue,
-        currency: row.schedule.currency ?? "USD",
+        currency: row.schedule.currency ?? "AED",
       },
     };
   }

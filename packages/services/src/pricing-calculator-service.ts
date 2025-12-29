@@ -72,7 +72,7 @@ export function calculatePerPerson(
   pricing: PerPersonPricing,
   guests: GuestBreakdown
 ): CalculatedPrice {
-  const currency = pricing.tiers[0]?.price.currency || "USD";
+  const currency = pricing.tiers[0]?.price.currency || "AED";
   let total = 0;
   const parts: string[] = [];
 
@@ -188,7 +188,7 @@ export function calculateTieredGroup(
   guests: GuestBreakdown
 ): CalculatedPrice | null {
   const totalGuests = getTotalGuests(guests);
-  const currency = pricing.tiers[0]?.price.currency || "USD";
+  const currency = pricing.tiers[0]?.price.currency || "AED";
 
   // Find matching tier
   const tier = pricing.tiers.find(
@@ -396,7 +396,7 @@ export function calculateAddOnPrice(
 
     case "per_participant": {
       let total = 0;
-      const currency = pricing.tiers[0]?.price.currency || "USD";
+      const currency = pricing.tiers[0]?.price.currency || "AED";
 
       for (const tier of pricing.tiers) {
         const name = tier.name.toLowerCase();
@@ -434,7 +434,7 @@ export function formatAddOnPriceBreakdown(
   unitsBooked: number = 1,
   quantity: number = 1
 ): string {
-  const currency = "USD"; // Default, should come from pricing
+  const currency = "AED"; // Default, should come from pricing
 
   switch (pricing.type) {
     case "fixed":

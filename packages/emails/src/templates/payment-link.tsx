@@ -39,7 +39,7 @@ export const PaymentLinkEmail = ({
   tourTime = "10:00 AM",
   participants = 2,
   amount = "99.00",
-  currency = "USD",
+  currency = "AED",
   paymentUrl = "https://checkout.stripe.com/...",
   expiresAt,
   organizationName = "Tour Company",
