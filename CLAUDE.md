@@ -44,11 +44,14 @@ pnpm db:studio            # Drizzle Studio
 |-------|--------|
 | Framework | Next.js 15 App Router |
 | API | tRPC (internal), REST (external) |
-| DB | Supabase PostgreSQL + Drizzle |
+| DB | Self-hosted PostgreSQL 16 + PgBouncer + Drizzle |
+| Cache | Self-hosted Redis |
+| Storage | Self-hosted MinIO (S3-compatible) |
 | Auth | Clerk Organizations |
 | Payments | Stripe Connect |
 | Jobs | Inngest |
 | Email | Resend + React Email |
+| Hosting | Hostinger VPS + Coolify |
 
 ## Code Patterns
 
