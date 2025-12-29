@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Eye
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
@@ -28,6 +29,9 @@ export default function BrandingPage() {
       utils.organization.get.invalidate();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to save branding");
     },
   });
 

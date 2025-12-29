@@ -1,111 +1,151 @@
 "use client";
 
-import { ExternalLink, Book, MessageCircle, Mail, Keyboard } from "lucide-react";
-
-const helpResources = [
-  {
-    title: "Documentation",
-    description: "Learn how to use every feature of the CRM",
-    icon: Book,
-    href: "#",
-  },
-  {
-    title: "Contact Support",
-    description: "Get help from our support team",
-    icon: Mail,
-    href: "mailto:support@example.com",
-  },
-  {
-    title: "Community",
-    description: "Connect with other tour operators",
-    icon: MessageCircle,
-    href: "#",
-  },
-];
+import { Book, MessageCircle, Mail, Keyboard, Sparkles, Lightbulb, Video, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 export default function HelpPage() {
+  const handleComingSoon = (feature: string) => {
+    toast.info(`${feature} coming soon`, {
+      description: "We're working on this. Check back later!",
+    });
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-4xl">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Help & Support</h1>
+        <h1 className="text-2xl font-bold text-foreground">Help & Support</h1>
         <p className="text-muted-foreground mt-1">
-          Get the help you need to make the most of your CRM
+          Everything you need to get the most out of Tour CRM
         </p>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="flex items-center gap-4 p-4 rounded-lg border bg-card">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      {/* Quick Start Cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <button
+          onClick={() => {
+            // Trigger the keyboard shortcuts modal
+            const event = new KeyboardEvent("keydown", { key: "?" });
+            document.dispatchEvent(event);
+          }}
+          className="flex items-start gap-4 p-5 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-left group"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <Keyboard className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="font-medium">Keyboard Shortcuts</h3>
-            <p className="text-sm text-muted-foreground">
-              Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs">?</kbd> to view all shortcuts
+            <h3 className="font-semibold text-foreground">Keyboard Shortcuts</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">?</kbd> anytime to see all shortcuts
+            </p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => handleComingSoon("Video tutorials")}
+          className="flex items-start gap-4 p-5 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-left group"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+            <Video className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground">Video Tutorials</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Step-by-step guides for common tasks
+            </p>
+            <span className="inline-flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+              <Sparkles className="h-3 w-3" /> Coming soon
+            </span>
+          </div>
+        </button>
+      </div>
+
+      {/* Getting Started */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-border bg-muted/30">
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-amber-500" />
+            Quick Tips
+          </h2>
+        </div>
+        <div className="divide-y divide-border">
+          <div className="px-6 py-4">
+            <h3 className="font-medium text-foreground">Creating a booking</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">Cmd+B</kbd> anywhere
+              to open quick booking, or use the <span className="text-primary">Book</span> button in the header.
+            </p>
+          </div>
+          <div className="px-6 py-4">
+            <h3 className="font-medium text-foreground">Finding anything fast</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">Cmd+K</kbd> to open
+              the command palette and search bookings, customers, tours, and more.
+            </p>
+          </div>
+          <div className="px-6 py-4">
+            <h3 className="font-medium text-foreground">Assigning guides</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Go to <span className="text-primary">Calendar</span>, click on any scheduled tour, and use
+              the "Assign Guide" action in the details panel.
+            </p>
+          </div>
+          <div className="px-6 py-4">
+            <h3 className="font-medium text-foreground">Checking today's schedule</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              The <span className="text-primary">Dashboard</span> shows today's tours at a glance.
+              For the full view, visit <span className="text-primary">Tour Runs</span>.
             </p>
           </div>
         </div>
-
-        {helpResources.map((resource) => (
-          <a
-            key={resource.title}
-            href={resource.href}
-            className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-accent transition-colors"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <resource.icon className="h-5 w-5" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-medium flex items-center gap-2">
-                {resource.title}
-                <ExternalLink className="h-3 w-3 text-muted-foreground" />
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {resource.description}
-              </p>
-            </div>
-          </a>
-        ))}
       </div>
 
-      {/* FAQ Section */}
-      <div className="rounded-lg border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-4">Frequently Asked Questions</h2>
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-medium">How do I create a booking?</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs">Cmd+B</kbd> anywhere
-              to open the quick booking modal, or click the &quot;Book&quot; button in the header.
-            </p>
+      {/* Contact & Resources */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <button
+          onClick={() => handleComingSoon("Documentation")}
+          className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-center group"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+            <Book className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="font-medium">How do I assign a guide to a tour?</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Go to the Calendar page, click on a schedule, and use the &quot;Assign Guide&quot;
-              button in the schedule panel.
-            </p>
+            <h3 className="font-semibold text-foreground">Documentation</h3>
+            <p className="text-xs text-muted-foreground mt-1">Full feature guides</p>
+          </div>
+        </button>
+
+        <a
+          href="mailto:support@tourcrm.app"
+          className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-center group"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/10 text-violet-500 group-hover:bg-violet-500 group-hover:text-white transition-colors">
+            <Mail className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="font-medium">How do I view today&apos;s schedule?</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              The &quot;Today&quot; page shows all tours, guests, and issues for the current day.
-              Access it from the main navigation.
-            </p>
+            <h3 className="font-semibold text-foreground">Email Support</h3>
+            <p className="text-xs text-muted-foreground mt-1">support@tourcrm.app</p>
           </div>
-        </div>
+        </a>
+
+        <button
+          onClick={() => handleComingSoon("Community forum")}
+          className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-center group"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+            <MessageCircle className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground">Community</h3>
+            <p className="text-xs text-muted-foreground mt-1">Connect with operators</p>
+          </div>
+        </button>
       </div>
 
-      {/* Version Info */}
-      <div className="text-center text-sm text-muted-foreground">
-        <p>Tour CRM v1.0.0</p>
-        <p className="mt-1">
-          Need help? Contact us at{" "}
-          <a href="mailto:support@example.com" className="text-primary hover:underline">
-            support@example.com
-          </a>
+      {/* Version */}
+      <div className="text-center pt-4 border-t border-border">
+        <p className="text-sm text-muted-foreground">
+          Tour CRM v1.0.0
         </p>
       </div>
     </div>

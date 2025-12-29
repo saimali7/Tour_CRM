@@ -2,6 +2,7 @@
 
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Calendar,
   Plus,
@@ -105,6 +106,9 @@ export default function PricingSettingsPage() {
       resetSeasonalForm();
       showSuccessMessage();
     },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create seasonal pricing");
+    },
   });
 
   const updateSeasonalMutation = trpc.seasonalPricing.update.useMutation({
@@ -115,12 +119,18 @@ export default function PricingSettingsPage() {
       resetSeasonalForm();
       showSuccessMessage();
     },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update seasonal pricing");
+    },
   });
 
   const deleteSeasonalMutation = trpc.seasonalPricing.delete.useMutation({
     onSuccess: () => {
       utils.seasonalPricing.list.invalidate();
       showSuccessMessage();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete seasonal pricing");
     },
   });
 
@@ -132,6 +142,9 @@ export default function PricingSettingsPage() {
       resetGroupForm();
       showSuccessMessage();
     },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create group discount");
+    },
   });
 
   const updateGroupMutation = trpc.groupDiscount.update.useMutation({
@@ -142,12 +155,18 @@ export default function PricingSettingsPage() {
       resetGroupForm();
       showSuccessMessage();
     },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update group discount");
+    },
   });
 
   const deleteGroupMutation = trpc.groupDiscount.delete.useMutation({
     onSuccess: () => {
       utils.groupDiscount.list.invalidate();
       showSuccessMessage();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete group discount");
     },
   });
 
