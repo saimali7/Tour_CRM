@@ -43,6 +43,9 @@ export const organizations = pgTable("organizations", {
   // Status
   status: text("status").$type<OrganizationStatus>().notNull().default("active"),
 
+  // Currency (ISO 4217 code)
+  currency: text("currency").notNull().default("AED"),
+
   // Feature flags (what this org can access)
   plan: text("plan").$type<OrganizationPlan>().notNull().default("free"),
   features: jsonb("features").$type<string[]>().default([]),

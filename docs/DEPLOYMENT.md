@@ -903,21 +903,37 @@ Tour CRM (Project)
 
 **General Settings:**
 ```
-Build Pack: Nixpacks
+Build Pack: Dockerfile
+Dockerfile Location: apps/crm/Dockerfile
 Base Directory: /
 Watch Paths: (empty - use webhook)
 ```
 
-**Build Configuration:**
+**Pre-deploy Command (CRITICAL for migrations):**
+```bash
+cd packages/database && npx drizzle-kit migrate
+```
+
+This runs migrations BEFORE the new container starts, ensuring:
+- Database is ready before new code runs
+- Deployment fails fast if migration has issues
+- Zero-downtime with proper migration
+
+**Alternative: Nixpacks Configuration:**
 ```bash
 # Build Command
-pnpm install --frozen-lockfile && pnpm db:push && pnpm build --filter @tour/crm
+pnpm install --frozen-lockfile && pnpm build --filter @tour/crm
 
 # Start Command
-pnpm start --filter @tour/crm
+node apps/crm/server.js
 
 # Port
 3000
+```
+
+**Pre-deploy Command** (same for both Dockerfile and Nixpacks):
+```bash
+cd packages/database && npx drizzle-kit migrate
 ```
 
 **Domain Configuration:**
@@ -1052,13 +1068,36 @@ NEXT_PUBLIC_WEB_URL="https://book.yourdomain.com"
 ### Migration Strategy
 
 ```bash
-# Development: Quick iteration
-pnpm db:push          # Push schema changes directly
+# Development: Quick iteration with db:push
+pnpm db:push          # Push schema changes directly (destructive OK in dev)
 
-# Production: Safe migrations
-pnpm db:generate      # Generate migration files
-pnpm db:migrate       # Apply migrations
+# Production: Safe migrations (ALWAYS use this workflow)
+pnpm db:generate --name descriptive-name  # Generate migration files
+# Review the generated SQL in packages/database/drizzle/
+pnpm db:migrate       # Apply migrations to production
 ```
+
+### Coolify Pre-deploy Command (REQUIRED for Production)
+
+In Coolify, configure the **Pre-deploy Command** to run migrations before the new container starts:
+
+```bash
+cd packages/database && npx drizzle-kit migrate
+```
+
+This ensures:
+1. Migrations run BEFORE the new code starts
+2. Zero-downtime deploys (old code keeps running until migration succeeds)
+3. Automatic rollback if migration fails (new container won't start)
+
+### Migration Workflow
+
+1. **Make schema changes** in `packages/database/src/schema/`
+2. **Generate migration**: `pnpm db:generate --name add-feature-x`
+3. **Review SQL**: Check `packages/database/drizzle/XXXX_add-feature-x.sql`
+4. **Test locally**: Apply migration to local DB and test
+5. **Commit migration files**: Include in your PR
+6. **Deploy**: Coolify pre-deploy runs migration automatically
 
 ### Migration Best Practices
 

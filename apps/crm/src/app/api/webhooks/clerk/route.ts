@@ -99,7 +99,7 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
     return;
   }
 
-  // Upsert user - handles duplicate webhooks and race conditions
+  // Upsert user (handles race conditions and duplicate webhooks)
   const result = await db
     .insert(users)
     .values({
