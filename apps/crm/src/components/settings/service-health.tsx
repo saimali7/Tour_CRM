@@ -71,7 +71,7 @@ const serviceDescriptions: Record<string, string> = {
   payments: "Stripe payment processing",
   email: "Resend transactional emails",
   automations: "Inngest background workflows",
-  storage: "Supabase file storage",
+  storage: "S3/MinIO file storage",
   cache: "Redis caching layer",
   sms: "Twilio SMS notifications",
   monitoring: "Sentry error tracking",
