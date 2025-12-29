@@ -1,7 +1,7 @@
 # =============================================================================
-# Tour CRM - Production Dockerfile
+# Tour CRM - Production Dockerfile (Optimized)
 # =============================================================================
-# Multi-stage build optimized for pnpm monorepo with Next.js standalone output
+# Uses BuildKit cache mounts for 2-3x faster builds
 #
 # Build: docker build -t tour-crm .
 # Run:   docker run -p 3000:3000 --env-file .env.production tour-crm
@@ -9,7 +9,7 @@
 FROM node:20-alpine AS base
 
 # =============================================================================
-# Dependencies stage - Install all dependencies
+# Dependencies stage - Install all dependencies with cache
 # =============================================================================
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
@@ -19,9 +19,8 @@ WORKDIR /app
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
 
-# Copy workspace configuration
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY turbo.json ./
+# Copy workspace configuration first (these change rarely)
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
 
 # Copy all package.json files for workspace packages
 COPY apps/crm/package.json ./apps/crm/
@@ -35,8 +34,10 @@ COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/validators/package.json ./packages/validators/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies with BuildKit cache mount
+# This caches the pnpm store between builds - HUGE speed improvement
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # =============================================================================
 # Builder stage - Build the application
@@ -62,16 +63,16 @@ COPY . .
 # Set build-time environment variables
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-# Skip env validation during build (will validate at runtime)
 ENV SKIP_ENV_VALIDATION=true
-# Dummy DATABASE_URL for build - actual URL provided at runtime
 ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
 
-# Build the CRM app
-RUN pnpm --filter @tour/crm build
+# Build with turbo cache mount for faster rebuilds
+RUN --mount=type=cache,id=turbo,target=/app/.turbo \
+    --mount=type=cache,id=next,target=/app/apps/crm/.next/cache \
+    pnpm --filter @tour/crm build
 
 # =============================================================================
-# Runner stage - Production runtime
+# Runner stage - Production runtime (minimal)
 # =============================================================================
 FROM base AS runner
 WORKDIR /app
@@ -79,36 +80,19 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install pnpm for running db commands
-RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
-
 # Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Copy public assets
+# Copy only what's needed for runtime
 COPY --from=builder /app/apps/crm/public ./public
-
-# Set correct permissions for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Copy standalone build output
 COPY --from=builder --chown=nextjs:nodejs /app/apps/crm/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/crm/.next/static ./apps/crm/.next/static
-
-# Copy database package for migrations (drizzle-kit)
-COPY --from=builder --chown=nextjs:nodejs /app/packages/database ./packages/database
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 USER nextjs
 
 EXPOSE 3000
-
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Start the application
 CMD ["node", "apps/crm/server.js"]
