@@ -25,7 +25,7 @@ export function DashboardProviders({
               {children}
               <ContextPanelRoot />
               <OnboardingWizard />
-              <Toaster position="bottom-right" />
+              <Toaster position="bottom-right" toastOptions={{ style: { zIndex: 99999 } }} />
             </QuickBookingProvider>
           </SlideOverProvider>
         </ContextPanelProvider>

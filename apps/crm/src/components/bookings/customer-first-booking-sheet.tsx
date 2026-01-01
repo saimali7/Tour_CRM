@@ -383,13 +383,20 @@ export function CustomerFirstBookingSheet({
             return;
           }
         } else {
+          // Show the actual error message instead of failing silently
+          toast.error(errorMessage || "Failed to create customer");
           return;
         }
       }
     }
 
-    if (!customerId || !selectedScheduleId) {
-      toast.error("Missing required information");
+    if (!customerId) {
+      toast.error("Customer information is missing. Please enter customer details.");
+      return;
+    }
+
+    if (!selectedScheduleId) {
+      toast.error("Please select a time slot before booking.");
       return;
     }
 
@@ -934,11 +941,24 @@ export function CustomerFirstBookingSheet({
                             : "border-border bg-muted/50 opacity-60"
                         )}
                         onClick={() => {
-                          if (option.available && option.scheduling.type === "fixed" && option.scheduling.timeSlots.length > 0) {
+                          if (!option.available) {
+                            toast.error("This option is not available for your group size or date.");
+                            return;
+                          }
+                          if (option.scheduling.type === "fixed") {
+                            if (option.scheduling.timeSlots.length === 0) {
+                              toast.error("No time slots available for this date. Try a different date.");
+                              return;
+                            }
                             const availableSlot = option.scheduling.timeSlots.find((s) => s.available);
                             if (availableSlot) {
                               handleSelectOption(option.id, availableSlot.scheduleId);
+                            } else {
+                              toast.error("All time slots are fully booked. Try a different date.");
                             }
+                          } else {
+                            // Flexible scheduling - user needs to select a time manually
+                            toast.info("Please contact us to book this flexible option.");
                           }
                         }}
                       >

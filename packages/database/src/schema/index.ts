@@ -35,6 +35,10 @@ export * from "./add-ons";
 // Phase 7: Operations Excellence - Goals
 export * from "./goals";
 
+// Phase 7: Operations Excellence - Tour Command Center
+export * from "./pickup-addresses";
+export * from "./pickup-assignments";
+
 // Booking System v2: Customer-first booking with options
 export * from "./booking-options";
 

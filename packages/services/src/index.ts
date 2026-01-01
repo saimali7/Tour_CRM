@@ -44,6 +44,12 @@ import { TourAvailabilityService } from "./tour-availability-service";
 import { TourRunService } from "./tour-run-service";
 // Product catalog
 import { ProductService } from "./product-service";
+// Tour Command Center: Daily operations and auto-assignment
+import { DailyOperationsService } from "./daily-operations-service";
+import { AutoAssignmentService } from "./auto-assignment-service";
+// Tour Command Center: Pickup operations
+import { PickupAddressService } from "./pickup-address-service";
+import { PickupAssignmentService } from "./pickup-assignment-service";
 
 export interface Services {
   tour: TourService;
@@ -91,6 +97,12 @@ export interface Services {
   tourRun: TourRunService;
   // Product catalog
   product: ProductService;
+  // Tour Command Center: Daily operations and auto-assignment
+  dailyOperations: DailyOperationsService;
+  autoAssignment: AutoAssignmentService;
+  // Tour Command Center: Pickup operations
+  pickupAddress: PickupAddressService;
+  pickupAssignment: PickupAssignmentService;
 }
 
 /**
@@ -150,6 +162,12 @@ export function createServices(ctx: ServiceContext): Services {
     tourRun: new TourRunService(ctx),
     // Product catalog
     product: new ProductService(ctx),
+    // Tour Command Center: Daily operations and auto-assignment
+    dailyOperations: new DailyOperationsService(ctx),
+    autoAssignment: new AutoAssignmentService(ctx),
+    // Tour Command Center: Pickup operations
+    pickupAddress: new PickupAddressService(ctx),
+    pickupAssignment: new PickupAssignmentService(ctx),
   };
 }
 
@@ -205,6 +223,52 @@ export { TourAvailabilityService } from "./tour-availability-service";
 export { TourRunService } from "./tour-run-service";
 // Product catalog
 export { ProductService } from "./product-service";
+// Tour Command Center: Route optimization
+export { RouteOptimizationService } from "./route-optimization-service";
+export type {
+  Coordinate,
+  PickupPoint,
+  PickupTimeResult,
+  PickupAdditionAnalysis,
+  ZoneReference,
+} from "./route-optimization-service";
+// Tour Command Center: Pickup operations
+export { PickupAddressService } from "./pickup-address-service";
+export type {
+  CreatePickupAddressInput,
+  UpdatePickupAddressInput,
+  GetPickupAddressesOptions,
+} from "./pickup-address-service";
+export { PickupAssignmentService } from "./pickup-assignment-service";
+export type {
+  AssignBookingInput,
+  GhostPreviewInput,
+  GhostPreview,
+  PickupAssignmentWithRelations,
+} from "./pickup-assignment-service";
+// Tour Command Center: Daily operations and auto-assignment
+export { DailyOperationsService } from "./daily-operations-service";
+export { AutoAssignmentService } from "./auto-assignment-service";
+export type {
+  TourAssignmentStatus,
+  TourSummary,
+  DayStats,
+  DayOverview,
+  GroupedTours,
+  BookingWithCustomer,
+  GuideAssignmentWithPickups,
+  AvailableGuide,
+  UnassignedBooking,
+  TourAssignmentData,
+  AssignmentStatus,
+} from "./daily-operations-service";
+export type {
+  AssignmentFlagType,
+  AssignmentFlag,
+  AutoAssignResult,
+  DayAssignResult,
+  AssignmentSuggestion,
+} from "./auto-assignment-service";
 export type {
   CreateBookingOptionInput,
   UpdateBookingOptionInput,
