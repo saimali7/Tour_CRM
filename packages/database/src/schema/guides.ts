@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, jsonb, index, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
@@ -46,6 +46,11 @@ export const guides = pgTable("guides", {
 
   // Notes (internal)
   notes: text("notes"),
+
+  // Vehicle info for pickup operations
+  vehicleCapacity: integer("vehicle_capacity"),
+  vehicleType: text("vehicle_type"), // e.g., "sedan", "van", "bus"
+  preferredZones: jsonb("preferred_zones").$type<string[]>().default([]),
 
   // Timestamps
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

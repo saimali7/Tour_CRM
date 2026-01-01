@@ -448,7 +448,7 @@ export class DailyOperationsService extends BaseService {
         referenceNumber: b.booking.referenceNumber,
         customerName: `${b.customer?.firstName || ""} ${b.customer?.lastName || ""}`.trim(),
         passengerCount: b.booking.totalParticipants,
-        isPrivate: b.booking.isPrivate || false,
+        isPrivate: Boolean(b.booking.isPrivate),
         zone: b.pickupAddress?.zone || null,
         pickupAddressName: b.pickupAddress?.name || null,
         pickupNotes: b.booking.pickupNotes || null,

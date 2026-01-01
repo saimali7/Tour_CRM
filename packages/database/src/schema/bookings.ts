@@ -5,6 +5,7 @@ import { organizations } from "./organizations";
 import { customers } from "./customers";
 import { schedules } from "./schedules";
 import { tours } from "./tours";
+import { pickupAddresses } from "./pickup-addresses";
 
 // Bookings - Customer reservations (org-scoped)
 export const bookings = pgTable("bookings", {
@@ -41,6 +42,14 @@ export const bookings = pgTable("bookings", {
 
   // Booking Option (nullable for backward compatibility)
   bookingOptionId: text("booking_option_id"),
+
+  // Pickup address for guest pickups
+  pickupAddressId: text("pickup_address_id")
+    .references(() => pickupAddresses.id, { onDelete: "set null" }),
+  pickupNotes: text("pickup_notes"), // Specific pickup instructions for this booking
+
+  // Private/charter booking
+  isPrivate: integer("is_private").default(0), // 0 = shared, 1 = private/charter
 
   // Guest breakdown (new customer-first approach)
   guestAdults: integer("guest_adults"),
@@ -123,6 +132,8 @@ export const bookings = pgTable("bookings", {
   bookingDateIdx: index("bookings_booking_date_idx").on(table.bookingDate),
   // Composite index for capacity computation (tour run lookups)
   tourDateTimeIdx: index("bookings_tour_date_time_idx").on(table.organizationId, table.tourId, table.bookingDate, table.bookingTime),
+  // Pickup address index for operations
+  pickupAddressIdx: index("bookings_pickup_address_idx").on(table.pickupAddressId),
 }));
 
 // Booking participants - Individual people on a booking
