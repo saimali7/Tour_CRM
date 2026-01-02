@@ -26,27 +26,36 @@ Services enforce this automatically via `BaseService`. Never bypass services wit
 
 ## Architecture
 
+**Two apps, shared services:**
+
+| App | Purpose | Status |
+|-----|---------|--------|
+| `apps/crm` | Staff dashboard — bookings, dispatch, operations | Active |
+| `apps/web` | Customer booking — public tours, checkout | Planned |
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        apps/crm (Next.js 15)                    │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ App Router   │  │ tRPC Routers │  │ Inngest Functions    │  │
-│  │ /org/[slug]/ │→ │ (41 routers) │→ │ (23 background jobs) │  │
-│  └──────────────┘  └──────┬───────┘  └──────────┬───────────┘  │
-└────────────────────────────┼────────────────────┼───────────────┘
-                             │                    │
-┌────────────────────────────┼────────────────────┼───────────────┐
-│                    packages/services                            │
-│  ┌─────────────────────────┴────────────────────┴────────────┐ │
-│  │ createServices({ organizationId }) → 32+ org-scoped services│ │
-│  │ BookingService, CustomerService, TourService, GuideService  │ │
-│  └─────────────────────────┬─────────────────────────────────┘ │
-└────────────────────────────┼────────────────────────────────────┘
-                             │
-┌────────────────────────────┼────────────────────────────────────┐
-│                    packages/database (Drizzle)                  │
-│  23 tables, all with organizationId FK + cascade delete         │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────┐  ┌──────────────────────────────┐
+│      apps/crm (Staff Dashboard)  │  │   apps/web (Customer Booking)│
+│  ┌────────────┐ ┌─────────────┐  │  │  ┌────────────┐ ┌─────────┐  │
+│  │ /org/[slug]│ │ 41 tRPC     │  │  │  │ /[slug]    │ │ Stripe  │  │
+│  │ App Router │ │ routers     │  │  │  │ booking    │ │ checkout│  │
+│  └─────┬──────┘ └──────┬──────┘  │  │  └─────┬──────┘ └────┬────┘  │
+└────────┼───────────────┼─────────┘  └────────┼─────────────┼───────┘
+         │               │                     │             │
+         └───────────────┴──────────┬──────────┴─────────────┘
+                                    │
+┌───────────────────────────────────┼───────────────────────────────┐
+│                    packages/services                              │
+│  ┌────────────────────────────────┴────────────────────────────┐ │
+│  │ createServices({ organizationId }) → 32+ org-scoped services │ │
+│  │ BookingService, CustomerService, TourService, GuideService   │ │
+│  └────────────────────────────────┬────────────────────────────┘ │
+└───────────────────────────────────┼───────────────────────────────┘
+                                    │
+┌───────────────────────────────────┼───────────────────────────────┐
+│                    packages/database (Drizzle)                    │
+│  23 tables, all with organizationId FK + cascade delete           │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ---
