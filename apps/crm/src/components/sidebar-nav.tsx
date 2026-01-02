@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Zap,
+  Send,
   Calendar,
   ClipboardList,
   MapPin,
@@ -40,12 +41,13 @@ interface NavItem {
 // Icons chosen for instant recognition
 const navItems: NavItem[] = [
   { name: "Today", href: "", icon: Zap, shortcut: "1" },
-  { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "2" },
-  { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "3" },
-  { name: "Tours", href: "/tours", icon: MapPin, shortcut: "4" },
-  { name: "Customers", href: "/customers", icon: Users, shortcut: "5" },
-  { name: "Team", href: "/guides", icon: UsersRound, shortcut: "6" },
-  { name: "Insights", href: "/analytics", icon: TrendingUp, shortcut: "7" },
+  { name: "Dispatch", href: "/command-center", icon: Send, shortcut: "2" },
+  { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "3" },
+  { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "4" },
+  { name: "Tours", href: "/tours", icon: MapPin, shortcut: "5" },
+  { name: "Customers", href: "/customers", icon: Users, shortcut: "6" },
+  { name: "Team", href: "/guides", icon: UsersRound, shortcut: "7" },
+  { name: "Insights", href: "/analytics", icon: TrendingUp, shortcut: "8" },
 ];
 
 interface SidebarNavProps {
@@ -60,13 +62,13 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
   const settingsPath = `${basePath}/settings` as Route;
   const isSettingsActive = pathname === settingsPath || pathname.startsWith(`${settingsPath}/`);
 
-  // Keyboard navigation: ⌘1-7 for nav items, ⌘0 for settings
+  // Keyboard navigation: ⌘1-8 for nav items, ⌘0 for settings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
 
       const num = parseInt(e.key);
-      if (num >= 1 && num <= 7) {
+      if (num >= 1 && num <= 8) {
         e.preventDefault();
         const item = navItems[num - 1];
         if (item) router.push(`${basePath}${item.href}` as Route);
@@ -92,7 +94,7 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
                 ? pathname === basePath
                 : pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 
-            // First 3 items are primary (daily ops), rest are secondary
+            // First 3 items are primary (daily ops: Today, Dispatch, Calendar), rest are secondary
             const isPrimary = index < 3;
 
             const linkContent = (

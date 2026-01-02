@@ -112,7 +112,7 @@ Created comprehensive implementation plan for Phase 7:
 | 7.2 | Operational Speed | Quick booking (<60s), Customer 360, batch ops |
 | 7.3 | Intelligence Surface | Forecasting, goal tracking, proactive alerts |
 | 7.4 | High-Impact Features | Waivers, deposits, check-in, add-ons, vouchers |
-| 7.5 | Guide Mobile PWA | Offline manifests, push notifications |
+| 7.5 | Tour Command Center | Guide dispatch, morning briefing, optimize & send |
 
 ---
 

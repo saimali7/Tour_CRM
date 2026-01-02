@@ -36,6 +36,10 @@ export {
 } from "./functions/dispatch-notifications";
 
 export {
+  dailyDispatchOptimization,
+} from "./functions/daily-optimization";
+
+export {
   sendReviewRequestEmail,
   sendReviewReminderEmail,
   dailyReviewRequestCheck,
@@ -84,6 +88,10 @@ import {
 } from "./functions/dispatch-notifications";
 
 import {
+  dailyDispatchOptimization,
+} from "./functions/daily-optimization";
+
+import {
   sendReviewRequestEmail,
   sendReviewReminderEmail,
   dailyReviewRequestCheck,
@@ -121,6 +129,8 @@ export const inngestFunctions = [
   sendGuideDailyManifest,
   // Dispatch notifications (Command Center)
   sendDispatchNotifications,
+  // Daily optimization (Command Center - runs at 4 AM)
+  dailyDispatchOptimization,
   // Review requests
   sendReviewRequestEmail,
   sendReviewReminderEmail,

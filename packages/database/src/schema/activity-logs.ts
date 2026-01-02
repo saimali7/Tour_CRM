@@ -49,6 +49,7 @@ export type ActivityAction =
   // Dispatch actions (Command Center)
   | "dispatch.manifest_sent"
   | "dispatch.notifications_completed"
+  | "dispatch.auto_optimized"
   // Assignment actions
   | "assignment.email_sent"
   | "assignment.reminder_sent"

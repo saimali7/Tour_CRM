@@ -28,8 +28,7 @@ Sub-phases:
 - 7.2 Operational Speed ✅
 - 7.3 Intelligence Surface ✅
 - 7.4 High-Impact Features ✅
-- 7.5 Guide Mobile PWA ⏳
-- 7.6 Tour Command Center 🔄
+- 7.5 Tour Command Center 🔄
 
 ## Completed Milestone Archives
 

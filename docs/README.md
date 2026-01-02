@@ -9,6 +9,7 @@
 | Understand the vision | [strategy/VISION.md](./strategy/VISION.md) |
 | See the roadmap | [strategy/ROADMAP.md](./strategy/ROADMAP.md) |
 | See current work | [project/ACTIVE-PROGRESS.md](./project/ACTIVE-PROGRESS.md) |
+| See feature specs | [project/features/](./project/features/) |
 | See what's planned | [project/BACKLOG.md](./project/BACKLOG.md) |
 | See what shipped | [history/CHANGELOG.md](./history/CHANGELOG.md) |
 
@@ -21,8 +22,9 @@ docs/
 │   └── ROADMAP.md     # All milestones overview
 │
 ├── project/           # What and when (active)
-│   ├── ACTIVE-PROGRESS.md      # Current milestone work
-│   └── BACKLOG.md     # Future work queue
+│   ├── ACTIVE-PROGRESS.md  # Current milestone work
+│   ├── BACKLOG.md          # Future work queue
+│   └── features/           # Feature specs (one per feature)
 │
 ├── history/           # What happened (append-only)
 │   ├── CHANGELOG.md   # Shipped changes

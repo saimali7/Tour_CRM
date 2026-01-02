@@ -381,6 +381,72 @@ export const commandCenterRouter = createRouter({
         });
       }
     }),
+
+  /**
+   * Apply guide reassignments (bulk update from adjust mode)
+   * Moves bookings from one guide to another
+   */
+  applyReassignments: adminProcedure
+    .input(z.object({
+      date: z.coerce.date(),
+      changes: z.array(z.object({
+        bookingId: z.string(),
+        fromGuideId: z.string().nullable(),
+        toGuideId: z.string(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({
+        organizationId: ctx.orgContext.organizationId,
+      });
+
+      const results: Array<{
+        bookingId: string;
+        success: boolean;
+        error?: string;
+      }> = [];
+
+      // Process each change sequentially to maintain consistency
+      for (const change of input.changes) {
+        try {
+          // If there's a current guide, unassign first
+          if (change.fromGuideId) {
+            await services.commandCenter.unassign(change.bookingId);
+          }
+
+          // Assign to the new guide
+          await services.commandCenter.manualAssign(change.bookingId, change.toGuideId);
+
+          results.push({
+            bookingId: change.bookingId,
+            success: true,
+          });
+        } catch (error) {
+          results.push({
+            bookingId: change.bookingId,
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const failedCount = results.filter(r => !r.success).length;
+
+      if (failedCount > 0 && successCount === 0) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `All ${failedCount} reassignments failed`,
+        });
+      }
+
+      return {
+        success: failedCount === 0,
+        applied: successCount,
+        failed: failedCount,
+        results,
+      };
+    }),
 });
 
 // =============================================================================

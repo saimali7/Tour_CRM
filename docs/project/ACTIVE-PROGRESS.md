@@ -14,8 +14,7 @@ Transform from feature-complete to operations-first world-class CRM.
 | 7.2 | Operational Speed | ✅ Done |
 | 7.3 | Intelligence Surface | ✅ Done |
 | 7.4 | High-Impact Features | ✅ Done |
-| 7.5 | Guide Mobile PWA | ⬜ Todo |
-| **7.6** | **Tour Command Center** | **🔄 Next** |
+| **7.5** | **Tour Command Center** | **🔄 Next** |
 
 ---
 
@@ -48,9 +47,9 @@ Transform from feature-complete to operations-first world-class CRM.
 
 ---
 
-## Current: 7.6 Tour Command Center 🔄
+## Current: 7.5 Tour Command Center 🔄
 
-> **Design Doc:** [reference/GUIDE_DISPATCH_SYSTEM.md](../reference/GUIDE_DISPATCH_SYSTEM.md)
+> **Design Doc:** [features/COMMAND_CENTER.md](./features/COMMAND_CENTER.md)
 
 The operations nerve center — **computer solves the puzzle, humans review and dispatch**.
 
@@ -84,18 +83,6 @@ Auto-Solve   Open CC   Warnings   Send to Guides
 - **Segmented Tape** — Drive → Pickup → Tour
 - **Guest Cards** — Full human details, special occasions
 - **Tap-to-Resolve** — Actionable warning choices
-
----
-
-## Upcoming: 7.5 Guide Mobile PWA ⬜
-
-| Feature | Status |
-|---------|--------|
-| PWA install support | ⬜ |
-| Offline manifest caching | ⬜ |
-| Push notifications | ⬜ |
-| Mobile-first UI | ⬜ |
-| Check-in from phone | ⬜ |
 
 ---
 
