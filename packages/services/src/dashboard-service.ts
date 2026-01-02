@@ -1,5 +1,5 @@
-import { eq, and, gte, lte, sql, desc, isNull, isNotNull } from "drizzle-orm";
-import { bookings, schedules, tours, customers } from "@tour/database";
+import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { bookings, tours, customers } from "@tour/database";
 import { BaseService } from "./base-service";
 import { type DateRangeFilter } from "./types";
 import { AnalyticsService } from "./analytics-service";
@@ -348,8 +348,12 @@ export class DashboardService extends BaseService {
   /**
    * Get bookings for a specific date range
    * Core method used by getTodayBookings and getTomorrowBookings
+   * Uses booking.bookingDate for date-based queries (availability-based model)
    */
   private async getBookingsForDateRange(startDate: Date, endDate: Date): Promise<TodayBooking[]> {
+    const startDateStr = startDate.toISOString().split("T")[0]!;
+    const endDateStr = endDate.toISOString().split("T")[0]!;
+
     const result = await this.db
       .select({
         bookingId: bookings.id,
@@ -360,59 +364,67 @@ export class DashboardService extends BaseService {
         childCount: bookings.childCount,
         infantCount: bookings.infantCount,
         total: bookings.total,
+        bookingDate: bookings.bookingDate,
+        bookingTime: bookings.bookingTime,
         customerFirstName: customers.firstName,
         customerLastName: customers.lastName,
         customerEmail: customers.email,
         customerPhone: customers.phone,
         tourName: tours.name,
         tourId: tours.id,
-        scheduleId: schedules.id,
-        startsAt: schedules.startsAt,
-        endsAt: schedules.endsAt,
-        maxParticipants: schedules.maxParticipants,
-        guidesRequired: schedules.guidesRequired,
-        guidesAssigned: schedules.guidesAssigned,
+        tourDurationMinutes: tours.durationMinutes,
+        tourMaxParticipants: tours.maxParticipants,
       })
       .from(bookings)
-      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .innerJoin(tours, eq(schedules.tourId, tours.id))
+      .innerJoin(tours, eq(bookings.tourId, tours.id))
       .innerJoin(customers, eq(bookings.customerId, customers.id))
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
-          gte(schedules.startsAt, startDate),
-          lte(schedules.startsAt, endDate),
+          sql`${bookings.bookingDate}::text >= ${startDateStr}`,
+          sql`${bookings.bookingDate}::text < ${endDateStr}`,
           sql`${bookings.status} NOT IN ('cancelled')`
         )
       )
-      .orderBy(schedules.startsAt, desc(bookings.createdAt));
+      .orderBy(bookings.bookingDate, bookings.bookingTime, desc(bookings.createdAt));
 
-    return result.map(row => ({
-      bookingId: row.bookingId,
-      referenceNumber: row.referenceNumber,
-      status: row.status as "pending" | "confirmed" | "completed" | "no_show",
-      paymentStatus: row.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed",
-      participants: (row.adultCount || 0) + (row.childCount || 0) + (row.infantCount || 0),
-      total: row.total,
-      customer: {
-        firstName: row.customerFirstName,
-        lastName: row.customerLastName,
-        email: row.customerEmail,
-        phone: row.customerPhone,
-      },
-      tour: {
-        id: row.tourId,
-        name: row.tourName || "Unknown",
-      },
-      schedule: {
-        id: row.scheduleId,
-        startsAt: row.startsAt,
-        endsAt: row.endsAt,
-        maxParticipants: row.maxParticipants ?? 0,
-        guidesRequired: row.guidesRequired ?? 0,
-        guidesAssigned: row.guidesAssigned ?? 0,
-      },
-    }));
+    return result.map(row => {
+      // Calculate start time from bookingDate and bookingTime
+      const startsAt = row.bookingDate ? new Date(row.bookingDate) : new Date();
+      if (row.bookingTime) {
+        const [hours, minutes] = row.bookingTime.split(":").map(Number);
+        startsAt.setHours(hours || 0, minutes || 0, 0, 0);
+      }
+      // Calculate end time based on tour duration
+      const endsAt = new Date(startsAt.getTime() + (row.tourDurationMinutes || 60) * 60 * 1000);
+
+      return {
+        bookingId: row.bookingId,
+        referenceNumber: row.referenceNumber,
+        status: row.status as "pending" | "confirmed" | "completed" | "no_show",
+        paymentStatus: row.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed",
+        participants: (row.adultCount || 0) + (row.childCount || 0) + (row.infantCount || 0),
+        total: row.total,
+        customer: {
+          firstName: row.customerFirstName,
+          lastName: row.customerLastName,
+          email: row.customerEmail,
+          phone: row.customerPhone,
+        },
+        tour: {
+          id: row.tourId,
+          name: row.tourName || "Unknown",
+        },
+        schedule: {
+          id: `${row.tourId}-${row.bookingDate}-${row.bookingTime}`, // Virtual schedule ID
+          startsAt,
+          endsAt,
+          maxParticipants: row.tourMaxParticipants ?? 0,
+          guidesRequired: 0, // Guide info not available without schedules
+          guidesAssigned: 0,
+        },
+      };
+    });
   }
 
   /**
@@ -441,6 +453,7 @@ export class DashboardService extends BaseService {
 
   /**
    * Get comprehensive tomorrow preview - everything needed to plan for tomorrow
+   * Uses availability-based booking model (bookingDate, bookingTime)
    */
   async getTomorrowPreview(): Promise<TomorrowPreview> {
     const today = new Date();
@@ -451,57 +464,46 @@ export class DashboardService extends BaseService {
     dayAfter.setDate(dayAfter.getDate() + 1);
 
     // Get all bookings for tomorrow
-    const bookings = await this.getBookingsForDateRange(tomorrow, dayAfter);
+    const tomorrowBookings = await this.getBookingsForDateRange(tomorrow, dayAfter);
 
-    // Get schedules for tomorrow (to check guide assignments)
-    const schedulesResult = await this.db
-      .select({
-        scheduleId: schedules.id,
-        tourName: tours.name,
-        startsAt: schedules.startsAt,
-        endsAt: schedules.endsAt,
-        bookedCount: schedules.bookedCount,
-        maxParticipants: schedules.maxParticipants,
-        guidesRequired: schedules.guidesRequired,
-        guidesAssigned: schedules.guidesAssigned,
-      })
-      .from(schedules)
-      .innerJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, tomorrow),
-          lte(schedules.startsAt, dayAfter),
-          sql`${schedules.status} != 'cancelled'`
-        )
-      )
-      .orderBy(schedules.startsAt);
+    // Group bookings by tour run (tourId + date + time) to simulate schedules
+    const tourRunsMap = new Map<string, {
+      tourId: string;
+      tourName: string;
+      bookingDate: Date;
+      bookingTime: string;
+      bookedCount: number;
+      maxParticipants: number;
+    }>();
 
-    // Filter to only schedules with bookings
-    const schedulesWithBookings = schedulesResult.filter(s => (s.bookedCount ?? 0) > 0);
+    for (const booking of tomorrowBookings) {
+      const key = booking.schedule.id; // This is the virtual schedule ID
+      const existing = tourRunsMap.get(key);
+      if (existing) {
+        existing.bookedCount += booking.participants;
+      } else {
+        tourRunsMap.set(key, {
+          tourId: booking.tour.id,
+          tourName: booking.tour.name,
+          bookingDate: booking.schedule.startsAt,
+          bookingTime: booking.schedule.startsAt.toTimeString().slice(0, 5),
+          bookedCount: booking.participants,
+          maxParticipants: booking.schedule.maxParticipants,
+        });
+      }
+    }
 
-    // Find schedules needing more guides (guidesAssigned < guidesRequired)
-    const schedulesNeedingGuides = schedulesWithBookings
-      .filter(s => (s.guidesAssigned ?? 0) < (s.guidesRequired ?? 0))
-      .map(s => ({
-        scheduleId: s.scheduleId,
-        tourName: s.tourName || "Unknown",
-        startsAt: s.startsAt,
-        bookedCount: s.bookedCount ?? 0,
-        maxParticipants: s.maxParticipants,
-        guidesRequired: s.guidesRequired ?? 0,
-        guidesAssigned: s.guidesAssigned ?? 0,
-        guideDeficit: Math.max(0, (s.guidesRequired ?? 0) - (s.guidesAssigned ?? 0)),
-      }));
+    // Convert to array (represents tour runs with bookings)
+    const tourRunsWithBookings = Array.from(tourRunsMap.values());
 
     // Calculate stats
-    const totalBookings = bookings.length;
-    const totalGuests = bookings.reduce((sum, b) => sum + b.participants, 0);
-    const expectedRevenue = bookings.reduce((sum, b) => sum + parseFloat(b.total), 0);
+    const totalBookings = tomorrowBookings.length;
+    const totalGuests = tomorrowBookings.reduce((sum, b) => sum + b.participants, 0);
+    const expectedRevenue = tomorrowBookings.reduce((sum, b) => sum + parseFloat(b.total), 0);
 
     // Bookings needing attention
-    const pendingConfirmation = bookings.filter(b => b.status === "pending");
-    const unpaidBookings = bookings.filter(b => b.paymentStatus === "pending" || b.paymentStatus === "partial");
+    const pendingConfirmation = tomorrowBookings.filter(b => b.status === "pending");
+    const unpaidBookings = tomorrowBookings.filter(b => b.paymentStatus === "pending" || b.paymentStatus === "partial");
 
     return {
       date: tomorrow,
@@ -509,12 +511,12 @@ export class DashboardService extends BaseService {
         totalBookings,
         totalGuests,
         expectedRevenue: expectedRevenue.toFixed(2),
-        schedulesWithBookings: schedulesWithBookings.length,
+        schedulesWithBookings: tourRunsWithBookings.length,
       },
-      schedulesNeedingGuides,
+      schedulesNeedingGuides: [], // Guide assignments not available without schedules table
       pendingConfirmation,
       unpaidBookings,
-      allBookings: bookings,
+      allBookings: tomorrowBookings,
     };
   }
 }

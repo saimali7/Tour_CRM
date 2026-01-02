@@ -15,47 +15,54 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Clock, Users } from "lucide-react";
 import { Button } from "@tour/ui";
-import type { Schedule } from "@tour/database";
+
+// Types matching the TourAvailabilityService output
+interface DateSlot {
+  time: string;
+  label?: string;
+  spotsRemaining: number;
+  maxCapacity: number;
+  bookedCount: number;
+  available: boolean;
+  almostFull: boolean;
+}
+
+interface AvailableDate {
+  date: string; // ISO date YYYY-MM-DD
+  slots: DateSlot[];
+  isBlackedOut: boolean;
+  blackoutReason?: string;
+}
 
 interface AvailabilityCalendarProps {
-  schedules: Schedule[];
+  availableDates: AvailableDate[];
   currency: string;
 }
 
-function formatTime(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return format(d, "h:mm a");
-}
-
-function formatPrice(price: string | number | null, currency: string): string {
-  if (!price) return "";
-  const numericPrice = typeof price === "string" ? parseFloat(price) : price;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(numericPrice);
+function formatTime(time: string): string {
+  // time is in HH:MM format
+  const [hours, minutes] = time.split(":");
+  const hour = parseInt(hours!, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
 }
 
 export function AvailabilityCalendar({
-  schedules,
+  availableDates,
   currency,
 }: AvailabilityCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // Group schedules by date
-  const schedulesByDate = useMemo(() => {
-    const map = new Map<string, Schedule[]>();
-    schedules.forEach((schedule) => {
-      const dateKey = format(new Date(schedule.startsAt), "yyyy-MM-dd");
-      const existing = map.get(dateKey) || [];
-      existing.push(schedule);
-      map.set(dateKey, existing);
+  // Create a map of available dates for quick lookup
+  const availableDatesMap = useMemo(() => {
+    const map = new Map<string, AvailableDate>();
+    availableDates.forEach((ad) => {
+      map.set(ad.date, ad);
     });
     return map;
-  }, [schedules]);
+  }, [availableDates]);
 
   // Get all days in the current month view
   const monthStart = startOfMonth(currentMonth);
@@ -65,12 +72,13 @@ export function AvailabilityCalendar({
   // Get the day of week the month starts on (0 = Sunday)
   const startDayOfWeek = monthStart.getDay();
 
-  // Schedules for selected date
-  const selectedDateSchedules = useMemo(() => {
+  // Slots for selected date
+  const selectedDateSlots = useMemo(() => {
     if (!selectedDate) return [];
     const dateKey = format(selectedDate, "yyyy-MM-dd");
-    return schedulesByDate.get(dateKey) || [];
-  }, [selectedDate, schedulesByDate]);
+    const dateData = availableDatesMap.get(dateKey);
+    return dateData?.slots ?? [];
+  }, [selectedDate, availableDatesMap]);
 
   const handlePrevMonth = () => {
     setCurrentMonth((prev) => subMonths(prev, 1));
@@ -84,38 +92,30 @@ export function AvailabilityCalendar({
 
   const handleDateClick = (date: Date) => {
     const dateKey = format(date, "yyyy-MM-dd");
-    const hasSchedules = schedulesByDate.has(dateKey);
-    if (hasSchedules && !isBefore(date, startOfDay(new Date()))) {
+    const dateData = availableDatesMap.get(dateKey);
+    if (dateData && !dateData.isBlackedOut && dateData.slots.length > 0 && !isBefore(date, startOfDay(new Date()))) {
       setSelectedDate(date);
     }
   };
 
   const getDayStatus = (date: Date) => {
     const dateKey = format(date, "yyyy-MM-dd");
-    const daySchedules = schedulesByDate.get(dateKey);
+    const dateData = availableDatesMap.get(dateKey);
 
-    if (!daySchedules || daySchedules.length === 0) {
+    if (!dateData || dateData.isBlackedOut || dateData.slots.length === 0) {
       return "unavailable";
     }
 
-    // Check if any schedule has availability
-    const hasAvailability = daySchedules.some(
-      (s) => (s.bookedCount || 0) < s.maxParticipants
-    );
+    // Check if any slot has availability
+    const hasAvailability = dateData.slots.some((s) => s.available);
 
     if (!hasAvailability) {
       return "sold-out";
     }
 
-    // Check capacity
-    const totalSpots = daySchedules.reduce(
-      (sum, s) => sum + s.maxParticipants,
-      0
-    );
-    const bookedSpots = daySchedules.reduce(
-      (sum, s) => sum + (s.bookedCount || 0),
-      0
-    );
+    // Check capacity across all slots
+    const totalSpots = dateData.slots.reduce((sum, s) => sum + s.maxCapacity, 0);
+    const bookedSpots = dateData.slots.reduce((sum, s) => sum + s.bookedCount, 0);
     const availabilityRate = (totalSpots - bookedSpots) / totalSpots;
 
     if (availabilityRate < 0.2) {
@@ -221,26 +221,24 @@ export function AvailabilityCalendar({
         </div>
       </div>
 
-      {/* Selected Date Schedules */}
+      {/* Selected Date Slots */}
       {selectedDate && (
         <div className="pt-4 border-t space-y-3">
           <h4 className="font-medium">
             {format(selectedDate, "EEEE, MMMM d, yyyy")}
           </h4>
-          {selectedDateSchedules.length === 0 ? (
+          {selectedDateSlots.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No availability on this date.
             </p>
           ) : (
             <div className="space-y-2">
-              {selectedDateSchedules.map((schedule) => {
-                const spotsRemaining =
-                  schedule.maxParticipants - (schedule.bookedCount || 0);
-                const isFull = spotsRemaining <= 0;
+              {selectedDateSlots.map((slot) => {
+                const isFull = !slot.available;
 
                 return (
                   <div
-                    key={schedule.id}
+                    key={slot.time}
                     className={`
                       p-3 rounded-md border
                       ${isFull ? "bg-muted/50 opacity-70" : "hover:border-primary"}
@@ -250,14 +248,14 @@ export function AvailabilityCalendar({
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">
-                          {formatTime(schedule.startsAt)}
+                          {formatTime(slot.time)}
                         </span>
+                        {slot.label && (
+                          <span className="text-xs text-muted-foreground">
+                            ({slot.label})
+                          </span>
+                        )}
                       </div>
-                      {schedule.price && (
-                        <span className="font-semibold">
-                          {formatPrice(schedule.price, currency)}
-                        </span>
-                      )}
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -265,19 +263,19 @@ export function AvailabilityCalendar({
                         <span>
                           {isFull ? (
                             <span className="text-red-500">Sold Out</span>
-                          ) : spotsRemaining <= 3 ? (
+                          ) : slot.almostFull ? (
                             <span className="text-orange-500">
-                              Only {spotsRemaining} spot
-                              {spotsRemaining !== 1 ? "s" : ""} left!
+                              Only {slot.spotsRemaining} spot
+                              {slot.spotsRemaining !== 1 ? "s" : ""} left!
                             </span>
                           ) : (
-                            `${spotsRemaining} spots available`
+                            `${slot.spotsRemaining} spots available`
                           )}
                         </span>
                       </div>
                       {!isFull && (
                         <Button size="sm" asChild>
-                          <a href={`book?schedule=${schedule.id}`}>
+                          <a href={`book?date=${format(selectedDate, "yyyy-MM-dd")}&time=${slot.time}`}>
                             Book Now
                           </a>
                         </Button>
@@ -292,7 +290,7 @@ export function AvailabilityCalendar({
       )}
 
       {/* No availability message */}
-      {!selectedDate && schedules.length === 0 && (
+      {!selectedDate && availableDates.length === 0 && (
         <div className="text-center py-6 text-muted-foreground">
           <p>No upcoming availability.</p>
           <p className="text-sm">Check back later for new dates.</p>

@@ -8,10 +8,9 @@
  * - bulkReschedule: Reschedule multiple bookings
  */
 
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import {
   bookings,
-  schedules,
   type PaymentStatus,
 } from "@tour/database";
 import { BaseService } from "../base-service";
@@ -121,8 +120,6 @@ export class BookingBulkService extends BaseService {
       .select({
         id: bookings.id,
         status: bookings.status,
-        scheduleId: bookings.scheduleId,
-        totalParticipants: bookings.totalParticipants,
       })
       .from(bookings)
       .where(
@@ -133,7 +130,7 @@ export class BookingBulkService extends BaseService {
       );
 
     const foundIds = new Set(allBookings.map(b => b.id));
-    const cancellableBookings: Array<{ id: string; scheduleId: string | null; totalParticipants: number }> = [];
+    const cancellableIds: string[] = [];
 
     // Check each ID for errors
     for (const id of ids) {
@@ -152,42 +149,12 @@ export class BookingBulkService extends BaseService {
         continue;
       }
 
-      cancellableBookings.push({
-        id: booking!.id,
-        scheduleId: booking!.scheduleId,
-        totalParticipants: booking!.totalParticipants,
-      });
+      cancellableIds.push(id);
     }
 
-    if (cancellableBookings.length > 0) {
-      const cancellableIds = cancellableBookings.map(b => b.id);
-
-      // Group by schedule to update booked counts efficiently
-      const scheduleUpdates = new Map<string, number>();
-      for (const booking of cancellableBookings) {
-        if (booking.scheduleId) {
-          const current = scheduleUpdates.get(booking.scheduleId) || 0;
-          scheduleUpdates.set(booking.scheduleId, current + booking.totalParticipants);
-        }
-      }
-
-      // Update each schedule's booked count (can't batch different decrements easily)
-      for (const [scheduleId, totalToDecrement] of scheduleUpdates) {
-        await this.db
-          .update(schedules)
-          .set({
-            bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${totalToDecrement})`,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(schedules.id, scheduleId),
-              eq(schedules.organizationId, this.organizationId)
-            )
-          );
-      }
-
+    if (cancellableIds.length > 0) {
       // Batch cancel all bookings in one query
+      // Capacity is now computed dynamically from bookings, no schedule update needed
       await this.db
         .update(bookings)
         .set({
@@ -209,14 +176,6 @@ export class BookingBulkService extends BaseService {
         ids: cancellableIds,
         reason,
       }, "Bulk cancelled bookings");
-
-      // Recalculate guide requirements for all affected schedules
-      const affectedScheduleIds = [...scheduleUpdates.keys()];
-      await Promise.all(
-        affectedScheduleIds.map((scheduleId) =>
-          this.core.recalculateGuideRequirements(scheduleId)
-        )
-      );
 
       return { cancelled: cancellableIds, errors };
     }
@@ -288,19 +247,23 @@ export class BookingBulkService extends BaseService {
   }
 
   /**
-   * Bulk reschedule multiple bookings to a new schedule
-   * Uses the single-booking reschedule method for proper validation
+   * Bulk reschedule multiple bookings to a new date/time
+   * Uses the availability-based reschedule method for proper validation
    */
   async bulkReschedule(
     ids: string[],
-    newScheduleId: string
+    input: {
+      tourId?: string;
+      bookingDate: Date;
+      bookingTime: string;
+    }
   ): Promise<BulkRescheduleResult> {
     const rescheduled: string[] = [];
     const errors: Array<{ id: string; error: string }> = [];
 
     for (const id of ids) {
       try {
-        await this.commandService.reschedule(id, newScheduleId);
+        await this.commandService.reschedule(id, input);
         rescheduled.push(id);
       } catch (error) {
         errors.push({

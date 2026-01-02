@@ -2,10 +2,8 @@ import { eq, and, desc, asc, count, sql, lt, or, ilike, gte, lte } from "drizzle
 import {
   abandonedCarts,
   tours,
-  schedules,
   type AbandonedCart,
   type Tour,
-  type Schedule,
   type AbandonedCartStatus,
   type AbandonedCartStep,
 } from "@tour/database";
@@ -30,7 +28,6 @@ export type AbandonedCartSortField = "createdAt" | "total" | "lastActivityAt";
 
 export interface AbandonedCartWithRelations extends AbandonedCart {
   tour: Tour;
-  schedule: Schedule | null;
 }
 
 export interface CreateAbandonedCartInput {
@@ -40,7 +37,6 @@ export interface CreateAbandonedCartInput {
   firstName?: string;
   lastName?: string;
   tourId: string;
-  scheduleId?: string;
   adultCount?: number;
   childCount?: number;
   infantCount?: number;
@@ -55,7 +51,6 @@ export interface CreateAbandonedCartInput {
 }
 
 export interface UpdateAbandonedCartInput {
-  scheduleId?: string;
   adultCount?: number;
   childCount?: number;
   infantCount?: number;
@@ -114,11 +109,9 @@ export class AbandonedCartService extends BaseService {
         .select({
           cart: abandonedCarts,
           tour: tours,
-          schedule: schedules,
         })
         .from(abandonedCarts)
         .innerJoin(tours, eq(abandonedCarts.tourId, tours.id))
-        .leftJoin(schedules, eq(abandonedCarts.scheduleId, schedules.id))
         .where(and(...conditions))
         .orderBy(orderBy)
         .limit(limit)
@@ -132,7 +125,6 @@ export class AbandonedCartService extends BaseService {
     const formattedData: AbandonedCartWithRelations[] = data.map((row) => ({
       ...row.cart,
       tour: row.tour,
-      schedule: row.schedule,
     }));
 
     return {
@@ -161,11 +153,9 @@ export class AbandonedCartService extends BaseService {
       .select({
         cart: abandonedCarts,
         tour: tours,
-        schedule: schedules,
       })
       .from(abandonedCarts)
       .innerJoin(tours, eq(abandonedCarts.tourId, tours.id))
-      .leftJoin(schedules, eq(abandonedCarts.scheduleId, schedules.id))
       .where(
         and(
           eq(abandonedCarts.organizationId, this.organizationId),
@@ -182,7 +172,6 @@ export class AbandonedCartService extends BaseService {
     return {
       ...row.cart,
       tour: row.tour,
-      schedule: row.schedule,
     };
   }
 
@@ -253,7 +242,6 @@ export class AbandonedCartService extends BaseService {
       // Update existing cart if it's for the same tour
       if (existing.tourId === input.tourId) {
         return this.update(existing.id, {
-          scheduleId: input.scheduleId,
           adultCount: input.adultCount,
           childCount: input.childCount,
           infantCount: input.infantCount,

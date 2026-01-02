@@ -52,7 +52,6 @@ interface UnifiedBookingSheetProps {
   // Pre-selection for context-aware booking
   preselectedCustomerId?: string;
   preselectedTourId?: string;
-  preselectedScheduleId?: string;
 }
 
 interface CustomerData {
@@ -118,7 +117,6 @@ export function UnifiedBookingSheet({
   orgSlug,
   preselectedCustomerId,
   preselectedTourId,
-  preselectedScheduleId,
 }: UnifiedBookingSheetProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
@@ -139,10 +137,10 @@ export function UnifiedBookingSheet({
     phone: "",
   });
 
-  // Tour & Schedule
+  // Tour & Time selection
   const [selectedTourId, setSelectedTourId] = useState<string>(preselectedTourId || "");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string>(preselectedScheduleId || "");
+  const [selectedTime, setSelectedTime] = useState<string>("");
   const [dateScrollOffset, setDateScrollOffset] = useState(0);
 
   // Guests
@@ -182,7 +180,7 @@ export function UnifiedBookingSheet({
       setNewCustomer({ firstName: "", lastName: "", email: "", phone: "" });
       setSelectedTourId(preselectedTourId || "");
       setSelectedDate(new Date());
-      setSelectedScheduleId(preselectedScheduleId || "");
+      setSelectedTime("");
       setDateScrollOffset(0);
       setGuestCounts({ adults: 1, children: 0, infants: 0 });
       setPickupLocation("");
@@ -202,7 +200,7 @@ export function UnifiedBookingSheet({
         }, 150);
       }
     }
-  }, [open, preselectedCustomerId, preselectedTourId, preselectedScheduleId]);
+  }, [open, preselectedCustomerId, preselectedTourId]);
 
   // ---------------------------------------------------------------------------
   // QUERIES
@@ -237,19 +235,23 @@ export function UnifiedBookingSheet({
     }
   }, [preselectedCustomerData, preselectedCustomerId, open]);
 
-  const { data: schedulesData, isLoading: schedulesLoading, isFetching: schedulesFetching } = trpc.schedule.list.useQuery(
+  // Get departure times for the selected tour
+  const { data: departureTimes, isLoading: departureTimesLoading } = trpc.availability.getDepartureTimes.useQuery(
+    { tourId: selectedTourId },
+    { enabled: open && !!selectedTourId }
+  );
+
+  // Helper to format date as YYYY-MM-DD
+  const getDateString = (date: Date): string => {
+    return date.toISOString().split("T")[0] || "";
+  };
+
+  // Check availability for the selected tour and date
+  const { data: availabilityData, isLoading: availabilityLoading, isFetching: availabilityFetching } = trpc.availability.checkAvailability.useQuery(
     {
-      filters: {
-        tourId: selectedTourId,
-        status: "scheduled",
-        hasAvailability: true,
-        dateRange: {
-          from: selectedDate,
-          to: new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000),
-        },
-      },
-      pagination: { page: 1, limit: 50 },
-      sort: { field: "startsAt", direction: "asc" },
+      tourId: selectedTourId,
+      date: getDateString(selectedDate),
+      guests: guestCounts,
     },
     { enabled: open && !!selectedTourId }
   );
@@ -284,74 +286,52 @@ export function UnifiedBookingSheet({
       .slice(0, 6);
   }, [customersData, customerSearch]);
 
-  // Schedule slots for selected date
-  const scheduleSlots = useMemo(() => {
-    if (!schedulesData?.data) return [];
-    return schedulesData.data
-      .filter((s) => {
-        const scheduleDate = new Date(s.startsAt);
-        return (
-          scheduleDate.getDate() === selectedDate.getDate() &&
-          scheduleDate.getMonth() === selectedDate.getMonth() &&
-          scheduleDate.getFullYear() === selectedDate.getFullYear()
-        );
-      })
-      .map((s) => ({
-        id: s.id,
-        time: formatTime(s.startsAt),
-        startsAt: new Date(s.startsAt),
-        bookedCount: s.bookedCount || 0,
-        maxParticipants: s.maxParticipants || 10,
-        available: (s.maxParticipants || 10) - (s.bookedCount || 0),
-        // Differentiators for duplicate time slots
-        meetingPoint: s.meetingPoint || null,
+  // Time slots from departure times
+  const timeSlots = useMemo(() => {
+    if (!departureTimes) return [];
+    return departureTimes
+      .filter((dt) => dt.isActive)
+      .map((dt) => ({
+        time: dt.time,
+        label: dt.label || null,
+        available: true, // All configured departure times are available
       }));
-  }, [schedulesData, selectedDate]);
+  }, [departureTimes]);
 
-  // Detect duplicate time slots (same time, different schedules)
-  const timeSlotCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    scheduleSlots.forEach(slot => {
-      counts.set(slot.time, (counts.get(slot.time) || 0) + 1);
-    });
-    return counts;
-  }, [scheduleSlots]);
+  // Get available dates for the tour in the next month for "next available" hint
+  const currentDate = new Date();
+  let availabilityYear = currentDate.getFullYear();
+  let availabilityMonth = currentDate.getMonth() + 1;
 
-  // Query for next available schedule (when current date has no slots)
-  const { data: nextAvailableData } = trpc.schedule.list.useQuery(
+  const { data: availableDatesData } = trpc.availability.getAvailableDatesForMonth.useQuery(
     {
-      filters: {
-        tourId: selectedTourId,
-        status: "scheduled",
-        hasAvailability: true,
-        dateRange: {
-          from: new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000), // day after selected
-          to: new Date(selectedDate.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days out
-        },
-      },
-      pagination: { page: 1, limit: 1 },
-      sort: { field: "startsAt", direction: "asc" },
+      tourId: selectedTourId,
+      year: availabilityYear,
+      month: availabilityMonth,
     },
-    {
-      enabled: open && !!selectedTourId && !schedulesLoading && scheduleSlots.length === 0,
-    }
+    { enabled: open && !!selectedTourId && timeSlots.length === 0 }
   );
 
-  // Next available date (when current date has no slots)
+  // Next available date from the dates data
   const nextAvailableDate = useMemo(() => {
-    if (!nextAvailableData?.data?.[0]) return null;
-    return new Date(nextAvailableData.data[0].startsAt);
-  }, [nextAvailableData]);
+    if (!availableDatesData?.dates?.length) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const futureDates = availableDatesData.dates.filter((d) => new Date(d.date) > today);
+    if (futureDates.length === 0) return null;
+    const firstDate = futureDates[0];
+    return firstDate ? new Date(firstDate.date) : null;
+  }, [availableDatesData]);
 
   // Selected tour
   const selectedTour = useMemo(() => {
     return toursData?.data?.find((t) => t.id === selectedTourId);
   }, [toursData, selectedTourId]);
 
-  // Selected schedule
-  const selectedSchedule = useMemo(() => {
-    return scheduleSlots.find((s) => s.id === selectedScheduleId);
-  }, [scheduleSlots, selectedScheduleId]);
+  // Selected time slot
+  const selectedTimeSlot = useMemo(() => {
+    return timeSlots.find((s) => s.time === selectedTime);
+  }, [timeSlots, selectedTime]);
 
   // Pricing calculation
   const pricing = useMemo(() => {
@@ -401,8 +381,8 @@ export function UnifiedBookingSheet({
   // Total guests
   const totalGuests = guestCounts.adults + guestCounts.children + guestCounts.infants;
 
-  // Available spots
-  const availableSpots = selectedSchedule?.available || 0;
+  // Available spots - use a high default since availability is handled by the booking system
+  const availableSpots = 100;
 
   // Has valid contact (email OR phone required for new customer)
   const hasValidContact = newCustomer.email.trim() || newCustomer.phone.trim();
@@ -415,7 +395,6 @@ export function UnifiedBookingSheet({
   const createBookingMutation = trpc.booking.create.useMutation({
     onSuccess: (booking) => {
       utils.booking.list.invalidate();
-      utils.schedule.list.invalidate();
       toast.success("Booking created successfully!");
       onOpenChange(false);
       router.push(`/org/${orgSlug}/bookings/${booking.id}`);
@@ -489,17 +468,12 @@ export function UnifiedBookingSheet({
     }
 
     if (!selectedTourId) newErrors.tour = "Select a tour";
-    if (!selectedScheduleId) newErrors.schedule = "Select a time slot";
+    if (!selectedTime) newErrors.time = "Select a time slot";
     if (totalGuests < 1) newErrors.guests = "At least 1 guest required";
-
-    // Check availability
-    if (selectedSchedule && totalGuests > availableSpots) {
-      newErrors.guests = `Only ${availableSpots} spots available`;
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [customerMode, newCustomer, selectedCustomer, selectedTourId, selectedScheduleId, totalGuests, selectedSchedule, availableSpots, hasValidContact]);
+  }, [customerMode, newCustomer, selectedCustomer, selectedTourId, selectedTime, totalGuests, hasValidContact]);
 
   // ---------------------------------------------------------------------------
   // SUBMIT
@@ -541,7 +515,10 @@ export function UnifiedBookingSheet({
     try {
       const booking = await createBookingMutation.mutateAsync({
         customerId,
-        scheduleId: selectedScheduleId,
+        // Availability-based booking fields
+        tourId: selectedTourId,
+        bookingDate: getDateString(selectedDate),
+        bookingTime: selectedTime,
         adultCount: guestCounts.adults,
         childCount: guestCounts.children || undefined,
         infantCount: guestCounts.infants || undefined,
@@ -592,9 +569,8 @@ export function UnifiedBookingSheet({
   const isSubmitting = createCustomerMutation.isPending || createBookingMutation.isPending;
   const canSubmit = (customerMode === "create" ? (newCustomer.firstName.trim() && hasValidContact) : !!selectedCustomer)
     && selectedTourId
-    && selectedScheduleId
-    && totalGuests > 0
-    && totalGuests <= availableSpots;
+    && selectedTime
+    && totalGuests > 0;
 
   // ---------------------------------------------------------------------------
   // RENDER
@@ -851,7 +827,7 @@ export function UnifiedBookingSheet({
                     type="button"
                     onClick={() => {
                       setSelectedTourId(tour.id);
-                      setSelectedScheduleId("");
+                      setSelectedTime("");
                     }}
                     className={cn(
                       "w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3",
@@ -932,7 +908,7 @@ export function UnifiedBookingSheet({
                           type="button"
                           onClick={() => {
                             setSelectedDate(date);
-                            setSelectedScheduleId("");
+                            setSelectedTime("");
                           }}
                           className={cn(
                             "flex-1 py-2 px-1 rounded-lg border-2 text-center transition-all",
@@ -985,7 +961,7 @@ export function UnifiedBookingSheet({
             {selectedTourId && (
               <section className="space-y-3">
                 <label className="text-sm font-medium text-foreground">Time</label>
-                {(schedulesLoading || schedulesFetching) ? (
+                {departureTimesLoading ? (
                   /* Loading skeleton */
                   <div className="grid grid-cols-3 gap-2">
                     {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -995,51 +971,30 @@ export function UnifiedBookingSheet({
                       </div>
                     ))}
                   </div>
-                ) : scheduleSlots.length > 0 ? (
+                ) : timeSlots.length > 0 ? (
                   <div className="grid grid-cols-3 gap-2">
-                    {scheduleSlots.map((slot) => {
-                      const isFull = slot.available <= 0;
-                      const isLow = slot.available > 0 && slot.available <= 5;
-                      const isSelected = selectedScheduleId === slot.id;
-                      const hasDuplicates = (timeSlotCounts.get(slot.time) || 0) > 1;
-                      const differentiator = hasDuplicates
-                        ? (slot.meetingPoint || `${slot.maxParticipants} max`)
-                        : null;
+                    {timeSlots.map((slot) => {
+                      const isSelected = selectedTime === slot.time;
                       return (
                         <button
-                          key={slot.id}
+                          key={slot.time}
                           type="button"
-                          onClick={() => !isFull && setSelectedScheduleId(slot.id)}
-                          disabled={isFull}
+                          onClick={() => setSelectedTime(slot.time)}
                           className={cn(
                             "p-3 rounded-lg border-2 text-center transition-all",
-                            isFull
-                              ? "border-border bg-muted/50 opacity-50 cursor-not-allowed"
-                              : isSelected
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-primary/50"
+                            isSelected
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50"
                           )}
                         >
                           <p className={cn("font-semibold", isSelected ? "text-primary" : "text-foreground")}>
                             {slot.time}
                           </p>
-                          {differentiator && (
+                          {slot.label && (
                             <p className="text-[10px] text-muted-foreground truncate max-w-full px-1">
-                              {differentiator}
+                              {slot.label}
                             </p>
                           )}
-                          <p
-                            className={cn(
-                              "text-xs mt-0.5 font-medium",
-                              isFull
-                                ? "text-destructive"
-                                : isLow
-                                  ? "text-orange-600"
-                                  : "text-emerald-600"
-                            )}
-                          >
-                            {isFull ? "Full" : `${slot.available} left`}
-                          </p>
                         </button>
                       );
                     })}
@@ -1047,7 +1002,7 @@ export function UnifiedBookingSheet({
                 ) : (
                   <div className="py-6 text-center bg-muted/50 rounded-lg border border-dashed border-border">
                     <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">No slots on this date</p>
+                    <p className="text-sm text-muted-foreground">No time slots configured</p>
                     {nextAvailableDate ? (
                       <button
                         type="button"
@@ -1058,21 +1013,21 @@ export function UnifiedBookingSheet({
                           today.setHours(0, 0, 0, 0);
                           const daysDiff = Math.floor((nextAvailableDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
                           setDateScrollOffset(Math.min(Math.max(0, daysDiff - 3), dates.length - 7));
-                          setSelectedScheduleId("");
+                          setSelectedTime("");
                         }}
                         className="text-xs text-primary hover:underline mt-2 font-medium"
                       >
                         Next available: {nextAvailableDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                       </button>
                     ) : (
-                      <p className="text-xs text-muted-foreground mt-1">Try another date</p>
+                      <p className="text-xs text-muted-foreground mt-1">Configure departure times for this tour</p>
                     )}
                   </div>
                 )}
-                {errors.schedule && (
+                {errors.time && (
                   <p className="text-sm text-destructive flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
-                    {errors.schedule}
+                    {errors.time}
                   </p>
                 )}
               </section>
@@ -1081,19 +1036,9 @@ export function UnifiedBookingSheet({
             {/* =========================================================== */}
             {/* GUESTS SECTION */}
             {/* =========================================================== */}
-            {selectedScheduleId && (
+            {selectedTime && (
               <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-foreground">Guests</label>
-                  <span className={cn(
-                    "text-xs font-medium px-2 py-1 rounded-full",
-                    availableSpots > 5 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
-                      availableSpots > 0 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" :
-                        "bg-red-500/10 text-red-600 dark:text-red-400"
-                  )}>
-                    {availableSpots} spots left
-                  </span>
-                </div>
+                <label className="text-sm font-medium text-foreground">Guests</label>
 
                 <div className="space-y-1 bg-muted/50 rounded-lg border border-border divide-y divide-border overflow-hidden">
                   {/* Adults */}
@@ -1234,7 +1179,7 @@ export function UnifiedBookingSheet({
             {/* =========================================================== */}
             {/* EXTRAS SECTION */}
             {/* =========================================================== */}
-            {selectedScheduleId && (
+            {selectedTime && (
               <section className="space-y-3">
                 <label className="text-sm font-medium text-foreground">Details (optional)</label>
                 <div className="space-y-3">
@@ -1262,7 +1207,7 @@ export function UnifiedBookingSheet({
             {/* =========================================================== */}
             {/* PAYMENT SECTION */}
             {/* =========================================================== */}
-            {selectedScheduleId && (
+            {selectedTime && (
               <section className="space-y-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -1328,13 +1273,13 @@ export function UnifiedBookingSheet({
         {/* =========================================================== */}
         <div className="border-t border-border bg-card p-4 space-y-4">
           {/* Price Summary */}
-          {selectedTourId && selectedScheduleId && (
+          {selectedTourId && selectedTime && (
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
               <div>
                 <p className="text-sm font-medium text-foreground">{selectedTour?.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                  {selectedSchedule && ` at ${selectedSchedule.time}`}
+                  {selectedTime && ` at ${selectedTime}`}
                   {` · ${totalGuests} guest${totalGuests > 1 ? "s" : ""}`}
                 </p>
               </div>

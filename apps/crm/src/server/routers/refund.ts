@@ -164,7 +164,7 @@ export const refundRouter = createRouter({
           const booking = await services.booking.getById(refund.bookingId);
 
           // Send refund confirmation email (only if customer has email)
-          if (booking && booking.customer?.email && booking.schedule && booking.tour) {
+          if (booking && booking.customer?.email && booking.tour) {
             await inngest.send({
               name: "refund/processed",
               data: {
@@ -212,7 +212,7 @@ export const refundRouter = createRouter({
           const booking = await services.booking.getById(refund.bookingId);
 
           // Send refund confirmation email (only if customer has email)
-          if (booking && booking.customer?.email && booking.schedule && booking.tour) {
+          if (booking && booking.customer?.email && booking.tour) {
             await inngest.send({
               name: "refund/processed",
               data: {
@@ -299,7 +299,7 @@ export const refundRouter = createRouter({
       );
 
       // Send refund confirmation email (only if customer has email)
-      if (booking && booking.customer?.email && booking.schedule && booking.tour) {
+      if (booking && booking.customer?.email && booking.tour) {
         await inngest.send({
           name: "refund/processed",
           data: {

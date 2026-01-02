@@ -1,6 +1,5 @@
 import { createRouter } from "../trpc";
 import { tourRouter } from "./tour";
-import { scheduleRouter } from "./schedule";
 import { bookingRouter } from "./booking";
 import { customerRouter } from "./customer";
 import { guideRouter } from "./guide";
@@ -50,7 +49,6 @@ import { productRouter } from "./product";
 
 export const appRouter = createRouter({
   tour: tourRouter,
-  schedule: scheduleRouter,
   booking: bookingRouter,
   customer: customerRouter,
   guide: guideRouter,

@@ -43,18 +43,17 @@ export const sendReviewRequests = inngest.createFunction(
       const twoDaysAgo = new Date(now);
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
-      // Get bookings where schedule ended between 24-48 hours ago
-      const { db, schedules, bookings: bookingsTable, communicationLogs } = await import("@tour/database");
+      // Get bookings where bookingDate is between 24-48 hours ago (completed tours)
+      const { db, bookings: bookingsTable, communicationLogs } = await import("@tour/database");
       const { eq, and, lte, gte, isNull } = await import("drizzle-orm");
 
       const completedBookingsQuery = await db
         .select({
           id: bookingsTable.id,
           customerId: bookingsTable.customerId,
-          scheduleId: bookingsTable.scheduleId,
+          tourId: bookingsTable.tourId,
         })
         .from(bookingsTable)
-        .innerJoin(schedules, eq(bookingsTable.scheduleId, schedules.id))
         .leftJoin(
           communicationLogs,
           and(
@@ -65,9 +64,9 @@ export const sendReviewRequests = inngest.createFunction(
         .where(
           and(
             eq(bookingsTable.organizationId, organizationId),
-            eq(bookingsTable.status, 'confirmed'),
-            lte(schedules.endsAt, yesterday),
-            gte(schedules.endsAt, twoDaysAgo),
+            eq(bookingsTable.status, 'completed'),
+            lte(bookingsTable.bookingDate, yesterday),
+            gte(bookingsTable.bookingDate, twoDaysAgo),
             isNull(communicationLogs.id) // No review request sent yet
           )
         );
@@ -101,7 +100,7 @@ export const checkAvailabilityAlerts = inngest.createFunction(
   },
   { event: "automation/check-availability-alerts" },
   async ({ event, step }) => {
-    const { organizationId, scheduleId, availableSpots } = event.data;
+    const { organizationId, tourId, availableSpots } = event.data;
     const services = createServices({ organizationId });
 
     // Check if automation is enabled
@@ -122,9 +121,9 @@ export const checkAvailabilityAlerts = inngest.createFunction(
       return { skipped: true, reason: "No template configured" };
     }
 
-    // Get alerts for this schedule
+    // Get alerts for this tour with capacity
     const alerts = await step.run("get-alerts", async () => {
-      return services.availabilityAlert.getAlertsForSchedule(scheduleId, availableSpots);
+      return services.availabilityAlert.getAlertsForTourWithCapacity(tourId, availableSpots);
     });
 
     // Filter alerts where requested spots <= available spots
@@ -135,11 +134,6 @@ export const checkAvailabilityAlerts = inngest.createFunction(
     if (eligibleAlerts.length === 0) {
       return { skipped: true, reason: "No eligible alerts" };
     }
-
-    // Get schedule details
-    const schedule = await step.run("get-schedule", async () => {
-      return services.schedule.getById(scheduleId);
-    });
 
     let notificationsSent = 0;
     for (const alert of eligibleAlerts) {
@@ -161,16 +155,14 @@ export const checkAvailabilityAlerts = inngest.createFunction(
           }
         }
 
+        // Note: Tour date/time not available without schedule - use empty strings
+        // This data would need to come from tour availability in the new model
         const content = services.communication.substituteVariables(template.contentHtml, {
           customer_name: customerName,
           customer_first_name: customerFirstName,
           tour_name: tour.name,
-          tour_date: schedule?.startsAt
-            ? format(new Date(schedule.startsAt), "MMMM d, yyyy")
-            : "",
-          tour_time: schedule?.startsAt
-            ? format(new Date(schedule.startsAt), "h:mm a")
-            : "",
+          tour_date: "",
+          tour_time: "",
           available_spots: availableSpots.toString(),
           requested_spots: (alert.requestedSpots || 1).toString(),
         });
@@ -185,7 +177,6 @@ export const checkAvailabilityAlerts = inngest.createFunction(
           recipientEmail: alert.email,
           recipientName: customerName !== "Valued Customer" ? customerName : undefined,
           tourId: alert.tourId,
-          scheduleId: alert.scheduleId || undefined,
           type: "email",
           templateId: template.id,
           templateName: template.name,

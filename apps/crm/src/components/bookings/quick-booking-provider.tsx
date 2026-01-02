@@ -8,7 +8,7 @@ import { CustomerFirstBookingSheet } from "./customer-first-booking-sheet";
 type BookingMode = "classic" | "customer-first";
 
 interface QuickBookingContextValue {
-  openQuickBooking: (options?: { customerId?: string; scheduleId?: string; tourId?: string; mode?: BookingMode }) => void;
+  openQuickBooking: (options?: { customerId?: string; tourId?: string; mode?: BookingMode }) => void;
   closeQuickBooking: () => void;
   isOpen: boolean;
 }
@@ -33,24 +33,20 @@ interface QuickBookingProviderProps {
 export function QuickBookingProvider({ children, orgSlug, defaultMode = "customer-first" }: QuickBookingProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<string>();
-  const [preselectedScheduleId, setPreselectedScheduleId] = useState<string>();
   const [preselectedTourId, setPreselectedTourId] = useState<string>();
   const [bookingMode, setBookingMode] = useState<BookingMode>(defaultMode);
 
-  const openQuickBooking = useCallback((options?: { customerId?: string; scheduleId?: string; tourId?: string; mode?: BookingMode }) => {
+  const openQuickBooking = useCallback((options?: { customerId?: string; tourId?: string; mode?: BookingMode }) => {
     setPreselectedCustomerId(options?.customerId);
-    setPreselectedScheduleId(options?.scheduleId);
     setPreselectedTourId(options?.tourId);
-    // Use customer-first by default, but allow override
-    // If a scheduleId is provided, use classic mode (already picked a slot)
-    setBookingMode(options?.mode ?? (options?.scheduleId ? "classic" : defaultMode));
+    // Use provided mode or default
+    setBookingMode(options?.mode ?? defaultMode);
     setIsOpen(true);
   }, [defaultMode]);
 
   const closeQuickBooking = useCallback(() => {
     setIsOpen(false);
     setPreselectedCustomerId(undefined);
-    setPreselectedScheduleId(undefined);
     setPreselectedTourId(undefined);
     setBookingMode(defaultMode);
   }, [defaultMode]);
@@ -78,7 +74,7 @@ export function QuickBookingProvider({ children, orgSlug, defaultMode = "custome
       {children}
       {/* Render based on booking mode */}
       {bookingMode === "customer-first" ? (
-        // Customer-first flow: Guests + Date → See ALL options → Pick best
+        // Customer-first flow: Guests + Date -> See ALL options -> Pick best
         <CustomerFirstBookingSheet
           open={isOpen}
           onOpenChange={setIsOpen}
@@ -87,13 +83,13 @@ export function QuickBookingProvider({ children, orgSlug, defaultMode = "custome
           preselectedTourId={preselectedTourId}
         />
       ) : (
-        // Classic flow: Schedule already selected (from schedule detail page)
+        // Classic flow: Tour + Date + Time selection
         <UnifiedBookingSheet
           open={isOpen}
           onOpenChange={setIsOpen}
           orgSlug={orgSlug}
-          preselectedScheduleId={preselectedScheduleId}
           preselectedCustomerId={preselectedCustomerId}
+          preselectedTourId={preselectedTourId}
         />
       )}
     </QuickBookingContext.Provider>

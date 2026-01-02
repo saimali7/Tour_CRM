@@ -28,8 +28,8 @@ function formatDate(dateStr: string): { day: string; weekday: string; isToday: b
   };
 }
 
-function getUtilizationColor(utilization: number, hasSchedules: boolean): string {
-  if (!hasSchedules) return "bg-muted/30"; // No schedules
+function getUtilizationColor(utilization: number, hasTourRuns: boolean): string {
+  if (!hasTourRuns) return "bg-muted/30"; // No tour runs
   if (utilization === 0) return "bg-success/20"; // Empty
   if (utilization < 50) return "bg-success/40"; // Plenty available
   if (utilization < 80) return "bg-warning/50"; // Filling up
@@ -59,9 +59,59 @@ export function CapacityHeatmap({ orgSlug }: CapacityHeatmapProps) {
     return { from, to };
   }, [dateOffset]);
 
-  const { data, isLoading, error } = trpc.schedule.getCapacityHeatmap.useQuery({
-    dateRange,
+  const { data: heatmapEntries, isLoading, error } = trpc.availability.getCapacityHeatmap.useQuery({
+    startDate: dateRange.from,
+    endDate: dateRange.to,
   });
+
+  // Transform flat array to grid structure
+  const { tours, dates, cells } = useMemo(() => {
+    if (!heatmapEntries || heatmapEntries.length === 0) {
+      return { tours: [] as { id: string; name: string }[], dates: [] as string[], cells: {} as Record<string, { tourRunCount: number; bookedCount: number; totalCapacity: number; utilization: number }> };
+    }
+
+    // Extract unique tours
+    const tourMap = new Map<string, string>();
+    heatmapEntries.forEach((entry) => {
+      if (!tourMap.has(entry.tourId)) {
+        tourMap.set(entry.tourId, entry.tourName);
+      }
+    });
+    const tours = Array.from(tourMap.entries()).map(([id, name]) => ({ id, name }));
+
+    // Extract unique dates
+    const dateSet = new Set<string>();
+    heatmapEntries.forEach((entry) => {
+      dateSet.add(entry.date);
+    });
+    const dates = Array.from(dateSet).sort();
+
+    // Build cells lookup - aggregate by tour+date
+    const cells: Record<string, { tourRunCount: number; bookedCount: number; totalCapacity: number; utilization: number }> = {};
+    heatmapEntries.forEach((entry) => {
+      const cellKey = `${entry.tourId}-${entry.date}`;
+      if (!cells[cellKey]) {
+        cells[cellKey] = {
+          tourRunCount: 0,
+          bookedCount: 0,
+          totalCapacity: 0,
+          utilization: 0,
+        };
+      }
+      cells[cellKey].tourRunCount += 1;
+      cells[cellKey].bookedCount += entry.bookedCount;
+      cells[cellKey].totalCapacity += entry.maxCapacity;
+    });
+
+    // Calculate utilization for each cell
+    Object.values(cells).forEach((cell) => {
+      cell.utilization = cell.totalCapacity > 0
+        ? Math.round((cell.bookedCount / cell.totalCapacity) * 100)
+        : 0;
+    });
+
+    return { tours, dates, cells };
+  }, [heatmapEntries]);
 
   const navigateWeek = (direction: "prev" | "next") => {
     setDateOffset((prev) => prev + (direction === "next" ? 1 : -1));
@@ -101,8 +151,6 @@ export function CapacityHeatmap({ orgSlug }: CapacityHeatmapProps) {
       </div>
     );
   }
-
-  const { tours, dates, cells } = data || { tours: [], dates: [], cells: {} };
 
   if (tours.length === 0) {
     return (
@@ -152,7 +200,7 @@ export function CapacityHeatmap({ orgSlug }: CapacityHeatmapProps) {
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-4 rounded bg-muted/30" />
-            <span className="text-muted-foreground">No schedules</span>
+            <span className="text-muted-foreground">No availability</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-4 rounded bg-success/40" />
@@ -222,7 +270,7 @@ export function CapacityHeatmap({ orgSlug }: CapacityHeatmapProps) {
                 {dates.map((dateStr) => {
                   const cellKey = `${tour.id}-${dateStr}`;
                   const cell = cells[cellKey];
-                  const hasSchedules = cell && cell.scheduleCount > 0;
+                  const hasTourRuns = cell && cell.tourRunCount > 0;
                   const utilization = cell?.utilization ?? 0;
                   const { isToday, isWeekend } = formatDate(dateStr);
 
@@ -239,16 +287,16 @@ export function CapacityHeatmap({ orgSlug }: CapacityHeatmapProps) {
                         href={`/org/${orgSlug}/availability?date=${dateStr}&tourId=${tour.id}` as Route}
                         className={cn(
                           "w-10 h-10 mx-auto rounded flex items-center justify-center text-xs font-medium transition-all hover:ring-2 hover:ring-primary/50",
-                          getUtilizationColor(utilization, !!hasSchedules),
-                          !!hasSchedules && getUtilizationTextColor(utilization)
+                          getUtilizationColor(utilization, !!hasTourRuns),
+                          !!hasTourRuns && getUtilizationTextColor(utilization)
                         )}
                         title={
-                          hasSchedules
+                          hasTourRuns
                             ? `${cell!.bookedCount}/${cell!.totalCapacity} booked (${utilization}%)`
-                            : "No schedules"
+                            : "No availability"
                         }
                       >
-                        {hasSchedules ? (
+                        {hasTourRuns ? (
                           <span>{utilization}%</span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -267,7 +315,7 @@ export function CapacityHeatmap({ orgSlug }: CapacityHeatmapProps) {
       <div className="flex items-center gap-6 text-sm text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <Info className="h-4 w-4" />
-          <span>Click a cell to view that day's schedules</span>
+          <span>Click a cell to view that day's availability</span>
         </div>
         <span>
           Showing {tours.length} tours over {dates.length} days

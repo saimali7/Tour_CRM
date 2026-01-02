@@ -1,6 +1,5 @@
 import type { ServiceContext } from "./types";
 import { TourService } from "./tour-service";
-import { ScheduleService } from "./schedule-service";
 // Booking module - refactored into focused services
 import { BookingService } from "./booking";
 import { CustomerService } from "./customer-service";
@@ -49,7 +48,6 @@ import { ProductService } from "./product-service";
 
 export interface Services {
   tour: TourService;
-  schedule: ScheduleService;
   booking: BookingService;
   customer: CustomerService;
   guide: GuideService;
@@ -109,7 +107,6 @@ export interface Services {
 export function createServices(ctx: ServiceContext): Services {
   return {
     tour: new TourService(ctx),
-    schedule: new ScheduleService(ctx),
     booking: new BookingService(ctx),
     customer: new CustomerService(ctx),
     guide: new GuideService(ctx),
@@ -159,7 +156,6 @@ export function createServices(ctx: ServiceContext): Services {
 
 // Export individual services for direct use if needed
 export { TourService } from "./tour-service";
-export { ScheduleService } from "./schedule-service";
 // Booking module - facade and specialized services
 export {
   BookingService,
@@ -290,14 +286,6 @@ export type {
   CreateProductInput,
   UpdateProductInput,
 } from "./product-service";
-export type {
-  ScheduleFilters,
-  ScheduleWithRelations,
-  CreateScheduleInput,
-  UpdateScheduleInput,
-  BulkCreateScheduleInput,
-  AutoGenerateScheduleInput,
-} from "./schedule-service";
 // Booking types - from refactored module
 export type {
   BookingFilters,

@@ -8,12 +8,6 @@ export interface BookingFormCustomer {
   email: string | null;
 }
 
-export interface BookingFormSchedule {
-  id: string;
-  startsAt: Date;
-  endsAt: Date;
-}
-
 export interface BookingFormTour {
   id: string;
   name: string;
@@ -23,8 +17,7 @@ export interface BookingFormTour {
 export interface ExistingBooking {
   id: string;
   customerId: string;
-  scheduleId: string | null;
-  // New availability-based fields
+  // Availability-based fields
   tourId?: string | null;
   bookingDate?: Date | null; // Date object from database
   bookingTime?: string | null;
@@ -40,25 +33,21 @@ export interface ExistingBooking {
   accessibilityNeeds: string | null;
   internalNotes: string | null;
   customer?: BookingFormCustomer;
-  schedule?: BookingFormSchedule;
   tour?: BookingFormTour;
 }
 
 export interface BookingFormProps {
   booking?: ExistingBooking;
   preselectedCustomerId?: string;
-  preselectedScheduleId?: string;
   preselectedTourId?: string;
 }
 
 export interface BookingFormData {
   customerId: string;
-  // New availability-based fields
+  // Availability-based fields
   tourId: string;
   bookingDate: string | null; // YYYY-MM-DD format
   bookingTime: string | null; // HH:MM format
-  // Legacy field - kept for backward compatibility
-  scheduleId: string;
   adultCount: number;
   childCount: number;
   infantCount: number;
@@ -73,20 +62,6 @@ export interface BookingFormData {
 export interface CalculatedPrice {
   subtotal: string;
   total: string;
-}
-
-export interface ScheduleWithDetails {
-  id: string;
-  startsAt: Date;
-  endsAt: Date;
-  maxParticipants: number;
-  bookedCount?: number;
-  price: string | null;
-  tour?: {
-    id: string;
-    name: string;
-    basePrice: string;
-  } | null;
 }
 
 export interface PricingTier {

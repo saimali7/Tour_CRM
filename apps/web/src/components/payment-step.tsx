@@ -29,14 +29,16 @@ export function PaymentStep({ organizationName }: PaymentStepProps) {
     dispatch({ type: "SET_ERROR", error: null });
 
     try {
-      // Create booking via API
+      // Create booking via API using availability-based model
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          scheduleId: state.schedule?.id,
+          tourId: state.tour?.id,
+          bookingDate: state.bookingDate?.toISOString().split("T")[0],
+          bookingTime: state.bookingTime,
           customer: state.customer,
           participants: state.participants.map((p) => ({
             firstName: p.firstName || state.customer?.firstName,

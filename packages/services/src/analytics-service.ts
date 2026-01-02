@@ -1,12 +1,10 @@
-import { eq, and, gte, lte, sql, desc, count, isNotNull } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, count } from "drizzle-orm";
 import {
   bookings,
-  schedules,
   tours,
-  guides,
-  guideAssignments,
   refunds,
   activityLogs,
+  guideAssignments,
   type BookingSource,
 } from "@tour/database";
 import { BaseService } from "./base-service";
@@ -193,7 +191,7 @@ export class AnalyticsService extends BaseService {
       ? (parseFloat(totalRevenue) / currentBookings).toFixed(2)
       : "0";
 
-    // Revenue by tour
+    // Revenue by tour (using bookings.tourId directly)
     const revenueByTourQuery = await this.db
       .select({
         tourId: tours.id,
@@ -202,8 +200,7 @@ export class AnalyticsService extends BaseService {
         bookingCount: count(bookings.id),
       })
       .from(bookings)
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .leftJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
@@ -370,17 +367,16 @@ export class AnalyticsService extends BaseService {
       throw new Error("Both from and to dates are required for booking stats");
     }
 
-    // Overall stats
+    // Overall stats (using bookingDate for lead time calculation)
     const statsQuery = await this.db
       .select({
         totalBookings: count(),
         totalParticipants: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)`,
         cancelled: sql<number>`COUNT(*) FILTER (WHERE ${bookings.status} = 'cancelled')`,
         noShows: sql<number>`COUNT(*) FILTER (WHERE ${bookings.status} = 'no_show')`,
-        avgLeadTime: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${schedules.startsAt} - ${bookings.createdAt})) / 86400), 0)`,
+        avgLeadTime: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${bookings.bookingDate}::timestamp - ${bookings.createdAt})) / 86400), 0)`,
       })
       .from(bookings)
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
@@ -400,7 +396,7 @@ export class AnalyticsService extends BaseService {
     const cancellationRate = totalBookings > 0 ? (cancelled / totalBookings) * 100 : 0;
     const noShowRate = totalBookings > 0 ? (noShows / totalBookings) * 100 : 0;
 
-    // Bookings by tour
+    // Bookings by tour (using bookings.tourId directly)
     const bookingsByTourQuery = await this.db
       .select({
         tourId: tours.id,
@@ -409,8 +405,7 @@ export class AnalyticsService extends BaseService {
         participantCount: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)`,
       })
       .from(bookings)
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .leftJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
@@ -539,6 +534,7 @@ export class AnalyticsService extends BaseService {
 
   /**
    * Get capacity utilization metrics
+   * Note: With schedules table removed, this uses booking-based approximations
    */
   async getCapacityUtilization(dateRange: DateRangeFilter): Promise<CapacityUtilization> {
     const { from, to } = dateRange;
@@ -547,159 +543,128 @@ export class AnalyticsService extends BaseService {
       throw new Error("Both from and to dates are required for capacity utilization");
     }
 
-    // Overall utilization
-    const overallQuery = await this.db
-      .select({
-        totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)`,
-        totalBooked: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)`,
-      })
-      .from(schedules)
-      .where(
-        and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, from),
-          lte(schedules.startsAt, to),
-          sql`${schedules.status} != 'cancelled'`
-        )
-      );
+    const fromStr = from.toISOString().split("T")[0]!;
+    const toStr = to.toISOString().split("T")[0]!;
 
-    const totalCapacity = Number(overallQuery[0]?.totalCapacity || 0);
-    const totalBooked = Number(overallQuery[0]?.totalBooked || 0);
-    const overallUtilization = totalCapacity > 0 ? (totalBooked / totalCapacity) * 100 : 0;
-
-    // Utilization by tour
-    const utilizationByTourQuery = await this.db
+    // Get booking-based stats grouped by tour
+    const bookingsByTourQuery = await this.db
       .select({
         tourId: tours.id,
         tourName: tours.name,
-        totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)`,
-        bookedCount: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)`,
-        scheduleCount: count(schedules.id),
+        tourMaxParticipants: tours.maxParticipants,
+        totalBooked: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)`,
+        uniqueDates: sql<number>`COUNT(DISTINCT ${bookings.bookingDate})`,
       })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .from(bookings)
+      .leftJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, from),
-          lte(schedules.startsAt, to),
-          sql`${schedules.status} != 'cancelled'`
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate}::text >= ${fromStr}`,
+          sql`${bookings.bookingDate}::text <= ${toStr}`,
+          sql`${bookings.status} != 'cancelled'`
         )
       )
-      .groupBy(tours.id, tours.name)
-      .orderBy(desc(sql`SUM(${schedules.bookedCount})`));
+      .groupBy(tours.id, tours.name, tours.maxParticipants)
+      .orderBy(desc(sql`SUM(${bookings.totalParticipants})`));
 
-    const utilizationByTour = utilizationByTourQuery.map(row => {
-      const capacity = Number(row.totalCapacity);
-      const booked = Number(row.bookedCount);
+    let totalBooked = 0;
+    let totalCapacity = 0;
+
+    const utilizationByTour = bookingsByTourQuery.map(row => {
+      const booked = Number(row.totalBooked);
+      const uniqueDates = Number(row.uniqueDates);
+      const maxPerTour = Number(row.tourMaxParticipants) || 10;
+      // Estimate capacity as max participants per unique booking date
+      const estimatedCapacity = uniqueDates * maxPerTour;
+
+      totalBooked += booked;
+      totalCapacity += estimatedCapacity;
+
       return {
         tourId: row.tourId || "",
         tourName: row.tourName || "Unknown",
-        totalCapacity: capacity,
+        totalCapacity: estimatedCapacity,
         bookedCount: booked,
-        utilization: capacity > 0 ? parseFloat(((booked / capacity) * 100).toFixed(2)) : 0,
-        scheduleCount: Number(row.scheduleCount),
+        utilization: estimatedCapacity > 0 ? parseFloat(((booked / estimatedCapacity) * 100).toFixed(2)) : 0,
+        scheduleCount: uniqueDates,
       };
     });
 
-    // Utilization by day of week
+    const overallUtilization = totalCapacity > 0 ? (totalBooked / totalCapacity) * 100 : 0;
+
+    // Utilization by day of week (from booking dates)
     const utilizationByDayQuery = await this.db
       .select({
-        dayOfWeek: sql<number>`EXTRACT(DOW FROM ${schedules.startsAt})`,
-        totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)`,
-        bookedCount: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)`,
+        dayOfWeek: sql<number>`EXTRACT(DOW FROM ${bookings.bookingDate}::timestamp)`,
+        totalBooked: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)`,
+        bookingCount: count(),
       })
-      .from(schedules)
+      .from(bookings)
       .where(
         and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, from),
-          lte(schedules.startsAt, to),
-          sql`${schedules.status} != 'cancelled'`
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate}::text >= ${fromStr}`,
+          sql`${bookings.bookingDate}::text <= ${toStr}`,
+          sql`${bookings.status} != 'cancelled'`
         )
       )
-      .groupBy(sql`EXTRACT(DOW FROM ${schedules.startsAt})`)
-      .orderBy(sql`EXTRACT(DOW FROM ${schedules.startsAt})`);
+      .groupBy(sql`EXTRACT(DOW FROM ${bookings.bookingDate}::timestamp)`)
+      .orderBy(sql`EXTRACT(DOW FROM ${bookings.bookingDate}::timestamp)`);
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const maxDailyParticipants = totalBooked > 0 ? totalBooked / 7 : 10; // Average as baseline
     const utilizationByDayOfWeek = utilizationByDayQuery.map(row => {
-      const capacity = Number(row.totalCapacity);
-      const booked = Number(row.bookedCount);
+      const booked = Number(row.totalBooked);
       const dow = Number(row.dayOfWeek);
       return {
         dayOfWeek: dow,
         dayName: dayNames[dow] || "Unknown",
-        utilization: capacity > 0 ? parseFloat(((booked / capacity) * 100).toFixed(2)) : 0,
+        utilization: parseFloat(((booked / maxDailyParticipants) * 100).toFixed(2)),
       };
     });
 
-    // Utilization by time slot (hour of day)
+    // Utilization by time slot (from booking time)
     const utilizationByTimeQuery = await this.db
       .select({
-        hour: sql<number>`EXTRACT(HOUR FROM ${schedules.startsAt})`,
-        totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)`,
-        bookedCount: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)`,
-        scheduleCount: count(schedules.id),
+        hour: sql<number>`CAST(SPLIT_PART(${bookings.bookingTime}, ':', 1) AS INT)`,
+        totalBooked: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)`,
+        bookingCount: count(),
       })
-      .from(schedules)
+      .from(bookings)
       .where(
         and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, from),
-          lte(schedules.startsAt, to),
-          sql`${schedules.status} != 'cancelled'`
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate}::text >= ${fromStr}`,
+          sql`${bookings.bookingDate}::text <= ${toStr}`,
+          sql`${bookings.status} != 'cancelled'`,
+          sql`${bookings.bookingTime} IS NOT NULL`
         )
       )
-      .groupBy(sql`EXTRACT(HOUR FROM ${schedules.startsAt})`)
-      .orderBy(sql`EXTRACT(HOUR FROM ${schedules.startsAt})`);
+      .groupBy(sql`SPLIT_PART(${bookings.bookingTime}, ':', 1)`)
+      .orderBy(sql`CAST(SPLIT_PART(${bookings.bookingTime}, ':', 1) AS INT)`);
 
+    const maxHourlyParticipants = totalBooked > 0 ? totalBooked / 10 : 10; // Estimate
     const utilizationByTimeSlot = utilizationByTimeQuery.map(row => {
       const hour = Number(row.hour);
-      const capacity = Number(row.totalCapacity);
-      const booked = Number(row.bookedCount);
+      const booked = Number(row.totalBooked);
       return {
         hour,
         timeLabel: `${hour.toString().padStart(2, "0")}:00`,
-        utilization: capacity > 0 ? parseFloat(((booked / capacity) * 100).toFixed(2)) : 0,
-        scheduleCount: Number(row.scheduleCount),
+        utilization: parseFloat(((booked / maxHourlyParticipants) * 100).toFixed(2)),
+        scheduleCount: Number(row.bookingCount),
       };
     });
 
-    // Underperforming schedules (< 50% utilization)
-    const underperformingQuery = await this.db
-      .select({
-        scheduleId: schedules.id,
-        tourName: tours.name,
-        startsAt: schedules.startsAt,
-        bookedCount: schedules.bookedCount,
-        maxParticipants: schedules.maxParticipants,
-      })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, from),
-          lte(schedules.startsAt, to),
-          sql`${schedules.status} != 'cancelled'`,
-          sql`(CAST(${schedules.bookedCount} AS FLOAT) / NULLIF(${schedules.maxParticipants}, 0)) < 0.5`
-        )
-      )
-      .orderBy(schedules.startsAt)
-      .limit(20);
-
-    const underperformingSchedules = underperformingQuery.map(row => {
-      const booked = Number(row.bookedCount || 0);
-      const capacity = Number(row.maxParticipants);
-      return {
-        scheduleId: row.scheduleId,
-        tourName: row.tourName || "Unknown",
-        startsAt: row.startsAt,
-        utilization: capacity > 0 ? parseFloat(((booked / capacity) * 100).toFixed(2)) : 0,
-        bookedCount: booked,
-        maxParticipants: capacity,
-      };
-    });
+    // Without schedules table, we cannot identify underperforming schedules
+    const underperformingSchedules: Array<{
+      scheduleId: string;
+      tourName: string;
+      startsAt: Date;
+      utilization: number;
+      bookedCount: number;
+      maxParticipants: number;
+    }> = [];
 
     return {
       overallUtilization: parseFloat(overallUtilization.toFixed(2)),
@@ -712,34 +677,33 @@ export class AnalyticsService extends BaseService {
 
   /**
    * Get today's operations summary
+   * Uses availability-based booking model (bookingDate, bookingTime)
    */
   async getTodaysOperations(): Promise<TodaysOperations> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayStr = today.toISOString().split("T")[0]!;
 
-    // Count today's scheduled tours
+    // Count today's bookings (grouped by unique tour runs)
     const statsQuery = await this.db
       .select({
-        scheduledTours: count(schedules.id),
-        totalParticipants: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)`,
+        bookingCount: count(),
+        totalParticipants: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)`,
+        uniqueTourRuns: sql<number>`COUNT(DISTINCT CONCAT(${bookings.tourId}, '-', ${bookings.bookingTime}))`,
       })
-      .from(schedules)
+      .from(bookings)
       .where(
         and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, today),
-          lte(schedules.startsAt, tomorrow),
-          sql`${schedules.status} != 'cancelled'`
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate}::text = ${todayStr}`,
+          sql`${bookings.status} != 'cancelled'`
         )
       );
 
-    const scheduledTours = Number(statsQuery[0]?.scheduledTours || 0);
+    const scheduledTours = Number(statsQuery[0]?.uniqueTourRuns || 0);
     const totalParticipants = Number(statsQuery[0]?.totalParticipants || 0);
 
-    // Count unique guides working today by joining through bookings
-    // Use try-catch to handle cases where guide_assignments table may have incomplete data
+    // Count unique guides working today via guide assignments
     let guidesWorking = 0;
     try {
       const guidesQuery = await this.db
@@ -748,75 +712,73 @@ export class AnalyticsService extends BaseService {
         })
         .from(guideAssignments)
         .leftJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
-        .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
         .where(
           and(
             eq(guideAssignments.organizationId, this.organizationId),
-            isNotNull(guideAssignments.bookingId),
-            isNotNull(schedules.startsAt),
-            gte(schedules.startsAt, today),
-            lte(schedules.startsAt, tomorrow),
+            sql`${bookings.bookingDate}::text = ${todayStr}`,
             eq(guideAssignments.status, "confirmed")
           )
         );
       guidesWorking = Number(guidesQuery[0]?.guideCount || 0);
     } catch (error) {
-      // Log error but continue - guides count is non-critical
       logger.error({ err: error }, "Failed to get guides working count");
       guidesWorking = 0;
     }
 
-    // Get upcoming schedules for next 24 hours
-    // Now we use denormalized guidesAssigned count instead of joining
+    // Get upcoming tour runs for next 24 hours (grouped by tour + time)
     const now = new Date();
     const next24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const next24Str = next24Hours.toISOString().split("T")[0]!;
 
-    const upcomingQuery = await this.db
+    const upcomingBookings = await this.db
       .select({
-        scheduleId: schedules.id,
+        tourId: bookings.tourId,
+        bookingDate: bookings.bookingDate,
+        bookingTime: bookings.bookingTime,
         tourName: tours.name,
-        startsAt: schedules.startsAt,
-        endsAt: schedules.endsAt,
-        bookedCount: schedules.bookedCount,
-        maxParticipants: schedules.maxParticipants,
-        status: schedules.status,
-        guidesRequired: schedules.guidesRequired,
-        guidesAssigned: schedules.guidesAssigned,
+        tourDuration: tours.durationMinutes,
+        tourMax: tours.maxParticipants,
+        bookedCount: sql<number>`SUM(${bookings.totalParticipants})`,
+        bookingCount: count(),
       })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .from(bookings)
+      .leftJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, now),
-          lte(schedules.startsAt, next24Hours),
-          sql`${schedules.status} != 'cancelled'`
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate}::text >= ${todayStr}`,
+          sql`${bookings.bookingDate}::text <= ${next24Str}`,
+          sql`${bookings.status} != 'cancelled'`
         )
       )
-      .orderBy(schedules.startsAt)
+      .groupBy(bookings.tourId, bookings.bookingDate, bookings.bookingTime, tours.name, tours.durationMinutes, tours.maxParticipants)
+      .orderBy(bookings.bookingDate, bookings.bookingTime)
       .limit(10);
 
-    // Map results to output format - now using denormalized guidesAssigned count
-    const upcomingSchedules = upcomingQuery.map(row => {
-      const guidesRequired = Number(row.guidesRequired || 0);
-      const guidesAssigned = Number(row.guidesAssigned || 0);
-      const needsMoreGuides = guidesAssigned < guidesRequired;
-      const guideDeficit = Math.max(0, guidesRequired - guidesAssigned);
+    // Map results to output format
+    const upcomingSchedules = upcomingBookings.map(row => {
+      const startsAt = row.bookingDate ? new Date(row.bookingDate) : new Date();
+      if (row.bookingTime) {
+        const [hours, minutes] = row.bookingTime.split(":").map(Number);
+        startsAt.setHours(hours || 0, minutes || 0, 0, 0);
+      }
+      const endsAt = new Date(startsAt.getTime() + (row.tourDuration || 60) * 60 * 1000);
+      const maxParticipants = Number(row.tourMax) || 10;
+      const bookedCount = Number(row.bookedCount) || 0;
 
       return {
-        scheduleId: row.scheduleId,
+        scheduleId: `${row.tourId}-${row.bookingDate}-${row.bookingTime}`,
         tourName: row.tourName || "Unknown",
-        startsAt: row.startsAt,
-        endsAt: row.endsAt,
-        bookedCount: Number(row.bookedCount || 0),
-        maxParticipants: Number(row.maxParticipants),
-        status: row.status,
-        guidesRequired,
-        guidesAssigned,
-        needsMoreGuides,
-        guideDeficit,
-        // Backwards compatibility
-        hasUnconfirmedGuide: needsMoreGuides,
+        startsAt,
+        endsAt,
+        bookedCount,
+        maxParticipants,
+        status: "scheduled" as const,
+        guidesRequired: 0,
+        guidesAssigned: 0,
+        needsMoreGuides: false,
+        guideDeficit: 0,
+        hasUnconfirmedGuide: false,
       };
     });
 
@@ -1051,6 +1013,7 @@ export class AnalyticsService extends BaseService {
   /**
    * Generate proactive business insights
    * Returns actionable alerts about opportunities and risks
+   * Note: With schedules table removed, uses booking-based insights
    */
   async getProactiveInsights(): Promise<Array<{
     id: string;
@@ -1076,105 +1039,10 @@ export class AnalyticsService extends BaseService {
     }> = [];
 
     const now = new Date();
-    const sevenDaysFromNow = new Date(now);
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-
-    // 1. Low capacity warning - Upcoming schedules with < 30% booking
-    const lowCapacitySchedules = await this.db
-      .select({
-        scheduleId: schedules.id,
-        tourName: tours.name,
-        startsAt: schedules.startsAt,
-        bookedCount: schedules.bookedCount,
-        maxParticipants: schedules.maxParticipants,
-      })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          eq(schedules.organizationId, this.organizationId),
-          eq(schedules.status, "scheduled"),
-          gte(schedules.startsAt, now),
-          lte(schedules.startsAt, sevenDaysFromNow),
-          sql`${schedules.maxParticipants} > 0`,
-          sql`(${schedules.bookedCount}::float / ${schedules.maxParticipants}::float) < 0.3`,
-          sql`${schedules.bookedCount} > 0`
-        )
-      )
-      .orderBy(schedules.startsAt)
-      .limit(5);
-
-    if (lowCapacitySchedules.length > 0) {
-      const firstSchedule = lowCapacitySchedules[0];
-      if (firstSchedule) {
-        const utilization = firstSchedule.maxParticipants > 0
-          ? Math.round(((firstSchedule.bookedCount ?? 0) / firstSchedule.maxParticipants) * 100)
-          : 0;
-        insights.push({
-          id: "low-capacity-upcoming",
-          type: "warning",
-          title: `${lowCapacitySchedules.length} tours running below capacity`,
-          description: `${firstSchedule.tourName ?? "Tour"} on ${new Date(firstSchedule.startsAt).toLocaleDateString()} is only ${utilization}% booked`,
-          action: {
-            label: "View schedules",
-            href: "/schedules",
-          },
-          metric: {
-            value: `${lowCapacitySchedules.length} tours`,
-            trend: "down",
-          },
-        });
-      }
-    }
-
-    // 2. High demand opportunity - Tours consistently selling out
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const highDemandTours = await this.db
-      .select({
-        tourId: tours.id,
-        tourName: tours.name,
-        avgUtilization: sql<number>`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100)`.as("avg_utilization"),
-        scheduleCount: count(),
-      })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, thirtyDaysAgo),
-          lte(schedules.startsAt, now),
-          sql`${schedules.status} != 'cancelled'`,
-          sql`${schedules.maxParticipants} > 0`
-        )
-      )
-      .groupBy(tours.id, tours.name)
-      .having(sql`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100) > 85`)
-      .orderBy(desc(sql`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100)`))
-      .limit(3);
-
-    if (highDemandTours.length > 0) {
-      const topTour = highDemandTours[0];
-      if (topTour && topTour.tourName && topTour.avgUtilization != null) {
-        insights.push({
-          id: "high-demand-tour",
-          type: "opportunity",
-          title: `${topTour.tourName} is in high demand`,
-          description: `This tour averaged ${Math.round(topTour.avgUtilization)}% capacity over the last 30 days. Consider adding more time slots.`,
-          action: {
-            label: "View tour",
-            href: `/tours`,
-          },
-          metric: {
-            value: `${Math.round(topTour.avgUtilization)}% full`,
-            trend: "up",
-          },
-        });
-      }
-    }
-
-    // 3. Revenue pace - Compare to last month's same point
+    // 1. Revenue pace - Compare to last month's same point
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonthSamePoint = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -1236,52 +1104,7 @@ export class AnalyticsService extends BaseService {
       });
     }
 
-    // 4. Tours needing more guides (guidesAssigned < guidesRequired)
-    const unassignedSchedules = await this.db
-      .select({
-        count: count(),
-      })
-      .from(schedules)
-      .where(
-        and(
-          eq(schedules.organizationId, this.organizationId),
-          eq(schedules.status, "scheduled"),
-          gte(schedules.startsAt, now),
-          lte(schedules.startsAt, sevenDaysFromNow),
-          sql`${schedules.guidesAssigned} < ${schedules.guidesRequired}`,
-          sql`${schedules.guidesRequired} > 0` // Only count schedules that need guides
-        )
-      );
-
-    const unassignedCount = unassignedSchedules[0]?.count ?? 0;
-    if (unassignedCount > 0) {
-      insights.push({
-        id: "unassigned-guides",
-        type: "warning",
-        title: `${unassignedCount} tours without guide assignment`,
-        description: "Upcoming tours in the next 7 days need guides assigned.",
-        action: {
-          label: "Assign guides",
-          href: "/availability",
-        },
-        metric: {
-          value: `${unassignedCount} tours`,
-          trend: "stable",
-        },
-      });
-    }
-
-    // 5. All guides assigned (success)
-    if (unassignedCount === 0 && lowCapacitySchedules.length === 0) {
-      insights.push({
-        id: "operations-healthy",
-        type: "success",
-        title: "Operations looking good",
-        description: "All upcoming tours have guides assigned and healthy booking levels.",
-      });
-    }
-
-    // 6. Tour trending up (>20% booking increase WoW)
+    // 2. Tour trending up (>20% booking increase WoW)
     const thisWeekStart = new Date(now);
     thisWeekStart.setDate(thisWeekStart.getDate() - 7);
     const lastWeekStart = new Date(thisWeekStart);
@@ -1295,8 +1118,7 @@ export class AnalyticsService extends BaseService {
         lastWeekBookings: sql<number>`COUNT(*) FILTER (WHERE ${bookings.createdAt} >= ${lastWeekStart} AND ${bookings.createdAt} < ${thisWeekStart})`,
       })
       .from(bookings)
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .leftJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
@@ -1331,108 +1153,7 @@ export class AnalyticsService extends BaseService {
       }
     }
 
-    // 7. Peak capacity alert (Tour at 95%+ for upcoming schedules)
-    const peakCapacityTours = await this.db
-      .select({
-        tourId: tours.id,
-        tourName: tours.name,
-        avgUtilization: sql<number>`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100)`,
-        scheduleCount: count(),
-      })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          eq(schedules.organizationId, this.organizationId),
-          eq(schedules.status, "scheduled"),
-          gte(schedules.startsAt, now),
-          lte(schedules.startsAt, sevenDaysFromNow),
-          sql`${schedules.maxParticipants} > 0`
-        )
-      )
-      .groupBy(tours.id, tours.name)
-      .having(sql`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100) >= 95`);
-
-    if (peakCapacityTours.length > 0) {
-      const peakTour = peakCapacityTours[0];
-      if (peakTour && peakTour.tourName) {
-        insights.push({
-          id: `peak-capacity-${peakTour.tourId}`,
-          type: "success",
-          title: `${peakTour.tourName} is nearly sold out!`,
-          description: `Upcoming schedules are at ${Math.round(peakTour.avgUtilization || 0)}% capacity. Consider adding more time slots.`,
-          action: {
-            label: "Add schedule",
-            href: `/schedules/new?tourId=${peakTour.tourId}`,
-          },
-          metric: {
-            value: `${Math.round(peakTour.avgUtilization || 0)}%`,
-            trend: "up",
-          },
-        });
-      }
-    }
-
-    // 8. Slow day alert (Days with low bookings historically)
-    const _dayOfWeek = now.getDay(); // Current day (unused but kept for potential future use)
-    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-    const slowDayQuery = await this.db
-      .select({
-        dayOfWeek: sql<number>`EXTRACT(DOW FROM ${schedules.startsAt})`,
-        avgUtilization: sql<number>`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100)`,
-        scheduleCount: count(),
-      })
-      .from(schedules)
-      .where(
-        and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, thirtyDaysAgo),
-          lte(schedules.startsAt, now),
-          sql`${schedules.status} != 'cancelled'`,
-          sql`${schedules.maxParticipants} > 0`
-        )
-      )
-      .groupBy(sql`EXTRACT(DOW FROM ${schedules.startsAt})`)
-      .having(sql`AVG((${schedules.bookedCount}::float / NULLIF(${schedules.maxParticipants}, 0)::float) * 100) < 40`);
-
-    // Check if we have slow days in the upcoming week
-    for (const slowDay of slowDayQuery) {
-      const slowDayNum = Number(slowDay.dayOfWeek);
-      // Check if this slow day has scheduled tours in the next 7 days
-      const upcomingSlowDaySchedules = await this.db
-        .select({ count: count() })
-        .from(schedules)
-        .where(
-          and(
-            eq(schedules.organizationId, this.organizationId),
-            eq(schedules.status, "scheduled"),
-            gte(schedules.startsAt, now),
-            lte(schedules.startsAt, sevenDaysFromNow),
-            sql`EXTRACT(DOW FROM ${schedules.startsAt}) = ${slowDayNum}`
-          )
-        );
-
-      if ((upcomingSlowDaySchedules[0]?.count ?? 0) > 0) {
-        insights.push({
-          id: `slow-day-${slowDayNum}`,
-          type: "info",
-          title: `${dayNames[slowDayNum] || "Day"} typically has lower bookings`,
-          description: `Historical data shows ${Math.round(slowDay.avgUtilization || 0)}% average capacity on ${dayNames[slowDayNum] || "this day"}s. Consider promotions or reduced schedules.`,
-          action: {
-            label: "View schedules",
-            href: "/schedules",
-          },
-          metric: {
-            value: `${Math.round(slowDay.avgUtilization || 0)}% avg`,
-            trend: "down",
-          },
-        });
-        break; // Only show one slow day alert
-      }
-    }
-
-    // 9. Seasonal opportunity (Compare to same period last year)
+    // 3. Seasonal opportunity (Compare to same period last year)
     const lastYearSamePeriodStart = new Date(now);
     lastYearSamePeriodStart.setFullYear(lastYearSamePeriodStart.getFullYear() - 1);
     lastYearSamePeriodStart.setDate(lastYearSamePeriodStart.getDate() - 7);
@@ -1471,6 +1192,16 @@ export class AnalyticsService extends BaseService {
           value: `$${Math.round(lastYearSeasonalRevenue - currentRev)} potential`,
           trend: "up",
         },
+      });
+    }
+
+    // 4. Operations healthy (if no warnings or opportunities)
+    if (insights.length === 0 || (insights.length === 1 && insights[0]?.type === "success")) {
+      insights.push({
+        id: "operations-healthy",
+        type: "success",
+        title: "Operations looking good",
+        description: "Your business metrics are healthy with stable booking levels.",
       });
     }
 

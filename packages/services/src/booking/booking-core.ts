@@ -8,18 +8,15 @@
  * - Urgency calculation logic
  */
 
-import { eq, and, sql, or, isNotNull } from "drizzle-orm";
+import { eq, and, or, isNotNull } from "drizzle-orm";
 import {
   bookings,
-  bookingParticipants,
   customers,
-  schedules,
   tours,
   type Booking,
 } from "@tour/database";
 import type { ServiceContext } from "../types";
 import { bookingLogger } from "../lib/logger";
-import { ScheduleService } from "../schedule-service";
 import type { BookingWithRelations } from "./types";
 
 export type UrgencyLevel = "critical" | "high" | "medium" | "low" | "none" | "past";
@@ -33,24 +30,6 @@ export class BookingCore {
 
   get serviceContext(): ServiceContext {
     return this.ctx;
-  }
-
-  /**
-   * Helper to recalculate guide requirements after booking changes
-   * Used by create, update, cancel, reschedule operations
-   */
-  async recalculateGuideRequirements(scheduleId: string): Promise<void> {
-    try {
-      const scheduleService = new ScheduleService(this.ctx);
-      await scheduleService.recalculateGuideRequirements(scheduleId);
-    } catch (error) {
-      // Log but don't fail the booking operation
-      bookingLogger.warn({
-        organizationId: this.organizationId,
-        scheduleId,
-        error: error instanceof Error ? error.message : "Unknown error",
-      }, "Failed to recalculate guide requirements");
-    }
   }
 
   /**
@@ -70,10 +49,8 @@ export class BookingCore {
     const now = new Date();
     let tourDate: Date | null = null;
 
-    // Determine tour date from schedule or booking fields
-    if (booking.schedule?.startsAt) {
-      tourDate = new Date(booking.schedule.startsAt);
-    } else if (booking.bookingDate && booking.bookingTime) {
+    // Determine tour date from booking fields
+    if (booking.bookingDate && booking.bookingTime) {
       const parts = booking.bookingTime.split(":");
       const hours = parseInt(parts[0] ?? "0", 10);
       const minutes = parseInt(parts[1] ?? "0", 10);
@@ -120,12 +97,6 @@ export class BookingCore {
         lastName: customers.lastName,
         phone: customers.phone,
       },
-      schedule: {
-        id: schedules.id,
-        startsAt: schedules.startsAt,
-        endsAt: schedules.endsAt,
-        status: schedules.status,
-      },
       tour: {
         id: tours.id,
         name: tours.name,
@@ -138,13 +109,10 @@ export class BookingCore {
 
   /**
    * Get the standard join condition for tours
-   * Handles both schedule-based and availability-based bookings
+   * Joins via bookings.tourId
    */
   getTourJoinCondition() {
-    return or(
-      eq(schedules.tourId, tours.id),
-      and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id))
-    );
+    return and(isNotNull(bookings.tourId), eq(bookings.tourId, tours.id));
   }
 
   /**
@@ -153,23 +121,17 @@ export class BookingCore {
   transformBookingRow(row: {
     booking: Booking;
     customer?: { id: string; email: string | null; firstName: string; lastName: string; phone: string | null } | null;
-    schedule?: { id: string; startsAt: Date; endsAt: Date; status: string } | null;
     tour?: { id: string; name: string; slug: string; meetingPoint: string | null; meetingPointDetails: string | null } | null;
-    scheduleTour?: { id: string; name: string; slug: string; meetingPoint: string | null; meetingPointDetails: string | null } | null;
   }): BookingWithRelations {
-    // Handle both 'tour' and 'scheduleTour' field naming
-    const tourData = row.tour || row.scheduleTour;
-
     return {
       ...row.booking,
       customer: row.customer?.id ? row.customer : undefined,
-      schedule: row.schedule?.id ? row.schedule : undefined,
-      tour: tourData?.id ? {
-        id: tourData.id,
-        name: tourData.name,
-        slug: tourData.slug,
-        meetingPoint: tourData.meetingPoint,
-        meetingPointDetails: tourData.meetingPointDetails,
+      tour: row.tour?.id ? {
+        id: row.tour.id,
+        name: row.tour.name,
+        slug: row.tour.slug,
+        meetingPoint: row.tour.meetingPoint,
+        meetingPointDetails: row.tour.meetingPointDetails,
       } : undefined,
     };
   }

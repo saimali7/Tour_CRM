@@ -1,9 +1,8 @@
-import { eq, and, sql, inArray, gte, lte } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { db } from "@tour/database";
 import {
   bookingParticipants,
   bookings,
-  schedules,
   tours,
 } from "@tour/database/schema";
 import type { CheckedInStatus } from "@tour/database/schema";
@@ -142,50 +141,22 @@ export class CheckInService {
   }
 
   // ==========================================
-  // Schedule Check-In Status
+  // Tour Run Check-In Status (availability-based model)
   // ==========================================
 
-  async getScheduleCheckInStatus(scheduleId: string) {
-    // Get all bookings and their participants for a schedule
-    const participants = await db
-      .select({
-        participant: bookingParticipants,
-        booking: {
-          id: bookings.id,
-          referenceNumber: bookings.referenceNumber,
-          status: bookings.status,
-        },
-      })
-      .from(bookingParticipants)
-      .innerJoin(bookings, eq(bookingParticipants.bookingId, bookings.id))
-      .where(
-        and(
-          eq(bookings.scheduleId, scheduleId),
-          eq(bookings.organizationId, this.ctx.organizationId),
-          eq(bookings.status, "confirmed")
-        )
-      );
-
-    const total = participants.length;
-    const checkedIn = participants.filter(
-      (p) => p.participant.checkedIn === "yes"
-    ).length;
-    const noShows = participants.filter(
-      (p) => p.participant.checkedIn === "no_show"
-    ).length;
-    const pending = total - checkedIn - noShows;
-
+  /**
+   * @deprecated Use getTourRunCheckInStatus instead
+   * This method is kept for backwards compatibility but schedules table has been removed
+   */
+  async getScheduleCheckInStatus(_scheduleId: string) {
+    // Return empty result - schedules table removed
     return {
-      total,
-      checkedIn,
-      noShows,
-      pending,
-      percentComplete: total > 0 ? Math.round((checkedIn / total) * 100) : 0,
-      participants: participants.map((p) => ({
-        ...p.participant,
-        bookingReference: p.booking.referenceNumber,
-        bookingId: p.booking.id,
-      })),
+      total: 0,
+      checkedIn: 0,
+      noShows: 0,
+      pending: 0,
+      percentComplete: 0,
+      participants: [],
     };
   }
 
@@ -219,42 +190,86 @@ export class CheckInService {
   // Today's Check-Ins
   // ==========================================
 
+  /**
+   * Get today's check-in summary using availability-based booking model
+   * Groups bookings by tour run (tourId + date + time)
+   */
   async getTodaysCheckInSummary() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayStr = today.toISOString().split("T")[0]!;
 
-    // Get today's schedules with check-in stats
-    const schedulesResult = await db
+    // Get today's bookings with check-in status
+    const todayBookings = await db
       .select({
-        schedule: schedules,
+        booking: bookings,
         tour: {
           id: tours.id,
           name: tours.name,
         },
       })
-      .from(schedules)
-      .innerJoin(tours, eq(schedules.tourId, tours.id))
+      .from(bookings)
+      .innerJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
-          eq(schedules.organizationId, this.ctx.organizationId),
-          sql`${schedules.startsAt} >= ${today}`,
-          sql`${schedules.startsAt} < ${tomorrow}`,
-          eq(schedules.status, "scheduled")
+          eq(bookings.organizationId, this.ctx.organizationId),
+          sql`${bookings.bookingDate}::text = ${todayStr}`,
+          eq(bookings.status, "confirmed")
         )
       )
-      .orderBy(schedules.startsAt);
+      .orderBy(bookings.bookingTime);
 
-    // Get check-in stats for each schedule
-    const summaries = await Promise.all(
-      schedulesResult.map(async ({ schedule, tour }) => {
-        const status = await this.getScheduleCheckInStatus(schedule.id);
-        return {
-          scheduleId: schedule.id,
+    // Group by tour run (tourId + time)
+    const tourRunsMap = new Map<string, {
+      tourRunId: string;
+      tourId: string;
+      tourName: string;
+      bookingTime: string | null;
+      bookingIds: string[];
+    }>();
+
+    for (const { booking, tour } of todayBookings) {
+      const key = `${tour.id}-${booking.bookingTime}`;
+      const existing = tourRunsMap.get(key);
+      if (existing) {
+        existing.bookingIds.push(booking.id);
+      } else {
+        tourRunsMap.set(key, {
+          tourRunId: key,
+          tourId: tour.id,
           tourName: tour.name,
-          startsAt: schedule.startsAt,
-          ...status,
+          bookingTime: booking.bookingTime,
+          bookingIds: [booking.id],
+        });
+      }
+    }
+
+    // Get check-in stats for each tour run
+    const summaries = await Promise.all(
+      Array.from(tourRunsMap.values()).map(async (tourRun) => {
+        const status = await this.getTourRunCheckInStatus(
+          tourRun.tourId,
+          today,
+          tourRun.bookingTime || "00:00"
+        );
+
+        // Create startsAt from date and time
+        const startsAt = new Date(today);
+        if (tourRun.bookingTime) {
+          const [hours, minutes] = tourRun.bookingTime.split(":").map(Number);
+          startsAt.setHours(hours || 0, minutes || 0, 0, 0);
+        }
+
+        return {
+          scheduleId: tourRun.tourRunId, // Virtual schedule ID for backwards compat
+          tourName: tourRun.tourName,
+          startsAt,
+          total: status.total,
+          checkedIn: status.checkedIn,
+          noShows: status.noShows,
+          pending: status.pending,
+          percentComplete: status.percentComplete,
+          participants: status.participants,
         };
       })
     );
@@ -286,73 +301,16 @@ export class CheckInService {
   // Auto-Complete Bookings
   // ==========================================
 
-  async completeBookingsForSchedule(scheduleId: string) {
-    // Mark booking as completed if all participants are checked in
-    const checkInStatus = await this.getScheduleCheckInStatus(scheduleId);
-
-    // Group by booking
-    const bookingGroups = new Map<
-      string,
-      { total: number; checkedIn: number; noShows: number }
-    >();
-
-    for (const p of checkInStatus.participants) {
-      const current = bookingGroups.get(p.bookingId) || {
-        total: 0,
-        checkedIn: 0,
-        noShows: 0,
-      };
-      current.total++;
-      if (p.checkedIn === "yes") current.checkedIn++;
-      if (p.checkedIn === "no_show") current.noShows++;
-      bookingGroups.set(p.bookingId, current);
-    }
-
-    // Update bookings where everyone attended or is no-show
-    const completedBookingIds: string[] = [];
-    const noShowBookingIds: string[] = [];
-
-    for (const [bookingId, stats] of bookingGroups) {
-      if (stats.checkedIn + stats.noShows === stats.total) {
-        if (stats.noShows === stats.total) {
-          // All no-shows
-          noShowBookingIds.push(bookingId);
-        } else {
-          // At least some attended
-          completedBookingIds.push(bookingId);
-        }
-      }
-    }
-
-    // Update completed bookings
-    if (completedBookingIds.length > 0) {
-      await db
-        .update(bookings)
-        .set({ status: "completed", updatedAt: new Date() })
-        .where(
-          and(
-            inArray(bookings.id, completedBookingIds),
-            eq(bookings.organizationId, this.ctx.organizationId)
-          )
-        );
-    }
-
-    // Update no-show bookings
-    if (noShowBookingIds.length > 0) {
-      await db
-        .update(bookings)
-        .set({ status: "no_show", updatedAt: new Date() })
-        .where(
-          and(
-            inArray(bookings.id, noShowBookingIds),
-            eq(bookings.organizationId, this.ctx.organizationId)
-          )
-        );
-    }
-
+  /**
+   * @deprecated Use completeBookingsForTourRun instead
+   * This method is kept for backwards compatibility but schedules table has been removed
+   */
+  async completeBookingsForSchedule(_scheduleId: string) {
+    // Return empty result - schedules table removed
+    // Use completeBookingsForTourRun instead
     return {
-      completed: completedBookingIds.length,
-      noShows: noShowBookingIds.length,
+      completed: 0,
+      noShows: 0,
     };
   }
 

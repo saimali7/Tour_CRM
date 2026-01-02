@@ -72,16 +72,12 @@ export async function GET(request: NextRequest) {
         totalParticipants: booking.totalParticipants,
         total: booking.total,
         currency: booking.currency,
-        schedule: booking.schedule
-          ? {
-              startsAt: booking.schedule.startsAt,
-              endsAt: booking.schedule.endsAt,
-            }
-          : null,
+        bookingDate: booking.bookingDate,
+        bookingTime: booking.bookingTime,
         tour: booking.tour
           ? {
               name: booking.tour.name,
-              meetingPoint: null, // Would need to fetch tour details
+              meetingPoint: booking.tour.meetingPoint,
             }
           : null,
         customer: booking.customer

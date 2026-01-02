@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure } from "../trpc";
 import { db } from "@tour/database";
-import { bookings, customers, tours, schedules, guides } from "@tour/database/schema";
-import { and, eq, ilike, or, sql, desc } from "drizzle-orm";
+import { bookings, customers, tours, guides } from "@tour/database/schema";
+import { and, eq, ilike, or, sql, desc, gte } from "drizzle-orm";
 
-export type EntityType = "booking" | "customer" | "tour" | "schedule" | "guide";
+export type EntityType = "booking" | "customer" | "tour" | "guide";
 
 export interface SearchResult {
   id: string;
@@ -29,14 +29,13 @@ export const searchRouter = createRouter({
       const { query, limit } = input;
       const orgId = ctx.orgContext.organizationId;
       const searchPattern = `%${query.toLowerCase()}%`;
-      const perEntityLimit = Math.ceil(limit / 5);
+      const perEntityLimit = Math.ceil(limit / 4);
 
       // Search all entities in parallel
       const [
         bookingResults,
         customerResults,
         tourResults,
-        scheduleResults,
         guideResults,
       ] = await Promise.all([
         // Search bookings by reference number or customer name
@@ -110,27 +109,6 @@ export const searchRouter = createRouter({
           .orderBy(desc(tours.createdAt))
           .limit(perEntityLimit),
 
-        // Search schedules by tour name
-        db
-          .select({
-            id: schedules.id,
-            startsAt: schedules.startsAt,
-            status: schedules.status,
-            tourName: tours.name,
-            maxParticipants: schedules.maxParticipants,
-            bookedCount: schedules.bookedCount,
-          })
-          .from(schedules)
-          .leftJoin(tours, eq(schedules.tourId, tours.id))
-          .where(
-            and(
-              eq(schedules.organizationId, orgId),
-              ilike(tours.name, searchPattern)
-            )
-          )
-          .orderBy(desc(schedules.startsAt))
-          .limit(perEntityLimit),
-
         // Search guides by name or email
         db
           .select({
@@ -190,24 +168,6 @@ export const searchRouter = createRouter({
         });
       }
 
-      // Add schedule results
-      for (const schedule of scheduleResults) {
-        const date = new Date(schedule.startsAt);
-        const dateStr = new Intl.DateTimeFormat("en-US", {
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        }).format(date);
-        const available = (schedule.maxParticipants || 0) - (schedule.bookedCount || 0);
-        results.push({
-          id: schedule.id,
-          type: "schedule",
-          title: `${schedule.tourName} - ${dateStr}`,
-          subtitle: `${available} spots available`,
-        });
-      }
-
       // Add guide results
       for (const guide of guideResults) {
         results.push({
@@ -224,7 +184,6 @@ export const searchRouter = createRouter({
           bookings: bookingResults.length,
           customers: customerResults.length,
           tours: tourResults.length,
-          schedules: scheduleResults.length,
           guides: guideResults.length,
         },
       };
@@ -232,7 +191,7 @@ export const searchRouter = createRouter({
 
   /**
    * Get recent items for quick access (no search query)
-   * Shows recently created/modified items
+   * Shows recently created/modified items (bookings, customers, upcoming tour bookings)
    */
   recent: protectedProcedure
     .input(
@@ -244,8 +203,9 @@ export const searchRouter = createRouter({
       const orgId = ctx.orgContext.organizationId;
       const perEntityLimit = Math.ceil(input.limit / 3);
 
-      // Get recent bookings, customers, and schedules
-      const [recentBookings, recentCustomers, recentSchedules] = await Promise.all([
+      // Get recent bookings, customers, and upcoming tour bookings
+      const today = new Date();
+      const [recentBookings, recentCustomers, upcomingTourBookings] = await Promise.all([
         db
           .select({
             id: bookings.id,
@@ -272,21 +232,24 @@ export const searchRouter = createRouter({
           .orderBy(desc(customers.createdAt))
           .limit(perEntityLimit),
 
+        // Get upcoming tour bookings (replacing schedules)
         db
           .select({
-            id: schedules.id,
-            startsAt: schedules.startsAt,
+            id: bookings.id,
+            bookingDate: bookings.bookingDate,
+            bookingTime: bookings.bookingTime,
             tourName: tours.name,
           })
-          .from(schedules)
-          .leftJoin(tours, eq(schedules.tourId, tours.id))
+          .from(bookings)
+          .leftJoin(tours, eq(bookings.tourId, tours.id))
           .where(
             and(
-              eq(schedules.organizationId, orgId),
-              eq(schedules.status, "scheduled")
+              eq(bookings.organizationId, orgId),
+              eq(bookings.status, "confirmed"),
+              gte(bookings.bookingDate, today)
             )
           )
-          .orderBy(schedules.startsAt)
+          .orderBy(bookings.bookingDate)
           .limit(perEntityLimit),
       ]);
 
@@ -312,20 +275,20 @@ export const searchRouter = createRouter({
         });
       }
 
-      for (const schedule of recentSchedules) {
-        const date = new Date(schedule.startsAt);
-        const dateStr = new Intl.DateTimeFormat("en-US", {
-          month: "short",
-          day: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        }).format(date);
-        results.push({
-          id: schedule.id,
-          type: "schedule",
-          title: schedule.tourName || "Unknown Tour",
-          subtitle: dateStr,
-        });
+      // Show upcoming tour bookings
+      for (const tourBooking of upcomingTourBookings) {
+        if (tourBooking.bookingDate) {
+          const dateStr = new Intl.DateTimeFormat("en-US", {
+            month: "short",
+            day: "numeric",
+          }).format(tourBooking.bookingDate);
+          results.push({
+            id: tourBooking.id,
+            type: "booking",
+            title: tourBooking.tourName || "Unknown Tour",
+            subtitle: `${dateStr}${tourBooking.bookingTime ? ` at ${tourBooking.bookingTime}` : ""}`,
+          });
+        }
       }
 
       return { results };

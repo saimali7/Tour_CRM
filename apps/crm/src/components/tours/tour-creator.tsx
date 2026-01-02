@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import {
   Sparkles,
   FileText,
-  Calendar,
   Settings,
   Check,
   ChevronRight,
@@ -28,7 +27,6 @@ import { useIsMobile } from "@/hooks/use-media-query";
 import { EssentialsTab } from "./tour-creator/essentials-tab";
 import { PricingTab, type PricingFormState } from "./tour-creator/pricing-tab";
 import { ContentTab } from "./tour-creator/content-tab";
-import { ScheduleTab } from "./tour-creator/schedule-tab";
 import { SettingsTab } from "./tour-creator/settings-tab";
 
 // Types
@@ -50,13 +48,6 @@ export interface TourFormState {
   coverImageUrl: string | null;
   images: string[];
   tags: string[];
-
-  // Schedule
-  scheduleEnabled: boolean;
-  scheduleStartDate: string;
-  scheduleEndDate: string;
-  scheduleDays: number[];
-  scheduleTimes: string[];
 
   // Settings
   slug: string;
@@ -83,7 +74,7 @@ interface TourCreatorProps {
   initialData?: Partial<TourFormState>;
 }
 
-type TabId = "essentials" | "pricing" | "content" | "schedule" | "settings";
+type TabId = "essentials" | "pricing" | "content" | "settings";
 
 interface Tab {
   id: TabId;
@@ -97,7 +88,6 @@ const TABS: Tab[] = [
   { id: "essentials", label: "Essentials", shortLabel: "Basics", icon: Sparkles, description: "Name, price & capacity" },
   { id: "pricing", label: "Pricing", shortLabel: "Price", icon: DollarSign, description: "Pricing & capacity" },
   { id: "content", label: "Content", shortLabel: "Content", icon: FileText, description: "Description & images" },
-  { id: "schedule", label: "Schedule", shortLabel: "When", icon: Calendar, description: "When it runs" },
   { id: "settings", label: "Settings", shortLabel: "Config", icon: Settings, description: "Policies & SEO" },
 ];
 
@@ -119,17 +109,6 @@ const DEFAULT_FORM_STATE: TourFormState = {
   coverImageUrl: null,
   images: [],
   tags: [],
-
-  // Schedule
-  scheduleEnabled: true,
-  scheduleStartDate: new Date().toISOString().split("T")[0] || "",
-  scheduleEndDate: (() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 3);
-    return d.toISOString().split("T")[0] || "";
-  })(),
-  scheduleDays: [1, 2, 3, 4, 5],
-  scheduleTimes: ["09:00"],
 
   // Settings
   slug: "",
@@ -237,7 +216,6 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
   // Mutations
   const createMutation = trpc.tour.create.useMutation();
   const updateMutation = trpc.tour.update.useMutation();
-  const autoGenerateMutation = trpc.schedule.autoGenerate.useMutation();
   const createBookingOptionMutation = trpc.bookingOptions.create.useMutation();
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -310,18 +288,12 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
       formState.coverImageUrl
     );
 
-    const scheduleComplete = !!(
-      !formState.scheduleEnabled ||
-      (formState.scheduleDays.length > 0 && formState.scheduleTimes.length > 0)
-    );
-
     const settingsComplete = !!formState.meetingPoint;
 
     return {
       essentials: { complete: essentialsComplete, required: true },
       pricing: { complete: pricingComplete, required: false },
       content: { complete: contentComplete, required: false },
-      schedule: { complete: scheduleComplete, required: false },
       settings: { complete: settingsComplete, required: false },
     };
   }, [formState]);
@@ -547,27 +519,6 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           }
         }
 
-        // Generate schedules if enabled
-        if (formState.scheduleEnabled && formState.scheduleDays.length > 0 && formState.scheduleTimes.length > 0) {
-          try {
-            const scheduleResult = await autoGenerateMutation.mutateAsync({
-              tourId: savedTourId,
-              startDate: new Date(formState.scheduleStartDate),
-              endDate: new Date(formState.scheduleEndDate),
-              daysOfWeek: formState.scheduleDays,
-              times: formState.scheduleTimes,
-              maxParticipants: formState.maxParticipants,
-              skipExisting: true,
-            });
-            if (scheduleResult.created.length > 0) {
-              toast.success(`Created ${scheduleResult.created.length} schedules`);
-            }
-          } catch (error) {
-            console.debug("Failed to auto-generate schedules:", error);
-            toast.error("Tour saved but failed to create schedules");
-          }
-        }
-
         utils.tour.list.invalidate();
         router.push(`/org/${slug}/tours/${savedTourId}`);
       } catch (error) {
@@ -582,7 +533,6 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
       tourId,
       createMutation,
       updateMutation,
-      autoGenerateMutation,
       createBookingOptionMutation,
       utils,
       router,
@@ -723,9 +673,6 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           )}
           {activeTab === "content" && (
             <ContentTab formState={formState} updateForm={updateForm} orgSlug={slug} />
-          )}
-          {activeTab === "schedule" && (
-            <ScheduleTab formState={formState} updateForm={updateForm} />
           )}
           {activeTab === "settings" && (
             <SettingsTab formState={formState} updateForm={updateForm} />

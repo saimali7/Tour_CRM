@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@tour/database";
-import { bookings, customers, schedules } from "@tour/database";
+import { bookings, customers, tours } from "@tour/database";
 import { eq, and } from "drizzle-orm";
 import { inngest } from "@/inngest";
 import { format } from "date-fns";
@@ -197,15 +197,17 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
     ),
   });
 
-  // Get schedule and tour details (only if booking has scheduleId)
-  const schedule = booking.scheduleId
-    ? await db.query.schedules.findFirst({
-        where: eq(schedules.id, booking.scheduleId),
-        with: {
-          tour: true,
-        },
+  // Get tour details (only if booking has tourId)
+  const tour = booking.tourId
+    ? await db.query.tours.findFirst({
+        where: eq(tours.id, booking.tourId),
       })
     : null;
+
+  // Format tour date from booking fields
+  const tourDate = booking.bookingDate
+    ? format(new Date(booking.bookingDate), "MMMM d, yyyy")
+    : "Scheduled Date";
 
   // Send payment confirmation email via Inngest
   if (customer?.email) {
@@ -218,10 +220,8 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
         customerEmail: customer.email,
         customerName: `${customer.firstName} ${customer.lastName}`,
         bookingReference: booking.referenceNumber,
-        tourName: schedule?.tour?.name || "Tour",
-        tourDate: schedule?.startsAt
-          ? format(new Date(schedule.startsAt), "MMMM d, yyyy")
-          : "Scheduled Date",
+        tourName: tour?.name || "Tour",
+        tourDate,
         amount: amountInDollars,
         currency: paymentIntent.currency.toUpperCase(),
         stripeReceiptUrl: paymentIntent.latest_charge

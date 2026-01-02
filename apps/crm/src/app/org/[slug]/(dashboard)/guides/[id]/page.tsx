@@ -29,13 +29,15 @@ export default function GuideDetailPage() {
   const router = useRouter();
   const slug = params.slug as string;
   const guideId = params.id as string;
-  const [activeTab, setActiveTab] = useState<"schedules" | "notes" | "availability">("schedules");
+  const [activeTab, setActiveTab] = useState<"assignments" | "notes" | "availability">("assignments");
 
   const { data: guide, isLoading, error } = trpc.guide.getByIdWithStats.useQuery({
     id: guideId,
   });
 
-  const { data: schedules } = trpc.guide.getSchedules.useQuery({ id: guideId });
+  const { data: assignments } = trpc.guideAssignment.getAssignmentsForGuide.useQuery({
+    guideId,
+  });
 
   // Fetch guide ratings from reviews
   const { data: guideRatings } = trpc.review.guideRatings.useQuery();
@@ -72,16 +74,6 @@ export default function GuideDetailPage() {
     }).format(new Date(date));
   };
 
-  const formatDateTime = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date(date));
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
@@ -95,27 +87,12 @@ export default function GuideDetailPage() {
     }
   };
 
-  const getScheduleStatusColor = (status: string) => {
-    switch (status) {
-      case "scheduled":
-        return "bg-info/10 text-info";
-      case "in_progress":
-        return "bg-success/10 text-success";
-      case "completed":
-        return "bg-muted text-muted-foreground";
-      case "cancelled":
-        return "bg-destructive/10 text-destructive";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const upcomingSchedules = schedules?.filter(
-    (s) => new Date(s.startsAt) > new Date() && s.status === "scheduled"
+  const upcomingAssignments = assignments?.filter(
+    (a) => a.booking?.bookingDate && new Date(a.booking.bookingDate) > new Date()
   ) || [];
 
-  const pastSchedules = schedules?.filter(
-    (s) => new Date(s.startsAt) <= new Date() || s.status !== "scheduled"
+  const pastAssignments = assignments?.filter(
+    (a) => !a.booking?.bookingDate || new Date(a.booking.bookingDate) <= new Date()
   ) || [];
 
   // Get this guide's rating from the ratings data
@@ -196,9 +173,9 @@ export default function GuideDetailPage() {
               <Calendar className="h-5 w-5 text-info" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total Schedules</p>
+              <p className="text-sm text-muted-foreground">Total Assignments</p>
               <p className="text-xl font-semibold text-foreground">
-                {guide.totalSchedules ?? 0}
+                {guide.totalAssignments ?? 0}
               </p>
             </div>
           </div>
@@ -212,7 +189,7 @@ export default function GuideDetailPage() {
             <div>
               <p className="text-sm text-muted-foreground">Upcoming</p>
               <p className="text-xl font-semibold text-foreground">
-                {guide.upcomingSchedules ?? 0}
+                {guide.upcomingAssignments ?? 0}
               </p>
             </div>
           </div>
@@ -407,16 +384,16 @@ export default function GuideDetailPage() {
         <div className="border-b border-border">
           <nav className="flex -mb-px">
             <button
-              onClick={() => setActiveTab("schedules")}
+              onClick={() => setActiveTab("assignments")}
               className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "schedules"
+                activeTab === "assignments"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
               }`}
             >
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Schedules ({schedules?.length ?? 0})
+                Assignments ({assignments?.length ?? 0})
               </div>
             </button>
             <button
@@ -450,55 +427,57 @@ export default function GuideDetailPage() {
 
         {/* Tab Content */}
         <div className="p-6">
-          {/* Schedules Tab */}
-          {activeTab === "schedules" && (
+          {/* Assignments Tab */}
+          {activeTab === "assignments" && (
             <>
-              {schedules && schedules.length > 0 ? (
+              {assignments && assignments.length > 0 ? (
                 <div className="space-y-6">
-                  {/* Upcoming Schedules */}
-                  {upcomingSchedules.length > 0 && (
+                  {/* Upcoming Assignments */}
+                  {upcomingAssignments.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold text-foreground mb-3">
-                        Upcoming Schedules
+                        Upcoming Assignments
                       </h3>
                       <div className="divide-y divide-border">
-                        {upcomingSchedules.map((schedule) => (
+                        {upcomingAssignments.map((assignment) => (
                           <div
-                            key={schedule.id}
+                            key={assignment.id}
                             className="py-4 flex items-center justify-between"
                           >
                             <div className="flex items-center gap-4">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <Link
-                                    href={`/org/${slug}/availability/${schedule.id}` as Route}
+                                    href={`/org/${slug}/bookings/${assignment.bookingId}` as Route}
                                     className="font-medium text-foreground hover:text-primary"
                                   >
-                                    {schedule.tour?.name || "Unknown Tour"}
+                                    {assignment.booking?.tour?.name || "Unknown Tour"}
                                   </Link>
                                   <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getScheduleStatusColor(
-                                      schedule.status
-                                    )}`}
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      assignment.status === "confirmed" ? "bg-success/10 text-success" :
+                                      assignment.status === "pending" ? "bg-warning/10 text-warning" :
+                                      "bg-muted text-muted-foreground"
+                                    }`}
                                   >
-                                    {schedule.status.charAt(0).toUpperCase() +
-                                      schedule.status.slice(1).replace("_", " ")}
+                                    {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
                                   </span>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                                   <Clock className="h-4 w-4" />
-                                  {formatDateTime(schedule.startsAt)}
+                                  {assignment.booking?.bookingDate ? formatDate(new Date(assignment.booking.bookingDate)) : "No date"}
+                                  {assignment.booking?.bookingTime && ` at ${assignment.booking.bookingTime}`}
                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-4">
                               <div className="text-right">
                                 <p className="text-sm text-muted-foreground">
-                                  {schedule.maxParticipants} capacity
+                                  {assignment.booking?.totalParticipants ?? 0} guests
                                 </p>
                               </div>
                               <Link
-                                href={`/org/${slug}/availability/${schedule.id}` as Route}
+                                href={`/org/${slug}/bookings/${assignment.bookingId}` as Route}
                                 className="text-primary hover:underline text-sm"
                               >
                                 View
@@ -510,50 +489,52 @@ export default function GuideDetailPage() {
                     </div>
                   )}
 
-                  {/* Past Schedules */}
-                  {pastSchedules.length > 0 && (
+                  {/* Past Assignments */}
+                  {pastAssignments.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold text-foreground mb-3">
-                        Past Schedules
+                        Past Assignments
                       </h3>
                       <div className="divide-y divide-border">
-                        {pastSchedules.map((schedule) => (
+                        {pastAssignments.map((assignment) => (
                           <div
-                            key={schedule.id}
+                            key={assignment.id}
                             className="py-4 flex items-center justify-between opacity-60"
                           >
                             <div className="flex items-center gap-4">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <Link
-                                    href={`/org/${slug}/availability/${schedule.id}` as Route}
+                                    href={`/org/${slug}/bookings/${assignment.bookingId}` as Route}
                                     className="font-medium text-foreground hover:text-primary"
                                   >
-                                    {schedule.tour?.name || "Unknown Tour"}
+                                    {assignment.booking?.tour?.name || "Unknown Tour"}
                                   </Link>
                                   <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getScheduleStatusColor(
-                                      schedule.status
-                                    )}`}
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                      assignment.status === "confirmed" ? "bg-success/10 text-success" :
+                                      assignment.status === "pending" ? "bg-warning/10 text-warning" :
+                                      "bg-muted text-muted-foreground"
+                                    }`}
                                   >
-                                    {schedule.status.charAt(0).toUpperCase() +
-                                      schedule.status.slice(1).replace("_", " ")}
+                                    {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
                                   </span>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                                   <Clock className="h-4 w-4" />
-                                  {formatDateTime(schedule.startsAt)}
+                                  {assignment.booking?.bookingDate ? formatDate(new Date(assignment.booking.bookingDate)) : "No date"}
+                                  {assignment.booking?.bookingTime && ` at ${assignment.booking.bookingTime}`}
                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-4">
                               <div className="text-right">
                                 <p className="text-sm text-muted-foreground">
-                                  {schedule.maxParticipants} capacity
+                                  {assignment.booking?.totalParticipants ?? 0} guests
                                 </p>
                               </div>
                               <Link
-                                href={`/org/${slug}/availability/${schedule.id}` as Route}
+                                href={`/org/${slug}/bookings/${assignment.bookingId}` as Route}
                                 className="text-primary hover:underline text-sm"
                               >
                                 View
@@ -568,13 +549,7 @@ export default function GuideDetailPage() {
               ) : (
                 <div className="text-center py-8">
                   <Calendar className="mx-auto h-12 w-12 text-muted-foreground/40" />
-                  <p className="mt-4 text-muted-foreground">No schedules yet</p>
-                  <Link
-                    href={`/org/${slug}/availability/new` as Route}
-                    className="mt-2 inline-block text-primary hover:underline"
-                  >
-                    Create a schedule
-                  </Link>
+                  <p className="mt-4 text-muted-foreground">No assignments yet</p>
                 </div>
               )}
             </>

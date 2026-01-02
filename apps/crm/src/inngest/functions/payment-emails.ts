@@ -124,12 +124,10 @@ export const sendPaymentFailedEmail = inngest.createFunction(
         customerEmail: data.customerEmail,
         bookingReference: data.bookingReference,
         tourName: booking?.tour?.name || "Your Tour",
-        tourDate: booking?.schedule?.startsAt
-          ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy")
+        tourDate: booking?.bookingDate
+          ? format(new Date(booking.bookingDate), "MMMM d, yyyy")
           : "Scheduled Date",
-        tourTime: booking?.schedule?.startsAt
-          ? format(new Date(booking.schedule.startsAt), "h:mm a")
-          : "Scheduled Time",
+        tourTime: booking?.bookingTime || "Scheduled Time",
         participants: booking?.totalParticipants || 1,
         totalAmount: booking?.total || "0.00",
         currency: booking?.currency || "USD",

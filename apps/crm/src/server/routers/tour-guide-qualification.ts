@@ -108,7 +108,11 @@ export const tourGuideQualificationRouter = createRouter({
         tourId: z.string(),
         startsAt: z.coerce.date(),
         endsAt: z.coerce.date(),
-        excludeScheduleId: z.string().optional(),
+        excludeTourRun: z.object({
+          tourId: z.string(),
+          date: z.coerce.date(),
+          time: z.string(),
+        }).optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -117,7 +121,7 @@ export const tourGuideQualificationRouter = createRouter({
         input.tourId,
         input.startsAt,
         input.endsAt,
-        input.excludeScheduleId
+        input.excludeTourRun
       );
     }),
 

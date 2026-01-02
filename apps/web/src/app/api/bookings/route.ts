@@ -1,12 +1,14 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { db, organizations, eq, schedules } from "@tour/database";
+import { db, organizations, eq, tours } from "@tour/database";
 import { createServices } from "@tour/services";
 import Stripe from "stripe";
 
 interface BookingRequestBody {
-  scheduleId: string;
+  tourId: string;
+  bookingDate: string; // ISO date string
+  bookingTime: string; // HH:MM format
   customer: {
     email: string;
     firstName: string;
@@ -57,9 +59,9 @@ export async function POST(request: NextRequest) {
     const body: BookingRequestBody = await request.json();
 
     // Validate required fields
-    if (!body.scheduleId) {
+    if (!body.tourId || !body.bookingDate || !body.bookingTime) {
       return NextResponse.json(
-        { message: "Schedule ID is required" },
+        { message: "Tour ID, booking date, and booking time are required" },
         { status: 400 }
       );
     }
@@ -94,10 +96,12 @@ export async function POST(request: NextRequest) {
     const childCount = body.participants.filter((p) => p.type === "child").length;
     const infantCount = body.participants.filter((p) => p.type === "infant").length;
 
-    // Create booking
+    // Create booking using availability-based model
     const booking = await services.booking.create({
       customerId: customer.id,
-      scheduleId: body.scheduleId,
+      tourId: body.tourId,
+      bookingDate: new Date(body.bookingDate),
+      bookingTime: body.bookingTime,
       adultCount,
       childCount,
       infantCount,
@@ -111,10 +115,6 @@ export async function POST(request: NextRequest) {
         email: p.email,
         type: p.type,
       })),
-      subtotal: body.subtotal,
-      discount: body.discount,
-      tax: body.tax,
-      total: body.total,
     });
 
     // For paid bookings, we would create a Stripe payment intent here
@@ -138,23 +138,18 @@ export async function POST(request: NextRequest) {
     // For paid bookings, create Stripe Checkout session if org has Stripe Connect
     if (org.stripeConnectAccountId && org.stripeConnectOnboarded) {
       try {
-        // Get schedule details for the checkout description
-        const schedule = await db.query.schedules.findFirst({
-          where: eq(schedules.id, body.scheduleId),
-          with: {
-            tour: true,
-          },
+        // Get tour details for the checkout description
+        const tour = await db.query.tours.findFirst({
+          where: eq(tours.id, body.tourId),
         });
 
-        const tourName = schedule?.tour?.name || "Tour";
-        const tourDate = schedule?.startsAt
-          ? new Date(schedule.startsAt).toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })
-          : "Scheduled Date";
+        const tourName = tour?.name || "Tour";
+        const tourDate = new Date(body.bookingDate).toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
 
         // Lazy initialize Stripe
         const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {

@@ -8,10 +8,7 @@
 import { eq, and, asc, desc } from "drizzle-orm";
 import {
   bookingOptions,
-  scheduleOptionAvailability,
-  schedules,
   type BookingOption,
-  type NewBookingOption,
   type PricingModel,
   type CapacityModel,
 } from "@tour/database";
@@ -347,49 +344,21 @@ export class BookingOptionService extends BaseService {
   }
 
   /**
-   * Initialize availability tracking for a schedule
-   * Called when a schedule is created
+   * @deprecated Schedules table has been removed. Use tour availability instead.
+   * This method is kept for backwards compatibility but no longer functions.
    */
-  async initializeScheduleAvailability(scheduleId: string): Promise<void> {
-    // Get the schedule to find its tour
-    const schedule = await this.db.query.schedules.findFirst({
-      where: and(
-        eq(schedules.id, scheduleId),
-        eq(schedules.organizationId, this.organizationId)
-      ),
-    });
-
-    if (!schedule) {
-      throw new NotFoundError("Schedule", scheduleId);
-    }
-
-    // Get all active options for this tour
-    const options = await this.getActiveByTourId(schedule.tourId);
-
-    // Create availability entries for each option
-    for (const option of options) {
-      const capacity = option.capacityModel;
-
-      await this.db
-        .insert(scheduleOptionAvailability)
-        .values({
-          scheduleId,
-          bookingOptionId: option.id,
-          totalSeats: capacity.type === "shared" ? capacity.totalSeats : null,
-          bookedSeats: 0,
-          totalUnits: capacity.type === "unit" ? capacity.totalUnits : null,
-          bookedUnits: 0,
-        })
-        .onConflictDoNothing(); // Idempotent
-    }
+  async initializeScheduleAvailability(_scheduleId: string): Promise<void> {
+    // Schedules table removed - availability is now managed via tour availability
+    return;
   }
 
   /**
-   * Get availability for a schedule and option
+   * @deprecated Schedules table has been removed. Use tour availability instead.
+   * Returns null - availability is now managed via tour availability model.
    */
   async getScheduleOptionAvailability(
-    scheduleId: string,
-    optionId: string
+    _scheduleId: string,
+    _optionId: string
   ): Promise<{
     totalSeats: number | null;
     bookedSeats: number;
@@ -397,34 +366,8 @@ export class BookingOptionService extends BaseService {
     bookedUnits: number;
     available: number;
   } | null> {
-    const availability = await this.db.query.scheduleOptionAvailability.findFirst({
-      where: and(
-        eq(scheduleOptionAvailability.scheduleId, scheduleId),
-        eq(scheduleOptionAvailability.bookingOptionId, optionId)
-      ),
-    });
-
-    if (!availability) {
-      return null;
-    }
-
-    // Calculate available capacity
-    let available: number;
-    if (availability.totalSeats !== null) {
-      available = availability.totalSeats - (availability.bookedSeats ?? 0);
-    } else if (availability.totalUnits !== null) {
-      available = availability.totalUnits - (availability.bookedUnits ?? 0);
-    } else {
-      available = 0;
-    }
-
-    return {
-      totalSeats: availability.totalSeats,
-      bookedSeats: availability.bookedSeats ?? 0,
-      totalUnits: availability.totalUnits,
-      bookedUnits: availability.bookedUnits ?? 0,
-      available,
-    };
+    // Schedules table removed - return null
+    return null;
   }
 
   // ============================================================

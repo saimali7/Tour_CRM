@@ -2,7 +2,6 @@ import { eq, and, sql, lte, gte, or } from "drizzle-orm";
 import { db } from "@tour/database";
 import {
   bookings,
-  schedules,
   tours,
 } from "@tour/database/schema";
 import type { ServiceContext } from "./types";
@@ -206,18 +205,13 @@ export class DepositService {
     return db
       .select({
         booking: bookings,
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
         },
       })
       .from(bookings)
-      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .innerJoin(tours, eq(schedules.tourId, tours.id))
+      .innerJoin(tours, eq(bookings.tourId, tours.id))
       .where(and(...conditions))
       .orderBy(bookings.balanceDueDate);
   }
@@ -228,18 +222,13 @@ export class DepositService {
     return db
       .select({
         booking: bookings,
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
         },
       })
       .from(bookings)
-      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .innerJoin(tours, eq(schedules.tourId, tours.id))
+      .innerJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
           eq(bookings.organizationId, this.ctx.organizationId),
@@ -263,18 +252,13 @@ export class DepositService {
     return db
       .select({
         booking: bookings,
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
         },
       })
       .from(bookings)
-      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .innerJoin(tours, eq(schedules.tourId, tours.id))
+      .innerJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
           eq(bookings.organizationId, this.ctx.organizationId),

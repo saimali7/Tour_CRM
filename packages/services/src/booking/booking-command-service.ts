@@ -12,12 +12,11 @@
  * - updatePaymentStatus: Update payment status
  */
 
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   bookings,
   bookingParticipants,
   customers,
-  schedules,
   tours,
   type PaymentStatus,
 } from "@tour/database";
@@ -46,24 +45,16 @@ export class BookingCommandService extends BaseService {
   }
 
   /**
-   * Create a booking - supports both schedule-based and availability-based models.
+   * Create a booking using the availability-based model.
    *
-   * During migration, both models are supported:
-   * - Schedule-based: Provide scheduleId -> capacity tracked via schedule.bookedCount
-   * - Availability-based: Provide tourId + bookingDate + bookingTime -> capacity computed dynamically
-   *
-   * If scheduleId is provided, the new fields (tourId, bookingDate, bookingTime) are also
-   * populated from the schedule data for forward compatibility (dual-write).
+   * Requires tourId + bookingDate + bookingTime. Capacity is computed dynamically
+   * by counting existing bookings against tour availability settings.
    */
   async create(input: CreateBookingInput): Promise<BookingWithRelations> {
-    // Determine which booking model to use
-    const useScheduleModel = !!input.scheduleId;
-    const useAvailabilityModel = !!(input.tourId && input.bookingDate && input.bookingTime);
-
-    // Validate: must have at least one complete set
-    if (!useScheduleModel && !useAvailabilityModel) {
+    // Validate required fields for availability-based model
+    if (!input.tourId || !input.bookingDate || !input.bookingTime) {
       throw new ValidationError(
-        "Must provide either scheduleId (legacy) or tourId + bookingDate + bookingTime (new model)"
+        "Must provide tourId, bookingDate, and bookingTime"
       );
     }
 
@@ -82,106 +73,46 @@ export class BookingCommandService extends BaseService {
     const totalParticipants =
       input.adultCount + (input.childCount || 0) + (input.infantCount || 0);
 
-    // Variables to be populated by either model
-    let scheduleId: string | undefined = input.scheduleId;
-    let tourId: string;
-    let bookingDate: Date;
-    let bookingTime: string;
-    let pricePerPerson: number;
-    let currency: string;
-    let tour: typeof tours.$inferSelect | null = null;
+    // Validate tour exists
+    const tour = await this.db.query.tours.findFirst({
+      where: and(
+        eq(tours.id, input.tourId),
+        eq(tours.organizationId, this.organizationId)
+      ),
+    });
 
-    if (useScheduleModel) {
-      // ========== SCHEDULE-BASED MODEL (LEGACY) ==========
-      // Fetch schedule and tour info
-      const scheduleResult = await this.db
-        .select({
-          schedule: schedules,
-          tour: tours,
-        })
-        .from(schedules)
-        .leftJoin(tours, eq(schedules.tourId, tours.id))
-        .where(
-          and(
-            eq(schedules.id, input.scheduleId!),
-            eq(schedules.organizationId, this.organizationId)
-          )
-        )
-        .limit(1);
-
-      const scheduleRow = scheduleResult[0];
-      if (!scheduleRow) {
-        throw new NotFoundError("Schedule", input.scheduleId!);
-      }
-
-      const { schedule: sched, tour: scheduleTour } = scheduleRow;
-      tour = scheduleTour;
-
-      if (sched.status === "cancelled") {
-        throw new ValidationError("Cannot book a cancelled schedule");
-      }
-
-      const availableSpots = sched.maxParticipants - (sched.bookedCount || 0);
-      if (totalParticipants > availableSpots) {
-        throw new ValidationError(
-          `Not enough availability. Only ${availableSpots} spots remaining.`
-        );
-      }
-
-      // Extract tourId, date, and time from schedule for dual-write
-      tourId = sched.tourId;
-      bookingDate = new Date(sched.startsAt);
-      bookingDate.setHours(0, 0, 0, 0); // Normalize to start of day
-      bookingTime = this.core.extractTimeFromDate(sched.startsAt);
-
-      pricePerPerson = parseFloat(sched.price || scheduleTour?.basePrice || "0");
-      currency = sched.currency || scheduleTour?.currency || "USD";
-
-    } else {
-      // ========== AVAILABILITY-BASED MODEL (NEW) ==========
-      // Validate tour exists
-      const tourResult = await this.db.query.tours.findFirst({
-        where: and(
-          eq(tours.id, input.tourId!),
-          eq(tours.organizationId, this.organizationId)
-        ),
-      });
-
-      if (!tourResult) {
-        throw new NotFoundError("Tour", input.tourId!);
-      }
-
-      tour = tourResult;
-      tourId = input.tourId!;
-      bookingDate = input.bookingDate!;
-      bookingTime = input.bookingTime!;
-
-      // Check availability via TourAvailabilityService
-      const availabilityService = new TourAvailabilityService(this.ctx);
-      const availability = await availabilityService.checkSlotAvailability({
-        tourId,
-        date: bookingDate,
-        time: bookingTime,
-        requestedSpots: totalParticipants,
-      });
-
-      if (!availability.available) {
-        const reasons: Record<string, string> = {
-          blackout: "Tour is not operating on this date (blackout)",
-          not_operating: "Tour does not operate on this date",
-          sold_out: "This tour is sold out",
-          insufficient_capacity: `Not enough availability. Only ${availability.spotsRemaining} spots remaining.`,
-          past_date: "Cannot book a date in the past",
-        };
-        throw new ValidationError(
-          reasons[availability.reason || ""] || "Slot is not available"
-        );
-      }
-
-      pricePerPerson = parseFloat(tourResult.basePrice || "0");
-      currency = tourResult.currency || "USD";
-      scheduleId = undefined; // No schedule for availability-based bookings
+    if (!tour) {
+      throw new NotFoundError("Tour", input.tourId);
     }
+
+    const tourId = input.tourId;
+    const bookingDate = input.bookingDate;
+    const bookingTime = input.bookingTime;
+
+    // Check availability via TourAvailabilityService
+    const availabilityService = new TourAvailabilityService(this.ctx);
+    const availability = await availabilityService.checkSlotAvailability({
+      tourId,
+      date: bookingDate,
+      time: bookingTime,
+      requestedSpots: totalParticipants,
+    });
+
+    if (!availability.available) {
+      const reasons: Record<string, string> = {
+        blackout: "Tour is not operating on this date (blackout)",
+        not_operating: "Tour does not operate on this date",
+        sold_out: "This tour is sold out",
+        insufficient_capacity: `Not enough availability. Only ${availability.spotsRemaining} spots remaining.`,
+        past_date: "Cannot book a date in the past",
+      };
+      throw new ValidationError(
+        reasons[availability.reason || ""] || "Slot is not available"
+      );
+    }
+
+    const pricePerPerson = parseFloat(tour.basePrice || "0");
+    const currency = tour.currency || "USD";
 
     // Calculate pricing
     const subtotal =
@@ -201,31 +132,25 @@ export class BookingCommandService extends BaseService {
     // Use a transaction to ensure all-or-nothing semantics
     const bookingId = await this.db.transaction(async (tx) => {
       // 1. Insert the booking
-      // For availability-based bookings: only write new fields (tourId, bookingDate, bookingTime, guestAdults, etc.)
-      // For schedule-based bookings: write both old and new fields for backward compatibility
       const [booking] = await tx
         .insert(bookings)
         .values({
           organizationId: this.organizationId,
           referenceNumber,
           customerId: input.customerId,
-          // Legacy field - only write for schedule-based bookings
-          scheduleId: useScheduleModel ? scheduleId : null,
-          // New fields for availability-based model
+          // Availability-based model fields
           tourId: tourId,
           bookingDate: bookingDate,
           bookingTime: bookingTime,
-          // Rest of the fields
           bookingOptionId: input.bookingOptionId,
-          // Guest counts - always use new fields
+          // Guest counts
           guestAdults: input.guestAdults ?? input.adultCount,
           guestChildren: input.guestChildren ?? input.childCount ?? 0,
           guestInfants: input.guestInfants ?? input.infantCount ?? 0,
           pricingSnapshot: input.pricingSnapshot,
-          // Legacy guest count fields - only write for schedule-based bookings
-          adultCount: useScheduleModel ? input.adultCount : 0,
-          childCount: useScheduleModel ? (input.childCount || 0) : 0,
-          infantCount: useScheduleModel ? (input.infantCount || 0) : 0,
+          adultCount: input.adultCount,
+          childCount: input.childCount || 0,
+          infantCount: input.infantCount || 0,
           totalParticipants,
           subtotal,
           discount,
@@ -265,37 +190,7 @@ export class BookingCommandService extends BaseService {
         );
       }
 
-      // 3. For schedule-based bookings, update schedule bookedCount with atomic capacity check
-      if (useScheduleModel && scheduleId) {
-        const updateResult = await tx
-          .update(schedules)
-          .set({
-            bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants}`,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(schedules.id, scheduleId),
-              eq(schedules.organizationId, this.organizationId),
-              // Atomic capacity check - only update if there's room
-              sql`COALESCE(${schedules.bookedCount}, 0) + ${totalParticipants} <= ${schedules.maxParticipants}`
-            )
-          )
-          .returning();
-
-        // If no rows updated, capacity was exceeded (race condition caught)
-        if (updateResult.length === 0) {
-          bookingLogger.warn({
-            organizationId: this.organizationId,
-            scheduleId,
-            requestedParticipants: totalParticipants,
-          }, "Booking failed: capacity exceeded during transaction");
-          throw new ValidationError("Schedule capacity exceeded. Please try again with fewer participants.");
-        }
-      }
-
-      // For availability-based bookings, no schedule update needed.
-      // Capacity is computed dynamically by counting bookings.
+      // Capacity is computed dynamically by counting bookings - no schedule update needed.
 
       return booking.id;
     });
@@ -305,20 +200,13 @@ export class BookingCommandService extends BaseService {
       bookingId,
       referenceNumber,
       customerId: input.customerId,
-      scheduleId: scheduleId || null,
       tourId,
       bookingDate: bookingDate.toISOString().split("T")[0],
       bookingTime,
       totalParticipants,
       total,
       source: input.source || "manual",
-      model: useScheduleModel ? "schedule" : "availability",
     }, "Booking created successfully");
-
-    // Recalculate guide requirements after booking creation (schedule-based only)
-    if (scheduleId) {
-      await this.core.recalculateGuideRequirements(scheduleId);
-    }
 
     return this.queryService.getById(bookingId);
   }
@@ -343,35 +231,22 @@ export class BookingCommandService extends BaseService {
       const oldTotal = booking.totalParticipants;
       const diff = newTotal - oldTotal;
 
-      if (diff !== 0 && booking.scheduleId) {
-        if (diff > 0 && booking.schedule) {
-          const schedule = await this.db.query.schedules.findFirst({
-            where: eq(schedules.id, booking.scheduleId),
-          });
+      // For availability-based bookings, check capacity via TourAvailabilityService
+      if (diff > 0 && booking.tourId && booking.bookingDate && booking.bookingTime) {
+        const availabilityService = new TourAvailabilityService(this.ctx);
+        const availability = await availabilityService.checkSlotAvailability({
+          tourId: booking.tourId,
+          date: booking.bookingDate,
+          time: booking.bookingTime,
+          requestedSpots: diff,
+          excludeBookingId: id, // Exclude current booking from count
+        });
 
-          if (schedule) {
-            const available =
-              schedule.maxParticipants - (schedule.bookedCount || 0);
-            if (diff > available) {
-              throw new ValidationError(
-                `Not enough availability. Only ${available} additional spots remaining.`
-              );
-            }
-          }
-        }
-
-        await this.db
-          .update(schedules)
-          .set({
-            bookedCount: sql`${schedules.bookedCount} + ${diff}`,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(schedules.id, booking.scheduleId),
-              eq(schedules.organizationId, this.organizationId)
-            )
+        if (!availability.available) {
+          throw new ValidationError(
+            `Not enough availability. Only ${availability.spotsRemaining} additional spots remaining.`
           );
+        }
       }
 
       updateData.totalParticipants = newTotal;
@@ -390,16 +265,6 @@ export class BookingCommandService extends BaseService {
 
     if (!updated) {
       throw new NotFoundError("Booking", id);
-    }
-
-    // Recalculate guide requirements if participant counts changed
-    if (
-      booking.scheduleId &&
-      (input.adultCount !== undefined ||
-       input.childCount !== undefined ||
-       input.infantCount !== undefined)
-    ) {
-      await this.core.recalculateGuideRequirements(booking.scheduleId);
     }
 
     return this.queryService.getById(updated.id);
@@ -453,21 +318,7 @@ export class BookingCommandService extends BaseService {
       throw new ValidationError("Cannot cancel a completed booking");
     }
 
-    // Update schedule booked count if this booking has a schedule
-    if (booking.scheduleId) {
-      await this.db
-        .update(schedules)
-        .set({
-          bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schedules.id, booking.scheduleId),
-            eq(schedules.organizationId, this.organizationId)
-          )
-        );
-    }
+    // Capacity is computed dynamically by counting bookings - no schedule update needed.
 
     const [updated] = await this.db
       .update(bookings)
@@ -487,11 +338,6 @@ export class BookingCommandService extends BaseService {
 
     if (!updated) {
       throw new NotFoundError("Booking", id);
-    }
-
-    // Recalculate guide requirements after cancellation
-    if (booking.scheduleId) {
-      await this.core.recalculateGuideRequirements(booking.scheduleId);
     }
 
     return this.queryService.getById(updated.id);
@@ -564,122 +410,12 @@ export class BookingCommandService extends BaseService {
   }
 
   /**
-   * Reschedule a booking to a different schedule
-   */
-  async reschedule(id: string, newScheduleId: string): Promise<BookingWithRelations> {
-    const booking = await this.queryService.getById(id);
-
-    if (booking.status === "cancelled" || booking.status === "completed") {
-      throw new ValidationError(
-        `Cannot reschedule a ${booking.status} booking`
-      );
-    }
-
-    // Store old scheduleId for later updates
-    const oldScheduleId = booking.scheduleId;
-
-    // Get new schedule
-    const newScheduleResult = await this.db
-      .select({
-        schedule: schedules,
-        tour: tours,
-      })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          eq(schedules.id, newScheduleId),
-          eq(schedules.organizationId, this.organizationId)
-        )
-      )
-      .limit(1);
-
-    const newScheduleRow = newScheduleResult[0];
-    if (!newScheduleRow) {
-      throw new NotFoundError("Schedule", newScheduleId);
-    }
-
-    const newSchedule = newScheduleRow.schedule;
-
-    if (newSchedule.status === "cancelled") {
-      throw new ValidationError("Cannot reschedule to a cancelled schedule");
-    }
-
-    // Check availability on new schedule
-    const availableSpots = newSchedule.maxParticipants - (newSchedule.bookedCount || 0);
-    if (booking.totalParticipants > availableSpots) {
-      throw new ValidationError(
-        `Not enough availability on new schedule. Only ${availableSpots} spots remaining.`
-      );
-    }
-
-    // Decrement old schedule's booked count (if there was one)
-    if (oldScheduleId) {
-      await this.db
-        .update(schedules)
-        .set({
-          bookedCount: sql`GREATEST(0, ${schedules.bookedCount} - ${booking.totalParticipants})`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schedules.id, oldScheduleId),
-            eq(schedules.organizationId, this.organizationId)
-          )
-        );
-    }
-
-    // Increment new schedule's booked count
-    await this.db
-      .update(schedules)
-      .set({
-        bookedCount: sql`COALESCE(${schedules.bookedCount}, 0) + ${booking.totalParticipants}`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(schedules.id, newScheduleId),
-          eq(schedules.organizationId, this.organizationId)
-        )
-      );
-
-    // Update the booking
-    const [updated] = await this.db
-      .update(bookings)
-      .set({
-        scheduleId: newScheduleId,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(bookings.id, id),
-          eq(bookings.organizationId, this.organizationId)
-        )
-      )
-      .returning();
-
-    if (!updated) {
-      throw new NotFoundError("Booking", id);
-    }
-
-    // Recalculate guide requirements for both old and new schedules
-    const recalcPromises = [this.core.recalculateGuideRequirements(newScheduleId)];
-    if (oldScheduleId) {
-      recalcPromises.push(this.core.recalculateGuideRequirements(oldScheduleId));
-    }
-    await Promise.all(recalcPromises);
-
-    return this.queryService.getById(updated.id);
-  }
-
-  /**
-   * Reschedule an availability-based booking to a different date/time.
+   * Reschedule a booking to a different date/time.
    *
-   * This method handles rescheduling for bookings that use the new availability model
-   * (tourId + bookingDate + bookingTime) rather than the legacy schedule model.
-   * It validates availability at the new slot and updates the booking date/time.
+   * This method validates availability at the new slot and updates the booking date/time.
+   * Optionally allows moving to a different tour.
    */
-  async rescheduleByAvailability(
+  async reschedule(
     id: string,
     input: {
       tourId?: string;
@@ -769,7 +505,7 @@ export class BookingCommandService extends BaseService {
       newDate: input.bookingDate.toISOString().split("T")[0],
       oldTime: booking.bookingTime,
       newTime: input.bookingTime,
-    }, "Booking rescheduled (availability model)");
+    }, "Booking rescheduled");
 
     return this.queryService.getById(updated.id);
   }

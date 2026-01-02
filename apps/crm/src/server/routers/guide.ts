@@ -102,7 +102,7 @@ export const guideRouter = createRouter({
       return { success: true };
     }),
 
-  getSchedules: protectedProcedure
+  getAssignedBookings: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -111,7 +111,7 @@ export const guideRouter = createRouter({
     )
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guide.getSchedules(input.id, input.dateRange);
+      return services.guide.getAssignedBookings(input.id, input.dateRange);
     }),
 
   getAvailableForTime: protectedProcedure
@@ -119,7 +119,11 @@ export const guideRouter = createRouter({
       z.object({
         startsAt: z.coerce.date(),
         endsAt: z.coerce.date(),
-        excludeScheduleId: z.string().optional(),
+        excludeTourRun: z.object({
+          tourId: z.string(),
+          date: z.coerce.date(),
+          time: z.string(),
+        }).optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -127,7 +131,7 @@ export const guideRouter = createRouter({
       return services.guide.getAvailableForTime(
         input.startsAt,
         input.endsAt,
-        input.excludeScheduleId
+        input.excludeTourRun
       );
     }),
 

@@ -24,16 +24,11 @@ interface BookingWithRelations extends Booking {
     email: string | null;
     phone: string | null;
   } | null;
-  schedule: {
+  tour: {
     id: string;
-    startsAt: Date;
-    endsAt: Date;
-    tour: {
-      id: string;
-      name: string;
-      meetingPoint: string | null;
-      meetingPointDetails: string | null;
-    } | null;
+    name: string;
+    meetingPoint: string | null;
+    meetingPointDetails: string | null;
   } | null;
 }
 
@@ -423,12 +418,11 @@ export const sendRefundProcessedEmail = inngest.createFunction(
     // Send the email
     const result = await step.run("send-email", async () => {
       const emailService = createEmailService(orgConfig);
-      const tourDate = booking?.schedule?.startsAt
-        ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy")
+      // Use booking's bookingDate and bookingTime fields
+      const tourDate = booking?.bookingDate
+        ? format(new Date(booking.bookingDate), "MMMM d, yyyy")
         : "N/A";
-      const tourTime = booking?.schedule?.startsAt
-        ? format(new Date(booking.schedule.startsAt), "h:mm a")
-        : "N/A";
+      const tourTime = booking?.bookingTime || "N/A";
       return emailService.sendRefundConfirmation({
         customerName: data.customerName,
         customerEmail: data.customerEmail,
@@ -538,37 +532,34 @@ export const dailyBookingReminderCheck = inngest.createFunction(
             ),
             with: {
               customer: true,
-              schedule: {
-                with: {
-                  tour: true,
-                },
-              },
+              tour: true,
             },
           }) as BookingWithRelations[];
 
-          // Filter bookings where schedule is tomorrow in org timezone
+          // Filter bookings where bookingDate is tomorrow in org timezone
           const bookingsToRemind = tomorrowsBookings.filter((booking) => {
-            if (!booking.schedule) return false;
-            const scheduleDate = new Date(booking.schedule.startsAt);
-            return scheduleDate >= tomorrowUtc && scheduleDate < dayAfterUtc;
+            if (!booking.bookingDate) return false;
+            const bookingDateObj = new Date(booking.bookingDate);
+            return bookingDateObj >= tomorrowUtc && bookingDateObj < dayAfterUtc;
           });
 
           let remindersSent = 0;
 
           // Send reminder for each booking (only if customer has email)
           for (const booking of bookingsToRemind) {
-            if (!booking.customer?.email || !booking.schedule || !booking.schedule.tour) {
+            if (!booking.customer?.email || !booking.tour || !booking.bookingDate) {
               continue;
             }
 
-            const scheduleDate = new Date(booking.schedule.startsAt);
+            const bookingDateObj = new Date(booking.bookingDate);
             const hoursUntilTour = Math.round(
-              (scheduleDate.getTime() - nowUtc.getTime()) / (1000 * 60 * 60)
+              (bookingDateObj.getTime() - nowUtc.getTime()) / (1000 * 60 * 60)
             );
 
             // Format dates in organization's timezone for customer-facing content
-            const tourDateFormatted = formatInTimeZone(scheduleDate, timezone, "MMMM d, yyyy");
-            const tourTimeFormatted = formatInTimeZone(scheduleDate, timezone, "h:mm a");
+            const tourDateFormatted = formatInTimeZone(bookingDateObj, timezone, "MMMM d, yyyy");
+            // Use bookingTime directly as it's already formatted
+            const tourTimeFormatted = booking.bookingTime || "N/A";
 
             // Send reminder event
             await inngest.send({
@@ -580,12 +571,12 @@ export const dailyBookingReminderCheck = inngest.createFunction(
                 customerEmail: booking.customer.email,
                 customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
                 bookingReference: booking.referenceNumber,
-                tourName: booking.schedule.tour.name,
+                tourName: booking.tour.name,
                 tourDate: tourDateFormatted,
                 tourTime: tourTimeFormatted,
                 participants: booking.totalParticipants,
-                meetingPoint: booking.schedule.tour.meetingPoint || undefined,
-                meetingPointDetails: booking.schedule.tour.meetingPointDetails || undefined,
+                meetingPoint: booking.tour.meetingPoint || undefined,
+                meetingPointDetails: booking.tour.meetingPointDetails || undefined,
                 hoursUntilTour,
               },
             });

@@ -6,7 +6,7 @@ import { BookingFlow } from "@/components/booking-flow";
 
 interface PageProps {
   params: Promise<{ slug: string; tourSlug: string }>;
-  searchParams: Promise<{ schedule?: string }>;
+  searchParams: Promise<{ date?: string; time?: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -34,10 +34,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BookTourPage({ params, searchParams }: PageProps) {
   const { slug, tourSlug } = await params;
-  const { schedule: scheduleId } = await searchParams;
+  const { date, time } = await searchParams;
 
-  if (!scheduleId) {
-    // Redirect back to tour page if no schedule selected
+  // Redirect back to tour page if no date/time selected
+  if (!date || !time) {
     redirect(`/tours/${tourSlug}`);
   }
 
@@ -57,25 +57,20 @@ export default async function BookTourPage({ params, searchParams }: PageProps) 
     notFound();
   }
 
-  // Get the selected schedule
-  let schedule;
-  try {
-    schedule = await services.schedule.getById(scheduleId);
-  } catch (error) {
-    // Schedule not found, redirect to tour page
-    logger.debug({ err: error, scheduleId, tourSlug }, "Schedule not found for booking page");
-    redirect(`/tours/${tourSlug}`);
-  }
+  // Parse booking date and time
+  const bookingDate = new Date(date);
+  const bookingTime = time;
 
-  // Validate schedule belongs to this tour and is available
-  if (schedule.tourId !== tour.id || schedule.status === "cancelled") {
-    redirect(`/tours/${tourSlug}`);
-  }
+  // Check slot availability
+  const availability = await services.tourAvailability.checkSlotAvailability({
+    tourId: tour.id,
+    date: bookingDate,
+    time: bookingTime,
+    requestedSpots: 1, // Basic check - actual spots checked during booking
+  });
 
-  // Check availability
-  const availableSpots = schedule.maxParticipants - (schedule.bookedCount || 0);
-  if (availableSpots <= 0) {
-    redirect(`/tours/${tourSlug}?error=sold-out`);
+  if (!availability.available) {
+    redirect(`/tours/${tourSlug}?error=${availability.reason || "unavailable"}`);
   }
 
   // Get pricing tiers
@@ -103,7 +98,9 @@ export default async function BookTourPage({ params, searchParams }: PageProps) 
 
       <BookingFlow
         tour={tour}
-        schedule={schedule}
+        bookingDate={bookingDate}
+        bookingTime={bookingTime}
+        availableSpots={availability.spotsRemaining ?? tour.maxParticipants}
         pricingTiers={activeTiers}
         currency={currency}
         organizationName={org.name}

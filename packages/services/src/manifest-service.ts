@@ -1,6 +1,5 @@
 import { eq, and, gte, lte, desc, inArray, sql, asc } from "drizzle-orm";
 import {
-  schedules,
   tours,
   guides,
   bookings,
@@ -158,197 +157,16 @@ export interface TourRunScheduleManifest {
 
 export class ManifestService extends BaseService {
   /**
-   * Get manifest for a specific schedule
-   * Returns all confirmed bookings with participant details
+   * @deprecated Use getForTourRun instead. Schedules table has been removed.
+   * Returns empty manifest for backwards compatibility.
    */
-  async getManifestForSchedule(scheduleId: string): Promise<ScheduleManifest> {
-    // Get schedule with tour info
-    const scheduleResult = await this.db
-      .select({
-        schedule: schedules,
-        tour: {
-          id: tours.id,
-          name: tours.name,
-          slug: tours.slug,
-          durationMinutes: tours.durationMinutes,
-        },
-      })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          eq(schedules.id, scheduleId),
-          eq(schedules.organizationId, this.organizationId)
-        )
-      )
-      .limit(1);
-
-    const row = scheduleResult[0];
-    if (!row) {
-      throw new NotFoundError("Schedule", scheduleId);
-    }
-
-    // Get all confirmed bookings for this schedule
-    const bookingResults = await this.db
-      .select({
-        booking: bookings,
-        customer: {
-          id: customers.id,
-          firstName: customers.firstName,
-          lastName: customers.lastName,
-          email: customers.email,
-          phone: customers.phone,
-        },
-      })
-      .from(bookings)
-      .leftJoin(customers, eq(bookings.customerId, customers.id))
-      .where(
-        and(
-          eq(bookings.scheduleId, scheduleId),
-          eq(bookings.organizationId, this.organizationId),
-          eq(bookings.status, "confirmed")
-        )
-      )
-      .orderBy(desc(bookings.createdAt));
-
-    // Get participants for all bookings
-    const bookingIds = bookingResults.map((r) => r.booking.id);
-    const participants: BookingParticipant[] = [];
-
-    if (bookingIds.length > 0) {
-      const participantResults = await this.db.query.bookingParticipants.findMany({
-        where: (bp, { inArray, and, eq }) => and(
-          inArray(bp.bookingId, bookingIds),
-          eq(bp.organizationId, this.organizationId)
-        ),
-      });
-      participants.push(...participantResults);
-    }
-
-    // Group participants by booking
-    const participantsByBooking = participants.reduce((acc, participant) => {
-      if (!acc[participant.bookingId]) {
-        acc[participant.bookingId] = [];
-      }
-      acc[participant.bookingId]!.push({
-        id: participant.id,
-        bookingId: participant.bookingId,
-        firstName: participant.firstName,
-        lastName: participant.lastName,
-        email: participant.email,
-        phone: participant.phone,
-        type: participant.type,
-        dietaryRequirements: participant.dietaryRequirements,
-        accessibilityNeeds: participant.accessibilityNeeds,
-        notes: participant.notes,
-      });
-      return acc;
-    }, {} as Record<string, ManifestParticipant[]>);
-
-    // Build manifest bookings
-    const manifestBookings: ManifestBooking[] = bookingResults.map((result) => ({
-      id: result.booking.id,
-      referenceNumber: result.booking.referenceNumber,
-      customerId: result.booking.customerId,
-      customerName: result.customer?.id
-        ? `${result.customer.firstName} ${result.customer.lastName}`
-        : "Unknown",
-      customerEmail: result.customer?.email || "",
-      customerPhone: result.customer?.phone || null,
-      adultCount: result.booking.adultCount,
-      childCount: result.booking.childCount || 0,
-      infantCount: result.booking.infantCount || 0,
-      totalParticipants: result.booking.totalParticipants,
-      specialRequests: result.booking.specialRequests,
-      dietaryRequirements: result.booking.dietaryRequirements,
-      accessibilityNeeds: result.booking.accessibilityNeeds,
-      internalNotes: result.booking.internalNotes,
-      paymentStatus: result.booking.paymentStatus,
-      total: result.booking.total,
-      currency: result.booking.currency,
-      participants: participantsByBooking[result.booking.id] || [],
-    }));
-
-    // Get all confirmed guides for this schedule (via assignments on bookings)
-    let confirmedGuides: Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-      phone: string | null;
-    }> = [];
-
-    if (bookingIds.length > 0) {
-      const guideResults = await this.db
-        .select({
-          guideId: guideAssignments.guideId,
-          firstName: guides.firstName,
-          lastName: guides.lastName,
-          email: guides.email,
-          phone: guides.phone,
-        })
-        .from(guideAssignments)
-        .innerJoin(guides, eq(guideAssignments.guideId, guides.id))
-        .where(
-          and(
-            inArray(guideAssignments.bookingId, bookingIds),
-            eq(guideAssignments.organizationId, this.organizationId),
-            eq(guideAssignments.status, "confirmed"),
-            sql`${guideAssignments.guideId} is not null`
-          )
-        );
-
-      // Deduplicate guides by ID (filter out nulls which shouldn't exist due to innerJoin)
-      const guideMap = new Map<string, { guideId: string; firstName: string; lastName: string; email: string; phone: string | null }>();
-      for (const guide of guideResults) {
-        if (guide.guideId) {
-          guideMap.set(guide.guideId, { ...guide, guideId: guide.guideId });
-        }
-      }
-      confirmedGuides = Array.from(guideMap.values()).map((g) => ({
-        id: g.guideId,
-        firstName: g.firstName,
-        lastName: g.lastName,
-        email: g.email,
-        phone: g.phone,
-      }));
-    }
-
-    // Calculate summary
-    const totalBookings = manifestBookings.length;
-    const totalParticipants = manifestBookings.reduce(
-      (sum, booking) => sum + booking.totalParticipants,
-      0
-    );
-    const totalRevenue = manifestBookings
-      .reduce((sum, booking) => sum + parseFloat(booking.total), 0)
-      .toFixed(2);
-
-    return {
-      schedule: {
-        id: row.schedule.id,
-        startsAt: row.schedule.startsAt,
-        endsAt: row.schedule.endsAt,
-        meetingPoint: row.schedule.meetingPoint,
-        meetingPointDetails: row.schedule.meetingPointDetails,
-        status: row.schedule.status,
-        maxParticipants: row.schedule.maxParticipants,
-        bookedCount: row.schedule.bookedCount || 0,
-      },
-      tour: row.tour!,
-      guides: confirmedGuides,
-      bookings: manifestBookings,
-      summary: {
-        totalBookings,
-        totalParticipants,
-        totalRevenue,
-        currency: row.schedule.currency ?? "USD",
-      },
-    };
+  async getManifestForSchedule(_scheduleId: string): Promise<ScheduleManifest> {
+    throw new NotFoundError("Schedule", _scheduleId);
   }
 
   /**
    * Get all manifests for a guide on a specific date
+   * Uses availability-based booking model (bookingDate, bookingTime)
    */
   async getManifestsForGuide(
     guideId: string,
@@ -366,31 +184,32 @@ export class ManifestService extends BaseService {
       throw new NotFoundError("Guide", guideId);
     }
 
-    // Get date range (start and end of day)
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const dateStr = date.toISOString().split("T")[0]!;
 
-    // Get schedules where this guide has confirmed assignments (via bookings)
-    const assignmentScheduleIds = await this.db
-      .select({ scheduleId: bookings.scheduleId })
+    // Get bookings where this guide has confirmed assignments for the date
+    const assignmentBookings = await this.db
+      .select({
+        booking: bookings,
+        tour: {
+          id: tours.id,
+          name: tours.name,
+          durationMinutes: tours.durationMinutes,
+        },
+      })
       .from(guideAssignments)
       .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
-      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
+      .innerJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
           eq(guideAssignments.guideId, guideId),
           eq(guideAssignments.organizationId, this.organizationId),
           eq(guideAssignments.status, "confirmed"),
-          gte(schedules.startsAt, startOfDay),
-          lte(schedules.startsAt, endOfDay)
+          sql`${bookings.bookingDate}::text = ${dateStr}`
         )
-      );
+      )
+      .orderBy(bookings.bookingTime);
 
-    const scheduleIds = [...new Set(assignmentScheduleIds.map((a) => a.scheduleId).filter((id): id is string => id !== null))];
-
-    if (scheduleIds.length === 0) {
+    if (assignmentBookings.length === 0) {
       return {
         guide: {
           id: guide.id,
@@ -407,33 +226,50 @@ export class ManifestService extends BaseService {
       };
     }
 
-    // Get the schedules with tour info
-    const scheduleResults = await this.db
-      .select({
-        schedule: schedules,
-        tour: {
-          id: tours.id,
-          name: tours.name,
-        },
-      })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
-      .where(
-        and(
-          inArray(schedules.id, scheduleIds),
-          eq(schedules.organizationId, this.organizationId)
-        )
-      )
-      .orderBy(schedules.startsAt);
+    // Group bookings by tour run (tourId + time)
+    const tourRunsMap = new Map<string, {
+      id: string;
+      tourId: string;
+      tourName: string;
+      bookingTime: string | null;
+      durationMinutes: number | null;
+      totalParticipants: number;
+    }>();
 
-    const scheduleSummaries = scheduleResults.map((result) => ({
-      id: result.schedule.id,
-      startsAt: result.schedule.startsAt,
-      endsAt: result.schedule.endsAt,
-      tourName: result.tour?.name || "Unknown Tour",
-      totalParticipants: result.schedule.bookedCount || 0,
-      bookedCount: result.schedule.bookedCount || 0,
-    }));
+    for (const { booking, tour } of assignmentBookings) {
+      const key = `${tour.id}-${booking.bookingTime}`;
+      const existing = tourRunsMap.get(key);
+      if (existing) {
+        existing.totalParticipants += booking.totalParticipants;
+      } else {
+        tourRunsMap.set(key, {
+          id: key,
+          tourId: tour.id,
+          tourName: tour.name,
+          bookingTime: booking.bookingTime,
+          durationMinutes: tour.durationMinutes,
+          totalParticipants: booking.totalParticipants,
+        });
+      }
+    }
+
+    const scheduleSummaries = Array.from(tourRunsMap.values()).map((run) => {
+      const startsAt = new Date(date);
+      if (run.bookingTime) {
+        const [hours, minutes] = run.bookingTime.split(":").map(Number);
+        startsAt.setHours(hours || 0, minutes || 0, 0, 0);
+      }
+      const endsAt = new Date(startsAt.getTime() + (run.durationMinutes || 60) * 60 * 1000);
+
+      return {
+        id: run.id,
+        startsAt,
+        endsAt,
+        tourName: run.tourName,
+        totalParticipants: run.totalParticipants,
+        bookedCount: run.totalParticipants,
+      };
+    });
 
     const totalSchedules = scheduleSummaries.length;
     const totalParticipants = scheduleSummaries.reduce(
@@ -459,69 +295,57 @@ export class ManifestService extends BaseService {
 
   /**
    * Get all manifests for a specific date (admin view)
+   * Uses availability-based booking model (bookingDate, bookingTime)
    */
   async getManifestsForDate(date: Date): Promise<DateManifestSummary> {
-    // Get date range (start and end of day)
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const dateStr = date.toISOString().split("T")[0]!;
 
-    // Get all schedules for this date
-    const scheduleResults = await this.db
+    // Get all confirmed bookings for this date grouped by tour + time
+    const bookingResults = await this.db
       .select({
-        schedule: schedules,
-        tour: {
-          id: tours.id,
-          name: tours.name,
-        },
+        tourId: bookings.tourId,
+        bookingTime: bookings.bookingTime,
+        tourName: tours.name,
+        tourDuration: tours.durationMinutes,
+        totalParticipants: sql<number>`SUM(${bookings.totalParticipants})`,
+        totalRevenue: sql<number>`SUM(${bookings.total}::numeric)`,
+        bookingCount: sql<number>`COUNT(*)`,
       })
-      .from(schedules)
-      .leftJoin(tours, eq(schedules.tourId, tours.id))
+      .from(bookings)
+      .leftJoin(tours, eq(bookings.tourId, tours.id))
       .where(
         and(
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, startOfDay),
-          lte(schedules.startsAt, endOfDay)
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate}::text = ${dateStr}`,
+          eq(bookings.status, "confirmed")
         )
       )
-      .orderBy(schedules.startsAt);
+      .groupBy(bookings.tourId, bookings.bookingTime, tours.name, tours.durationMinutes)
+      .orderBy(bookings.bookingTime);
 
-    // Get all confirmed bookings for these schedules
-    const scheduleIds = scheduleResults.map((r) => r.schedule.id);
     let totalRevenue = 0;
 
-    if (scheduleIds.length > 0) {
-      const bookingResults = await this.db
-        .select({
-          total: bookings.total,
-        })
-        .from(bookings)
-        .where(
-          and(
-            inArray(bookings.scheduleId, scheduleIds),
-            eq(bookings.organizationId, this.organizationId),
-            eq(bookings.status, "confirmed")
-          )
-        );
+    const scheduleSummaries = bookingResults.map((result) => {
+      const startsAt = new Date(date);
+      if (result.bookingTime) {
+        const [hours, minutes] = result.bookingTime.split(":").map(Number);
+        startsAt.setHours(hours || 0, minutes || 0, 0, 0);
+      }
+      const endsAt = new Date(startsAt.getTime() + (result.tourDuration || 60) * 60 * 1000);
+      const revenue = Number(result.totalRevenue) || 0;
+      totalRevenue += revenue;
 
-      totalRevenue = bookingResults.reduce(
-        (sum, booking) => sum + parseFloat(booking.total),
-        0
-      );
-    }
-
-    const scheduleSummaries = scheduleResults.map((result) => ({
-      id: result.schedule.id,
-      startsAt: result.schedule.startsAt,
-      endsAt: result.schedule.endsAt,
-      tourName: result.tour?.name || "Unknown Tour",
-      // Use guide capacity counts instead of single guide name
-      guidesRequired: result.schedule.guidesRequired ?? 0,
-      guidesAssigned: result.schedule.guidesAssigned ?? 0,
-      totalParticipants: result.schedule.bookedCount || 0,
-      bookedCount: result.schedule.bookedCount || 0,
-    }));
+      return {
+        id: `${result.tourId}-${dateStr}-${result.bookingTime}`,
+        startsAt,
+        endsAt,
+        tourName: result.tourName || "Unknown Tour",
+        guidesRequired: 0, // Guide info not available without schedules
+        guidesAssigned: 0,
+        totalParticipants: Number(result.totalParticipants) || 0,
+        bookedCount: Number(result.totalParticipants) || 0,
+      };
+    });
 
     const totalSchedules = scheduleSummaries.length;
     const totalParticipants = scheduleSummaries.reduce(

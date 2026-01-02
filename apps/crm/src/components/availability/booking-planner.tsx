@@ -5,24 +5,18 @@ import { useState, useMemo } from "react";
 import { Search, Calendar, Users, Clock, User, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
+import { addDays, format, startOfDay, endOfDay } from "date-fns";
 
 interface BookingPlannerProps {
   orgSlug: string;
 }
 
-function formatDateTime(date: Date | string): { date: string; time: string; dayName: string } {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return {
-    date: new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-    }).format(d),
-    time: new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(d),
-    dayName: new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(d),
-  };
+function formatTime(time: string): string {
+  const [hours, minutes] = time.split(":");
+  const hour = parseInt(hours || "0", 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
 }
 
 function formatDateForInput(date: Date): string {
@@ -43,16 +37,43 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
     filters: { status: "active" },
   });
 
-  // Search for availability
-  const { data: results, isLoading, error, refetch } = trpc.schedule.searchAvailability.useQuery(
+  // Calculate date range for search
+  const dateRange = useMemo(() => {
+    const baseDate = new Date(searchDate);
+    const from = startOfDay(addDays(baseDate, -flexDays));
+    const to = endOfDay(addDays(baseDate, flexDays));
+    return { from, to };
+  }, [searchDate, flexDays]);
+
+  // Search for availability using tourRun.list
+  const { data: tourRunsResult, isLoading, error, refetch } = trpc.tourRun.list.useQuery(
     {
-      date: new Date(searchDate),
-      participants,
-      tourId: selectedTourId || undefined,
-      flexDays,
+      dateFrom: dateRange.from,
+      dateTo: dateRange.to,
     },
     { enabled: hasSearched }
   );
+
+  // Filter and transform tour runs to availability results
+  const results = useMemo(() => {
+    if (!tourRunsResult?.tourRuns) return [];
+
+    return tourRunsResult.tourRuns
+      .filter((tr) => {
+        // Filter by tour if selected
+        if (selectedTourId && tr.tourId !== selectedTourId) return false;
+        // Filter by available capacity
+        const availableSpots = (tr.capacity || 0) - (tr.bookedCount || 0);
+        return availableSpots >= participants;
+      })
+      .map((tr) => ({
+        tourId: tr.tourId,
+        tourName: tr.tourName,
+        date: tr.date,
+        time: tr.time,
+        availableSpots: (tr.capacity || 0) - (tr.bookedCount || 0),
+      }));
+  }, [tourRunsResult, selectedTourId, participants]);
 
   const handleSearch = () => {
     setHasSearched(true);
@@ -67,20 +88,20 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
 
   // Group results by date
   const groupedResults = useMemo(() => {
-    if (!results) return [];
+    if (!results || results.length === 0) return [];
 
     const groups = new Map<string, typeof results>();
     for (const result of results) {
-      const dateKey = new Date(result.startsAt).toDateString();
+      const dateKey = new Date(result.date).toDateString();
       if (!groups.has(dateKey)) {
         groups.set(dateKey, []);
       }
       groups.get(dateKey)!.push(result);
     }
 
-    return Array.from(groups.entries()).map(([dateKey, schedules]) => ({
+    return Array.from(groups.entries()).map(([dateKey, tourRuns]) => ({
       date: new Date(dateKey),
-      schedules,
+      tourRuns,
     }));
   }, [results]);
 
@@ -244,7 +265,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
           {/* Results Grouped by Date */}
           {!isLoading && groupedResults.length > 0 && (
             <div className="space-y-6">
-              {groupedResults.map(({ date, schedules }) => (
+              {groupedResults.map(({ date, tourRuns }) => (
                 <div key={date.toISOString()}>
                   {/* Date Header */}
                   <div
@@ -265,14 +286,12 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
                     )}
                   </div>
 
-                  {/* Schedule Cards */}
+                  {/* Tour Run Cards */}
                   <div className="space-y-2">
-                    {schedules.map((schedule) => {
-                      const { time } = formatDateTime(schedule.startsAt);
-
+                    {tourRuns.map((tourRun) => {
                       return (
                         <div
-                          key={schedule.scheduleId}
+                          key={`${tourRun.tourId}-${tourRun.date}-${tourRun.time}`}
                           className="rounded-b-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors"
                         >
                           <div className="flex items-center gap-4">
@@ -280,36 +299,26 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
                             <div className="w-20 flex-shrink-0">
                               <div className="flex items-center gap-1.5 text-lg font-semibold text-foreground">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
-                                {time}
+                                {formatTime(tourRun.time)}
                               </div>
                             </div>
 
                             {/* Tour Info */}
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-foreground truncate">
-                                {schedule.tourName}
+                                {tourRun.tourName}
                               </div>
                               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Users className="h-3.5 w-3.5" />
-                                  {schedule.availableSpots} spots left
+                                  {tourRun.availableSpots} spots left
                                 </span>
                               </div>
                             </div>
 
-                            {/* Price */}
-                            {schedule.price && (
-                              <div className="text-right flex-shrink-0">
-                                <div className="text-lg font-semibold text-foreground">
-                                  ${parseFloat(schedule.price).toFixed(2)}
-                                </div>
-                                <div className="text-xs text-muted-foreground">per person</div>
-                              </div>
-                            )}
-
                             {/* Book Button */}
                             <button
-                              onClick={() => openQuickBooking({ scheduleId: schedule.scheduleId })}
+                              onClick={() => openQuickBooking({ tourId: tourRun.tourId })}
                               className="flex-shrink-0 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5"
                             >
                               <Ticket className="h-4 w-4" />
