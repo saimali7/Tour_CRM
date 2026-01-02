@@ -200,7 +200,11 @@
       "Bash(comm:*)",
       "Bash(paste:*)",
       "Bash(pnpm exec eslint:*)",
-      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -1)"
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -1)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM checkout:*)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM rebase --continue)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM diff --name-only --diff-filter=U)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM diff --check)"
     ]
   }
 }
