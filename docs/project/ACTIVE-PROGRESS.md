@@ -1,6 +1,6 @@
 # Active Work
 
-> **Milestone 7: Operations Excellence** — 80% complete
+> **Milestone 7: Operations Excellence** — 90% complete
 
 ## Goal
 
@@ -14,7 +14,7 @@ Transform from feature-complete to operations-first world-class CRM.
 | 7.2 | Operational Speed | ✅ Done |
 | 7.3 | Intelligence Surface | ✅ Done |
 | 7.4 | High-Impact Features | ✅ Done |
-| **7.5** | **Tour Command Center** | **🔄 Next** |
+| **7.5** | **Tour Command Center** | **🔄 90%** |
 
 ---
 
@@ -71,19 +71,31 @@ Auto-Solve   Open CC   Warnings   Send to Guides
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| Foundation | Schema, services, algorithm | ⬜ Todo |
-| Timeline UI | Guide rows, segmented tape | ⬜ Todo |
-| Warnings | Exception handling, tap-to-resolve | ⬜ Todo |
+| Foundation | Schema, services, router | ✅ Done |
+| Core UI | Status banner, stats, date nav | ✅ Done |
+| Warnings | Unassigned guides, conflicts | ✅ Done |
+| Optimize | Auto-assignment algorithm | ✅ Done |
+| Dispatch | Button, Inngest notifications | ✅ Done |
 | Adjust Mode | Drag-drop, ghost preview | ⬜ Todo |
-| Dispatch | Notifications, animations | ⬜ Todo |
+| Timeline UI | Guide rows, segmented tape | ⬜ Todo |
 
-### Key UI Elements
+### What's Working Now
 
-- **Status Banner** — Optimized / Needs Review / Ready / Dispatched
-- **Segmented Tape** — Drive → Pickup → Tour
-- **Guest Cards** — Full human details, special occasions
-- **Tap-to-Resolve** — Actionable warning choices
+- **Command Center page** at `/org/[slug]/command-center`
+- **Status banner** — NEEDS REVIEW / READY / DISPATCHED states
+- **Day stats** — Guest count, guide count, driving time, efficiency %
+- **Date navigation** — Previous/next day, keyboard shortcuts
+- **Warning list** — Shows tours needing guide assignment
+- **Optimize button** — Auto-assigns available guides
+- **Dispatch button** — Finalizes assignments, triggers notifications
+- **Sidebar link** — "Dispatch" nav item (⌘2) — *Turbopack cache bug in dev*
+
+### Remaining (Nice-to-have)
+
+- **Adjust Mode** — Drag-drop guide reassignment
+- **Timeline UI** — Visual guide schedule tape
+- **Guest Cards** — Expandable participant details
 
 ---
 
-*Update this file as work progresses. Archive to history/milestones/ on completion.*
+*Last updated: January 2, 2026*
