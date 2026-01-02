@@ -728,6 +728,13 @@ function CommandCenterContent({
     nextDayLabel: format(new Date(date.getTime() + 86400000), "MMM d"),
   }), [date]);
 
+  // Handler to select a guide when clicking their row (for map panel)
+  // IMPORTANT: This hook must be defined before any early returns to maintain hooks order
+  const handleTimelineGuideClick = useCallback((guide: GuideInfo) => {
+    setSelectedTimelineGuideId(guide.id);
+    handleGuideClick(guide); // Also open the guide card
+  }, [handleGuideClick]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -792,12 +799,6 @@ function CommandCenterContent({
   const hasWarnings = data.warnings.length > 0;
   const isReady = data.status === "ready";
   const isDispatched = data.status === "dispatched";
-
-  // Handler to select a guide when clicking their row (for map panel)
-  const handleTimelineGuideClick = useCallback((guide: GuideInfo) => {
-    setSelectedTimelineGuideId(guide.id);
-    handleGuideClick(guide); // Also open the guide card
-  }, [handleGuideClick]);
 
   return (
     <div className="space-y-4">
