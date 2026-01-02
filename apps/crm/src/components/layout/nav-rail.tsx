@@ -101,6 +101,7 @@ export function NavRail({ orgSlug, orgName, userButton }: NavRailProps) {
                   document.dispatchEvent(new CustomEvent("open-command-palette"));
                 }}
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                aria-label="Search"
               >
                 <Search className="h-4 w-4" />
               </button>

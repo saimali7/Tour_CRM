@@ -233,6 +233,7 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
                   "flex items-center justify-center rounded-lg p-2 text-muted-foreground transition-all duration-150",
                   "hover:bg-accent hover:text-foreground hover:scale-105 active:scale-95"
                 )}
+                aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               >
                 {isCollapsed ? (
                   <ChevronsRight className="h-4 w-4" />
