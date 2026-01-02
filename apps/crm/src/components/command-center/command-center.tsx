@@ -2,12 +2,15 @@
 
 import { useMemo, useCallback, useState } from "react";
 import { format, isToday, isTomorrow, isYesterday } from "date-fns";
+import { cn } from "@/lib/utils";
 import { DispatchHeader } from "./dispatch-header";
 import { StatusBanner } from "./status-banner";
 import { WarningsPanel } from "./warnings-panel";
 import { TimelineContainer } from "./timeline/timeline-container";
 import { GuestCard, type GuestCardBooking } from "./guest-card";
 import { GuideCard, type GuideCardData } from "./guide-card";
+import { HopperPanel, type HopperBooking } from "./hopper";
+import { MapPanel, type RouteStop, type GhostPreviewData } from "./map-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, Calendar } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -298,6 +301,10 @@ function CommandCenterContent({
   // Panel state for guest and guide details
   const [selectedGuest, setSelectedGuest] = useState<GuestCardBooking | null>(null);
   const [selectedGuide, setSelectedGuide] = useState<GuideCardData | null>(null);
+
+  // State for the three-panel layout
+  const [selectedTimelineGuideId, setSelectedTimelineGuideId] = useState<string | null>(null);
+  const [ghostPreview, setGhostPreview] = useState<GhostPreviewData | null>(null);
 
   // Get tRPC utils for query invalidation
   const utils = trpc.useUtils();
@@ -614,6 +621,99 @@ function CommandCenterContent({
     };
   }, [dispatchResponse]);
 
+  // Extract unassigned bookings for the hopper panel
+  const hopperBookings = useMemo<HopperBooking[]>(() => {
+    if (!dispatchResponse?.tourRuns) return [];
+
+    const unassigned: HopperBooking[] = [];
+
+    for (const run of dispatchResponse.tourRuns) {
+      // Only include bookings from unassigned or partial tour runs
+      if (run.status === "unassigned" || run.status === "partial") {
+        for (const booking of run.bookings) {
+          unassigned.push({
+            id: booking.id,
+            referenceNumber: booking.referenceNumber,
+            customerName: booking.customerName,
+            customerEmail: booking.customerEmail,
+            guestCount: booking.totalParticipants,
+            adultCount: booking.adultCount,
+            childCount: booking.childCount,
+            infantCount: booking.infantCount,
+            pickupZone: booking.pickupZoneId
+              ? {
+                  id: booking.pickupZoneId,
+                  name: booking.pickupLocation || "Unknown Zone",
+                  color: "#6B7280", // Default color, will be enhanced with actual zone data
+                }
+              : null,
+            pickupLocation: booking.pickupLocation,
+            pickupTime: booking.pickupTime,
+            tourName: run.tour?.name || "Tour",
+            tourTime: run.time,
+            tourRunKey: run.key,
+            isVIP: false, // Could enhance with customer data
+            isFirstTimer: booking.isFirstTime,
+            specialOccasion: booking.specialOccasion,
+            accessibilityNeeds: booking.accessibilityNeeds,
+            hasChildren: booking.childCount > 0 || booking.infantCount > 0,
+          });
+        }
+      }
+    }
+
+    return unassigned;
+  }, [dispatchResponse]);
+
+  // Get route stops for the selected guide (for map panel)
+  const selectedGuideRouteStops = useMemo<RouteStop[]>(() => {
+    if (!selectedTimelineGuideId || !data?.guideTimelines) return [];
+
+    const timeline = data.guideTimelines.find(
+      (t) => t.guide.id === selectedTimelineGuideId
+    );
+    if (!timeline) return [];
+
+    const stops: RouteStop[] = [];
+    for (const segment of timeline.segments) {
+      if (segment.type === "pickup") {
+        stops.push({
+          id: segment.id,
+          type: "pickup",
+          name: segment.pickupLocation || "Pickup",
+          time: segment.startTime,
+          guestCount: segment.guestCount,
+          // Zone data would be enhanced with actual zone lookup
+        });
+      } else if (segment.type === "tour") {
+        stops.push({
+          id: segment.id,
+          type: "tour",
+          name: segment.tour?.name || "Tour",
+          time: segment.startTime,
+          guestCount: segment.totalGuests,
+        });
+      }
+    }
+
+    return stops;
+  }, [selectedTimelineGuideId, data?.guideTimelines]);
+
+  // Get the selected guide's name and total drive minutes
+  const selectedGuideInfo = useMemo(() => {
+    if (!selectedTimelineGuideId || !data?.guideTimelines) return null;
+
+    const timeline = data.guideTimelines.find(
+      (t) => t.guide.id === selectedTimelineGuideId
+    );
+    if (!timeline) return null;
+
+    return {
+      name: `${timeline.guide.firstName} ${timeline.guide.lastName}`.trim(),
+      totalDriveMinutes: timeline.totalDriveMinutes,
+    };
+  }, [selectedTimelineGuideId, data?.guideTimelines]);
+
   // Format date for display
   const formattedDate = useMemo(() => {
     if (isToday(date)) return `${format(date, "MMMM d, yyyy")} (Today)`;
@@ -690,6 +790,12 @@ function CommandCenterContent({
   const isReady = data.status === "ready";
   const isDispatched = data.status === "dispatched";
 
+  // Handler to select a guide when clicking their row (for map panel)
+  const handleTimelineGuideClick = useCallback((guide: GuideInfo) => {
+    setSelectedTimelineGuideId(guide.id);
+    handleGuideClick(guide); // Also open the guide card
+  }, [handleGuideClick]);
+
   return (
     <div className="space-y-4">
       {/* Date Navigation Header */}
@@ -725,25 +831,72 @@ function CommandCenterContent({
         isAdjustMode={isAdjustMode}
       />
 
-      {/* Warnings Panel (if any) */}
-      {hasWarnings && (
+      {/* Warnings Panel (if any) - only show when not in adjust mode */}
+      {hasWarnings && !isAdjustMode && (
         <WarningsPanel
           warnings={data.warnings}
           onResolve={handleResolveWarning}
         />
       )}
 
-      {/* Timeline with DnD support */}
+      {/* Main Content Area */}
       <DndProvider>
-        <TimelineContainer
-          timelines={data.guideTimelines}
-          startHour={6}
-          endHour={20}
-          onSegmentClick={handleSegmentClick}
-          onGuideClick={handleGuideClick}
-          className={isDispatched ? "opacity-75 pointer-events-none" : undefined}
-          isAdjustMode={isAdjustMode}
-        />
+        {isAdjustMode ? (
+          /* ============================================================
+           * THREE-PANEL LAYOUT (Adjust Mode)
+           * Hopper (left) | Timeline (center) | Map (right)
+           * ============================================================ */
+          <div className="grid grid-cols-[280px_1fr_260px] gap-0 h-[calc(100vh-280px)] min-h-[500px] rounded-lg border border-border overflow-hidden">
+            {/* Left Panel: Hopper - Unassigned Bookings */}
+            <HopperPanel
+              bookings={hopperBookings}
+              onBookingClick={(booking) => {
+                // Could open booking details
+                toast.info(`Selected: ${booking.customerName}`);
+              }}
+              isLoading={isLoading}
+            />
+
+            {/* Center Panel: Guide Dispatch Timeline */}
+            <div className="overflow-hidden bg-card">
+              <TimelineContainer
+                timelines={data.guideTimelines}
+                startHour={6}
+                endHour={20}
+                onSegmentClick={handleSegmentClick}
+                onGuideClick={handleTimelineGuideClick}
+                className={cn(
+                  "h-full",
+                  isDispatched && "opacity-75 pointer-events-none"
+                )}
+                isAdjustMode={isAdjustMode}
+              />
+            </div>
+
+            {/* Right Panel: Map / Route Context */}
+            <MapPanel
+              selectedGuideId={selectedTimelineGuideId}
+              selectedGuideName={selectedGuideInfo?.name}
+              routeStops={selectedGuideRouteStops}
+              totalDriveMinutes={selectedGuideInfo?.totalDriveMinutes}
+              ghostPreview={ghostPreview}
+            />
+          </div>
+        ) : (
+          /* ============================================================
+           * STANDARD LAYOUT (Normal Mode)
+           * Full-width timeline
+           * ============================================================ */
+          <TimelineContainer
+            timelines={data.guideTimelines}
+            startHour={6}
+            endHour={20}
+            onSegmentClick={handleSegmentClick}
+            onGuideClick={handleGuideClick}
+            className={isDispatched ? "opacity-75 pointer-events-none" : undefined}
+            isAdjustMode={isAdjustMode}
+          />
+        )}
       </DndProvider>
 
       {/* Guest Details Panel */}
