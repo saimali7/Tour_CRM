@@ -1,192 +1,152 @@
 # Tour CRM
 
-Multi-tenant tour operations SaaS. Organization-scoped everything.
+Multi-tenant tour operations SaaS. **Every query must be organization-scoped.**
+
+## The One Rule
+
+```typescript
+// ALWAYS filter by organizationId - this is non-negotiable
+eq(table.organizationId, ctx.organizationId)
+```
+
+If you write a query without `organizationId`, you've created a data leak between tenants.
 
 ## Architecture
 
 ```
-apps/crm     → Staff dashboard (Next.js 15, tRPC, Clerk)
-apps/web     → Public booking (optional per org)
+apps/crm/                    → Staff dashboard (Next.js 15 App Router)
+  src/
+    app/org/[slug]/          → All org routes under /org/:slug
+    server/routers/          → tRPC routers (thin, delegate to services)
+    components/              → React components
+    inngest/functions/       → Background jobs
+
 packages/
-  database   → Drizzle schema, every table has organizationId
-  services   → Business logic, always org-scoped
-  ui         → shadcn/ui components
-  validators → Zod schemas
+  database/src/schema/       → Drizzle schema (23 tables)
+  services/src/              → Business logic (40+ services)
+  validators/src/            → Zod schemas for API validation
+  ui/                        → shadcn/ui components
 ```
 
-## Core Constraints
+## Domain Model
 
-```typescript
-// EVERY query, mutation, event MUST include organizationId
-eq(bookings.organizationId, ctx.organizationId)  // Always
-
-// Services are org-scoped by construction
-const services = createServices({ organizationId });
-await services.booking.getAll();  // Auto-filtered
-
-// Events trigger Inngest, never call services directly for side effects
-await inngest.send({ name: 'booking.created', data: { organizationId, bookingId } });
 ```
-
-## Commands
-
-```bash
-pnpm dev                  # All apps
-pnpm dev --filter crm     # CRM only
-pnpm build && pnpm typecheck  # Before commit
-pnpm db:push              # Push schema
-pnpm db:studio            # Drizzle Studio
-docker-compose up -d      # Start local infrastructure (Postgres, Redis, MinIO)
+Organization (tenant boundary)
+  └── Tours (products)
+        └── TourAvailability (when tours run)
+              └── TourRuns (actual instances with guests)
+                    └── Bookings → Customers
+                          └── Participants (who's coming)
+                          └── Payments
+                          └── AddOns
+  └── Guides
+        └── GuideAssignments (guide ↔ tour run)
+        └── GuideAvailability (when guides work)
 ```
-
-## Stack
-
-| Layer | Choice |
-|-------|--------|
-| Framework | Next.js 15 App Router |
-| API | tRPC (internal), REST (external) |
-| DB | Self-hosted PostgreSQL 16 + PgBouncer + Drizzle |
-| Cache | Self-hosted Redis |
-| Storage | Self-hosted MinIO (S3-compatible) |
-| Auth | Clerk Organizations |
-| Payments | Stripe Connect |
-| Jobs | Inngest |
-| Email | Resend + React Email |
-| Hosting | Hostinger VPS + Coolify |
 
 ## Code Patterns
 
-### tRPC Router
+### tRPC Router (thin layer)
 ```typescript
+// apps/crm/src/server/routers/booking.ts
 export const bookingRouter = router({
-  getAll: orgProcedure.query(async ({ ctx }) => {
-    return ctx.services.booking.getAll();
-  }),
+  getAll: orgProcedure.query(({ ctx }) => ctx.services.booking.getAll()),
+
   create: adminProcedure
     .input(createBookingSchema)
-    .mutation(async ({ ctx, input }) => {
-      return ctx.services.booking.create(input);
-    }),
+    .mutation(({ ctx, input }) => ctx.services.booking.create(input)),
 });
 ```
 
-### Service Method
+### Service (where logic lives)
 ```typescript
-async getById(id: string) {
-  return db.query.bookings.findFirst({
-    where: and(
-      eq(bookings.id, id),
-      eq(bookings.organizationId, this.ctx.organizationId)
-    ),
-  });
+// packages/services/src/booking-service.ts
+export class BookingService extends BaseService {
+  async getAll() {
+    return this.db.query.bookings.findMany({
+      where: eq(bookings.organizationId, this.organizationId), // Always!
+    });
+  }
 }
 ```
 
-### Inngest Event
+### Inngest (background jobs)
 ```typescript
+// apps/crm/src/inngest/functions/booking-emails.ts
 inngest.createFunction(
-  { id: 'booking-confirmation' },
+  { id: 'send-confirmation' },
   { event: 'booking.created' },
   async ({ event }) => {
     const { organizationId, bookingId } = event.data;
-    // Send confirmation email using org's branding
+    const services = createServices({ organizationId });
+    // ... send email
   }
 );
 ```
 
-## Design System
+## Procedures
 
-### Layout
-```
-┌─────┬────────────────────────────┬─────────┐
-│ 60px│      Fluid Content         │  280px  │
-│ Nav │   Tables/Forms/Calendar    │ Context │
-└─────┴────────────────────────────┴─────────┘
-```
+| Procedure | Auth | Use for |
+|-----------|------|---------|
+| `publicProcedure` | None | Public API endpoints |
+| `orgProcedure` | Clerk + org member | Read operations |
+| `adminProcedure` | Clerk + org admin | Write operations |
 
-### Tokens
-```tsx
-// Backgrounds
-bg-background  bg-card  bg-muted  bg-accent
+## Key Files
 
-// Text
-text-foreground  text-muted-foreground
+| What | Where |
+|------|-------|
+| Database schema | `packages/database/src/schema/` |
+| All services | `packages/services/src/` |
+| Service factory | `packages/services/src/index.ts` |
+| tRPC routers | `apps/crm/src/server/routers/` |
+| tRPC setup | `apps/crm/src/server/trpc.ts` |
+| Inngest functions | `apps/crm/src/inngest/functions/` |
+| API validators | `packages/validators/src/` |
 
-// Interactive
-bg-primary text-primary-foreground
-border-border  ring-ring
+## Commands
 
-// Status
-status-confirmed  status-pending  status-cancelled  status-completed
-payment-paid  payment-partial  payment-pending
-```
-
-### Typography
-```tsx
-text-xl font-semibold tracking-tight    // Page title
-text-sm font-medium uppercase tracking-wide text-muted-foreground  // Section
-text-sm text-foreground                 // Body
-text-xs text-muted-foreground           // Meta
-font-mono tabular-nums                  // Numbers
+```bash
+pnpm dev                      # Start all (CRM on :3000)
+pnpm dev --filter crm         # CRM only
+pnpm build && pnpm typecheck  # Before commit (required)
+pnpm db:push                  # Push schema changes
+pnpm db:studio                # Open Drizzle Studio
+docker-compose up -d          # Start Postgres, Redis, MinIO, Mailpit
 ```
 
-### Motion
-```tsx
-transition-colors                       // Color changes
-transition-all duration-150             // General
-hover:scale-[1.02] active:scale-[0.98]  // Buttons
-```
+## Stack
 
-## Keyboard
+| Layer | Tech |
+|-------|------|
+| Framework | Next.js 15 App Router |
+| API | tRPC v11 + superjson |
+| Database | PostgreSQL 16 + Drizzle ORM |
+| Auth | Clerk Organizations |
+| Payments | Stripe Connect (per-org accounts) |
+| Jobs | Inngest |
+| Email | Resend + React Email |
+| Storage | MinIO (S3-compatible) |
+| Cache | Redis |
 
-`Cmd+K` Command palette | `Cmd+1-7` Navigate | `Cmd+B` Quick book | `Esc` Close
+## Gotchas
+
+1. **Services need context** - Always use `createServices({ organizationId })`, never instantiate directly
+2. **No direct DB in routers** - Routers call services, services call DB
+3. **Inngest for side effects** - Don't send emails/notifications directly, emit events
+4. **Clerk org != DB org** - Clerk handles auth, we sync to `organizations` table
+5. **Slug routing** - All org routes are `/org/[slug]/...`, slug comes from URL not user
 
 ## Status
 
-Phases 0-6 complete. Phase 7 Operations Excellence in progress:
-- 7.1 Command Center & Guide Dispatch: Complete
-- 7.2 Booking UX & Quick Actions: In progress
-- 7.3 Intelligence & Forecasting: Pending
-- 7.4 Customer-Facing Features: Pending
+**Milestone 7: Operations Excellence** — 80% complete
 
 ## Docs
 
-| Doc | Purpose |
-|-----|---------|
-| `docs/PROGRESS.md` | Implementation tracker (source of truth) |
-| `docs/TECHNICAL_DEBT.md` | Technical debt analysis & remediation plan |
-| `docs/INFRASTRUCTURE_PLAN.md` | Self-hosted infrastructure (Postgres, PgBouncer, Redis, MinIO) |
-| `docs/DESIGN_SYSTEM_V2.md` | Full design system |
-| `docs/ARCHITECTURE.md` | Domain model, schema |
-| `docs/DEPLOYMENT.md` | Production setup |
-
-## Infrastructure
-
-Self-hosted on Hostinger KVM 4 VPS ($20/mo) via Coolify:
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         CRM Application                              │
-│                     (Next.js 15 + tRPC)                             │
-└─────────────────────────────────┬───────────────────────────────────┘
-                                  │
-        ┌─────────────────────────┼─────────────────────────┐
-        ▼                         ▼                         ▼
-┌───────────────┐         ┌───────────────┐         ┌───────────────┐
-│   PgBouncer   │         │     Redis     │         │     MinIO     │
-│  (Pooling)    │         │    (Cache)    │         │   (Storage)   │
-│   :6432       │         │    :6379      │         │    :9000      │
-└───────┬───────┘         └───────────────┘         └───────────────┘
-        ▼
-┌───────────────┐
-│  PostgreSQL   │
-│    (Data)     │
-│    :5432      │
-└───────────────┘
-```
-
-Key files:
-- `docker-compose.yml` - Local development (Postgres, Redis, MinIO, Mailpit)
-- `docker-compose.prod.yml` - Production stack with PgBouncer
-- `scripts/backup-database.sh` - Backup script for VPS
-- `scripts/restore-database.sh` - Restore script
+| Need | Path |
+|------|------|
+| Current work | `docs/project/ACTIVE.md` |
+| Roadmap | `docs/strategy/ROADMAP.md` |
+| Architecture deep-dive | `docs/reference/ARCHITECTURE.md` |
+| Design system | `docs/reference/DESIGN_SYSTEM.md` |
+| All docs | `docs/README.md` |
