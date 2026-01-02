@@ -143,22 +143,24 @@ hover:scale-[1.02] active:scale-[0.98]  // Buttons
 
 ## Status
 
-Phases 0-6 complete. Phase 7 Operations Excellence in progress:
-- 7.1 Command Center & Guide Dispatch: Complete
-- 7.2 Booking UX & Quick Actions: In progress
-- 7.3 Intelligence & Forecasting: Pending
-- 7.4 Customer-Facing Features: Pending
+**Milestone 7: Operations Excellence** — 80% complete
+
+See `docs/project/ACTIVE.md` for current work.
 
 ## Docs
 
-| Doc | Purpose |
-|-----|---------|
-| `docs/progress/PROGRESS.md` | Implementation tracker (source of truth) |
-| `docs/TECHNICAL_DEBT.md` | Technical debt analysis & remediation plan |
-| `docs/INFRASTRUCTURE_PLAN.md` | Self-hosted infrastructure (Postgres, PgBouncer, Redis, MinIO) |
-| `docs/DESIGN_SYSTEM_V2.md` | Full design system |
-| `docs/ARCHITECTURE.md` | Domain model, schema |
-| `docs/DEPLOYMENT.md` | Production setup |
+Start at `docs/README.md` for full index.
+
+| Path | Purpose |
+|------|---------|
+| `docs/strategy/VISION.md` | Product vision, principles |
+| `docs/strategy/ROADMAP.md` | All milestones overview |
+| `docs/project/ACTIVE.md` | Current work (source of truth) |
+| `docs/project/BACKLOG.md` | Future work queue |
+| `docs/history/CHANGELOG.md` | What shipped, when |
+| `docs/reference/ARCHITECTURE.md` | Domain model, schema |
+| `docs/reference/INFRASTRUCTURE.md` | Self-hosted infra guide |
+| `docs/reference/DESIGN_SYSTEM.md` | Full design system |
 
 ## Infrastructure
 

@@ -200,7 +200,8 @@
       "Bash(comm:*)",
       "Bash(paste:*)",
       "Bash(pnpm exec eslint:*)",
-      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -1)"
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -1)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM status --short docs/)"
     ]
   }
 }
