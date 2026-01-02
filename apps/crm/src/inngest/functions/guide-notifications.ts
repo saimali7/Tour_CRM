@@ -1,6 +1,6 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
-import { createServices } from "@tour/services";
+import { createServices, logger } from "@tour/services";
 import { eq, and, gte, lte, db, schedules, bookings, organizations, guideAssignments } from "@tour/database";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
@@ -110,8 +110,9 @@ export const sendPendingAssignmentReminder = inngest.createFunction(
       const services = createServices({ organizationId: data.organizationId });
       try {
         return await services.guideAssignment.getById(data.assignmentId);
-      } catch {
+      } catch (error) {
         // Assignment might have been deleted
+        logger.debug({ err: error, assignmentId: data.assignmentId }, "Assignment not found, may have been deleted");
         return null;
       }
     });

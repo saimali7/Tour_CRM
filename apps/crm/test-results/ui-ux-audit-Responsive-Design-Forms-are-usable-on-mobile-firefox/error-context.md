@@ -1,0 +1,105 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - banner [ref=e5]:
+        - button [ref=e6]:
+          - img
+        - generic [ref=e7]: D
+        - paragraph [ref=e8]: Demo Tours
+        - img [ref=e10]
+      - main [ref=e13]:
+        - generic [ref=e14]:
+          - generic [ref=e15]:
+            - generic [ref=e16]:
+              - generic [ref=e17]:
+                - heading "Good afternoon" [level=1] [ref=e18]
+                - generic [ref=e19]: Friday, Jan 2
+              - button "Quick book" [ref=e20]:
+                - img [ref=e21]
+            - generic [ref=e23]:
+              - generic [ref=e24]:
+                - img [ref=e25]
+                - generic [ref=e28]:
+                  - generic [ref=e29]: $300
+                  - generic [ref=e30]: today
+                  - generic [ref=e31]:
+                    - img [ref=e32]
+                    - text: +100%
+              - generic [ref=e36]:
+                - img [ref=e37]
+                - generic [ref=e42]:
+                  - generic [ref=e43]: $300
+                  - generic [ref=e44]: this week
+              - generic [ref=e46]:
+                - img [ref=e47]
+                - generic [ref=e52]:
+                  - generic [ref=e53]: "0"
+                  - generic [ref=e54]: bookings
+          - generic [ref=e55]:
+            - generic [ref=e56]:
+              - img [ref=e57]
+              - generic [ref=e61]: 2 actions
+            - link "Confirm 44" [ref=e62] [cursor=pointer]:
+              - /url: /org/demo-tours/bookings?status=pending
+              - img [ref=e63]
+              - generic [ref=e66]: Confirm 44
+              - img [ref=e67]
+            - link "Collect $4,156" [ref=e69] [cursor=pointer]:
+              - /url: /org/demo-tours/bookings?payment=pending
+              - img [ref=e70]
+              - generic [ref=e73]: Collect $4,156
+              - img [ref=e74]
+          - generic [ref=e76]:
+            - heading "Today's Tours" [level=2] [ref=e78]
+            - generic [ref=e79]:
+              - img [ref=e80]
+              - generic [ref=e85]: No bookings for today
+          - generic [ref=e86]:
+            - generic [ref=e87]:
+              - heading "Tomorrow" [level=2] [ref=e89]
+              - link "Calendar" [ref=e90] [cursor=pointer]:
+                - /url: /org/demo-tours/calendar
+                - text: Calendar
+                - img [ref=e91]
+            - generic [ref=e94]:
+              - img [ref=e95]
+              - generic [ref=e100]: No bookings for tomorrow
+    - navigation "Main navigation" [ref=e101]:
+      - generic [ref=e102]:
+        - link "Home" [ref=e103] [cursor=pointer]:
+          - /url: /org/demo-tours
+          - img [ref=e105]
+          - generic [ref=e110]: Home
+        - link "Calendar" [ref=e111] [cursor=pointer]:
+          - /url: /org/demo-tours/calendar
+          - img [ref=e112]
+          - generic [ref=e117]: Calendar
+        - link "Bookings" [ref=e118] [cursor=pointer]:
+          - /url: /org/demo-tours/bookings
+          - img [ref=e119]
+          - generic [ref=e126]: Bookings
+        - link "Tours" [ref=e127] [cursor=pointer]:
+          - /url: /org/demo-tours/tours
+          - img [ref=e128]
+          - generic [ref=e131]: Tours
+        - link "Customers" [ref=e132] [cursor=pointer]:
+          - /url: /org/demo-tours/customers
+          - img [ref=e133]
+          - generic [ref=e138]: Customers
+  - complementary [ref=e140]:
+    - generic [ref=e142]:
+      - button [ref=e143]:
+        - img
+      - heading [level=2] [ref=e145]: Details
+  - region "Notifications alt+T"
+  - status [ref=e147]
+  - alert [ref=e148]
+  - button "Open Next.js Dev Tools" [ref=e154] [cursor=pointer]:
+    - img [ref=e155]
+  - alert [ref=e159]
+```

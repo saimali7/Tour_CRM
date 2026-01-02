@@ -1,0 +1,116 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e6] [cursor=pointer]: D
+      - generic [ref=e7]:
+        - button [ref=e8]:
+          - img [ref=e9]
+        - button [ref=e12]:
+          - img
+      - navigation [ref=e13]:
+        - link [ref=e14] [cursor=pointer]:
+          - /url: /org/demo-tours
+          - img [ref=e16]
+        - link [ref=e21] [cursor=pointer]:
+          - /url: /org/demo-tours/calendar
+          - img [ref=e22]
+        - link [ref=e27] [cursor=pointer]:
+          - /url: /org/demo-tours/bookings
+          - img [ref=e28]
+        - link [ref=e35] [cursor=pointer]:
+          - /url: /org/demo-tours/tours
+          - img [ref=e36]
+        - link [ref=e39] [cursor=pointer]:
+          - /url: /org/demo-tours/customers
+          - img [ref=e40]
+        - link [ref=e45] [cursor=pointer]:
+          - /url: /org/demo-tours/guides
+          - img [ref=e46]
+        - link [ref=e48] [cursor=pointer]:
+          - /url: /org/demo-tours/analytics
+          - img [ref=e49]
+      - generic [ref=e54]:
+        - link [ref=e55] [cursor=pointer]:
+          - /url: /org/demo-tours/settings
+          - img [ref=e56]
+        - button [ref=e59]:
+          - img [ref=e60]
+        - img [ref=e66] [cursor=pointer]
+    - main [ref=e70]:
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - generic [ref=e73]:
+            - generic [ref=e74]:
+              - heading "Good afternoon" [level=1] [ref=e75]
+              - generic [ref=e76]: Friday, Jan 2
+            - button "Quick Book" [ref=e77]:
+              - img [ref=e78]
+              - text: Quick Book
+          - generic [ref=e80]:
+            - generic [ref=e81]:
+              - img [ref=e82]
+              - generic [ref=e85]:
+                - generic [ref=e86]: $300
+                - generic [ref=e87]: today
+                - generic [ref=e88]:
+                  - img [ref=e89]
+                  - text: +100%
+            - generic [ref=e93]:
+              - img [ref=e94]
+              - generic [ref=e99]:
+                - generic [ref=e100]: $300
+                - generic [ref=e101]: this week
+            - generic [ref=e103]:
+              - img [ref=e104]
+              - generic [ref=e109]:
+                - generic [ref=e110]: "0"
+                - generic [ref=e111]: bookings
+        - generic [ref=e112]:
+          - generic [ref=e113]:
+            - img [ref=e114]
+            - generic [ref=e118]: 2 actions
+          - link "Confirm 44" [ref=e119] [cursor=pointer]:
+            - /url: /org/demo-tours/bookings?status=pending
+            - img [ref=e120]
+            - generic [ref=e123]: Confirm 44
+            - img [ref=e124]
+          - link "Collect $4,156" [ref=e126] [cursor=pointer]:
+            - /url: /org/demo-tours/bookings?payment=pending
+            - img [ref=e127]
+            - generic [ref=e130]: Collect $4,156
+            - img [ref=e131]
+        - generic [ref=e133]:
+          - heading "Today's Tours" [level=2] [ref=e135]
+          - generic [ref=e136]:
+            - img [ref=e137]
+            - generic [ref=e142]: No bookings for today
+        - generic [ref=e143]:
+          - generic [ref=e144]:
+            - heading "Tomorrow" [level=2] [ref=e146]
+            - link "Calendar" [ref=e147] [cursor=pointer]:
+              - /url: /org/demo-tours/calendar
+              - text: Calendar
+              - img [ref=e148]
+          - generic [ref=e151]:
+            - img [ref=e152]
+            - generic [ref=e157]: No bookings for tomorrow
+  - complementary [ref=e158]:
+    - generic [ref=e159]:
+      - generic [ref=e160]:
+        - button [ref=e161]:
+          - img
+        - heading [level=2] [ref=e163]: Details
+      - button [ref=e164]:
+        - img
+  - region "Notifications alt+T"
+  - status [ref=e166]
+  - alert [ref=e167]
+  - button "Open Next.js Dev Tools" [ref=e173] [cursor=pointer]:
+    - img [ref=e174]
+  - alert [ref=e178]
+```

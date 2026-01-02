@@ -38,6 +38,7 @@ import { GuideAssignmentService } from "./guide-assignment-service";
 import { GuideAvailabilityService } from "./guide-availability-service";
 import { TourGuideQualificationService } from "./tour-guide-qualification-service";
 import { TourRunService, type TourRun as BaseTourRun } from "./tour-run-service";
+import { createServiceLogger } from "./lib/logger";
 
 // =============================================================================
 // INTERNAL TYPES
@@ -222,6 +223,20 @@ export interface WarningResolution {
   action: "assign_guide" | "add_external" | "cancel_tour" | "split_booking";
   guideId?: string;
   impactMinutes?: number;
+  // Additional context for resolution execution
+  tourRunKey?: string; // For tour-level actions (cancel_tour, add_external)
+  bookingId?: string; // For booking-level actions (assign_guide, split_booking)
+  // For add_external
+  externalGuideName?: string;
+  externalGuideContact?: string;
+  // For split_booking
+  splitConfig?: {
+    bookingId: string;
+    splits: Array<{
+      guideId: string;
+      guestCount: number;
+    }>;
+  };
 }
 
 /**
@@ -270,6 +285,7 @@ export class CommandCenterService extends BaseService {
   private guideAvailabilityService: GuideAvailabilityService;
   private tourGuideQualificationService: TourGuideQualificationService;
   private tourRunService: TourRunService;
+  private logger: ReturnType<typeof createServiceLogger>;
 
   constructor(ctx: { organizationId: string; userId?: string }) {
     super(ctx);
@@ -277,6 +293,7 @@ export class CommandCenterService extends BaseService {
     this.guideAvailabilityService = new GuideAvailabilityService(ctx);
     this.tourGuideQualificationService = new TourGuideQualificationService(ctx);
     this.tourRunService = new TourRunService(ctx);
+    this.logger = createServiceLogger("command-center", ctx.organizationId);
   }
 
   // ===========================================================================
@@ -411,6 +428,10 @@ export class CommandCenterService extends BaseService {
       runMap.get(key)!.bookings.push(booking);
     }
 
+    // Batch fetch first-time customer status for ALL bookings upfront (fixes N+1)
+    const allCustomerIds = typedBookings.map((b) => b.customerId);
+    const firstTimeMap = await this.batchCheckFirstTimeCustomers(allCustomerIds);
+
     // Build tour runs with assignment info
     const tourRuns: TourRun[] = [];
 
@@ -425,7 +446,8 @@ export class CommandCenterService extends BaseService {
       for (const booking of runBookings) {
         totalGuests += booking.totalParticipants;
 
-        const isFirstTime = await this.checkIfFirstTimeCustomer(booking.customerId);
+        // Use batched lookup instead of individual query (fixes N+1)
+        const isFirstTime = firstTimeMap.get(booking.customerId) ?? true;
 
         bookingsWithCustomer.push({
           id: booking.id,
@@ -547,6 +569,7 @@ export class CommandCenterService extends BaseService {
 
   /**
    * Get available guides for a date (checking availability patterns + overrides)
+   * Optimized to parallelize per-guide queries and batch where possible
    */
   async getAvailableGuides(date: Date): Promise<AvailableGuide[]> {
     // Get all active guides
@@ -557,25 +580,40 @@ export class CommandCenterService extends BaseService {
       ),
     });
 
+    if (allGuides.length === 0) {
+      return [];
+    }
+
+    const guideIds = allGuides.map((g) => g.id);
+
+    // Batch fetch all data in parallel (fixes N+1)
+    const [
+      availabilityResults,
+      allQualifications,
+      allAssignments,
+    ] = await Promise.all([
+      // Check availability for all guides in parallel
+      this.batchCheckGuideAvailability(guideIds, date),
+      // Get qualifications for all guides at once
+      this.batchGetGuideQualifications(guideIds),
+      // Get assignments for all guides at once
+      this.batchGetGuideAssignmentsForDate(guideIds, date),
+    ]);
+
     const availableGuides: AvailableGuide[] = [];
 
     for (const guide of allGuides) {
       // Check if guide is available on this date
-      const isAvailable = await this.guideAvailabilityService.isAvailableOnDate(guide.id, date);
-
-      if (!isAvailable) {
+      const availabilityData = availabilityResults.get(guide.id);
+      if (!availabilityData?.isAvailable) {
         continue;
       }
 
-      // Get availability times for the date
-      const availability = await this.getGuideAvailabilityForDate(guide.id, date);
+      // Get qualified tours from batch result
+      const qualifiedTours = allQualifications.get(guide.id) ?? [];
 
-      // Get qualified tours
-      const qualifications = await this.tourGuideQualificationService.getQualificationsForGuide(guide.id);
-      const qualifiedTours = qualifications.map((q) => q.tourId);
-
-      // Get current assignments for this date
-      const currentAssignments = await this.getGuideAssignmentsForDate(guide.id, date);
+      // Get current assignments from batch result
+      const currentAssignments = allAssignments.get(guide.id) ?? [];
 
       availableGuides.push({
         guide: {
@@ -590,13 +628,239 @@ export class CommandCenterService extends BaseService {
         vehicleCapacity: guide.vehicleCapacity ?? 6, // Use guide's actual capacity
         baseZone: null, // TODO [Phase 7.3]: Map baseZoneId to zone name
         qualifiedTours,
-        availableFrom: availability.startTime || "07:00",
-        availableTo: availability.endTime || "22:00",
+        availableFrom: availabilityData.startTime || "07:00",
+        availableTo: availabilityData.endTime || "22:00",
         currentAssignments,
       });
     }
 
     return availableGuides;
+  }
+
+  /**
+   * Batch check availability for multiple guides on a date
+   * Returns Map of guideId -> { isAvailable, startTime, endTime }
+   */
+  private async batchCheckGuideAvailability(
+    guideIds: string[],
+    date: Date
+  ): Promise<Map<string, { isAvailable: boolean; startTime: string | null; endTime: string | null }>> {
+    const result = new Map<string, { isAvailable: boolean; startTime: string | null; endTime: string | null }>();
+    const dateStr = this.formatDateKey(date);
+    const dayOfWeek = date.getDay();
+
+    try {
+      // Fetch overrides and weekly availability in parallel
+      const [overridesResult, weeklyResult] = await Promise.all([
+        // Get all overrides for this date and these guides
+        this.db
+          .select()
+          .from(guideAvailabilityOverrides)
+          .where(
+            and(
+              eq(guideAvailabilityOverrides.organizationId, this.organizationId),
+              inArray(guideAvailabilityOverrides.guideId, guideIds),
+              sql`${guideAvailabilityOverrides.date}::text = ${dateStr}`
+            )
+          ),
+        // Get weekly availability for this day for all guides
+        this.db
+          .select()
+          .from(guideAvailability)
+          .where(
+            and(
+              eq(guideAvailability.organizationId, this.organizationId),
+              inArray(guideAvailability.guideId, guideIds),
+              eq(guideAvailability.dayOfWeek, dayOfWeek)
+            )
+          )
+          .orderBy(asc(guideAvailability.startTime)),
+      ]);
+
+      // Build override lookup
+      const overrideMap = new Map<string, typeof overridesResult[0]>();
+      for (const override of overridesResult) {
+        overrideMap.set(override.guideId, override);
+      }
+
+      // Build weekly availability lookup (first slot per guide)
+      const weeklyMap = new Map<string, typeof weeklyResult[0]>();
+      for (const slot of weeklyResult) {
+        // Only keep first slot per guide (earliest time)
+        if (!weeklyMap.has(slot.guideId)) {
+          weeklyMap.set(slot.guideId, slot);
+        }
+      }
+
+      // Process each guide
+      for (const guideId of guideIds) {
+        const override = overrideMap.get(guideId);
+        const weekly = weeklyMap.get(guideId);
+
+        if (override) {
+          // Override takes precedence
+          result.set(guideId, {
+            isAvailable: override.isAvailable,
+            startTime: override.startTime,
+            endTime: override.endTime,
+          });
+        } else if (weekly) {
+          // Use weekly pattern
+          result.set(guideId, {
+            isAvailable: weekly.isAvailable,
+            startTime: weekly.startTime,
+            endTime: weekly.endTime,
+          });
+        } else {
+          // No availability data - default to unavailable
+          result.set(guideId, {
+            isAvailable: false,
+            startTime: null,
+            endTime: null,
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error({ err: error, guideIds }, "Failed to batch check guide availability");
+      // Fallback: mark all as unavailable
+      for (const guideId of guideIds) {
+        result.set(guideId, { isAvailable: false, startTime: null, endTime: null });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Batch get qualifications for multiple guides
+   * Returns Map of guideId -> tourId[]
+   */
+  private async batchGetGuideQualifications(guideIds: string[]): Promise<Map<string, string[]>> {
+    const result = new Map<string, string[]>();
+
+    if (guideIds.length === 0) {
+      return result;
+    }
+
+    try {
+      const qualifications = await this.db
+        .select({
+          guideId: tourGuideQualifications.guideId,
+          tourId: tourGuideQualifications.tourId,
+        })
+        .from(tourGuideQualifications)
+        .where(
+          and(
+            eq(tourGuideQualifications.organizationId, this.organizationId),
+            inArray(tourGuideQualifications.guideId, guideIds)
+          )
+        );
+
+      // Group by guideId
+      for (const q of qualifications) {
+        const existing = result.get(q.guideId) ?? [];
+        existing.push(q.tourId);
+        result.set(q.guideId, existing);
+      }
+
+      // Ensure all guides have an entry (even if empty)
+      for (const guideId of guideIds) {
+        if (!result.has(guideId)) {
+          result.set(guideId, []);
+        }
+      }
+    } catch (error) {
+      this.logger.error({ err: error, guideIds }, "Failed to batch get guide qualifications");
+      // Fallback: empty arrays
+      for (const guideId of guideIds) {
+        result.set(guideId, []);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Batch get assignments for multiple guides on a date
+   * Returns Map of guideId -> CurrentAssignment[]
+   */
+  private async batchGetGuideAssignmentsForDate(
+    guideIds: string[],
+    date: Date
+  ): Promise<Map<string, CurrentAssignment[]>> {
+    const result = new Map<string, CurrentAssignment[]>();
+    const dateStr = this.formatDateKey(date);
+
+    if (guideIds.length === 0) {
+      return result;
+    }
+
+    try {
+      const assignmentsResult = await this.db
+        .select({
+          guideId: guideAssignments.guideId,
+          bookingId: guideAssignments.bookingId,
+          tourId: bookings.tourId,
+          tourName: tours.name,
+          bookingTime: bookings.bookingTime,
+          totalParticipants: bookings.totalParticipants,
+        })
+        .from(guideAssignments)
+        .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
+        .innerJoin(tours, eq(bookings.tourId, tours.id))
+        .where(
+          and(
+            eq(guideAssignments.organizationId, this.organizationId),
+            inArray(guideAssignments.guideId, guideIds),
+            eq(guideAssignments.status, "confirmed"),
+            sql`${bookings.bookingDate}::text = ${dateStr}`
+          )
+        );
+
+      // Group by guide, then by tour run
+      const guideRunMaps = new Map<string, Map<string, CurrentAssignment>>();
+
+      for (const row of assignmentsResult) {
+        if (!row.guideId || !row.tourId || !row.bookingTime) continue;
+
+        if (!guideRunMaps.has(row.guideId)) {
+          guideRunMaps.set(row.guideId, new Map());
+        }
+
+        const runMap = guideRunMaps.get(row.guideId)!;
+        const key = `${row.tourId}|${dateStr}|${row.bookingTime}`;
+
+        const existing = runMap.get(key);
+        if (existing) {
+          existing.guestCount += row.totalParticipants;
+        } else {
+          runMap.set(key, {
+            tourRunKey: key,
+            tourName: row.tourName,
+            time: row.bookingTime,
+            guestCount: row.totalParticipants,
+          });
+        }
+      }
+
+      // Convert to final format
+      for (const guideId of guideIds) {
+        const runMap = guideRunMaps.get(guideId);
+        if (runMap) {
+          result.set(guideId, Array.from(runMap.values()));
+        } else {
+          result.set(guideId, []);
+        }
+      }
+    } catch (error) {
+      this.logger.error({ err: error, guideIds, date: dateStr }, "Failed to batch get guide assignments");
+      // Fallback: empty arrays
+      for (const guideId of guideIds) {
+        result.set(guideId, []);
+      }
+    }
+
+    return result;
   }
 
   // ===========================================================================
@@ -912,32 +1176,378 @@ export class CommandCenterService extends BaseService {
 
   /**
    * Resolve a warning by applying a resolution
+   *
+   * @param warningId - The ID of the warning being resolved (for logging/tracking)
+   * @param resolution - The resolution to apply, must include necessary context (bookingId, tourRunKey, etc.)
    */
   async resolveWarning(warningId: string, resolution: WarningResolution): Promise<void> {
-    // Resolution logic depends on action type
+    this.logger.info(`Resolving warning ${warningId} with action: ${resolution.action}`);
+
     switch (resolution.action) {
       case "assign_guide":
-        if (!resolution.guideId) {
-          throw new ValidationError("Guide ID required for assign_guide action");
-        }
-        // The booking ID should be extracted from the warning context
-        // For now, we throw - this would need to be implemented with warning tracking
-        throw new ValidationError("Warning resolution not fully implemented yet");
+        await this.resolveAssignGuide(warningId, resolution);
+        break;
 
       case "add_external":
-        // Add outsourced guide flow
-        throw new ValidationError("Add external guide not implemented yet");
+        await this.resolveAddExternal(warningId, resolution);
+        break;
 
       case "cancel_tour":
-        // Cancel tour run flow
-        throw new ValidationError("Cancel tour not implemented yet");
+        await this.resolveCancelTour(warningId, resolution);
+        break;
 
       case "split_booking":
-        // Split booking across multiple guides
-        throw new ValidationError("Split booking not implemented yet");
+        await this.resolveSplitBooking(warningId, resolution);
+        break;
 
       default:
         throw new ValidationError(`Unknown resolution action: ${resolution.action}`);
+    }
+  }
+
+  /**
+   * Resolve warning by assigning a guide
+   * Assigns the specified guide to either:
+   * - A specific booking (if bookingId provided)
+   * - All bookings in a tour run (if tourRunKey provided)
+   */
+  private async resolveAssignGuide(warningId: string, resolution: WarningResolution): Promise<void> {
+    if (!resolution.guideId) {
+      throw new ValidationError("Guide ID required for assign_guide action");
+    }
+
+    // If bookingId is provided, assign to that specific booking
+    if (resolution.bookingId) {
+      await this.guideAssignmentService.assignGuideToBooking(
+        resolution.bookingId,
+        resolution.guideId,
+        { autoConfirm: true }
+      );
+
+      // Get the booking to invalidate cache
+      const booking = await this.db.query.bookings.findFirst({
+        where: and(
+          eq(bookings.id, resolution.bookingId),
+          eq(bookings.organizationId, this.organizationId)
+        ),
+      });
+
+      if (booking?.bookingDate) {
+        this.invalidateDispatchCache(booking.bookingDate);
+      }
+
+      this.logger.info(`Resolved warning ${warningId}: assigned guide ${resolution.guideId} to booking ${resolution.bookingId}`);
+      return;
+    }
+
+    // If tourRunKey is provided, assign to all bookings in that tour run
+    if (resolution.tourRunKey) {
+      const [tourId, dateStr, time] = resolution.tourRunKey.split("|");
+
+      if (!tourId || !dateStr || !time) {
+        throw new ValidationError(`Invalid tourRunKey format: ${resolution.tourRunKey}. Expected: tourId|YYYY-MM-DD|HH:MM`);
+      }
+
+      // Find all bookings for this tour run
+      const tourRunBookings = await this.db.query.bookings.findMany({
+        where: and(
+          eq(bookings.organizationId, this.organizationId),
+          eq(bookings.tourId, tourId),
+          sql`${bookings.bookingDate}::text = ${dateStr}`,
+          eq(bookings.bookingTime, time),
+          inArray(bookings.status, ["pending", "confirmed"])
+        ),
+      });
+
+      if (tourRunBookings.length === 0) {
+        throw new ValidationError(`No bookings found for tour run: ${resolution.tourRunKey}`);
+      }
+
+      // Assign guide to each booking (skip if already assigned)
+      let assignedCount = 0;
+      for (const booking of tourRunBookings) {
+        try {
+          await this.guideAssignmentService.assignGuideToBooking(
+            booking.id,
+            resolution.guideId,
+            { autoConfirm: true }
+          );
+          assignedCount++;
+        } catch (error) {
+          // Skip if already assigned (ConflictError)
+          if (error instanceof ConflictError) {
+            this.logger.debug(`Guide already assigned to booking ${booking.id}, skipping`);
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      // Invalidate cache for the date
+      const date = new Date(dateStr);
+      this.invalidateDispatchCache(date);
+
+      this.logger.info(`Resolved warning ${warningId}: assigned guide ${resolution.guideId} to ${assignedCount} bookings in tour run ${resolution.tourRunKey}`);
+      return;
+    }
+
+    throw new ValidationError("Either bookingId or tourRunKey required for assign_guide action");
+  }
+
+  /**
+   * Resolve warning by adding an external/outsourced guide
+   * For now, this creates an outsourced guide assignment if name is provided,
+   * otherwise marks the resolution as needing external guide arrangement.
+   */
+  private async resolveAddExternal(warningId: string, resolution: WarningResolution): Promise<void> {
+    // If external guide details are provided, create the outsourced assignment
+    if (resolution.externalGuideName && resolution.tourRunKey) {
+      const [tourId, dateStr, time] = resolution.tourRunKey.split("|");
+
+      if (!tourId || !dateStr || !time) {
+        throw new ValidationError(`Invalid tourRunKey format: ${resolution.tourRunKey}`);
+      }
+
+      // Find bookings for this tour run
+      const tourRunBookings = await this.db.query.bookings.findMany({
+        where: and(
+          eq(bookings.organizationId, this.organizationId),
+          eq(bookings.tourId, tourId),
+          sql`${bookings.bookingDate}::text = ${dateStr}`,
+          eq(bookings.bookingTime, time),
+          inArray(bookings.status, ["pending", "confirmed"])
+        ),
+      });
+
+      if (tourRunBookings.length === 0) {
+        throw new ValidationError(`No bookings found for tour run: ${resolution.tourRunKey}`);
+      }
+
+      // Assign outsourced guide to each booking
+      let assignedCount = 0;
+      for (const booking of tourRunBookings) {
+        try {
+          await this.guideAssignmentService.assignOutsourcedGuideToBooking(
+            {
+              bookingId: booking.id,
+              outsourcedGuideName: resolution.externalGuideName,
+              outsourcedGuideContact: resolution.externalGuideContact,
+              notes: `Added via warning resolution ${warningId}`,
+            },
+            { autoConfirm: true }
+          );
+          assignedCount++;
+        } catch (error) {
+          // Skip if already assigned
+          if (error instanceof ConflictError) {
+            this.logger.debug(`Outsourced guide already assigned to booking ${booking.id}, skipping`);
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      // Invalidate cache
+      const date = new Date(dateStr);
+      this.invalidateDispatchCache(date);
+
+      this.logger.info(`Resolved warning ${warningId}: added external guide "${resolution.externalGuideName}" to ${assignedCount} bookings`);
+      return;
+    }
+
+    // If no external guide details provided, log the intent
+    // This is a placeholder for future external guide booking flow
+    this.logger.info(`Warning ${warningId}: External guide needed for tour run ${resolution.tourRunKey || "unknown"}. Manual arrangement required.`);
+
+    // For now, we don't throw - this allows the UI to mark the warning as "acknowledged"
+    // In a future phase, this could trigger an Inngest event to notify operations team
+  }
+
+  /**
+   * Resolve warning by cancelling a tour run
+   * This is a significant action - cancels all bookings for a tour run.
+   * For safety, this implementation requires explicit tourRunKey and logs the action.
+   */
+  private async resolveCancelTour(warningId: string, resolution: WarningResolution): Promise<void> {
+    if (!resolution.tourRunKey) {
+      throw new ValidationError(
+        "tourRunKey is required for cancel_tour action. " +
+        "Format: tourId|YYYY-MM-DD|HH:MM"
+      );
+    }
+
+    const [tourId, dateStr, time] = resolution.tourRunKey.split("|");
+
+    if (!tourId || !dateStr || !time) {
+      throw new ValidationError(`Invalid tourRunKey format: ${resolution.tourRunKey}. Expected: tourId|YYYY-MM-DD|HH:MM`);
+    }
+
+    // Find all bookings for this tour run
+    const tourRunBookings = await this.db.query.bookings.findMany({
+      where: and(
+        eq(bookings.organizationId, this.organizationId),
+        eq(bookings.tourId, tourId),
+        sql`${bookings.bookingDate}::text = ${dateStr}`,
+        eq(bookings.bookingTime, time),
+        inArray(bookings.status, ["pending", "confirmed"])
+      ),
+    });
+
+    if (tourRunBookings.length === 0) {
+      this.logger.warn(`No active bookings found for tour run: ${resolution.tourRunKey}`);
+      return;
+    }
+
+    // Mark all bookings as cancelled
+    // Note: In a full implementation, this should:
+    // 1. Trigger refund processing
+    // 2. Send cancellation emails to customers
+    // 3. Notify assigned guides
+    // For now, we update the status and log
+    const bookingIds = tourRunBookings.map((b) => b.id);
+
+    await this.db
+      .update(bookings)
+      .set({
+        status: "cancelled",
+        internalNotes: sql`COALESCE(${bookings.internalNotes}, '') || E'\n[' || NOW() || '] Cancelled via warning resolution: ${warningId}'`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          inArray(bookings.id, bookingIds)
+        )
+      );
+
+    // Cancel any guide assignments
+    for (const booking of tourRunBookings) {
+      try {
+        const assignments = await this.guideAssignmentService.getAssignmentsForBooking(booking.id);
+        for (const assignment of assignments) {
+          if (assignment.status === "confirmed" || assignment.status === "pending") {
+            await this.guideAssignmentService.cancelAssignment(assignment.id);
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to cancel assignments for booking ${booking.id}: ${error}`);
+      }
+    }
+
+    // Invalidate cache
+    const date = new Date(dateStr);
+    this.invalidateDispatchCache(date);
+
+    this.logger.warn(
+      `Resolved warning ${warningId}: CANCELLED tour run ${resolution.tourRunKey} ` +
+      `affecting ${tourRunBookings.length} bookings. IDs: ${bookingIds.join(", ")}`
+    );
+
+    // TODO [Phase 7.4]: Emit 'tour_run.cancelled' Inngest event for:
+    // - Customer notification emails
+    // - Refund processing
+    // - Guide notification
+  }
+
+  /**
+   * Resolve warning by splitting a booking across multiple guides
+   * This is a complex operation that would split guests from one booking
+   * into separate bookings, each assigned to different guides.
+   *
+   * For now, this logs the intended split and provides guidance on what data is needed.
+   * Full implementation requires:
+   * - Creating new bookings with subset of participants
+   * - Updating original booking participant count
+   * - Assigning different guides to each split
+   */
+  private async resolveSplitBooking(warningId: string, resolution: WarningResolution): Promise<void> {
+    if (!resolution.splitConfig) {
+      throw new ValidationError(
+        "splitConfig is required for split_booking action. " +
+        "Expected format: { bookingId: string, splits: [{ guideId: string, guestCount: number }] }"
+      );
+    }
+
+    const { bookingId, splits } = resolution.splitConfig;
+
+    if (!bookingId) {
+      throw new ValidationError("splitConfig.bookingId is required");
+    }
+
+    if (!splits || splits.length === 0) {
+      throw new ValidationError("splitConfig.splits must contain at least one split configuration");
+    }
+
+    // Verify the booking exists
+    const booking = await this.db.query.bookings.findFirst({
+      where: and(
+        eq(bookings.id, bookingId),
+        eq(bookings.organizationId, this.organizationId)
+      ),
+    });
+
+    if (!booking) {
+      throw new NotFoundError("Booking", bookingId);
+    }
+
+    // Validate total guest count matches
+    const totalSplitGuests = splits.reduce((sum, s) => sum + s.guestCount, 0);
+    if (totalSplitGuests !== booking.totalParticipants) {
+      throw new ValidationError(
+        `Split guest count (${totalSplitGuests}) does not match booking total (${booking.totalParticipants})`
+      );
+    }
+
+    // Log the intended split for now
+    // Full implementation would create new bookings and assign guides
+    this.logger.info(
+      `Warning ${warningId}: Split booking requested for booking ${bookingId}. ` +
+      `Total guests: ${booking.totalParticipants}. ` +
+      `Splits: ${splits.map((s) => `${s.guestCount} guests -> guide ${s.guideId}`).join(", ")}`
+    );
+
+    // For now, we can at least assign the first guide to the original booking
+    // This partially resolves the warning
+    if (splits.length > 0 && splits[0]?.guideId) {
+      try {
+        await this.guideAssignmentService.assignGuideToBooking(
+          bookingId,
+          splits[0].guideId,
+          { autoConfirm: true }
+        );
+        this.logger.info(`Assigned primary guide ${splits[0].guideId} to booking ${bookingId}`);
+      } catch (error) {
+        if (!(error instanceof ConflictError)) {
+          throw error;
+        }
+        // Guide already assigned, that's fine
+      }
+    }
+
+    // Invalidate cache
+    if (booking.bookingDate) {
+      this.invalidateDispatchCache(booking.bookingDate);
+    }
+
+    // TODO [Phase 7.3]: Implement full split functionality:
+    // 1. Create new bookings for each split (except first)
+    // 2. Move participants to new bookings
+    // 3. Update original booking participant count
+    // 4. Assign guides to each split booking
+    this.logger.warn(
+      `Split booking for ${bookingId} partially implemented. ` +
+      `Full split functionality pending Phase 7.3.`
+    );
+  }
+
+  /**
+   * Invalidate the dispatch status cache for a specific date
+   */
+  private invalidateDispatchCache(date: Date): void {
+    const dateKey = this.formatDateKey(date);
+    const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId);
+    if (orgCache) {
+      orgCache.delete(dateKey);
     }
   }
 
@@ -1203,6 +1813,59 @@ export class CommandCenterService extends BaseService {
   }
 
   /**
+   * Batch check if multiple customers are first-time bookers
+   * Returns a Map of customerId -> isFirstTime
+   */
+  private async batchCheckFirstTimeCustomers(customerIds: string[]): Promise<Map<string, boolean>> {
+    const result = new Map<string, boolean>();
+
+    if (customerIds.length === 0) {
+      return result;
+    }
+
+    // Deduplicate customer IDs
+    const uniqueCustomerIds = [...new Set(customerIds)];
+
+    try {
+      // Single query to count completed bookings per customer
+      const completedCounts = await this.db
+        .select({
+          customerId: bookings.customerId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.organizationId, this.organizationId),
+            inArray(bookings.customerId, uniqueCustomerIds),
+            eq(bookings.status, "completed")
+          )
+        )
+        .groupBy(bookings.customerId);
+
+      // Build lookup map
+      const countMap = new Map<string, number>();
+      for (const row of completedCounts) {
+        countMap.set(row.customerId, row.count);
+      }
+
+      // Set results: isFirstTime = true if count is 0 or not found
+      for (const customerId of uniqueCustomerIds) {
+        const count = countMap.get(customerId) ?? 0;
+        result.set(customerId, count === 0);
+      }
+    } catch (error) {
+      this.logger.error({ err: error, customerIds: uniqueCustomerIds }, "Failed to batch check first-time customers");
+      // Fallback: assume all are first-time to avoid blocking
+      for (const customerId of uniqueCustomerIds) {
+        result.set(customerId, true);
+      }
+    }
+
+    return result;
+  }
+
+  /**
    * Get guide availability details for a specific date
    */
   private async getGuideAvailabilityForDate(guideId: string, date: Date): Promise<{
@@ -1377,6 +2040,7 @@ export class CommandCenterService extends BaseService {
         label: `Assign to ${guide.guide.firstName} ${guide.guide.lastName}`,
         action: "assign_guide",
         guideId: guide.guide.id,
+        tourRunKey: run.key, // Include tour run key for resolution
         impactMinutes: 0, // TODO [Phase 7.3]: Calculate actual impact
       });
     }
@@ -1386,6 +2050,15 @@ export class CommandCenterService extends BaseService {
       id: "res_add_external",
       label: "Add External Guide",
       action: "add_external",
+      tourRunKey: run.key, // Include tour run key for resolution
+    });
+
+    // Add cancel tour option for severe staffing issues
+    resolutions.push({
+      id: "res_cancel_tour",
+      label: "Cancel Tour Run",
+      action: "cancel_tour",
+      tourRunKey: run.key,
     });
 
     return resolutions;

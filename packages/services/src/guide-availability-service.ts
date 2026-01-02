@@ -308,15 +308,16 @@ export class GuideAvailabilityService extends BaseService {
   async getOverrideForDate(guideId: string, date: Date): Promise<GuideAvailabilityOverride | null> {
     await this.verifyGuideOwnership(guideId);
 
-    // Normalize date to start of day
+    // Normalize date to start of day and format as ISO string for SQL
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
+    const dateStr = normalizedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
 
     const override = await this.db.query.guideAvailabilityOverrides.findFirst({
       where: and(
         eq(guideAvailabilityOverrides.organizationId, this.organizationId),
         eq(guideAvailabilityOverrides.guideId, guideId),
-        sql`DATE(${guideAvailabilityOverrides.date}) = DATE(${normalizedDate})`
+        sql`DATE(${guideAvailabilityOverrides.date}) = ${dateStr}::DATE`
       ),
     });
 

@@ -76,8 +76,9 @@ END:VCALENDAR`;
         );
         alert("Link copied to clipboard!");
       }
-    } catch {
-      // User cancelled or error
+    } catch (error) {
+      // User cancelled share dialog or clipboard error - expected behavior
+      console.debug("Share action cancelled or failed:", error);
     }
   };
 

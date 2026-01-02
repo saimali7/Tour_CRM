@@ -22,6 +22,7 @@ import {
   type SortOptions,
   NotFoundError,
 } from "./types";
+import { sanitizeEmailHtml } from "./lib/sanitize";
 
 // ============================================
 // Communication Log Types
@@ -381,11 +382,17 @@ export class CommunicationService extends BaseService {
   }
 
   async createEmailTemplate(input: CreateEmailTemplateInput): Promise<EmailTemplate> {
+    // Sanitize HTML content to prevent XSS attacks
+    const sanitizedInput = {
+      ...input,
+      contentHtml: sanitizeEmailHtml(input.contentHtml),
+    };
+
     const [template] = await this.db
       .insert(emailTemplates)
       .values({
         organizationId: this.organizationId,
-        ...input,
+        ...sanitizedInput,
       })
       .returning();
 
@@ -397,10 +404,16 @@ export class CommunicationService extends BaseService {
   }
 
   async updateEmailTemplate(id: string, input: UpdateEmailTemplateInput): Promise<EmailTemplate> {
+    // Sanitize HTML content if provided to prevent XSS attacks
+    const sanitizedInput = {
+      ...input,
+      ...(input.contentHtml && { contentHtml: sanitizeEmailHtml(input.contentHtml) }),
+    };
+
     const [template] = await this.db
       .update(emailTemplates)
       .set({
-        ...input,
+        ...sanitizedInput,
         updatedAt: new Date(),
       })
       .where(

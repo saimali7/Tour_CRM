@@ -25,6 +25,9 @@ import {
   type GuestBreakdown,
   type CalculatedPrice,
 } from "./pricing-calculator-service";
+import { createServiceLogger } from "./lib/logger";
+
+const logger = createServiceLogger("availability");
 
 // ============================================================
 // TYPES
@@ -165,7 +168,7 @@ export class AvailabilityService extends BaseService {
       });
     } catch (error) {
       // Table might not exist yet - fall through to legacy handling
-      console.warn("[AvailabilityService] booking_options query failed, using legacy fallback:", error);
+      logger.warn({ err: error, tourId }, "booking_options query failed, using legacy fallback");
     }
 
     // If no options configured, create a default "legacy" option from tour data

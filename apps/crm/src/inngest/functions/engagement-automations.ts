@@ -1,5 +1,5 @@
 import { inngest } from "../client";
-import { createServices } from "@tour/services";
+import { createServices, logger } from "@tour/services";
 import { format } from "date-fns";
 
 /**
@@ -155,8 +155,9 @@ export const checkAvailabilityAlerts = inngest.createFunction(
             const customer = await services.customer.getById(alert.customerId);
             customerName = `${customer.firstName} ${customer.lastName || ""}`.trim();
             customerFirstName = customer.firstName;
-          } catch {
+          } catch (error) {
             // Customer not found, use defaults
+            logger.debug({ err: error, customerId: alert.customerId }, "Customer not found for availability alert, using defaults");
           }
         }
 
@@ -266,8 +267,9 @@ export const checkPriceDrops = inngest.createFunction(
             customerEmail = customer.email;
             customerName = `${customer.firstName} ${customer.lastName || ""}`.trim();
             customerFirstName = customer.firstName;
-          } catch {
+          } catch (error) {
             // Customer not found, use wishlist email
+            logger.debug({ err: error, customerId: wishlist.customerId }, "Customer not found for price drop notification, using wishlist email");
           }
         }
 

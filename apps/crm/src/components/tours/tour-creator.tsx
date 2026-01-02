@@ -562,7 +562,8 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
             if (scheduleResult.created.length > 0) {
               toast.success(`Created ${scheduleResult.created.length} schedules`);
             }
-          } catch {
+          } catch (error) {
+            console.debug("Failed to auto-generate schedules:", error);
             toast.error("Tour saved but failed to create schedules");
           }
         }

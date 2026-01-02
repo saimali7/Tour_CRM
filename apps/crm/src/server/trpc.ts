@@ -8,6 +8,7 @@ import {
   createRateLimitKey,
   RATE_LIMITS,
 } from "../lib/rate-limit";
+import { logger } from "@tour/services";
 
 /**
  * tRPC context type
@@ -35,8 +36,8 @@ export const createContext = async (opts: {
   if (orgSlug) {
     try {
       orgContext = await getOrgContext(orgSlug);
-    } catch {
-      // User might not have access to this org
+    } catch (error) {
+      logger.debug({ err: error, orgSlug }, "User may not have access to this org");
     }
   }
 
@@ -142,7 +143,7 @@ export const bulkProcedure = adminProcedure.use(async ({ ctx, next }) => {
     "bulk"
   );
 
-  const result = checkRateLimit(key, RATE_LIMITS.bulk);
+  const result = await checkRateLimit(key, RATE_LIMITS.bulk);
 
   if (!result.allowed) {
     throw new TRPCError({
@@ -162,7 +163,7 @@ export const sensitiveProcedure = adminProcedure.use(async ({ ctx, next }) => {
     "sensitive"
   );
 
-  const result = checkRateLimit(key, RATE_LIMITS.sensitive);
+  const result = await checkRateLimit(key, RATE_LIMITS.sensitive);
 
   if (!result.allowed) {
     throw new TRPCError({

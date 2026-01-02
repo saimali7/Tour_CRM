@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { PricingModel, CapacityModel } from "@tour/validators";
+import type { BookingOption } from "@tour/database";
 
 // ============================================================================
 // TYPES
@@ -331,8 +332,7 @@ export function TourBookingOptionsTab({ tourId }: TourBookingOptionsTabProps) {
     };
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleOpenModal = (option?: any) => {
+  const handleOpenModal = (option?: BookingOption) => {
     if (option) {
       setEditingId(option.id);
       const pm = option.pricingModel as PricingModel;
@@ -428,8 +428,7 @@ export function TourBookingOptionsTab({ tourId }: TourBookingOptionsTabProps) {
     return `$${(amount / 100).toFixed(0)}`;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const getPricingDescription = (pm: any): string => {
+  const getPricingDescription = (pm: PricingModel): string => {
     switch (pm.type) {
       case "per_person": {
         const adultTier = pm.tiers?.find((t: { name: string }) => t.name === "adult");
@@ -448,16 +447,14 @@ export function TourBookingOptionsTab({ tourId }: TourBookingOptionsTabProps) {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const getCapacityDescription = (cm: any): string => {
+  const getCapacityDescription = (cm: CapacityModel): string => {
     if (cm.type === "shared") {
       return `${cm.totalSeats} seats`;
     }
     return `${cm.totalUnits} units × ${cm.occupancyPerUnit} people`;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const getExperienceIcon = (pm: any) => {
+  const getExperienceIcon = (pm: PricingModel) => {
     switch (pm.type) {
       case "per_person":
         return <Users className="h-4 w-4" />;

@@ -1,17 +1,21 @@
 /**
- * Simple in-memory rate limiter for tRPC procedures
+ * Redis-based rate limiter for tRPC procedures
  *
- * For production at scale with multiple instances, upgrade to:
- * - @upstash/ratelimit with Redis
- * - Or a centralized rate limiting service
+ * Uses sliding window algorithm with Redis for:
+ * - Persistence across restarts
+ * - Shared state across multiple instances
+ * - Automatic TTL-based cleanup
  *
- * This implementation uses a sliding window algorithm with automatic cleanup.
+ * Falls back to allowing requests if Redis is unavailable.
  */
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
+import {
+  getCache,
+  CachePrefix,
+  createServiceLogger,
+} from "@tour/services";
+
+const logger = createServiceLogger("rate-limit");
 
 interface RateLimitConfig {
   /** Maximum requests allowed in the window */
@@ -20,68 +24,99 @@ interface RateLimitConfig {
   windowMs: number;
 }
 
-// Store rate limit entries in memory
-// Key format: `${identifier}:${endpoint}`
-const store = new Map<string, RateLimitEntry>();
-
-// Cleanup old entries every 5 minutes
-const CLEANUP_INTERVAL = 5 * 60 * 1000;
-let lastCleanup = Date.now();
-
-function cleanup() {
-  const now = Date.now();
-  if (now - lastCleanup < CLEANUP_INTERVAL) return;
-
-  lastCleanup = now;
-  for (const [key, entry] of store.entries()) {
-    if (entry.resetAt < now) {
-      store.delete(key);
-    }
-  }
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetIn: number;
 }
 
 /**
- * Check rate limit for an identifier
- * @returns true if request is allowed, false if rate limited
+ * Check rate limit for an identifier using Redis
+ * @returns Result indicating if request is allowed
+ *
+ * Implementation uses Redis INCR with EXPIRE for simple fixed-window rate limiting.
+ * Keys automatically expire after the window duration.
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   identifier: string,
   config: RateLimitConfig
-): { allowed: boolean; remaining: number; resetIn: number } {
-  cleanup();
+): Promise<RateLimitResult> {
+  const cache = getCache();
+  const key = `${CachePrefix.RATE_LIMIT}${identifier}`;
+  const ttlSeconds = Math.ceil(config.windowMs / 1000);
 
-  const now = Date.now();
-  const entry = store.get(identifier);
+  try {
+    // Increment counter - returns current count after increment
+    // If key doesn't exist, it's created with value 1
+    // TTL is set on first increment (when count === 1)
+    const count = await cache.increment(key, ttlSeconds);
 
-  // No existing entry or expired - create new window
-  if (!entry || entry.resetAt < now) {
-    store.set(identifier, {
-      count: 1,
-      resetAt: now + config.windowMs,
-    });
+    // If Redis returned 0, it means there was an error
+    // Fall back to allowing the request
+    if (count === 0) {
+      logger.warn({ identifier }, "Redis increment returned 0, allowing request");
+      return {
+        allowed: true,
+        remaining: config.limit - 1,
+        resetIn: config.windowMs,
+      };
+    }
+
+    const allowed = count <= config.limit;
+    const remaining = Math.max(0, config.limit - count);
+
+    // Get actual TTL for more accurate resetIn
+    // Use cache's internal method to get TTL
+    const resetIn = await getRemainingTTL(key, config.windowMs);
+
+    if (!allowed) {
+      logger.debug(
+        { identifier, count, limit: config.limit, resetIn },
+        "Rate limit exceeded"
+      );
+    }
+
+    return {
+      allowed,
+      remaining,
+      resetIn,
+    };
+  } catch (error) {
+    // On any error, fail open - allow the request
+    // This prevents Redis issues from blocking all requests
+    logger.error({ err: error, identifier }, "Rate limit check failed, allowing request");
     return {
       allowed: true,
       remaining: config.limit - 1,
       resetIn: config.windowMs,
     };
   }
+}
 
-  // Within window - check limit
-  if (entry.count >= config.limit) {
-    return {
-      allowed: false,
-      remaining: 0,
-      resetIn: entry.resetAt - now,
-    };
+/**
+ * Get remaining TTL for a rate limit key
+ * Falls back to the default window if TTL cannot be retrieved
+ */
+async function getRemainingTTL(key: string, defaultMs: number): Promise<number> {
+  try {
+    // Access the underlying Redis client through the cache service
+    // We need to use PTTL (milliseconds) for more precise timing
+    const cache = getCache();
+    // @ts-expect-error - accessing private redis property for TTL check
+    const redis = await cache.ensureConnection?.() || cache["redis"];
+
+    if (redis) {
+      const fullKey = `tour:${key}`;
+      const ttl = await redis.pttl(fullKey);
+      // PTTL returns -2 if key doesn't exist, -1 if no TTL set
+      if (ttl > 0) {
+        return ttl;
+      }
+    }
+  } catch {
+    // Ignore errors, use default
   }
-
-  // Increment count
-  entry.count++;
-  return {
-    allowed: true,
-    remaining: config.limit - entry.count,
-    resetIn: entry.resetAt - now,
-  };
+  return defaultMs;
 }
 
 /**
@@ -111,7 +146,15 @@ export function createRateLimitKey(
   orgId: string | undefined,
   endpoint: string
 ): string {
-  // Use user ID if available, otherwise fall back to a hash or IP
+  // Use user ID if available, otherwise fall back to org or anonymous
   const identifier = userId || orgId || "anonymous";
   return `${identifier}:${endpoint}`;
 }
+
+/**
+ * Alternative rate limiter object interface for consistency
+ * Kept for backwards compatibility if needed
+ */
+export const rateLimiter = {
+  check: checkRateLimit,
+};

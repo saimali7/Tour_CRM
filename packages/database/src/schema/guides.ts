@@ -1,8 +1,9 @@
-import { pgTable, text, timestamp, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, jsonb, index, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { users } from "./users";
+import { pickupZones } from "./pickup-zones";
 
 // Guides - Tour guides (org-scoped, optionally linked to a user)
 export const guides = pgTable("guides", {
@@ -40,6 +41,11 @@ export const guides = pgTable("guides", {
   emergencyContactName: text("emergency_contact_name"),
   emergencyContactPhone: text("emergency_contact_phone"),
 
+  // Vehicle / Dispatch info
+  vehicleCapacity: integer("vehicle_capacity").notNull().default(6),
+  vehicleDescription: text("vehicle_description"), // "Toyota Land Cruiser"
+  baseZoneId: text("base_zone_id").references(() => pickupZones.id, { onDelete: "set null" }),
+
   // Status
   status: text("status").$type<GuideStatus>().notNull().default("active"),
   isPublic: boolean("is_public").default(false), // Show on booking website
@@ -65,6 +71,10 @@ export const guidesRelations = relations(guides, ({ one }) => ({
   user: one(users, {
     fields: [guides.userId],
     references: [users.id],
+  }),
+  baseZone: one(pickupZones, {
+    fields: [guides.baseZoneId],
+    references: [pickupZones.id],
   }),
 }));
 

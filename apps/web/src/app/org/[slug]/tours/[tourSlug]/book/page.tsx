@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { requireOrganization } from "@/lib/organization";
-import { createServices } from "@tour/services";
+import { createServices, logger } from "@tour/services";
 import { BookingFlow } from "@/components/booking-flow";
 
 interface PageProps {
@@ -24,7 +24,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         follow: false,
       },
     };
-  } catch {
+  } catch (error) {
+    logger.debug({ err: error, tourSlug, orgSlug: slug }, "Tour not found for metadata generation");
     return {
       title: "Book Tour",
     };
@@ -46,7 +47,8 @@ export default async function BookTourPage({ params, searchParams }: PageProps) 
   let tour;
   try {
     tour = await services.tour.getBySlug(tourSlug);
-  } catch {
+  } catch (error) {
+    logger.debug({ err: error, tourSlug, orgSlug: slug }, "Tour not found for booking page");
     notFound();
   }
 
@@ -59,8 +61,9 @@ export default async function BookTourPage({ params, searchParams }: PageProps) 
   let schedule;
   try {
     schedule = await services.schedule.getById(scheduleId);
-  } catch {
+  } catch (error) {
     // Schedule not found, redirect to tour page
+    logger.debug({ err: error, scheduleId, tourSlug }, "Schedule not found for booking page");
     redirect(`/tours/${tourSlug}`);
   }
 

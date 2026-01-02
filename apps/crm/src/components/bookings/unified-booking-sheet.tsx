@@ -520,7 +520,8 @@ export function UnifiedBookingSheet({
           phone: newCustomer.phone.trim() || undefined,
         });
         customerId = customer.id;
-      } catch {
+      } catch (error) {
+        console.debug("Failed to create customer:", error);
         return;
       }
     }
@@ -558,12 +559,14 @@ export function UnifiedBookingSheet({
             amount: paymentAmount,
             method: paymentMethod,
           });
-        } catch {
+        } catch (error) {
+          console.debug("Failed to record payment:", error);
           toast.warning("Booking created but payment recording failed");
         }
       }
-    } catch {
-      // Error handled by mutation
+    } catch (error) {
+      // Error handled by mutation, log for debugging
+      console.debug("Booking creation error:", error);
     }
   };
 

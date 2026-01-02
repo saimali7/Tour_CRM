@@ -39,6 +39,7 @@ import { checkInRouter } from "./check-in";
 import { depositRouter } from "./deposit";
 // Phase 7: Operations Excellence
 import { goalRouter } from "./goal";
+import { commandCenterRouter } from "./command-center";
 // Booking System v2: Customer-first booking
 import { bookingOptionsRouter } from "./booking-options";
 import { availabilityRouter } from "./availability";
@@ -89,6 +90,7 @@ export const appRouter = createRouter({
   deposit: depositRouter,
   // Phase 7: Operations Excellence
   goal: goalRouter,
+  commandCenter: commandCenterRouter,
   // Booking System v2: Customer-first booking
   bookingOptions: bookingOptionsRouter,
   availability: availabilityRouter,

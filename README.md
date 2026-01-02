@@ -88,6 +88,8 @@ Customer-facing booking website.
 - [CLAUDE.md](./CLAUDE.md) - Quick reference and code patterns
 - [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Technical architecture and decisions
 - [docs/PROGRESS.md](./docs/PROGRESS.md) - Implementation tracker (source of truth)
+- [docs/CODEBASE_ORGANIZATION.md](./docs/CODEBASE_ORGANIZATION.md) - New developer onboarding guide
+- [docs/DESIGN_SYSTEM_V2.md](./docs/DESIGN_SYSTEM_V2.md) - UI patterns and tokens
 - [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Production deployment guide
 - [docs/INFRASTRUCTURE_PLAN.md](./docs/INFRASTRUCTURE_PLAN.md) - Self-hosted infrastructure
 - [docs/TECHNICAL_DEBT.md](./docs/TECHNICAL_DEBT.md) - Technical debt analysis

@@ -537,6 +537,7 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 | **7.3** | Intelligence Surface | 1 week | ✅ COMPLETE |
 | **7.4** | High-Impact Features | 3 weeks | ✅ COMPLETE |
 | **7.5** | Guide Mobile PWA | 1 week | ⬜ TODO |
+| **7.6** | **Guide Dispatch System** | 2 weeks | 🔄 NEXT |
 
 ### 7.1 Production Completion ✅ COMPLETE
 
@@ -603,6 +604,70 @@ Mobile-first experience for guides:
 | Push notifications | ⬜ TODO |
 | Mobile-first UI | ⬜ TODO |
 | Check-in from phone | ⬜ TODO |
+
+### 7.6 Tour Command Center 🔄 NEXT (Critical Core Feature)
+
+> **Full Design:** See [`docs/GUIDE_DISPATCH_SYSTEM.md`](./GUIDE_DISPATCH_SYSTEM.md)
+
+The operations nerve center — **computer solves the puzzle, humans review and dispatch**.
+
+**Design Philosophy (Jobs/Ive Approved):**
+- Computer does the work (auto-optimization overnight)
+- Human provides judgment (review and approve)
+- Time is the truth (horizontal timeline primary view)
+- Drive time is visible (segmented tape visualization)
+- Guests are people, not inventory (surface human details)
+- Completion has ceremony (celebration when ready)
+
+**The Flow:**
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   OVERNIGHT  │────▶│   MORNING    │────▶│    REVIEW    │────▶│   DISPATCH   │
+│  Auto-Solve  │     │ Open Command │     │   Warnings   │     │  Send Guides │
+│   @ 4 AM     │     │    Center    │     │  (if any)    │     │  Manifests   │
+└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
+```
+
+**States:**
+1. **Optimized** — Algorithm solved the day, ready for review
+2. **Needs Review** — Warnings to resolve (tap to pick from suggestions)
+3. **Ready to Dispatch** — All clear, one button to send
+4. **Dispatched** — Locked, guides notified
+
+**Implementation Phases:**
+
+| Phase | Focus | Duration | Status |
+|-------|-------|----------|--------|
+| **Foundation** | Schema, services, algorithm | 3 days | ⬜ TODO |
+| **Timeline UI** | Guide rows, segmented tape, time axis | 4 days | ⬜ TODO |
+| **Warnings & Resolution** | Exception handling, tap-to-resolve | 2 days | ⬜ TODO |
+| **Adjust Mode** | Power user drag-drop, ghost preview | 2 days | ⬜ TODO |
+| **Dispatch & Polish** | Notifications, animations, completion | 2 days | ⬜ TODO |
+
+**Schema Additions:**
+```typescript
+// New tables
+pickup_zones: { id, name, color, center_lat, center_lng }
+zone_travel_times: { from_zone_id, to_zone_id, estimated_minutes }
+dispatch_status: { dispatch_date, status, efficiency_score }
+
+// Enhanced fields
+guides.vehicleCapacity: integer (default: 6)
+guides.baseZoneId: text
+bookings.pickupZoneId: text
+bookings.pickupLocation: text
+bookings.specialOccasion: text
+guideAssignments.pickupOrder: integer
+guideAssignments.calculatedPickupTime: text
+```
+
+**Key UI Elements:**
+- 📊 **Status Banner** — Optimized / Needs Review / Ready / Dispatched
+- ⏱️ **Segmented Tape** — Drive (░) → Pickup (▓) → Tour (█)
+- 🎨 **Confidence Colors** — Green/Blue/Amber/Red (not zone colors)
+- 👤 **Guest Cards** — Full human details, special occasions, requests
+- ⚡ **Tap-to-Resolve** — Warnings show actionable choices, not drag puzzles
 
 ### Previously Completed (Review System)
 

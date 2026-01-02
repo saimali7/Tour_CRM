@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db, organizations, eq } from "@tour/database";
-import { createServices } from "@tour/services";
+import { createServices, logger } from "@tour/services";
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
     let booking;
     try {
       booking = await services.booking.getByReference(referenceNumber.toUpperCase());
-    } catch {
+    } catch (error) {
+      logger.debug({ err: error, referenceNumber, orgSlug }, "Booking not found by reference number");
       return NextResponse.json(
         { message: "Booking not found. Please check your reference number." },
         { status: 404 }
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Booking lookup error:", error);
+    logger.error({ err: error }, "Booking lookup failed");
     return NextResponse.json(
       { message: "Failed to look up booking" },
       { status: 500 }
