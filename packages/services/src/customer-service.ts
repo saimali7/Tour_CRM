@@ -16,6 +16,8 @@ import {
   type SortOptions,
   NotFoundError,
   ConflictError,
+  ValidationError,
+  ServiceError,
 } from "./types";
 
 export interface CustomerFilters {
@@ -224,7 +226,7 @@ export class CustomerService extends BaseService {
   async create(input: CreateCustomerInput): Promise<Customer> {
     // Validation: Must have email OR phone
     if (!input.email && !input.phone) {
-      throw new Error("Customer must have either email or phone number");
+      throw new ValidationError("Customer must have either email or phone number", { contact: ["Either email or phone is required"] });
     }
 
     // Check for duplicate email if email is provided
@@ -261,7 +263,7 @@ export class CustomerService extends BaseService {
       .returning();
 
     if (!customer) {
-      throw new Error("Failed to create customer");
+      throw new ServiceError("Failed to create customer", "CREATE_FAILED", 500);
     }
 
     return customer;
@@ -285,7 +287,7 @@ export class CustomerService extends BaseService {
     const updatedPhone = input.phone !== undefined ? input.phone : existingCustomer.phone;
 
     if (!updatedEmail && !updatedPhone) {
-      throw new Error("Customer must have either email or phone number");
+      throw new ValidationError("Customer must have either email or phone number", { contact: ["Either email or phone is required"] });
     }
 
     if (input.email) {

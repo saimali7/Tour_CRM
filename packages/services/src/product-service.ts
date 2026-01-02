@@ -16,6 +16,7 @@ import {
   type SortOptions,
   NotFoundError,
   ConflictError,
+  ServiceError,
 } from "./types";
 
 export interface ProductFilters {
@@ -371,7 +372,7 @@ export class ProductService extends BaseService {
       .returning();
 
     if (!product) {
-      throw new Error("Failed to create product");
+      throw new ServiceError("Failed to create product", "CREATE_FAILED", 500);
     }
 
     return product;

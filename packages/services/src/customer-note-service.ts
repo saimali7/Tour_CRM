@@ -9,6 +9,7 @@ import {
   type PaginatedResult,
   type SortOptions,
   NotFoundError,
+  ServiceError,
 } from "./types";
 
 export type CustomerNoteSortField = "createdAt";
@@ -97,7 +98,7 @@ export class CustomerNoteService extends BaseService {
       .returning();
 
     if (!note) {
-      throw new Error("Failed to create customer note");
+      throw new ServiceError("Failed to create customer note", "CREATE_FAILED", 500);
     }
 
     return note;

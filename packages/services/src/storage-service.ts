@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { logger } from "./lib/logger";
+import { ServiceError, ForbiddenError } from "./types";
 
 // Default bucket name
 const DEFAULT_BUCKET = "tour-images";
@@ -61,8 +62,10 @@ function createS3Client(config?: S3Config): S3Client {
   const cfg = config || getS3Config();
 
   if (!cfg.endpoint || !cfg.accessKey || !cfg.secretKey) {
-    throw new Error(
-      "S3 storage not configured. Set S3_ENDPOINT, S3_ACCESS_KEY, and S3_SECRET_KEY environment variables."
+    throw new ServiceError(
+      "S3 storage not configured. Set S3_ENDPOINT, S3_ACCESS_KEY, and S3_SECRET_KEY environment variables.",
+      "STORAGE_NOT_CONFIGURED",
+      503
     );
   }
 
@@ -173,7 +176,7 @@ export class StorageService {
   async delete(path: string): Promise<void> {
     // Ensure path starts with org folder (security)
     if (!path.startsWith(`${this.organizationId}/`)) {
-      throw new Error("Cannot delete files outside organization folder");
+      throw new ForbiddenError("Cannot delete files outside organization folder");
     }
 
     await this.s3.send(
@@ -191,7 +194,7 @@ export class StorageService {
     // Verify all paths belong to organization
     for (const path of paths) {
       if (!path.startsWith(`${this.organizationId}/`)) {
-        throw new Error("Cannot delete files outside organization folder");
+        throw new ForbiddenError("Cannot delete files outside organization folder");
       }
     }
 
@@ -213,7 +216,7 @@ export class StorageService {
   async getSignedUrl(path: string, expiresIn: number = 3600): Promise<string> {
     // Security: Ensure path belongs to this organization
     if (!path.startsWith(`${this.organizationId}/`)) {
-      throw new Error("Cannot access files outside organization folder");
+      throw new ForbiddenError("Cannot access files outside organization folder");
     }
 
     const command = new GetObjectCommand({

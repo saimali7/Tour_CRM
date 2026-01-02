@@ -3,6 +3,7 @@ import { guideTokens, guides, organizations } from "@tour/database/schema";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { randomBytes, createHash } from "crypto";
+import { ServiceError } from "@tour/services";
 
 const COOKIE_NAME = "guide-portal-token";
 
@@ -13,7 +14,7 @@ const COOKIE_NAME = "guide-portal-token";
 function getJwtSecret(): Uint8Array {
   const jwtSecret = process.env.GUIDE_JWT_SECRET;
   if (!jwtSecret) {
-    throw new Error("GUIDE_JWT_SECRET environment variable must be set");
+    throw new ServiceError("GUIDE_JWT_SECRET environment variable must be set", "CONFIG_MISSING", 503);
   }
   return new TextEncoder().encode(jwtSecret);
 }

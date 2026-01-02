@@ -512,8 +512,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                 isDefault: true,
               });
               toast.success("Booking option created");
-            } catch (optionError) {
-              console.error("Failed to create booking option:", optionError);
+            } catch {
               // Don't fail the whole flow, the tour is created
             }
           }

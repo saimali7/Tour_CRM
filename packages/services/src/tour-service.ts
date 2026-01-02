@@ -20,6 +20,7 @@ import {
   type SortOptions,
   NotFoundError,
   ConflictError,
+  ServiceError,
 } from "./types";
 
 export interface TourFilters {
@@ -343,7 +344,7 @@ export class TourService extends BaseService {
         .returning();
 
       if (!product) {
-        throw new Error("Failed to create product");
+        throw new ServiceError("Failed to create product", "CREATE_FAILED", 500);
       }
 
       // 2. Create tour with productId (extension table)
@@ -389,7 +390,7 @@ export class TourService extends BaseService {
         .returning();
 
       if (!tour) {
-        throw new Error("Failed to create tour");
+        throw new ServiceError("Failed to create tour", "CREATE_FAILED", 500);
       }
 
       return { ...tour, product };
@@ -733,7 +734,7 @@ export class TourService extends BaseService {
       .returning();
 
     if (!tier) {
-      throw new Error("Failed to create pricing tier");
+      throw new ServiceError("Failed to create pricing tier", "CREATE_FAILED", 500);
     }
 
     return tier;
@@ -946,7 +947,7 @@ export class TourService extends BaseService {
       .returning();
 
     if (!variant) {
-      throw new Error("Failed to create variant");
+      throw new ServiceError("Failed to create variant", "CREATE_FAILED", 500);
     }
 
     return variant;

@@ -23,6 +23,11 @@ import {
 import { BaseService } from "./base-service";
 import { TourAvailabilityService } from "./tour-availability-service";
 import { NotFoundError } from "./types";
+import {
+  validateBookingWithRelationsArray,
+  validateBookingWithDateFieldsArray,
+} from "./lib/type-guards";
+import { createTourRunKey, formatDateForKey } from "./lib/tour-run-utils";
 
 // =============================================================================
 // TYPES
@@ -261,7 +266,8 @@ export class TourRunService extends BaseService {
       },
     });
 
-    // Cast to expected type (Drizzle relations are loaded but TS doesn't know)
+    // Validate that relations are loaded, then cast to internal type
+    validateBookingWithDateFieldsArray(dateBookingsRaw, "TourRunService.getForDateRange");
     const dateBookings = dateBookingsRaw as unknown as Array<
       BookingWithRelations & { tourId: string | null; bookingDate: Date | null; bookingTime: string | null }
     >;
@@ -280,7 +286,7 @@ export class TourRunService extends BaseService {
         continue; // Skip bookings that don't have the new fields yet
       }
 
-      const key = `${booking.tourId}|${this.formatDateForKey(booking.bookingDate)}|${booking.bookingTime}`;
+      const key = createTourRunKey(booking.tourId, booking.bookingDate, booking.bookingTime);
 
       if (!runMap.has(key)) {
         runMap.set(key, {
@@ -344,7 +350,7 @@ export class TourRunService extends BaseService {
     }
 
     // Get bookings for this tour run
-    const dateStr = this.formatDateForKey(date);
+    const dateStr = formatDateForKey(date);
     const runBookingsRaw = await this.db.query.bookings.findMany({
       where: and(
         eq(bookings.organizationId, this.organizationId),
@@ -359,7 +365,8 @@ export class TourRunService extends BaseService {
       },
     });
 
-    // Cast to expected type
+    // Validate that relations are loaded, then cast to internal type
+    validateBookingWithRelationsArray(runBookingsRaw, "TourRunService.get");
     const runBookings = runBookingsRaw as unknown as BookingWithRelations[];
 
     return this.buildTourRun({
@@ -389,7 +396,7 @@ export class TourRunService extends BaseService {
     }
 
     // Get bookings for this tour run with participants
-    const dateStr = this.formatDateForKey(date);
+    const dateStr = formatDateForKey(date);
     const runBookingsRaw = await this.db.query.bookings.findMany({
       where: and(
         eq(bookings.organizationId, this.organizationId),
@@ -405,7 +412,8 @@ export class TourRunService extends BaseService {
       orderBy: [asc(bookings.createdAt)],
     });
 
-    // Cast to expected type
+    // Validate that relations are loaded, then cast to internal type
+    validateBookingWithRelationsArray(runBookingsRaw, "TourRunService.getManifest");
     const runBookings = runBookingsRaw as unknown as BookingWithRelations[];
 
     // Get guide assignments for bookings in this run
@@ -702,7 +710,4 @@ export class TourRunService extends BaseService {
     };
   }
 
-  private formatDateForKey(date: Date): string {
-    return date.toISOString().split("T")[0]!;
-  }
 }

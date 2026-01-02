@@ -15,6 +15,9 @@ import {
   type PaginatedResult,
   type SortOptions,
   NotFoundError,
+  ConflictError,
+  ValidationError,
+  ServiceError,
 } from "./types";
 
 export type ReviewSortField = "createdAt" | "overallRating";
@@ -310,7 +313,7 @@ export class ReviewService extends BaseService {
     // Check if review already exists for this booking
     const existing = await this.getByBookingId(input.bookingId);
     if (existing) {
-      throw new Error("A review already exists for this booking");
+      throw new ConflictError("A review already exists for this booking");
     }
 
     // Validate rating values
@@ -341,7 +344,7 @@ export class ReviewService extends BaseService {
       .returning();
 
     if (!review) {
-      throw new Error("Failed to create review");
+      throw new ServiceError("Failed to create review", "CREATE_FAILED", 500);
     }
 
     return review;
@@ -636,7 +639,7 @@ export class ReviewService extends BaseService {
 
   private validateRating(rating: number, field: string): void {
     if (rating < 1 || rating > 5) {
-      throw new Error(`${field} must be between 1 and 5`);
+      throw new ValidationError(`${field} must be between 1 and 5`, { [field]: ["Must be between 1 and 5"] });
     }
   }
 }

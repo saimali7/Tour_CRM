@@ -13,6 +13,7 @@ import {
   type PaginatedResult,
   type SortOptions,
   NotFoundError,
+  ServiceError,
 } from "./types";
 
 export interface AbandonedCartFilters {
@@ -206,7 +207,7 @@ export class AbandonedCartService extends BaseService {
       .returning();
 
     if (!cart) {
-      throw new Error("Failed to create abandoned cart");
+      throw new ServiceError("Failed to create abandoned cart", "CREATE_FAILED", 500);
     }
 
     return cart;

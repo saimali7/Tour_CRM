@@ -11,7 +11,7 @@ import type {
   VoucherType,
   VoucherStatus,
 } from "@tour/database/schema";
-import type { ServiceContext } from "./types";
+import { type ServiceContext, ServiceError, ValidationError } from "./types";
 
 export class VoucherService {
   constructor(private ctx: ServiceContext) {}
@@ -143,7 +143,7 @@ export class VoucherService {
 
     const voucher = results[0];
     if (!voucher) {
-      throw new Error("Failed to create voucher");
+      throw new ServiceError("Failed to create voucher", "CREATE_FAILED", 500);
     }
     return voucher;
   }
@@ -482,6 +482,6 @@ export class VoucherService {
       attempts++;
     }
 
-    throw new Error("Failed to generate unique voucher code");
+    throw new ServiceError("Failed to generate unique voucher code", "GENERATION_FAILED", 500);
   }
 }

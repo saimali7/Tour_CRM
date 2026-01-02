@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import * as Sentry from "@sentry/nextjs";
 import { stripe } from "@/lib/stripe";
 import { db } from "@tour/database";
 import { bookings, customers, tours } from "@tour/database";
@@ -51,6 +52,19 @@ export async function POST(req: Request) {
     );
   } catch (err) {
     webhookLogger.error({ err }, "Webhook signature verification failed");
+
+    // Capture signature verification failures in Sentry
+    Sentry.captureException(err, {
+      tags: {
+        service: "stripe-webhook",
+        operation: "signature-verification",
+      },
+      extra: {
+        hasSignature: !!signature,
+        hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+      },
+    });
+
     return NextResponse.json(
       { error: "Webhook signature verification failed" },
       { status: 400 }
@@ -103,6 +117,21 @@ export async function POST(req: Request) {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     }, "Error processing Stripe webhook event");
+
+    // Capture payment processing errors in Sentry with full context
+    Sentry.captureException(error, {
+      tags: {
+        service: "stripe-webhook",
+        operation: "event-processing",
+        eventType: event.type,
+      },
+      extra: {
+        eventId: event.id,
+        eventType: event.type,
+        livemode: event.livemode,
+        created: new Date(event.created * 1000).toISOString(),
+      },
+    });
 
     // Return 500 to trigger Stripe retry - include event ID for correlation
     // Don't expose internal error details to the webhook caller

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { AlertOctagon, RefreshCw, Home, ArrowLeft, Bug } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
+import { logger } from "@tour/services";
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -17,7 +18,7 @@ interface ErrorProps {
 export default function DashboardError({ error, reset }: ErrorProps) {
   useEffect(() => {
     // Log the error to an error reporting service
-    console.error("Dashboard error:", error);
+    logger.error({ err: error, digest: error.digest }, "Dashboard error");
   }, [error]);
 
   return (

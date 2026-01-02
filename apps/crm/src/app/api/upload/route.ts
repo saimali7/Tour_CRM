@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createStorageService } from "@tour/services";
+import * as Sentry from "@sentry/nextjs";
+import { createStorageService, createServiceLogger } from "@tour/services";
 import { config } from "@tour/config";
 import { getOrgContext } from "@/lib/auth";
+
+const log = createServiceLogger("upload");
 
 /**
  * Allowed upload folders - whitelist to prevent path traversal attacks
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // SECURITY: Validate folder against whitelist to prevent path traversal
     if (!isAllowedFolder(rawFolder)) {
-      console.warn(`Upload rejected: Invalid folder "${rawFolder}" from org ${organizationId}`);
+      log.warn({ folder: rawFolder, organizationId }, "Upload rejected: Invalid folder");
       return NextResponse.json(
         {
           error: "Invalid upload folder",
@@ -109,7 +112,19 @@ export async function POST(request: NextRequest) {
       uploads: results,
     });
   } catch (error) {
-    console.error("Upload error:", error);
+    log.error({ err: error }, "Upload error");
+
+    // Capture upload failures in Sentry
+    Sentry.captureException(error, {
+      tags: {
+        service: "upload",
+        operation: "file-upload",
+      },
+      extra: {
+        fileCount: "unknown", // Can't access formData after error
+      },
+    });
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Upload failed" },
       { status: 500 }
@@ -158,7 +173,16 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete error:", error);
+    log.error({ err: error }, "Delete error");
+
+    // Capture delete failures in Sentry
+    Sentry.captureException(error, {
+      tags: {
+        service: "upload",
+        operation: "file-delete",
+      },
+    });
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Delete failed" },
       { status: 500 }

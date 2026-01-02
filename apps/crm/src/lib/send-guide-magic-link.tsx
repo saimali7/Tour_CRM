@@ -1,3 +1,4 @@
+import { logger, ServiceError } from "@tour/services";
 import { generateGuideMagicLink } from "./guide-auth";
 
 // Dynamic email sending using fetch to avoid build-time dependency
@@ -5,7 +6,7 @@ async function sendEmail(to: string, subject: string, html: string, fromName: st
   try {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      throw new Error("RESEND_API_KEY environment variable must be set");
+      throw new ServiceError("RESEND_API_KEY environment variable must be set", "CONFIG_MISSING", 503);
     }
 
     // Use fetch API to call Resend directly
@@ -112,7 +113,7 @@ export async function sendGuideMagicLink(
     // Use environment variable or fallback for development
     const appUrl = baseUrl || process.env.NEXT_PUBLIC_APP_URL;
     if (!appUrl) {
-      throw new Error("NEXT_PUBLIC_APP_URL environment variable must be set or baseUrl must be provided");
+      throw new ServiceError("NEXT_PUBLIC_APP_URL environment variable must be set or baseUrl must be provided", "CONFIG_MISSING", 503);
     }
 
     // Generate the magic link
@@ -127,14 +128,14 @@ export async function sendGuideMagicLink(
     );
 
     if (error) {
-      console.error("Failed to send guide magic link email:", error);
+      logger.error({ err: error, guideId, guideEmail }, "Failed to send guide magic link email");
       return { success: false, error: error.message };
     }
 
     return { success: true, messageId: id };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    console.error("Failed to send guide magic link:", errorMessage);
+    logger.error({ err, guideId, guideEmail }, "Failed to send guide magic link");
     return { success: false, error: errorMessage };
   }
 }

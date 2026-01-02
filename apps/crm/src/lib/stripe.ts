@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { ServiceError } from "@tour/services";
 
 // Lazy initialization to avoid breaking the app when STRIPE_SECRET_KEY is not set
 let _stripe: Stripe | null = null;
@@ -6,7 +7,7 @@ let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
   if (!_stripe) {
     if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error("Missing STRIPE_SECRET_KEY environment variable");
+      throw new ServiceError("Missing STRIPE_SECRET_KEY environment variable", "CONFIG_MISSING", 503);
     }
     _stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   }

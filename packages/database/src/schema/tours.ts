@@ -95,6 +95,7 @@ export const tours = pgTable("tours", {
   statusIdx: index("tours_status_idx").on(table.status),
   publicIdx: index("tours_public_idx").on(table.isPublic),
   productIdx: index("tours_product_idx").on(table.productId),
+  orgStatusIdx: index("tours_org_status_idx").on(table.organizationId, table.status),
 }));
 
 // Tour Pricing Tiers - Different price categories (Adult, Child, Senior, etc.)

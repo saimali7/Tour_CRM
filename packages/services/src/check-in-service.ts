@@ -6,7 +6,7 @@ import {
   tours,
 } from "@tour/database/schema";
 import type { CheckedInStatus } from "@tour/database/schema";
-import type { ServiceContext } from "./types";
+import { type ServiceContext, NotFoundError } from "./types";
 
 /**
  * Tour run check-in status result
@@ -416,7 +416,7 @@ export class CheckInService {
       .limit(1);
 
     if (booking.length === 0) {
-      throw new Error("Booking not found in specified tour run");
+      throw new NotFoundError("Booking");
     }
 
     // Check in all participants for this booking

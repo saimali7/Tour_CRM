@@ -11,6 +11,7 @@ import {
   type PaginationOptions,
   type PaginatedResult,
   NotFoundError,
+  ServiceError,
 } from "./types";
 
 export interface AvailabilityAlertWithRelations extends AvailabilityAlert {
@@ -146,7 +147,7 @@ export class AvailabilityAlertService extends BaseService {
       .returning();
 
     if (!alert) {
-      throw new Error("Failed to create availability alert");
+      throw new ServiceError("Failed to create availability alert", "CREATE_FAILED", 500);
     }
 
     return alert;

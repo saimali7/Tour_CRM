@@ -49,6 +49,7 @@ export const customers = pgTable("customers", {
   orgIdx: index("customers_org_idx").on(table.organizationId),
   emailIdx: index("customers_email_idx").on(table.email),
   nameIdx: index("customers_name_idx").on(table.firstName, table.lastName),
+  orgCreatedAtIdx: index("customers_org_created_at_idx").on(table.organizationId, table.createdAt),
 }));
 
 // Relations

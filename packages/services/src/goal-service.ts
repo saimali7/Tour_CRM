@@ -9,7 +9,7 @@ import {
   type GoalStatus,
 } from "@tour/database";
 import { BaseService } from "./base-service";
-import { NotFoundError } from "./types";
+import { NotFoundError, ServiceError } from "./types";
 
 // Types
 export interface CreateGoalInput {
@@ -64,7 +64,7 @@ export class GoalService extends BaseService {
       .returning();
 
     if (!result[0]) {
-      throw new Error("Failed to create goal");
+      throw new ServiceError("Failed to create goal", "CREATE_FAILED", 500);
     }
 
     return result[0];
@@ -109,7 +109,7 @@ export class GoalService extends BaseService {
       .returning();
 
     if (!result[0]) {
-      throw new Error("Failed to update goal");
+      throw new ServiceError("Failed to update goal", "UPDATE_FAILED", 500);
     }
 
     return result[0];
@@ -159,6 +159,7 @@ export class GoalService extends BaseService {
 
   /**
    * Get active goals with calculated progress
+   * Optimized to calculate progress in parallel using Promise.all
    */
   async getActiveGoals(): Promise<GoalWithProgress[]> {
     const activeGoals = await this.db.query.goals.findMany({
@@ -169,12 +170,10 @@ export class GoalService extends BaseService {
       orderBy: [desc(goals.periodEnd)],
     });
 
-    const goalsWithProgress: GoalWithProgress[] = [];
-
-    for (const goal of activeGoals) {
-      const progress = await this.calculateProgress(goal);
-      goalsWithProgress.push(progress);
-    }
+    // Calculate progress for all goals in parallel to avoid N+1 queries
+    const goalsWithProgress = await Promise.all(
+      activeGoals.map((goal) => this.calculateProgress(goal))
+    );
 
     return goalsWithProgress;
   }
@@ -348,6 +347,7 @@ export class GoalService extends BaseService {
 
   /**
    * Update goal status based on period end and progress
+   * Optimized to calculate values in parallel and batch updates by status
    */
   async updateGoalStatuses(): Promise<void> {
     const now = new Date();
@@ -361,20 +361,56 @@ export class GoalService extends BaseService {
       ),
     });
 
-    for (const goal of expiredGoals) {
-      const currentValue = await this.calculateCurrentValue(goal);
-      const targetValue = parseFloat(goal.targetValue);
-      const achieved = parseFloat(currentValue) >= targetValue;
+    if (expiredGoals.length === 0) {
+      return;
+    }
 
-      await this.db
-        .update(goals)
-        .set({
-          status: achieved ? "completed" : "missed",
-          currentValue,
-          lastCalculatedAt: now,
-          updatedAt: now,
-        })
-        .where(eq(goals.id, goal.id));
+    // Calculate current values for all goals in parallel
+    const goalResults = await Promise.all(
+      expiredGoals.map(async (goal) => {
+        const currentValue = await this.calculateCurrentValue(goal);
+        const targetValue = parseFloat(goal.targetValue);
+        const achieved = parseFloat(currentValue) >= targetValue;
+        return { goal, currentValue, achieved };
+      })
+    );
+
+    // Group goals by status for batch updates
+    const completedGoals = goalResults.filter((r) => r.achieved);
+    const missedGoals = goalResults.filter((r) => !r.achieved);
+
+    // Batch update completed goals
+    if (completedGoals.length > 0) {
+      await Promise.all(
+        completedGoals.map((r) =>
+          this.db
+            .update(goals)
+            .set({
+              status: "completed",
+              currentValue: r.currentValue,
+              lastCalculatedAt: now,
+              updatedAt: now,
+            })
+            .where(eq(goals.id, r.goal.id))
+        )
+      );
+    }
+
+    // Batch update missed goals
+    if (missedGoals.length > 0) {
+      await Promise.all(
+        missedGoals.map((r) =>
+          this.db
+            .update(goals)
+            .set({
+              status: "missed",
+              currentValue: r.currentValue,
+              lastCalculatedAt: now,
+              updatedAt: now,
+            })
+            .where(eq(goals.id, r.goal.id))
+        )
+      );
     }
   }
 

@@ -428,14 +428,12 @@ export function CustomerFirstBookingSheet({
             amount: paymentAmount,
             method: paymentMethod,
           });
-        } catch (error) {
-          console.debug("Failed to record payment:", error);
+        } catch {
           toast.warning("Booking created but payment recording failed");
         }
       }
-    } catch (error) {
-      // Error handled by mutation, log for debugging
-      console.debug("Booking creation error:", error);
+    } catch {
+      // Error handled by mutation's onError callback
     }
   };
 

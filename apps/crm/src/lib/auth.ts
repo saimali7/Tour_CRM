@@ -2,6 +2,8 @@ import { db, eq, and } from "@tour/database";
 import { users, organizationMembers, organizations } from "@tour/database/schema";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
+import * as Sentry from "@sentry/nextjs";
+import { authLogger, UnauthorizedError, NotFoundError, ForbiddenError } from "@tour/services";
 
 /**
  * Authentication configuration
@@ -20,10 +22,10 @@ const DEV_AUTH_BYPASS_ENABLED =
 
 // Log warning if dev auth bypass is enabled
 if (DEV_AUTH_BYPASS_ENABLED) {
-  console.warn(
-    "\n⚠️  WARNING: Dev auth bypass is enabled. All authentication is being bypassed.\n" +
-    "   This should NEVER be used in production.\n" +
-    "   Set DEV_AUTH_BYPASS=false or remove it to enable proper authentication.\n"
+  authLogger.warn(
+    "Dev auth bypass is enabled. All authentication is being bypassed. " +
+    "This should NEVER be used in production. " +
+    "Set DEV_AUTH_BYPASS=false or remove it to enable proper authentication."
   );
 }
 
@@ -46,7 +48,7 @@ export const getCurrentUser = cache(async () => {
   if (DEV_AUTH_BYPASS_ENABLED) {
     const devUser = await db.query.users.findFirst();
     if (!devUser) {
-      console.warn("DEV AUTH BYPASS: No users found in database. Please seed the database.");
+      authLogger.warn("DEV AUTH BYPASS: No users found in database. Please seed the database.");
     }
     return devUser || null;
   }
@@ -150,14 +152,40 @@ export const getOrgContext = cache(async (orgSlug: string): Promise<OrgContext> 
   const user = await getCurrentUser();
 
   if (!user) {
-    throw new Error("Unauthorized: No user found");
+    const error = new UnauthorizedError("No authenticated user found");
+    // Track auth failures in Sentry for security monitoring
+    Sentry.captureException(error, {
+      tags: {
+        service: "auth",
+        operation: "get-org-context",
+        errorType: "no-user",
+      },
+      extra: {
+        orgSlug,
+      },
+      level: "warning",
+    });
+    throw error;
   }
 
   // Get organization by slug - cached
   const org = await getCachedOrganization(orgSlug);
 
   if (!org) {
-    throw new Error("Organization not found");
+    const error = new NotFoundError("Organization");
+    Sentry.captureException(error, {
+      tags: {
+        service: "auth",
+        operation: "get-org-context",
+        errorType: "org-not-found",
+      },
+      extra: {
+        orgSlug,
+        userId: user.id,
+      },
+      level: "warning",
+    });
+    throw error;
   }
 
   // Dev mode bypass - skip membership check ONLY in development with explicit flag
@@ -188,7 +216,23 @@ export const getOrgContext = cache(async (orgSlug: string): Promise<OrgContext> 
   if (!membership) {
     // Check if user is super admin
     if (!user.isSuperAdmin) {
-      throw new Error("Access denied: Not a member of this organization");
+      const error = new ForbiddenError("Not a member of this organization");
+      // Track unauthorized access attempts for security monitoring
+      Sentry.captureException(error, {
+        tags: {
+          service: "auth",
+          operation: "get-org-context",
+          errorType: "access-denied",
+        },
+        extra: {
+          orgSlug,
+          organizationId: org.id,
+          userId: user.id,
+          userEmail: user.email,
+        },
+        level: "warning",
+      });
+      throw error;
     }
   }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, publicProcedure } from "../trpc";
-import { createServices } from "@tour/services";
+import { createServices, validateGuidePortalBookingArray, createTourRunKey } from "@tour/services";
 import { TRPCError } from "@trpc/server";
 import { getGuideContext } from "../../lib/guide-auth";
 import { db, eq, and, gte, lte, inArray } from "@tour/database";
@@ -79,7 +79,7 @@ export const guidePortalRouter = createRouter({
         booking.bookingDate <= nextWeek &&
         (booking.status === "pending" || booking.status === "confirmed")
       ) {
-        const tourRunKey = `${booking.tourId}|${booking.bookingDate.toISOString().split("T")[0]}|${booking.bookingTime}`;
+        const tourRunKey = createTourRunKey(booking.tourId!, booking.bookingDate, booking.bookingTime);
         if (!tourRunMap.has(tourRunKey)) {
           tourRunMap.set(tourRunKey, {
             tourId: booking.tourId!,
@@ -296,8 +296,8 @@ export const guidePortalRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const { guideId, organizationId } = ctx.guideContext;
 
-      const dateStr = input.date.toISOString().split("T")[0];
-      const tourRunKey = `${input.tourId}|${dateStr}|${input.time}`;
+      const dateStr = input.date.toISOString().split("T")[0]!;
+      const tourRunKey = createTourRunKey(input.tourId, dateStr, input.time);
 
       // Verify the guide is assigned to this tour run (via any booking on this tour run)
       const allAssignments = await db.query.guideAssignments.findMany({
@@ -314,7 +314,7 @@ export const guidePortalRouter = createRouter({
       const hasTourRunAssignment = allAssignments.some((a) => {
         const booking = a.booking;
         if (!booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) return false;
-        const assignmentTourRunKey = `${booking.tourId}|${booking.bookingDate.toISOString().split("T")[0]}|${booking.bookingTime}`;
+        const assignmentTourRunKey = createTourRunKey(booking.tourId!, booking.bookingDate!, booking.bookingTime!);
         return assignmentTourRunKey === tourRunKey;
       });
 
@@ -330,7 +330,7 @@ export const guidePortalRouter = createRouter({
         tour: { id: string; name: string; maxParticipants: number } | null;
         customer: { id: string; firstName: string; lastName: string; email: string | null } | null;
       };
-      const tourRunBookings = await db.query.bookings.findMany({
+      const tourRunBookingsRaw = await db.query.bookings.findMany({
         where: and(
           eq(bookings.tourId, input.tourId),
           eq(bookings.organizationId, organizationId),
@@ -341,7 +341,11 @@ export const guidePortalRouter = createRouter({
           tour: true,
         },
         orderBy: (bookings, { asc }) => [asc(bookings.createdAt)],
-      }) as BookingWithRelations[];
+      });
+
+      // Validate the query result has expected relations loaded
+      validateGuidePortalBookingArray(tourRunBookingsRaw, "guidePortal.getTourRunManifest");
+      const tourRunBookings = tourRunBookingsRaw as BookingWithRelations[];
 
       // Filter by date and time (date is stored as Date, need to compare)
       const filteredBookings = tourRunBookings.filter((b) => {

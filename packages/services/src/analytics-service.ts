@@ -8,7 +8,7 @@ import {
   type BookingSource,
 } from "@tour/database";
 import { BaseService } from "./base-service";
-import { type DateRangeFilter } from "./types";
+import { type DateRangeFilter, ValidationError } from "./types";
 import { createServiceLogger } from "./lib/logger";
 
 const logger = createServiceLogger("analytics");
@@ -143,7 +143,7 @@ export class AnalyticsService extends BaseService {
     const { from, to } = dateRange;
 
     if (!from || !to) {
-      throw new Error("Both from and to dates are required for revenue stats");
+      throw new ValidationError("Both from and to dates are required for revenue stats");
     }
 
     // Calculate previous period for comparison
@@ -364,7 +364,7 @@ export class AnalyticsService extends BaseService {
     const { from, to } = dateRange;
 
     if (!from || !to) {
-      throw new Error("Both from and to dates are required for booking stats");
+      throw new ValidationError("Both from and to dates are required for booking stats");
     }
 
     // Overall stats (using bookingDate for lead time calculation)
@@ -540,7 +540,7 @@ export class AnalyticsService extends BaseService {
     const { from, to } = dateRange;
 
     if (!from || !to) {
-      throw new Error("Both from and to dates are required for capacity utilization");
+      throw new ValidationError("Both from and to dates are required for capacity utilization");
     }
 
     const fromStr = from.toISOString().split("T")[0]!;

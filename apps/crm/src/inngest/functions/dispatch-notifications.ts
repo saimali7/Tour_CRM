@@ -1,7 +1,10 @@
 import { inngest } from "../client";
+import * as Sentry from "@sentry/nextjs";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
-import { createServices } from "@tour/services";
+import { createServices, createServiceLogger } from "@tour/services";
 import { formatInTimeZone } from "date-fns-tz";
+
+const log = createServiceLogger("dispatch");
 
 /**
  * Dispatch Notifications
@@ -148,10 +151,28 @@ export const sendDispatchNotifications = inngest.createFunction(
               };
             }
           } catch (error) {
-            console.error(
-              `Failed to send dispatch notification to guide ${guideTimeline.guide.id}:`,
-              error
+            log.error(
+              { err: error, guideId: guideTimeline.guide.id },
+              "Failed to send dispatch notification to guide"
             );
+
+            // Capture dispatch notification failures in Sentry
+            Sentry.captureException(error, {
+              tags: {
+                service: "inngest",
+                operation: "dispatch-notification",
+                function: "send-dispatch-notifications",
+              },
+              extra: {
+                organizationId,
+                dispatchDate,
+                guideId: guideTimeline.guide.id,
+                guideName: `${guideTimeline.guide.firstName} ${guideTimeline.guide.lastName}`,
+                guideEmail: guideTimeline.guide.email,
+                tourCount: tourSegments.length,
+              },
+            });
+
             return {
               guideId: guideTimeline.guide.id,
               guideName: `${guideTimeline.guide.firstName} ${guideTimeline.guide.lastName}`,

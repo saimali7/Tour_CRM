@@ -5,6 +5,7 @@ import { organizations } from "./organizations";
 import { customers } from "./customers";
 import { tours } from "./tours";
 import { pickupZones } from "./pickup-zones";
+import type { PricingModel, ExperienceMode } from "./booking-options";
 
 // Bookings - Customer reservations (org-scoped)
 export const bookings = pgTable("bookings", {
@@ -53,8 +54,8 @@ export const bookings = pgTable("bookings", {
   pricingSnapshot: jsonb("pricing_snapshot").$type<{
     optionId?: string;
     optionName?: string;
-    pricingModel?: unknown;
-    experienceMode?: "join" | "book" | "charter";
+    pricingModel?: PricingModel;
+    experienceMode?: ExperienceMode;
     priceBreakdown?: string;
   }>(),
 

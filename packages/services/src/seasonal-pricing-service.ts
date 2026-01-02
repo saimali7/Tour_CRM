@@ -7,6 +7,7 @@ import {
   type SortOptions,
   NotFoundError,
   ValidationError,
+  ServiceError,
 } from "./types";
 
 export interface SeasonalPricingFilters {
@@ -171,7 +172,7 @@ export class SeasonalPricingService extends BaseService {
       .returning();
 
     if (!pricing) {
-      throw new Error("Failed to create seasonal pricing");
+      throw new ServiceError("Failed to create seasonal pricing", "CREATE_FAILED", 500);
     }
 
     return pricing;

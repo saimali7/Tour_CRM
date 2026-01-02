@@ -39,6 +39,13 @@ import { GuideAvailabilityService } from "./guide-availability-service";
 import { TourGuideQualificationService } from "./tour-guide-qualification-service";
 import { TourRunService, type TourRun as BaseTourRun } from "./tour-run-service";
 import { createServiceLogger } from "./lib/logger";
+import { createTourRunKey, parseTourRunKey, formatDateForKey } from "./lib/tour-run-utils";
+import { requireEntity } from "./lib/validation-helpers";
+import {
+  validateBookingWithRelationsArray,
+  validateGuideAssignmentWithRelationsArray,
+  validateBookingWithRelations,
+} from "./lib/type-guards";
 
 // =============================================================================
 // INTERNAL TYPES
@@ -400,7 +407,8 @@ export class CommandCenterService extends BaseService {
       },
     });
 
-    // Cast to proper type with relations
+    // Validate that relations are loaded, then cast to internal type
+    validateBookingWithRelationsArray(dateBookings, "CommandCenterService.getTourRuns");
     const typedBookings = dateBookings as unknown as BookingWithRelations[];
 
     // Group bookings by tour + time
@@ -415,7 +423,7 @@ export class CommandCenterService extends BaseService {
         continue;
       }
 
-      const key = `${booking.tourId}|${dateStr}|${booking.bookingTime}`;
+      const key = createTourRunKey(booking.tourId, dateStr, booking.bookingTime);
 
       if (!runMap.has(key)) {
         runMap.set(key, {
@@ -495,6 +503,7 @@ export class CommandCenterService extends BaseService {
           })
         : [];
 
+      validateGuideAssignmentWithRelationsArray(assignmentsRaw, "CommandCenterService.getTourRuns.assignments");
       const assignments = assignmentsRaw as unknown as GuideAssignmentWithRelations[];
 
       // Build unique guides list
@@ -828,7 +837,7 @@ export class CommandCenterService extends BaseService {
         }
 
         const runMap = guideRunMaps.get(row.guideId)!;
-        const key = `${row.tourId}|${dateStr}|${row.bookingTime}`;
+        const key = createTourRunKey(row.tourId, dateStr, row.bookingTime);
 
         const existing = runMap.get(key);
         if (existing) {
@@ -1242,11 +1251,7 @@ export class CommandCenterService extends BaseService {
 
     // If tourRunKey is provided, assign to all bookings in that tour run
     if (resolution.tourRunKey) {
-      const [tourId, dateStr, time] = resolution.tourRunKey.split("|");
-
-      if (!tourId || !dateStr || !time) {
-        throw new ValidationError(`Invalid tourRunKey format: ${resolution.tourRunKey}. Expected: tourId|YYYY-MM-DD|HH:MM`);
-      }
+      const { tourId, date: dateStr, time } = parseTourRunKey(resolution.tourRunKey);
 
       // Find all bookings for this tour run
       const tourRunBookings = await this.db.query.bookings.findMany({
@@ -1559,29 +1564,31 @@ export class CommandCenterService extends BaseService {
    * Manually assign a booking to a guide
    */
   async manualAssign(bookingId: string, guideId: string): Promise<void> {
-    // Verify booking exists and belongs to org
-    const booking = await this.db.query.bookings.findFirst({
-      where: and(
-        eq(bookings.id, bookingId),
-        eq(bookings.organizationId, this.organizationId)
-      ),
-    });
+    // Verify booking exists and belongs to org (using shared validation helper)
+    const booking = await requireEntity(
+      () =>
+        this.db.query.bookings.findFirst({
+          where: and(
+            eq(bookings.id, bookingId),
+            eq(bookings.organizationId, this.organizationId)
+          ),
+        }),
+      "Booking",
+      bookingId
+    );
 
-    if (!booking) {
-      throw new NotFoundError("Booking", bookingId);
-    }
-
-    // Verify guide exists and belongs to org
-    const guide = await this.db.query.guides.findFirst({
-      where: and(
-        eq(guides.id, guideId),
-        eq(guides.organizationId, this.organizationId)
-      ),
-    });
-
-    if (!guide) {
-      throw new NotFoundError("Guide", guideId);
-    }
+    // Verify guide exists and belongs to org (using shared validation helper)
+    await requireEntity(
+      () =>
+        this.db.query.guides.findFirst({
+          where: and(
+            eq(guides.id, guideId),
+            eq(guides.organizationId, this.organizationId)
+          ),
+        }),
+      "Guide",
+      guideId
+    );
 
     // Create assignment (auto-confirm for manual assignments)
     await this.guideAssignmentService.assignGuideToBooking(bookingId, guideId, {
@@ -1638,10 +1645,17 @@ export class CommandCenterService extends BaseService {
    * Dispatch: finalize and send notifications to all guides
    */
   async dispatch(date: Date): Promise<DispatchResult> {
+    const dateStr = this.formatDateKey(date);
+    this.logger.info({ date: dateStr }, "Starting dispatch process");
+
     const status = await this.getDispatchStatus(date);
 
     // Check if ready to dispatch
     if (status.unresolvedWarnings > 0) {
+      this.logger.warn(
+        { date: dateStr, unresolvedWarnings: status.unresolvedWarnings },
+        "Dispatch failed: unresolved warnings"
+      );
       throw new ValidationError(
         `Cannot dispatch: ${status.unresolvedWarnings} unresolved warnings`
       );
@@ -1671,6 +1685,17 @@ export class CommandCenterService extends BaseService {
       status: "dispatched",
       dispatchedAt,
     });
+
+    this.logger.info(
+      {
+        date: dateStr,
+        tourRunCount: tourRuns.length,
+        guideCount: guideIds.size,
+        totalGuests: status.totalGuests,
+        dispatchedAt: dispatchedAt.toISOString(),
+      },
+      "Dispatch completed successfully"
+    );
 
     return {
       success: true,
@@ -1705,7 +1730,8 @@ export class CommandCenterService extends BaseService {
       throw new NotFoundError("Booking", bookingId);
     }
 
-    // Cast to proper type with relations
+    // Validate that relations are loaded, then cast to internal type
+    validateBookingWithRelations(bookingRaw, "CommandCenterService.getGuestDetails");
     const booking = bookingRaw as unknown as BookingWithRelations;
 
     // Check if first-time customer
@@ -1789,9 +1815,10 @@ export class CommandCenterService extends BaseService {
 
   /**
    * Format date as YYYY-MM-DD
+   * Uses shared formatDateForKey from tour-run-utils.ts
    */
   private formatDateKey(date: Date): string {
-    return date.toISOString().split("T")[0]!;
+    return formatDateForKey(date);
   }
 
   /**
@@ -1863,94 +1890,6 @@ export class CommandCenterService extends BaseService {
     }
 
     return result;
-  }
-
-  /**
-   * Get guide availability details for a specific date
-   */
-  private async getGuideAvailabilityForDate(guideId: string, date: Date): Promise<{
-    startTime: string | null;
-    endTime: string | null;
-  }> {
-    // Check for override first
-    const override = await this.guideAvailabilityService.getOverrideForDate(guideId, date);
-    if (override) {
-      return {
-        startTime: override.startTime,
-        endTime: override.endTime,
-      };
-    }
-
-    // Fall back to weekly pattern
-    const dayOfWeek = date.getDay();
-    const weeklySlots = await this.db
-      .select()
-      .from(guideAvailability)
-      .where(
-        and(
-          eq(guideAvailability.organizationId, this.organizationId),
-          eq(guideAvailability.guideId, guideId),
-          eq(guideAvailability.dayOfWeek, dayOfWeek),
-          eq(guideAvailability.isAvailable, true)
-        )
-      )
-      .orderBy(asc(guideAvailability.startTime))
-      .limit(1);
-
-    const slot = weeklySlots[0];
-    return {
-      startTime: slot?.startTime ?? null,
-      endTime: slot?.endTime ?? null,
-    };
-  }
-
-  /**
-   * Get guide assignments for a specific date
-   */
-  private async getGuideAssignmentsForDate(guideId: string, date: Date): Promise<CurrentAssignment[]> {
-    const dateStr = this.formatDateKey(date);
-
-    const assignmentsResult = await this.db
-      .select({
-        bookingId: guideAssignments.bookingId,
-        tourId: bookings.tourId,
-        tourName: tours.name,
-        bookingTime: bookings.bookingTime,
-        totalParticipants: bookings.totalParticipants,
-      })
-      .from(guideAssignments)
-      .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
-      .innerJoin(tours, eq(bookings.tourId, tours.id))
-      .where(
-        and(
-          eq(guideAssignments.organizationId, this.organizationId),
-          eq(guideAssignments.guideId, guideId),
-          eq(guideAssignments.status, "confirmed"),
-          sql`${bookings.bookingDate}::text = ${dateStr}`
-        )
-      );
-
-    // Group by tour run
-    const runMap = new Map<string, CurrentAssignment>();
-    for (const row of assignmentsResult) {
-      if (!row.tourId || !row.bookingTime) continue;
-
-      const key = `${row.tourId}|${dateStr}|${row.bookingTime}`;
-      const existing = runMap.get(key);
-
-      if (existing) {
-        existing.guestCount += row.totalParticipants;
-      } else {
-        runMap.set(key, {
-          tourRunKey: key,
-          tourName: row.tourName,
-          time: row.bookingTime,
-          guestCount: row.totalParticipants,
-        });
-      }
-    }
-
-    return Array.from(runMap.values());
   }
 
   /**

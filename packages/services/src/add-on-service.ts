@@ -10,7 +10,7 @@ import type {
   AddOnType,
   BookingAddOnStatus,
 } from "@tour/database/schema";
-import type { ServiceContext } from "./types";
+import { type ServiceContext, ServiceError } from "./types";
 
 export class AddOnService {
   constructor(private ctx: ServiceContext) {}
@@ -83,7 +83,7 @@ export class AddOnService {
 
     const product = results[0];
     if (!product) {
-      throw new Error("Failed to create add-on product");
+      throw new ServiceError("Failed to create add-on product", "CREATE_FAILED", 500);
     }
     return product;
   }
@@ -186,7 +186,7 @@ export class AddOnService {
 
     const tourAddOn = results[0];
     if (!tourAddOn) {
-      throw new Error("Failed to add add-on to tour");
+      throw new ServiceError("Failed to add add-on to tour", "CREATE_FAILED", 500);
     }
     return tourAddOn;
   }
@@ -276,7 +276,7 @@ export class AddOnService {
 
     const bookingAddOn = results[0];
     if (!bookingAddOn) {
-      throw new Error("Failed to add add-on to booking");
+      throw new ServiceError("Failed to add add-on to booking", "CREATE_FAILED", 500);
     }
     return bookingAddOn;
   }

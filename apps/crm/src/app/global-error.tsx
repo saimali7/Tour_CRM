@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { AlertOctagon, RefreshCw } from "lucide-react";
+import { logger } from "@tour/services";
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -14,7 +15,7 @@ interface GlobalErrorProps {
  */
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   useEffect(() => {
-    console.error("Global error:", error);
+    logger.error({ err: error, digest: error.digest }, "Global error");
   }, [error]);
 
   return (

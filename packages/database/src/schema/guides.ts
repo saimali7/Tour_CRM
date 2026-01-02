@@ -60,6 +60,7 @@ export const guides = pgTable("guides", {
   orgIdx: index("guides_org_idx").on(table.organizationId),
   userIdx: index("guides_user_idx").on(table.userId),
   statusIdx: index("guides_status_idx").on(table.status),
+  orgStatusIdx: index("guides_org_status_idx").on(table.organizationId, table.status),
 }));
 
 // Relations
