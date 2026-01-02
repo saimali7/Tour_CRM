@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { AlertOctagon, RefreshCw, Home, ArrowLeft, Bug } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { logger } from "@tour/services";
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -17,8 +17,13 @@ interface ErrorProps {
  */
 export default function DashboardError({ error, reset }: ErrorProps) {
   useEffect(() => {
-    // Log the error to an error reporting service
-    logger.error({ err: error, digest: error.digest }, "Dashboard error");
+    // Log to console for debugging
+    console.error("Dashboard error:", error);
+    // Report to Sentry for monitoring
+    Sentry.captureException(error, {
+      tags: { errorBoundary: "dashboard" },
+      extra: { digest: error.digest },
+    });
   }, [error]);
 
   return (
