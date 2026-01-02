@@ -143,13 +143,18 @@ hover:scale-[1.02] active:scale-[0.98]  // Buttons
 
 ## Status
 
-Phases 0-6 complete. Next: Phase 7 Operations Excellence.
+Phases 0-6 complete. Phase 7 Operations Excellence in progress:
+- 7.1 Command Center & Guide Dispatch: Complete
+- 7.2 Booking UX & Quick Actions: In progress
+- 7.3 Intelligence & Forecasting: Pending
+- 7.4 Customer-Facing Features: Pending
 
 ## Docs
 
 | Doc | Purpose |
 |-----|---------|
 | `docs/PROGRESS.md` | Implementation tracker (source of truth) |
+| `docs/TECHNICAL_DEBT.md` | Technical debt analysis & remediation plan |
 | `docs/INFRASTRUCTURE_PLAN.md` | Self-hosted infrastructure (Postgres, PgBouncer, Redis, MinIO) |
 | `docs/DESIGN_SYSTEM_V2.md` | Full design system |
 | `docs/ARCHITECTURE.md` | Domain model, schema |

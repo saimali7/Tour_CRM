@@ -5,6 +5,7 @@ import { organizations } from "./organizations";
 import { customers } from "./customers";
 import { schedules } from "./schedules";
 import { tours } from "./tours";
+import { pickupZones } from "./pickup-zones";
 
 // Bookings - Customer reservations (org-scoped)
 export const bookings = pgTable("bookings", {
@@ -23,8 +24,8 @@ export const bookings = pgTable("bookings", {
     .notNull()
     .references(() => customers.id, { onDelete: "restrict" }),
 
-  // Schedule (DEPRECATED - use tourId, bookingDate, bookingTime instead)
-  // Made nullable for migration - will be removed after migration complete
+  // Schedule reference (primary booking method)
+  // Note: tourId/bookingDate/bookingTime are alternative fields for availability-based booking
   scheduleId: text("schedule_id")
     .references(() => schedules.id, { onDelete: "restrict" }),
 
@@ -99,6 +100,18 @@ export const bookings = pgTable("bookings", {
   dietaryRequirements: text("dietary_requirements"),
   accessibilityNeeds: text("accessibility_needs"),
 
+  // =========================================================================
+  // PICKUP / DISPATCH FIELDS (Tour Command Center)
+  // =========================================================================
+  pickupZoneId: text("pickup_zone_id").references(() => pickupZones.id, { onDelete: "set null" }),
+  pickupLocation: text("pickup_location"), // Specific venue name, e.g., "Hilton Dubai Marina"
+  pickupAddress: text("pickup_address"), // Full address
+  pickupLat: numeric("pickup_lat", { precision: 10, scale: 7 }),
+  pickupLng: numeric("pickup_lng", { precision: 10, scale: 7 }),
+  pickupTime: text("pickup_time"), // Calculated pickup time, e.g., "08:15"
+  pickupNotes: text("pickup_notes"), // Additional notes, e.g., "Tower 2 lobby"
+  specialOccasion: text("special_occasion"), // "Birthday", "Anniversary", etc.
+
   // Internal notes
   internalNotes: text("internal_notes"),
 
@@ -123,6 +136,8 @@ export const bookings = pgTable("bookings", {
   bookingDateIdx: index("bookings_booking_date_idx").on(table.bookingDate),
   // Composite index for capacity computation (tour run lookups)
   tourDateTimeIdx: index("bookings_tour_date_time_idx").on(table.organizationId, table.tourId, table.bookingDate, table.bookingTime),
+  // Pickup zone index for dispatch/command center queries
+  pickupZoneIdx: index("bookings_pickup_zone_idx").on(table.pickupZoneId),
 }));
 
 // Booking participants - Individual people on a booking
@@ -185,6 +200,11 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   tour: one(tours, {
     fields: [bookings.tourId],
     references: [tours.id],
+  }),
+  // Pickup zone for dispatch/command center
+  pickupZone: one(pickupZones, {
+    fields: [bookings.pickupZoneId],
+    references: [pickupZones.id],
   }),
   participants: many(bookingParticipants),
   // Note: payments relation added in payments.ts to avoid circular dependencies

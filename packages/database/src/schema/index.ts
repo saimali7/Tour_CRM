@@ -7,7 +7,7 @@ export * from "./customers";
 export * from "./tours";
 export * from "./tour-availability"; // NEW: Availability-based scheduling
 export * from "./guides";
-export * from "./schedules"; // DEPRECATED: Will be removed after migration
+export * from "./schedules"; // Tour schedules (still actively used)
 export * from "./bookings";
 export * from "./activity-logs";
 export * from "./refunds";
@@ -37,6 +37,10 @@ export * from "./goals";
 
 // Booking System v2: Customer-first booking with options
 export * from "./booking-options";
+
+// Tour Command Center: Dispatch & Route Optimization
+export * from "./pickup-zones";
+export * from "./dispatch-status";
 
 // Products
 export * from "./products";

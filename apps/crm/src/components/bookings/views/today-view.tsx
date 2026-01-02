@@ -401,12 +401,10 @@ export function TodayView({ orgSlug }: TodayViewProps) {
                     booking={booking}
                     orgSlug={orgSlug}
                     onConfirm={(id) => {
-                      // TODO: Implement confirm action
-                      console.log("Confirm booking:", id);
+                      // TODO [Phase 7.2]: Wire booking confirmation via tRPC
                     }}
                     onSendPaymentLink={(id) => {
-                      // TODO: Implement send payment link action
-                      console.log("Send payment link:", id);
+                      // TODO [Phase 7.2]: Wire send payment link via tRPC
                     }}
                   />
                 </div>
