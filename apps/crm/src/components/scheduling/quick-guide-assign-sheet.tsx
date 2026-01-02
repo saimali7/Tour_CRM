@@ -259,7 +259,7 @@ export function QuickGuideAssignSheet({
       });
       utils.guideAssignment.invalidate();
       utils.booking.invalidate();
-      utils.schedule.invalidate();
+      utils.tourRun.invalidate();
       onSuccess?.();
       onOpenChange(false);
     },
@@ -277,7 +277,7 @@ export function QuickGuideAssignSheet({
       });
       utils.guideAssignment.invalidate();
       utils.booking.invalidate();
-      utils.schedule.invalidate();
+      utils.tourRun.invalidate();
       onSuccess?.();
       onOpenChange(false);
     },

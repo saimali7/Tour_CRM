@@ -21,14 +21,12 @@ interface BookingQuickViewProps {
   bookingId: string;
   orgSlug: string;
   onCustomerClick?: (customerId: string) => void;
-  onScheduleClick?: (scheduleId: string) => void;
 }
 
 export function BookingQuickView({
   bookingId,
   orgSlug,
   onCustomerClick,
-  onScheduleClick,
 }: BookingQuickViewProps) {
   const { data: booking, isLoading, error } = trpc.booking.getById.useQuery({ id: bookingId });
 
@@ -147,40 +145,32 @@ export function BookingQuickView({
         )}
       </div>
 
-      {/* Schedule Info */}
+      {/* Tour Details */}
       <div className="border rounded-lg p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            Tour Details
-          </h4>
-          {onScheduleClick && booking.schedule && (
-            <button
-              onClick={() => onScheduleClick(booking.schedule!.id)}
-              className="text-xs text-primary hover:underline"
-            >
-              View Schedule
-            </button>
-          )}
-        </div>
-        {booking.schedule ? (
+        <h4 className="text-sm font-medium flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          Tour Details
+        </h4>
+        {booking.tour ? (
           <div className="space-y-2">
-            {booking.tour && (
-              <p className="font-medium">{booking.tour.name}</p>
+            <p className="font-medium">{booking.tour.name}</p>
+            {booking.bookingDate && (
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(booking.bookingDate), "EEE, MMM d, yyyy")}
+                </span>
+                {booking.bookingTime && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {booking.bookingTime}
+                  </span>
+                )}
+              </div>
             )}
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {format(new Date(booking.schedule.startsAt), "EEE, MMM d, yyyy")}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {format(new Date(booking.schedule.startsAt), "h:mm a")}
-              </span>
-            </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No schedule data</p>
+          <p className="text-sm text-muted-foreground">No tour data</p>
         )}
       </div>
 

@@ -186,7 +186,7 @@ export function CustomerFirstBookingSheet({
 
   // Selected option from availability
   const [selectedOptionId, setSelectedOptionId] = useState<string>("");
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
+  const [selectedTime, setSelectedTime] = useState<string>("");
 
   // Extras
   const [pickupLocation, setPickupLocation] = useState("");
@@ -223,7 +223,7 @@ export function CustomerFirstBookingSheet({
       setDateScrollOffset(0);
       setGuestCounts({ adults: 2, children: 0, infants: 0 });
       setSelectedOptionId("");
-      setSelectedScheduleId("");
+      setSelectedTime("");
       setPickupLocation("");
       setNotes("");
       setRecordPayment(false);
@@ -310,7 +310,6 @@ export function CustomerFirstBookingSheet({
   const createBookingMutation = trpc.booking.create.useMutation({
     onSuccess: (booking) => {
       utils.booking.list.invalidate();
-      utils.schedule.list.invalidate();
       toast.success("Booking created successfully!");
       onOpenChange(false);
       router.push(`/org/${orgSlug}/bookings/${booking.id}`);
@@ -347,10 +346,10 @@ export function CustomerFirstBookingSheet({
     }
   }, [customerMode, newCustomer, selectedCustomer, selectedTourId, totalGuests, hasValidContact]);
 
-  const handleSelectOption = (optionId: string, scheduleId?: string) => {
+  const handleSelectOption = (optionId: string, time?: string) => {
     setSelectedOptionId(optionId);
-    if (scheduleId) {
-      setSelectedScheduleId(scheduleId);
+    if (time) {
+      setSelectedTime(time);
     }
     setStep("checkout");
   };
@@ -383,20 +382,13 @@ export function CustomerFirstBookingSheet({
             return;
           }
         } else {
-          // Show the actual error message instead of failing silently
-          toast.error(errorMessage || "Failed to create customer");
           return;
         }
       }
     }
 
-    if (!customerId) {
-      toast.error("Customer information is missing. Please enter customer details.");
-      return;
-    }
-
-    if (!selectedScheduleId) {
-      toast.error("Please select a time slot before booking.");
+    if (!customerId || !selectedTime) {
+      toast.error("Missing required information");
       return;
     }
 
@@ -408,11 +400,11 @@ export function CustomerFirstBookingSheet({
     try {
       const booking = await createBookingMutation.mutateAsync({
         customerId,
-        scheduleId: selectedScheduleId,
+        // Availability-based booking fields
+        tourId: selectedTourId,
+        bookingDate: getDateString(selectedDate),
+        bookingTime: selectedTime,
         bookingOptionId: selectedOptionId !== "legacy-default" ? selectedOptionId : undefined,
-        guestAdults: guestCounts.adults,
-        guestChildren: guestCounts.children || undefined,
-        guestInfants: guestCounts.infants || undefined,
         pricingSnapshot: selectedOption ? {
           optionId: selectedOption.id,
           optionName: selectedOption.name,
@@ -943,24 +935,11 @@ export function CustomerFirstBookingSheet({
                             : "border-border bg-muted/50 opacity-60"
                         )}
                         onClick={() => {
-                          if (!option.available) {
-                            toast.error("This option is not available for your group size or date.");
-                            return;
-                          }
-                          if (option.scheduling.type === "fixed") {
-                            if (option.scheduling.timeSlots.length === 0) {
-                              toast.error("No time slots available for this date. Try a different date.");
-                              return;
-                            }
+                          if (option.available && option.scheduling.type === "fixed" && option.scheduling.timeSlots.length > 0) {
                             const availableSlot = option.scheduling.timeSlots.find((s) => s.available);
                             if (availableSlot) {
-                              handleSelectOption(option.id, availableSlot.scheduleId);
-                            } else {
-                              toast.error("All time slots are fully booked. Try a different date.");
+                              handleSelectOption(option.id, availableSlot.time);
                             }
-                          } else {
-                            // Flexible scheduling - user needs to select a time manually
-                            toast.info("Please contact us to book this flexible option.");
                           }
                         }}
                       >
@@ -1006,19 +985,19 @@ export function CustomerFirstBookingSheet({
                               <div className="flex flex-wrap gap-2 mt-3">
                                 {option.scheduling.timeSlots.map((slot) => (
                                   <button
-                                    key={slot.scheduleId}
+                                    key={slot.time}
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       if (slot.available) {
-                                        handleSelectOption(option.id, slot.scheduleId);
+                                        handleSelectOption(option.id, slot.time);
                                       }
                                     }}
                                     disabled={!slot.available}
                                     className={cn(
                                       "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
                                       slot.available
-                                        ? selectedScheduleId === slot.scheduleId
+                                        ? selectedTime === slot.time
                                           ? "bg-primary text-primary-foreground"
                                           : "bg-muted hover:bg-accent"
                                         : "bg-muted/50 text-muted-foreground cursor-not-allowed"

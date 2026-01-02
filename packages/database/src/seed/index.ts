@@ -342,77 +342,101 @@ async function seedOrgData(orgId: string) {
     where: (customers, { eq }) => eq(customers.organizationId, orgId),
   });
 
-  // Create schedules for the next 14 days
-  console.log("Creating schedules...");
-  const schedulesToCreate = [];
+  // Create departure times for tours (availability-based booking model)
+  console.log("Creating departure times for tours...");
+  const departureTimesToCreate = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  // Standard departure times
+  const timeSlots = [
+    { time: "09:00", label: "Morning Tour" },
+    { time: "14:00", label: "Afternoon Tour" },
+    { time: "18:30", label: "Sunset Tour" },
+  ];
+
+  for (const tour of allTours) {
+    for (let i = 0; i < timeSlots.length; i++) {
+      const slot = timeSlots[i]!;
+      departureTimesToCreate.push({
+        id: createId(),
+        organizationId: orgId,
+        tourId: tour.id,
+        time: slot.time,
+        label: slot.label,
+        isActive: true,
+        sortOrder: i,
+      });
+    }
+  }
+
+  await db.insert(schema.tourDepartureTimes).values(departureTimesToCreate).onConflictDoNothing();
+  console.log(`  ✓ Created ${departureTimesToCreate.length} departure times\n`);
+
+  // Build a list of tour runs (tour + date + time combinations) for booking creation
+  interface TourRun {
+    tour: typeof allTours[0];
+    date: Date;
+    time: string;
+    guide: typeof allGuides[0] | undefined;
+  }
+  const tourRuns: TourRun[] = [];
 
   for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
     const date = new Date(today);
     date.setDate(today.getDate() + dayOffset);
 
     for (const tour of allTours) {
-      // Create 2-3 time slots per tour per day
-      const timeSlots = [
-        { hour: 9, minute: 0 },
-        { hour: 14, minute: 0 },
-        ...(dayOffset % 2 === 0 ? [{ hour: 18, minute: 30 }] : []),
-      ];
-
       for (const slot of timeSlots) {
-        const startsAt = new Date(date);
-        startsAt.setHours(slot.hour, slot.minute, 0, 0);
-
-        const endsAt = new Date(startsAt);
-        endsAt.setMinutes(endsAt.getMinutes() + tour.durationMinutes);
-
-        // Randomly assign a guide
+        // Randomly assign a guide for this run
         const guide = allGuides[Math.floor(Math.random() * allGuides.length)];
-
-        schedulesToCreate.push({
-          id: createId(),
-          organizationId: orgId,
-          tourId: tour.id,
-          startsAt,
-          endsAt,
-          maxParticipants: tour.maxParticipants,
-          bookedCount: 0,
-          guideId: guide?.id,
-          guideConfirmed: guide ? Math.random() > 0.2 : false,
-          status: "scheduled" as const,
-          price: tour.basePrice,
+        tourRuns.push({
+          tour,
+          date: new Date(date),
+          time: slot.time,
+          guide,
         });
       }
     }
   }
 
-  const createdSchedules = await db
-    .insert(schema.schedules)
-    .values(schedulesToCreate)
-    .onConflictDoNothing()
-    .returning();
+  console.log(`  ✓ Prepared ${tourRuns.length} tour runs for bookings\n`);
 
-  console.log(`  ✓ Created ${createdSchedules.length} schedules\n`);
-
-  // Create bookings for some schedules
+  // Create bookings for some tour runs
   console.log("Creating bookings...");
-  const bookingsToCreate = [];
+  const bookingsToCreate: Array<{
+    id: string;
+    organizationId: string;
+    referenceNumber: string;
+    customerId: string;
+    tourId: string;
+    bookingDate: Date;
+    bookingTime: string;
+    status: "confirmed" | "pending";
+    paymentStatus: "paid" | "pending" | "partial";
+    adultCount: number;
+    childCount: number;
+    infantCount: number;
+    totalParticipants: number;
+    subtotal: string;
+    total: string;
+    currency: string;
+    source: "website" | "phone" | "walk_in";
+  }> = [];
   const paymentsToCreate = [];
   const participantsToCreate = [];
 
-  // Get today's and tomorrow's schedules for bookings
+  // Get today's and tomorrow's tour runs for bookings
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
-  const schedulesForBookings = createdSchedules.filter((s) => {
-    const scheduleDate = new Date(s.startsAt);
+  const runsForBookings = tourRuns.filter((run) => {
     // Include both today and tomorrow
-    return scheduleDate.getDate() === today.getDate() || scheduleDate.getDate() === tomorrow.getDate();
+    return run.date.getDate() === today.getDate() || run.date.getDate() === tomorrow.getDate();
   });
 
-  // Create 3-8 bookings per schedule (use up to 6 schedules for more demo data)
-  for (const schedule of schedulesForBookings.slice(0, 6)) {
+  // Create 3-8 bookings per run (use up to 6 runs for more demo data)
+  for (const run of runsForBookings.slice(0, 6)) {
     const numBookings = Math.floor(Math.random() * 5) + 3;
 
     for (let i = 0; i < numBookings; i++) {
@@ -423,22 +447,24 @@ async function seedOrgData(orgId: string) {
       const numChildren = Math.random() > 0.7 ? Math.floor(Math.random() * 2) + 1 : 0;
       const totalParticipants = numAdults + numChildren;
 
-      const basePrice = parseFloat(schedule.price || "49.00");
+      const basePrice = parseFloat(run.tour.basePrice || "49.00");
       const subtotal = numAdults * basePrice + numChildren * (basePrice * 0.5);
       const total = subtotal;
 
       const bookingId = createId();
       const statuses = ["confirmed", "pending", "confirmed", "confirmed"] as const;
       const paymentStatuses = ["paid", "pending", "partial", "paid"] as const;
-      const status = statuses[i % statuses.length];
-      const paymentStatus = paymentStatuses[i % paymentStatuses.length];
+      const status = statuses[i % statuses.length]!;
+      const paymentStatus = paymentStatuses[i % paymentStatuses.length]!;
 
       bookingsToCreate.push({
         id: bookingId,
         organizationId: orgId,
         referenceNumber: generateReferenceNumber("BK"),
         customerId: customer.id,
-        scheduleId: schedule.id,
+        tourId: run.tour.id,
+        bookingDate: run.date,
+        bookingTime: run.time,
         status,
         paymentStatus,
         adultCount: numAdults,
@@ -506,22 +532,8 @@ async function seedOrgData(orgId: string) {
     console.log(`  ✓ Created ${participantsToCreate.length} participants`);
   }
 
-  // Update booked counts on schedules
-  const scheduleBookedCounts = new Map<string, number>();
-  for (const booking of bookingsToCreate) {
-    if (booking.status === "confirmed") {
-      const current = scheduleBookedCounts.get(booking.scheduleId) || 0;
-      scheduleBookedCounts.set(booking.scheduleId, current + booking.totalParticipants);
-    }
-  }
-
-  const { eq } = await import("drizzle-orm");
-  for (const [scheduleId, bookedCount] of scheduleBookedCounts) {
-    await db
-      .update(schema.schedules)
-      .set({ bookedCount })
-      .where(eq(schema.schedules.id, scheduleId));
-  }
+  // Note: With availability-based booking, capacity is calculated dynamically from bookings
+  // No need to update booked counts on schedules anymore
 
   console.log("\n✅ Seed completed successfully!\n");
   console.log("Demo data created:");
@@ -529,7 +541,7 @@ async function seedOrgData(orgId: string) {
   console.log("  Tours: 3");
   console.log("  Guides: 2");
   console.log("  Customers: 3");
-  console.log(`  Schedules: ${createdSchedules.length}`);
+  console.log(`  Departure Times: ${departureTimesToCreate.length}`);
   console.log(`  Bookings: ${bookingsToCreate.length}`);
   console.log("\nURL: http://localhost:3000/org/demo-tours");
 }

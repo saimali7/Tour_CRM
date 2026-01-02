@@ -85,10 +85,6 @@ export class BookingService extends BaseService {
     return this.query.getByReference(referenceNumber);
   }
 
-  getForSchedule(scheduleId: string): Promise<BookingWithRelations[]> {
-    return this.query.getForSchedule(scheduleId);
-  }
-
   getForTourRun(
     tourId: string,
     date: Date,
@@ -129,8 +125,11 @@ export class BookingService extends BaseService {
     return this.command.complete(id);
   }
 
-  reschedule(id: string, newScheduleId: string): Promise<BookingWithRelations> {
-    return this.command.reschedule(id, newScheduleId);
+  reschedule(
+    id: string,
+    input: { tourId?: string; bookingDate: Date; bookingTime: string }
+  ): Promise<BookingWithRelations> {
+    return this.command.reschedule(id, input);
   }
 
   updatePaymentStatus(
@@ -202,8 +201,8 @@ export class BookingService extends BaseService {
 
   bulkReschedule(
     ids: string[],
-    newScheduleId: string
+    input: { tourId?: string; bookingDate: Date; bookingTime: string }
   ): Promise<BulkRescheduleResult> {
-    return this.bulk.bulkReschedule(ids, newScheduleId);
+    return this.bulk.bulkReschedule(ids, input);
   }
 }

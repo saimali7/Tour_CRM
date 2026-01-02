@@ -2,10 +2,8 @@ import { eq, and, desc, count, sql, lt } from "drizzle-orm";
 import {
   availabilityAlerts,
   tours,
-  schedules,
   type AvailabilityAlert,
   type Tour,
-  type Schedule,
   type AvailabilityAlertStatus,
 } from "@tour/database";
 import { BaseService } from "./base-service";
@@ -17,12 +15,10 @@ import {
 
 export interface AvailabilityAlertWithRelations extends AvailabilityAlert {
   tour: Tour;
-  schedule: Schedule | null;
 }
 
 export interface AvailabilityAlertFilters {
   tourId?: string;
-  scheduleId?: string;
   status?: AvailabilityAlertStatus;
   email?: string;
 }
@@ -32,7 +28,6 @@ export interface CreateAvailabilityAlertInput {
   email: string;
   phone?: string;
   tourId: string;
-  scheduleId?: string;
   requestedSpots?: number;
 }
 
@@ -49,9 +44,6 @@ export class AvailabilityAlertService extends BaseService {
     if (filters.tourId) {
       conditions.push(eq(availabilityAlerts.tourId, filters.tourId));
     }
-    if (filters.scheduleId) {
-      conditions.push(eq(availabilityAlerts.scheduleId, filters.scheduleId));
-    }
     if (filters.status) {
       conditions.push(eq(availabilityAlerts.status, filters.status));
     }
@@ -64,11 +56,9 @@ export class AvailabilityAlertService extends BaseService {
         .select({
           alert: availabilityAlerts,
           tour: tours,
-          schedule: schedules,
         })
         .from(availabilityAlerts)
         .innerJoin(tours, eq(availabilityAlerts.tourId, tours.id))
-        .leftJoin(schedules, eq(availabilityAlerts.scheduleId, schedules.id))
         .where(and(...conditions))
         .orderBy(desc(availabilityAlerts.createdAt))
         .limit(limit)
@@ -82,7 +72,6 @@ export class AvailabilityAlertService extends BaseService {
     const formattedData: AvailabilityAlertWithRelations[] = data.map((row) => ({
       ...row.alert,
       tour: row.tour,
-      schedule: row.schedule,
     }));
 
     return {
@@ -108,8 +97,7 @@ export class AvailabilityAlertService extends BaseService {
 
   async getExistingAlert(
     email: string,
-    tourId: string,
-    scheduleId?: string
+    tourId: string
   ): Promise<AvailabilityAlert | null> {
     const conditions = [
       eq(availabilityAlerts.organizationId, this.organizationId),
@@ -117,10 +105,6 @@ export class AvailabilityAlertService extends BaseService {
       eq(availabilityAlerts.tourId, tourId),
       eq(availabilityAlerts.status, "active"),
     ];
-
-    if (scheduleId) {
-      conditions.push(eq(availabilityAlerts.scheduleId, scheduleId));
-    }
 
     const alert = await this.db.query.availabilityAlerts.findFirst({
       where: and(...conditions),
@@ -133,8 +117,7 @@ export class AvailabilityAlertService extends BaseService {
     // Check for existing active alert
     const existing = await this.getExistingAlert(
       input.email,
-      input.tourId,
-      input.scheduleId
+      input.tourId
     );
 
     if (existing) {
@@ -145,17 +128,9 @@ export class AvailabilityAlertService extends BaseService {
       return existing;
     }
 
-    // Set expiration based on schedule date if provided
-    let expiresAt: Date | undefined;
-    if (input.scheduleId) {
-      const schedule = await this.db.query.schedules.findFirst({
-        where: eq(schedules.id, input.scheduleId),
-      });
-      if (schedule) {
-        expiresAt = new Date(schedule.startsAt);
-        expiresAt.setDate(expiresAt.getDate() + 1); // Expire day after schedule
-      }
-    }
+    // Set default expiration (30 days from now for tour-wide alerts)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
 
     const [alert] = await this.db
       .insert(availabilityAlerts)
@@ -165,7 +140,6 @@ export class AvailabilityAlertService extends BaseService {
         phone: input.phone,
         customerId: input.customerId,
         tourId: input.tourId,
-        scheduleId: input.scheduleId,
         requestedSpots: input.requestedSpots ?? 1,
         expiresAt,
       })
@@ -268,11 +242,11 @@ export class AvailabilityAlertService extends BaseService {
   }
 
   /**
-   * Get active alerts for a schedule that should be notified
+   * Get active alerts for a tour that should be notified
    * when spots become available
    */
-  async getAlertsForSchedule(
-    scheduleId: string,
+  async getAlertsForTourWithCapacity(
+    tourId: string,
     availableSpots: number
   ): Promise<AvailabilityAlert[]> {
     return this.db
@@ -281,7 +255,7 @@ export class AvailabilityAlertService extends BaseService {
       .where(
         and(
           eq(availabilityAlerts.organizationId, this.organizationId),
-          eq(availabilityAlerts.scheduleId, scheduleId),
+          eq(availabilityAlerts.tourId, tourId),
           eq(availabilityAlerts.status, "active"),
           sql`${availabilityAlerts.requestedSpots} <= ${availableSpots}`
         )
@@ -290,7 +264,7 @@ export class AvailabilityAlertService extends BaseService {
   }
 
   /**
-   * Get active alerts for a tour (any schedule) that should be notified
+   * Get active alerts for a tour that should be notified
    */
   async getAlertsForTour(tourId: string): Promise<AvailabilityAlert[]> {
     return this.db
@@ -300,7 +274,6 @@ export class AvailabilityAlertService extends BaseService {
         and(
           eq(availabilityAlerts.organizationId, this.organizationId),
           eq(availabilityAlerts.tourId, tourId),
-          sql`${availabilityAlerts.scheduleId} IS NULL`, // Tour-wide alerts only
           eq(availabilityAlerts.status, "active")
         )
       )

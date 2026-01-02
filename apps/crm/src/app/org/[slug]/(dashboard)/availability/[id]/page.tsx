@@ -3,7 +3,6 @@
 import { trpc } from "@/lib/trpc";
 import {
   ArrowLeft,
-  Edit,
   Clock,
   Users,
   DollarSign,
@@ -16,29 +15,66 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
-import { ScheduleManifest } from "@/components/schedules/schedule-manifest";
-import { QuickGuideAssign } from "@/components/guides/QuickGuideAssign";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
+import { format } from "date-fns";
 
-type Tab = "details" | "bookings" | "manifest";
+type Tab = "details" | "bookings";
 
-export default function ScheduleDetailPage() {
+/**
+ * Tour Run Detail Page
+ *
+ * Shows details for a specific tour run (tourId + date + time combination).
+ * The ID param is the tourId, and date/time come from search params.
+ */
+export default function TourRunDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const slug = params.slug as string;
-  const scheduleId = params.id as string;
+  const tourId = params.id as string;
+  const dateParam = searchParams.get("date");
+  const timeParam = searchParams.get("time");
+
   const [activeTab, setActiveTab] = useState<Tab>("details");
   const { openQuickBooking } = useQuickBookingContext();
 
-  const { data: schedule, isLoading, error } = trpc.schedule.getById.useQuery({ id: scheduleId });
-  const { data: scheduleBookings } = trpc.booking.getForSchedule.useQuery(
-    { scheduleId },
-    { enabled: activeTab === "bookings" }
+  // Parse date from search params
+  const date = useMemo(() => {
+    if (!dateParam) return new Date();
+    return new Date(dateParam);
+  }, [dateParam]);
+
+  const time = timeParam || "09:00";
+
+  // Fetch the tour run data
+  const { data: tourRun, isLoading, error } = trpc.tourRun.get.useQuery(
+    { tourId, date, time },
+    { enabled: !!tourId && !!dateParam && !!timeParam }
   );
+
+  // Fetch bookings for this tour run
+  const { data: manifest } = trpc.tourRun.getManifest.useQuery(
+    { tourId, date, time },
+    { enabled: activeTab === "bookings" && !!tourId && !!dateParam && !!timeParam }
+  );
+
+  // Fetch the tour for additional details
+  const { data: tour } = trpc.tour.getById.useQuery(
+    { id: tourId },
+    { enabled: !!tourId }
+  );
+
+  if (!dateParam || !timeParam) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6">
+        <p className="text-muted-foreground">Missing date or time parameter. Please access this page from the calendar or availability list.</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -51,44 +87,44 @@ export default function ScheduleDetailPage() {
   if (error) {
     return (
       <div className="rounded-lg border border-destructive bg-destructive/10 p-6">
-        <p className="text-destructive">Error loading schedule: {error.message}</p>
+        <p className="text-destructive">Error loading tour run: {error.message}</p>
       </div>
     );
   }
 
-  if (!schedule) {
+  if (!tourRun) {
     return (
       <div className="rounded-lg border border-border bg-card p-6">
-        <p className="text-muted-foreground">Schedule not found</p>
+        <p className="text-muted-foreground">Tour run not found</p>
       </div>
     );
   }
 
-  const formatDate = (date: Date) => {
+  const formatDate = (d: Date) => {
     return new Intl.DateTimeFormat("en-US", {
       weekday: "long",
       month: "long",
       day: "numeric",
       year: "numeric",
-    }).format(new Date(date));
+    }).format(new Date(d));
   };
 
-  const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date(date));
+  const formatTime = (t: string) => {
+    const [hours, minutes] = t.split(":");
+    const hour = parseInt(hours || "0", 10);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  const formatDateTime = (date: Date) => {
+  const formatDateTime = (d: Date) => {
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
       hour: "numeric",
       minute: "2-digit",
-    }).format(new Date(date));
+    }).format(new Date(d));
   };
 
   const getStatusColor = (status: string) => {
@@ -109,14 +145,18 @@ export default function ScheduleDetailPage() {
   };
 
   const handleAddBooking = () => {
-    // Pass scheduleId to open classic mode (schedule already selected)
-    openQuickBooking({ scheduleId });
+    // Open quick booking with tour pre-selected
+    openQuickBooking({
+      tourId,
+    });
   };
 
-  const booked = schedule.bookedCount ?? 0;
-  const max = schedule.maxParticipants || 0;
+  const booked = tourRun.bookedCount ?? 0;
+  const max = tourRun.capacity || tour?.maxParticipants || 0;
   const availableSpots = max - booked;
   const fillRate = max > 0 ? Math.round((booked / max) * 100) : 0;
+
+  const bookings = manifest?.bookings || [];
 
   return (
     <div className="space-y-6">
@@ -131,22 +171,10 @@ export default function ScheduleDetailPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-foreground">
-                {schedule.tour?.name || "Schedule Details"}
+                {tour?.name || tourRun.tourName || "Tour Details"}
               </h1>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${schedule.status === "scheduled"
-                  ? "bg-primary/10 text-primary"
-                  : schedule.status === "in_progress"
-                    ? "status-pending"
-                    : schedule.status === "completed"
-                      ? "status-completed"
-                      : "status-cancelled"
-                  }`}
-              >
-                {schedule.status === "in_progress" ? "In Progress" : schedule.status}
-              </span>
             </div>
-            <p className="text-muted-foreground mt-1">{formatDate(schedule.startsAt)}</p>
+            <p className="text-muted-foreground mt-1">{formatDate(date)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -156,13 +184,6 @@ export default function ScheduleDetailPage() {
               Add Booking
             </Button>
           )}
-          <Link
-            href={`/org/${slug}/availability/${schedule.id}/edit` as Route}
-            className="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
-          >
-            <Edit className="h-4 w-4" />
-            Edit Schedule
-          </Link>
         </div>
       </div>
 
@@ -192,7 +213,7 @@ export default function ScheduleDetailPage() {
                 fillRate >= 100 ? "bg-destructive" :
                   fillRate >= 80 ? "bg-warning" : "bg-success"
               )}
-              style={{ width: `${fillRate}%` }}
+              style={{ width: `${Math.min(fillRate, 100)}%` }}
             />
           </div>
           <div className="flex items-center justify-between text-sm">
@@ -228,17 +249,8 @@ export default function ScheduleDetailPage() {
           >
             Bookings
             <span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full">
-              {schedule.bookedCount || 0}
+              {tourRun.bookingCount || 0}
             </span>
-          </button>
-          <button
-            onClick={() => setActiveTab("manifest")}
-            className={`${activeTab === "manifest"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
-          >
-            Manifest
           </button>
         </nav>
       </div>
@@ -256,7 +268,7 @@ export default function ScheduleDetailPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Time</p>
                   <p className="font-semibold text-foreground">
-                    {formatTime(schedule.startsAt)} - {formatTime(schedule.endsAt)}
+                    {formatTime(time)}
                   </p>
                 </div>
               </div>
@@ -270,7 +282,7 @@ export default function ScheduleDetailPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Availability</p>
                   <p className="font-semibold text-foreground">
-                    {schedule.bookedCount ?? 0} / {schedule.maxParticipants}
+                    {booked} / {max}
                   </p>
                 </div>
               </div>
@@ -284,7 +296,7 @@ export default function ScheduleDetailPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Price</p>
                   <p className="font-semibold text-foreground">
-                    {schedule.price ? `$${parseFloat(schedule.price).toFixed(2)}` : "Tour default"}
+                    {tour?.basePrice ? `$${parseFloat(tour.basePrice).toFixed(2)}` : "N/A"}
                   </p>
                 </div>
               </div>
@@ -294,17 +306,17 @@ export default function ScheduleDetailPage() {
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "p-2 rounded-lg",
-                  schedule.guidesAssigned >= schedule.guidesRequired ? "bg-success/10" : "bg-warning/10"
+                  (tourRun.guidesAssigned ?? 0) >= (tourRun.guidesRequired ?? 1) ? "bg-success/10" : "bg-warning/10"
                 )}>
                   <User className={cn(
                     "h-5 w-5",
-                    schedule.guidesAssigned >= schedule.guidesRequired ? "text-success" : "text-warning"
+                    (tourRun.guidesAssigned ?? 0) >= (tourRun.guidesRequired ?? 1) ? "text-success" : "text-warning"
                   )} />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Guides</p>
                   <p className="font-semibold text-foreground">
-                    {schedule.guidesAssigned}/{schedule.guidesRequired}
+                    {tourRun.guidesAssigned ?? 0}/{tourRun.guidesRequired ?? 1}
                   </p>
                 </div>
               </div>
@@ -312,17 +324,17 @@ export default function ScheduleDetailPage() {
           </div>
 
           {/* Tour Info */}
-          {schedule.tour && (
+          {tour && (
             <div className="bg-card rounded-lg border border-border p-6">
               <h2 className="text-lg font-semibold text-foreground mb-4">Tour Information</h2>
               <div className="flex items-start gap-4">
                 <div className="flex-1">
-                  <h3 className="font-medium text-foreground">{schedule.tour.name}</h3>
+                  <h3 className="font-medium text-foreground">{tour.name}</h3>
                   <p className="text-muted-foreground mt-1">
-                    {schedule.tour.durationMinutes} minutes • ${parseFloat(schedule.tour.basePrice).toFixed(2)}
+                    {tour.durationMinutes} minutes • ${parseFloat(tour.basePrice).toFixed(2)}
                   </p>
                   <Link
-                    href={`/org/${slug}/tours/${schedule.tour.id}` as Route}
+                    href={`/org/${slug}/tours/${tour.id}` as Route}
                     className="inline-flex items-center gap-1 text-sm text-primary hover:underline mt-2"
                   >
                     View Tour Details
@@ -333,40 +345,22 @@ export default function ScheduleDetailPage() {
           )}
 
           {/* Meeting Point */}
-          {(schedule.meetingPoint || schedule.meetingPointDetails) && (
+          {(tour?.meetingPoint || tour?.meetingPointDetails) && (
             <div className="bg-card rounded-lg border border-border p-6">
               <h2 className="text-lg font-semibold text-foreground mb-4">Meeting Point</h2>
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div>
                   <p className="font-medium text-foreground">
-                    {schedule.meetingPoint || "Not specified"}
+                    {tour.meetingPoint || "Not specified"}
                   </p>
-                  {schedule.meetingPointDetails && (
+                  {tour.meetingPointDetails && (
                     <p className="text-muted-foreground mt-1">
-                      {schedule.meetingPointDetails}
+                      {tour.meetingPointDetails}
                     </p>
                   )}
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          {(schedule.internalNotes || schedule.publicNotes) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {schedule.internalNotes && (
-                <div className="bg-card rounded-lg border border-border p-6">
-                  <h2 className="text-lg font-semibold text-foreground mb-4">Internal Notes</h2>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{schedule.internalNotes}</p>
-                </div>
-              )}
-              {schedule.publicNotes && (
-                <div className="bg-card rounded-lg border border-border p-6">
-                  <h2 className="text-lg font-semibold text-foreground mb-4">Public Notes</h2>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{schedule.publicNotes}</p>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -379,7 +373,7 @@ export default function ScheduleDetailPage() {
             <div>
               <h2 className="text-lg font-semibold text-foreground">Bookings</h2>
               <p className="text-sm text-muted-foreground">
-                {schedule.bookedCount || 0} of {schedule.maxParticipants} spots booked
+                {booked} of {max} spots booked
               </p>
             </div>
             {availableSpots > 0 && (
@@ -390,52 +384,56 @@ export default function ScheduleDetailPage() {
             )}
           </div>
 
-          {scheduleBookings && scheduleBookings.length > 0 ? (
+          {bookings.length > 0 ? (
             <div className="divide-y divide-border">
-              {scheduleBookings.map((booking) => (
-                <div
-                  key={booking.id}
-                  onClick={() => router.push(`/org/${slug}/bookings/${booking.id}` as Route)}
-                  className="p-4 flex items-center justify-between hover:bg-accent/50 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      {booking.customer ? (
-                        <span className="text-primary font-semibold text-sm">
-                          {booking.customer.firstName?.[0]}
-                          {booking.customer.lastName?.[0]}
-                        </span>
-                      ) : (
-                        <User className="h-5 w-5 text-primary" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">
-                          {booking.customer
-                            ? `${booking.customer.firstName} ${booking.customer.lastName}`
-                            : "Unknown Customer"}
-                        </span>
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {booking.referenceNumber}
-                        </span>
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                            booking.status
-                          )}`}
-                        >
-                          {booking.status.charAt(0).toUpperCase() +
-                            booking.status.slice(1).replace("_", " ")}
-                        </span>
+              {bookings.map((booking) => {
+                const customerInitials = booking.customer?.name
+                  ? booking.customer.name.split(" ").map(n => n[0]).join("").slice(0, 2)
+                  : "";
+                const participantCount = booking.participants?.length || 0;
+
+                return (
+                  <div
+                    key={booking.id}
+                    onClick={() => router.push(`/org/${slug}/bookings/${booking.id}` as Route)}
+                    className="p-4 flex items-center justify-between hover:bg-accent/50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        {customerInitials ? (
+                          <span className="text-primary font-semibold text-sm">
+                            {customerInitials}
+                          </span>
+                        ) : (
+                          <User className="h-5 w-5 text-primary" />
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {booking.totalParticipants} participants • ${parseFloat(booking.total).toFixed(2)} • {formatDateTime(booking.createdAt)}
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground">
+                            {booking.customer?.name || "Unknown Customer"}
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {booking.referenceNumber}
+                          </span>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                              booking.status
+                            )}`}
+                          >
+                            {booking.status.charAt(0).toUpperCase() +
+                              booking.status.slice(1).replace("_", " ")}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {participantCount} participant{participantCount !== 1 ? "s" : ""}
+                        </p>
+                      </div>
                     </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="p-8 text-center">
@@ -451,8 +449,6 @@ export default function ScheduleDetailPage() {
           )}
         </div>
       )}
-
-      {activeTab === "manifest" && <ScheduleManifest scheduleId={scheduleId} />}
     </div>
   );
 }

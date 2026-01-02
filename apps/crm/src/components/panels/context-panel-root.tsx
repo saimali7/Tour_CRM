@@ -5,7 +5,6 @@ import { SlideOutPanel } from "@/components/layout/context-panel";
 import { useContextPanel } from "@/providers/context-panel-provider";
 import { BookingPreview, BookingPreviewActions } from "./booking-preview";
 import { CustomerQuickView, CustomerQuickViewActions } from "./customer-quick-view";
-import { SchedulePreview, SchedulePreviewActions } from "./schedule-preview";
 import { TourPreview, TourPreviewActions } from "./tour-preview";
 import { GuidePreview, GuidePreviewActions } from "./guide-preview";
 
@@ -34,11 +33,6 @@ export function ContextPanelRoot() {
             ? `${content.data.firstName} ${content.data.lastName}`
             : undefined,
         };
-      case "schedule":
-        return {
-          title: "Schedule",
-          subtitle: content.data?.tour?.name || undefined,
-        };
       case "tour":
         return {
           title: "Tour",
@@ -63,8 +57,6 @@ export function ContextPanelRoot() {
         return <BookingPreview bookingId={content.id} />;
       case "customer":
         return <CustomerQuickView customerId={content.id} />;
-      case "schedule":
-        return <SchedulePreview scheduleId={content.id} />;
       case "tour":
         return <TourPreview tourId={content.id} />;
       case "guide":
@@ -83,8 +75,6 @@ export function ContextPanelRoot() {
         return <BookingPreviewActions bookingId={content.id} />;
       case "customer":
         return <CustomerQuickViewActions customerId={content.id} />;
-      case "schedule":
-        return <SchedulePreviewActions scheduleId={content.id} />;
       case "tour":
         return <TourPreviewActions tourId={content.id} />;
       case "guide":

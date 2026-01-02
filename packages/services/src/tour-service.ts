@@ -3,8 +3,8 @@ import {
   tours,
   tourPricingTiers,
   tourVariants,
-  schedules,
   products,
+  bookings,
   type Tour,
   type TourStatus,
   type TourPricingTier,
@@ -198,50 +198,50 @@ export class TourService extends BaseService {
       };
     }
 
-    // Get schedule stats for these tours in a separate query
+    // Get booking stats for these tours (availability-based model)
     const tourIds = toursResult.map(t => t.id);
-    const now = new Date().toISOString();
+    const nowDate = new Date().toISOString().split("T")[0]!;
 
-    const scheduleStats = await this.db
+    const bookingStats = await this.db
       .select({
-        tourId: schedules.tourId,
-        upcomingCount: sql<number>`COUNT(*)::int`,
-        totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)::int`,
-        totalBooked: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)::int`,
-        nextScheduleDate: sql<Date | null>`MIN(${schedules.startsAt})`,
+        tourId: bookings.tourId,
+        upcomingCount: sql<number>`COUNT(DISTINCT ${bookings.bookingDate})::int`,
+        totalBooked: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)::int`,
+        nextBookingDate: sql<Date | null>`MIN(${bookings.bookingDate})`,
       })
-      .from(schedules)
+      .from(bookings)
       .where(
         and(
-          inArray(schedules.tourId, tourIds),
-          eq(schedules.organizationId, this.organizationId),
-          sql`${schedules.startsAt} > ${now}`,
-          sql`${schedules.status} != 'cancelled'`
+          inArray(bookings.tourId, tourIds),
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate}::text >= ${nowDate}`,
+          sql`${bookings.status} != 'cancelled'`
         )
       )
-      .groupBy(schedules.tourId);
+      .groupBy(bookings.tourId);
 
     // Create a map for quick lookup
-    const statsMap = new Map(scheduleStats.map(s => [s.tourId, s]));
+    const statsMap = new Map(bookingStats.map(s => [s.tourId, s]));
 
-    // Transform data to include scheduleStats
+    // Transform data to include scheduleStats (now derived from bookings)
     const toursWithStats: TourWithScheduleStats[] = toursResult.map((tour) => {
       const stats = statsMap.get(tour.id);
       const upcomingCount = Number(stats?.upcomingCount) || 0;
-      const totalCapacity = Number(stats?.totalCapacity) || 0;
       const totalBooked = Number(stats?.totalBooked) || 0;
-      const utilizationPercent = totalCapacity > 0
-        ? Math.round((totalBooked / totalCapacity) * 100)
+      // Estimate capacity based on tour's maxParticipants
+      const estimatedCapacity = upcomingCount * (tour.maxParticipants || 1);
+      const utilizationPercent = estimatedCapacity > 0
+        ? Math.round((totalBooked / estimatedCapacity) * 100)
         : 0;
 
       return {
         ...tour,
         scheduleStats: {
           upcomingCount,
-          totalCapacity,
+          totalCapacity: estimatedCapacity,
           totalBooked,
           utilizationPercent,
-          nextScheduleDate: stats?.nextScheduleDate ?? null,
+          nextScheduleDate: stats?.nextBookingDate ?? null,
         },
       };
     });

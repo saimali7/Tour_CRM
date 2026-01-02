@@ -3,12 +3,11 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 
 // Panel content types with discriminated unions for type safety
-export type PanelContentType = "booking" | "customer" | "schedule" | "tour" | "guide";
+export type PanelContentType = "booking" | "customer" | "tour" | "guide";
 
 export type PanelContent =
   | { type: "booking"; id: string; data?: BookingPreviewData }
   | { type: "customer"; id: string; data?: CustomerPreviewData }
-  | { type: "schedule"; id: string; data?: SchedulePreviewData }
   | { type: "tour"; id: string; data?: TourPreviewData }
   | { type: "guide"; id: string; data?: GuidePreviewData }
   | { type: null; id: null; data?: undefined };
@@ -38,19 +37,6 @@ export interface CustomerPreviewData {
   lastName: string;
   email?: string | null;
   phone?: string | null;
-}
-
-export interface SchedulePreviewData {
-  startsAt: Date;
-  status: string;
-  currentParticipants: number;
-  maxParticipants: number;
-  tour?: {
-    name: string;
-  };
-  guide?: {
-    name: string;
-  };
 }
 
 export interface TourPreviewData {

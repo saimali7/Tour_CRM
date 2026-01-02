@@ -138,17 +138,17 @@ export function BookingPreview({ bookingId }: BookingPreviewProps) {
         {booking.tour && (
           <div className="space-y-2">
             <p className="text-sm font-medium text-foreground">{booking.tour.name}</p>
-            {booking.schedule && (
-              <>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5 shrink-0" />
-                  <span>{formatDate(booking.schedule.startsAt)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5 shrink-0" />
-                  <span>{formatTime(booking.schedule.startsAt)}</span>
-                </div>
-              </>
+            {booking.bookingDate && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5 shrink-0" />
+                <span>{formatDate(new Date(booking.bookingDate))}</span>
+              </div>
+            )}
+            {booking.bookingTime && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span>{booking.bookingTime}</span>
+              </div>
             )}
             {booking.tour.meetingPoint && (
               <div className="flex items-start gap-2 text-sm text-muted-foreground">

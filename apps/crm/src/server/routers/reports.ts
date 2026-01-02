@@ -118,8 +118,8 @@ export const reportsRouter = createRouter({
           // Get participant count from confirmed assignments
           let totalParticipants = 0;
           for (const assignment of assignments.filter((a) => a.status === 'confirmed')) {
-            if (assignment.booking?.schedule) {
-              totalParticipants += assignment.booking.schedule.bookedCount || 0;
+            if (assignment.booking) {
+              totalParticipants += assignment.booking.totalParticipants || 0;
             }
           }
 
@@ -189,8 +189,8 @@ export const reportsRouter = createRouter({
               const declinedAssignments = assignments.filter((a) => a.status === 'declined').length;
               let totalParticipants = 0;
               for (const assignment of assignments.filter((a) => a.status === 'confirmed')) {
-                if (assignment.booking?.schedule) {
-                  totalParticipants += assignment.booking.schedule.bookedCount || 0;
+                if (assignment.booking) {
+                  totalParticipants += assignment.booking.totalParticipants || 0;
                 }
               }
               return {

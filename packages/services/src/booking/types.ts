@@ -23,10 +23,9 @@ export interface BookingFilters {
   paymentStatus?: PaymentStatus;
   source?: BookingSource;
   customerId?: string;
-  scheduleId?: string;
   tourId?: string;
   dateRange?: DateRangeFilter;
-  scheduleDateRange?: DateRangeFilter; // Filter by schedule start date
+  bookingDateRange?: DateRangeFilter; // Filter by booking date (tour date)
   search?: string;
 }
 
@@ -43,12 +42,6 @@ export interface BookingWithRelations extends Booking {
     firstName: string;
     lastName: string;
     phone: string | null;
-  };
-  schedule?: {
-    id: string;
-    startsAt: Date;
-    endsAt: Date;
-    status: string;
   };
   tour?: {
     id: string;
@@ -77,32 +70,19 @@ export interface PricingSnapshot {
 // ============================================================================
 
 /**
- * CreateBookingInput supports two booking models:
+ * CreateBookingInput for the availability-based booking model.
  *
- * 1. **Schedule-based (legacy)**: Provide `scheduleId`
- *    - Booking is linked to a pre-created schedule
- *    - Capacity tracked via schedule.bookedCount
- *    - tourId, bookingDate, bookingTime auto-populated from schedule (dual-write)
- *
- * 2. **Availability-based (new)**: Provide `tourId`, `bookingDate`, `bookingTime`
- *    - No schedule record needed
- *    - Capacity computed dynamically by counting bookings
- *    - Validated against TourAvailabilityService
- *
- * During migration, you can provide either or both. If scheduleId is provided,
- * the schedule-based flow is used and new fields are back-filled. If only
- * tourId+date+time is provided, the availability-based flow is used.
+ * Requires `tourId`, `bookingDate`, and `bookingTime`:
+ * - Capacity is computed dynamically by counting existing bookings
+ * - Validated against TourAvailabilityService
  */
 export interface CreateBookingInput {
   customerId: string;
 
-  // Schedule-based model (legacy) - optional during migration
-  scheduleId?: string;
-
-  // Availability-based model (new) - required if no scheduleId
-  tourId?: string;
-  bookingDate?: Date;
-  bookingTime?: string; // "HH:MM" format
+  // Required fields for availability-based model
+  tourId: string;
+  bookingDate: Date;
+  bookingTime: string; // "HH:MM" format
 
   bookingOptionId?: string;
   guestAdults?: number;

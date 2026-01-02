@@ -39,30 +39,60 @@ export default function CalendarPage() {
     filters: { status: "active" },
   });
 
-  // Calendar stats
-  const { data: schedulesData, isLoading } = trpc.schedule.list.useQuery({
-    pagination: { page: 1, limit: 200 },
-    filters: {
-      dateRange: calendarDateRange,
-      tourId: tourFilter === "all" ? undefined : tourFilter,
-    },
-    sort: { field: "startsAt", direction: "asc" },
+  // Fetch tour runs for calendar
+  const { data: tourRunsResult, isLoading } = trpc.tourRun.list.useQuery({
+    dateFrom: calendarDateRange.from,
+    dateTo: calendarDateRange.to,
   });
 
-  const schedules = schedulesData?.data || [];
+  const tourRunsData = tourRunsResult?.tourRuns || [];
+
+  // Filter tour runs by tour if selected
+  const filteredTourRuns = useMemo(() => {
+    if (!tourRunsData.length) return [];
+    if (tourFilter === "all") return tourRunsData;
+    return tourRunsData.filter((tr) => tr.tourId === tourFilter);
+  }, [tourRunsData, tourFilter]);
+
+  // Convert tour runs to schedule-like objects for the calendar component
+  const schedules = useMemo(() => {
+    return filteredTourRuns.map((tr) => {
+      const dateStr = tr.date instanceof Date
+        ? tr.date.toISOString().split("T")[0]
+        : String(tr.date).split("T")[0];
+      const startsAt = new Date(`${dateStr}T${tr.time}:00`);
+      const endsAt = new Date(startsAt.getTime() + (tr.durationMinutes || 60) * 60000);
+      return {
+        id: `${tr.tourId}-${dateStr}-${tr.time}`,
+        tourId: tr.tourId,
+        startsAt,
+        endsAt,
+        maxParticipants: tr.capacity || 0,
+        bookedCount: tr.bookedCount || 0,
+        guidesRequired: tr.guidesRequired || 1,
+        guidesAssigned: tr.guidesAssigned || 0,
+        status: "scheduled" as const,
+        tour: {
+          id: tr.tourId,
+          name: tr.tourName,
+          durationMinutes: tr.durationMinutes,
+        },
+      };
+    });
+  }, [filteredTourRuns]);
 
   // Calculate inline stats
   const stats = useMemo(() => {
-    const thisMonth = schedules.filter(s => {
-      const date = new Date(s.startsAt);
+    const thisMonth = filteredTourRuns.filter((tr) => {
+      const date = new Date(tr.date);
       return date.getMonth() === selectedDate.getMonth() && date.getFullYear() === selectedDate.getFullYear();
     });
-    const totalSchedules = thisMonth.length;
-    const totalBooked = thisMonth.reduce((sum, s) => sum + (s.bookedCount ?? 0), 0);
-    const totalCapacity = thisMonth.reduce((sum, s) => sum + s.maxParticipants, 0);
-    const needsGuide = thisMonth.filter(s => s.guidesAssigned < s.guidesRequired).length;
-    return { totalSchedules, totalBooked, totalCapacity, needsGuide };
-  }, [schedules, selectedDate]);
+    const totalTourRuns = thisMonth.length;
+    const totalBooked = thisMonth.reduce((sum, tr) => sum + (tr.bookedCount ?? 0), 0);
+    const totalCapacity = thisMonth.reduce((sum, tr) => sum + (tr.capacity ?? 0), 0);
+    const needsGuide = thisMonth.filter((tr) => (tr.guidesAssigned ?? 0) < (tr.guidesRequired ?? 1)).length;
+    return { totalTourRuns, totalBooked, totalCapacity, needsGuide };
+  }, [filteredTourRuns, selectedDate]);
 
   return (
     <div className="space-y-4">
@@ -72,7 +102,7 @@ export default function CalendarPage() {
           <h1 className="text-lg font-semibold text-foreground">Calendar</h1>
           {/* Inline Stats */}
           <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
-            <span><span className="font-medium text-foreground">{stats.totalSchedules}</span> schedules</span>
+            <span><span className="font-medium text-foreground">{stats.totalTourRuns}</span> departures</span>
             <span><span className="font-medium text-foreground">{stats.totalBooked}</span>/{stats.totalCapacity} booked</span>
             {stats.needsGuide > 0 && (
               <span><span className="font-medium text-amber-600">{stats.needsGuide}</span> need guide</span>
@@ -100,13 +130,13 @@ export default function CalendarPage() {
             </SelectContent>
           </Select>
 
-          {/* Add Schedule Button */}
+          {/* Add Booking Button */}
           <Link
-            href={`/org/${slug}/tours` as Route}
+            href={`/org/${slug}/bookings/new` as Route}
             className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Add Schedule
+            New Booking
           </Link>
         </div>
       </header>
@@ -129,4 +159,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-

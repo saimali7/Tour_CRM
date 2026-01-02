@@ -5,17 +5,15 @@
  * - getAll: Paginated list with filters
  * - getById: Single booking lookup
  * - getByReference: Lookup by reference number
- * - getForSchedule: Bookings for a schedule
- * - getForTourRun: Bookings for a tour run (availability-based)
+ * - getForTourRun: Bookings for a tour run (tourId + date + time)
  * - getTodaysBookings: Today's confirmed bookings
  */
 
-import { eq, and, desc, asc, sql, count, gte, lte, ilike, or, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, sql, count, gte, lte, ilike, or, inArray } from "drizzle-orm";
 import {
   bookings,
   bookingParticipants,
   customers,
-  schedules,
   tours,
 } from "@tour/database";
 import { BaseService } from "../base-service";
@@ -61,11 +59,7 @@ export class BookingQueryService extends BaseService {
     if (filters.customerId) {
       conditions.push(eq(bookings.customerId, filters.customerId));
     }
-    if (filters.scheduleId) {
-      conditions.push(eq(bookings.scheduleId, filters.scheduleId));
-    }
     if (filters.tourId) {
-      // Filter by tourId - works for both schedule-based and availability-based bookings
       conditions.push(eq(bookings.tourId, filters.tourId));
     }
     if (filters.dateRange?.from) {
@@ -74,12 +68,12 @@ export class BookingQueryService extends BaseService {
     if (filters.dateRange?.to) {
       conditions.push(lte(bookings.createdAt, filters.dateRange.to));
     }
-    // Filter by schedule start date (for calendar view)
-    if (filters.scheduleDateRange?.from) {
-      conditions.push(gte(schedules.startsAt, filters.scheduleDateRange.from));
+    // Filter by booking date (for calendar view)
+    if (filters.bookingDateRange?.from) {
+      conditions.push(gte(bookings.bookingDate, filters.bookingDateRange.from));
     }
-    if (filters.scheduleDateRange?.to) {
-      conditions.push(lte(schedules.startsAt, filters.scheduleDateRange.to));
+    if (filters.bookingDateRange?.to) {
+      conditions.push(lte(bookings.bookingDate, filters.bookingDateRange.to));
     }
     if (filters.search) {
       conditions.push(
@@ -97,10 +91,6 @@ export class BookingQueryService extends BaseService {
         ? asc(bookings[sort.field])
         : desc(bookings[sort.field]);
 
-    // We use two left joins for tour:
-    // 1. Via schedule (for legacy schedule-based bookings where scheduleId is set)
-    // 2. Via bookings.tourId directly (for new availability-based bookings)
-    // COALESCE picks the first non-null value
     const [data, countResult] = await Promise.all([
       this.db
         .select({
@@ -112,41 +102,26 @@ export class BookingQueryService extends BaseService {
             lastName: customers.lastName,
             phone: customers.phone,
           },
-          schedule: {
-            id: schedules.id,
-            startsAt: schedules.startsAt,
-            endsAt: schedules.endsAt,
-            status: schedules.status,
-          },
-          scheduleTour: {
-            id: sql<string>`${tours.id}`.as("schedule_tour_id"),
-            name: sql<string>`${tours.name}`.as("schedule_tour_name"),
-            slug: sql<string>`${tours.slug}`.as("schedule_tour_slug"),
-            meetingPoint: sql<string | null>`${tours.meetingPoint}`.as("schedule_tour_mp"),
-            meetingPointDetails: sql<string | null>`${tours.meetingPointDetails}`.as("schedule_tour_mpd"),
+          tour: {
+            id: tours.id,
+            name: tours.name,
+            slug: tours.slug,
+            meetingPoint: tours.meetingPoint,
+            meetingPointDetails: tours.meetingPointDetails,
           },
         })
         .from(bookings)
         .leftJoin(customers, eq(bookings.customerId, customers.id))
-        .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
         .leftJoin(tours, this.core.getTourJoinCondition())
         .where(and(...conditions))
         .orderBy(orderBy)
         .limit(limit)
         .offset(offset),
-      // Count query needs to join schedules if filtering by scheduleDateRange
-      filters.scheduleDateRange
-        ? this.db
-            .select({ total: count() })
-            .from(bookings)
-            .leftJoin(customers, eq(bookings.customerId, customers.id))
-            .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-            .where(and(...conditions))
-        : this.db
-            .select({ total: count() })
-            .from(bookings)
-            .leftJoin(customers, eq(bookings.customerId, customers.id))
-            .where(and(...conditions)),
+      this.db
+        .select({ total: count() })
+        .from(bookings)
+        .leftJoin(customers, eq(bookings.customerId, customers.id))
+        .where(and(...conditions)),
     ]);
 
     const total = countResult[0]?.total ?? 0;
@@ -154,13 +129,12 @@ export class BookingQueryService extends BaseService {
     const formattedData = data.map((row) => ({
       ...row.booking,
       customer: row.customer?.id ? row.customer : undefined,
-      schedule: row.schedule?.id ? row.schedule : undefined,
-      tour: row.scheduleTour?.id ? {
-        id: row.scheduleTour.id,
-        name: row.scheduleTour.name,
-        slug: row.scheduleTour.slug,
-        meetingPoint: row.scheduleTour.meetingPoint,
-        meetingPointDetails: row.scheduleTour.meetingPointDetails,
+      tour: row.tour?.id ? {
+        id: row.tour.id,
+        name: row.tour.name,
+        slug: row.tour.slug,
+        meetingPoint: row.tour.meetingPoint,
+        meetingPointDetails: row.tour.meetingPointDetails,
       } : undefined,
     }));
 
@@ -184,12 +158,6 @@ export class BookingQueryService extends BaseService {
           lastName: customers.lastName,
           phone: customers.phone,
         },
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-          endsAt: schedules.endsAt,
-          status: schedules.status,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
@@ -200,8 +168,6 @@ export class BookingQueryService extends BaseService {
       })
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      // Join tour via schedule OR directly via booking.tourId
       .leftJoin(tours, this.core.getTourJoinCondition())
       .where(
         and(
@@ -226,7 +192,6 @@ export class BookingQueryService extends BaseService {
     return {
       ...row.booking,
       customer: row.customer?.id ? row.customer : undefined,
-      schedule: row.schedule?.id ? row.schedule : undefined,
       tour: row.tour?.id ? row.tour : undefined,
       participants,
     };
@@ -246,12 +211,6 @@ export class BookingQueryService extends BaseService {
           lastName: customers.lastName,
           phone: customers.phone,
         },
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-          endsAt: schedules.endsAt,
-          status: schedules.status,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
@@ -262,8 +221,6 @@ export class BookingQueryService extends BaseService {
       })
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      // Join tour via schedule OR directly via booking.tourId
       .leftJoin(tours, this.core.getTourJoinCondition())
       .where(
         and(
@@ -281,27 +238,12 @@ export class BookingQueryService extends BaseService {
     return {
       ...row.booking,
       customer: row.customer?.id ? row.customer : undefined,
-      schedule: row.schedule?.id ? row.schedule : undefined,
       tour: row.tour?.id ? row.tour : undefined,
     };
   }
 
   /**
-   * Get all active bookings for a schedule (excluding cancelled and no-show)
-   */
-  async getForSchedule(scheduleId: string): Promise<BookingWithRelations[]> {
-    // Get all active bookings for this schedule (pending, confirmed, completed - exclude cancelled and no_show)
-    const result = await this.getAll(
-      { scheduleId },
-      { limit: 100 }
-    );
-    // Filter out cancelled and no_show bookings
-    return result.data.filter(b => b.status !== "cancelled" && b.status !== "no_show");
-  }
-
-  /**
-   * Get bookings for a "tour run" (availability-based virtual grouping)
-   * A tour run is a unique combination of tourId + date + time
+   * Get bookings for a "tour run" (tourId + date + time)
    */
   async getForTourRun(
     tourId: string,
@@ -364,7 +306,6 @@ export class BookingQueryService extends BaseService {
     return result.map((row) => ({
       ...row.booking,
       customer: row.customer?.id ? row.customer : undefined,
-      schedule: undefined, // Tour runs don't have schedules
       tour: row.tour?.id ? row.tour : undefined,
       participants: participantsByBooking.get(row.booking.id) || [],
     }));
@@ -372,14 +313,9 @@ export class BookingQueryService extends BaseService {
 
   /**
    * Get today's confirmed bookings.
-   * Supports both schedule-based (schedules.startsAt) and availability-based (bookings.bookingDate) bookings.
    */
   async getTodaysBookings(): Promise<BookingWithRelations[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const todayStr = today.toISOString().split("T")[0]; // YYYY-MM-DD
+    const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
     const result = await this.db
       .select({
@@ -391,12 +327,6 @@ export class BookingQueryService extends BaseService {
           lastName: customers.lastName,
           phone: customers.phone,
         },
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-          endsAt: schedules.endsAt,
-          status: schedules.status,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
@@ -407,35 +337,21 @@ export class BookingQueryService extends BaseService {
       })
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      // Join tour via schedule OR directly via booking.tourId
       .leftJoin(tours, this.core.getTourJoinCondition())
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
           eq(bookings.status, "confirmed"),
-          // Match today's bookings via either:
-          // 1. Schedule-based: schedule.startsAt is today
-          // 2. Availability-based: booking.bookingDate is today
-          or(
-            and(
-              isNotNull(schedules.startsAt),
-              gte(schedules.startsAt, today),
-              lte(schedules.startsAt, tomorrow)
-            ),
-            sql`${bookings.bookingDate}::text = ${todayStr}`
-          )
+          sql`${bookings.bookingDate}::text = ${todayStr}`
         )
       )
       .orderBy(
-        // Sort by schedule.startsAt if available, else by bookingTime
-        sql`COALESCE(${schedules.startsAt}, (${bookings.bookingDate}::date + ${bookings.bookingTime}::time)::timestamp)`
+        sql`(${bookings.bookingDate}::date + ${bookings.bookingTime}::time)::timestamp`
       );
 
     return result.map((row) => ({
       ...row.booking,
       customer: row.customer?.id ? row.customer : undefined,
-      schedule: row.schedule?.id ? row.schedule : undefined,
       tour: row.tour?.id ? row.tour : undefined,
     }));
   }

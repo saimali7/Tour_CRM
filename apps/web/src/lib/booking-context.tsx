@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useReducer, type ReactNode } from "react";
-import type { Schedule, Tour, TourPricingTier } from "@tour/database";
+import type { Tour, TourPricingTier } from "@tour/database";
 
 export interface BookingParticipant {
   id: string;
@@ -24,9 +24,11 @@ export interface CustomerDetails {
 }
 
 export interface BookingState {
-  // Selected tour and schedule
+  // Selected tour and availability info
   tour: Tour | null;
-  schedule: Schedule | null;
+  bookingDate: Date | null;
+  bookingTime: string | null;
+  availableSpots: number;
   pricingTiers: TourPricingTier[];
 
   // Participant selections
@@ -55,7 +57,7 @@ export interface BookingState {
 }
 
 type BookingAction =
-  | { type: "SET_TOUR_SCHEDULE"; tour: Tour; schedule: Schedule; pricingTiers: TourPricingTier[]; currency: string }
+  | { type: "SET_TOUR_AND_AVAILABILITY"; tour: Tour; bookingDate: Date; bookingTime: string; availableSpots: number; pricingTiers: TourPricingTier[]; currency: string }
   | { type: "ADD_PARTICIPANT"; participant: BookingParticipant }
   | { type: "REMOVE_PARTICIPANT"; id: string }
   | { type: "UPDATE_PARTICIPANT"; id: string; updates: Partial<BookingParticipant> }
@@ -71,7 +73,9 @@ type BookingAction =
 
 const initialState: BookingState = {
   tour: null,
-  schedule: null,
+  bookingDate: null,
+  bookingTime: null,
+  availableSpots: 0,
   pricingTiers: [],
   participants: [],
   customer: null,
@@ -103,11 +107,13 @@ function calculateTotals(participants: BookingParticipant[], discount: number): 
 
 function bookingReducer(state: BookingState, action: BookingAction): BookingState {
   switch (action.type) {
-    case "SET_TOUR_SCHEDULE":
+    case "SET_TOUR_AND_AVAILABILITY":
       return {
         ...initialState,
         tour: action.tour,
-        schedule: action.schedule,
+        bookingDate: action.bookingDate,
+        bookingTime: action.bookingTime,
+        availableSpots: action.availableSpots,
         pricingTiers: action.pricingTiers,
         currency: action.currency,
         step: "select",
@@ -219,7 +225,14 @@ interface BookingContextValue {
   dispatch: React.Dispatch<BookingAction>;
 
   // Helper methods
-  setTourSchedule: (tour: Tour, schedule: Schedule, pricingTiers: TourPricingTier[], currency: string) => void;
+  setTourAndAvailability: (
+    tour: Tour,
+    bookingDate: Date,
+    bookingTime: string,
+    availableSpots: number,
+    pricingTiers: TourPricingTier[],
+    currency: string
+  ) => void;
   addParticipant: (type: "adult" | "child" | "infant", price: number, pricingTierId?: string) => void;
   removeParticipant: (id: string) => void;
   updateParticipant: (id: string, updates: Partial<BookingParticipant>) => void;
@@ -234,13 +247,23 @@ const BookingContext = createContext<BookingContextValue | null>(null);
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState);
 
-  const setTourSchedule = (
+  const setTourAndAvailability = (
     tour: Tour,
-    schedule: Schedule,
+    bookingDate: Date,
+    bookingTime: string,
+    availableSpots: number,
     pricingTiers: TourPricingTier[],
     currency: string
   ) => {
-    dispatch({ type: "SET_TOUR_SCHEDULE", tour, schedule, pricingTiers, currency });
+    dispatch({
+      type: "SET_TOUR_AND_AVAILABILITY",
+      tour,
+      bookingDate,
+      bookingTime,
+      availableSpots,
+      pricingTiers,
+      currency,
+    });
   };
 
   const addParticipant = (
@@ -296,7 +319,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         dispatch,
-        setTourSchedule,
+        setTourAndAvailability,
         addParticipant,
         removeParticipant,
         updateParticipant,

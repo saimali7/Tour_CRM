@@ -9,7 +9,6 @@ import {
   Send,
   MoreHorizontal,
   UserMinus,
-  CalendarClock,
   DollarSign,
   CreditCard,
   Edit,
@@ -78,7 +77,6 @@ export default function BookingDetailPage() {
   const headerRef = useRef<HTMLElement>(null);
 
   // Modal/Sheet states
-  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -86,7 +84,6 @@ export default function BookingDetailPage() {
   const [showAssignGuideSheet, setShowAssignGuideSheet] = useState(false);
 
   // Form states
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState<"customer_request" | "booking_cancelled" | "other">("customer_request");
   const [refundNotes, setRefundNotes] = useState("");
@@ -105,19 +102,6 @@ export default function BookingDetailPage() {
 
   const { data: booking, isLoading, error } = trpc.booking.getById.useQuery({ id: bookingId });
   const utils = trpc.useUtils();
-
-  // Query for available schedules (same tour)
-  const { data: availableSchedules } = trpc.schedule.list.useQuery(
-    {
-      filters: {
-        tourId: booking?.tour?.id,
-        status: "scheduled",
-        dateRange: { from: new Date() },
-      },
-      pagination: { limit: 50 },
-    },
-    { enabled: showRescheduleModal && !!booking?.tour?.id }
-  );
 
   // Query for existing refunds
   const { data: refunds } = trpc.refund.getForBooking.useQuery(
@@ -193,17 +177,6 @@ export default function BookingDetailPage() {
       toast.success("Booking marked as no-show");
     },
     onError: (error) => toast.error(`Failed to mark as no-show: ${error.message}`),
-  });
-
-  const rescheduleMutation = trpc.booking.reschedule.useMutation({
-    onSuccess: () => {
-      utils.booking.getById.invalidate({ id: bookingId });
-      utils.booking.list.invalidate();
-      setShowRescheduleModal(false);
-      setSelectedScheduleId(null);
-      toast.success("Booking rescheduled successfully");
-    },
-    onError: (error) => toast.error(`Failed to reschedule: ${error.message}`),
   });
 
   const createRefundMutation = trpc.refund.create.useMutation({
@@ -292,8 +265,8 @@ export default function BookingDetailPage() {
 
   // Calculate urgency/time context
   const urgency: UrgencyLevel | null = useMemo(() => {
-    if (!booking?.schedule?.startsAt) return null;
-    const tourDate = new Date(booking.schedule.startsAt);
+    if (!booking?.bookingDate) return null;
+    const tourDate = new Date(booking.bookingDate);
     const now = new Date();
     const diffMs = tourDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -303,7 +276,7 @@ export default function BookingDetailPage() {
     if (diffDays === 1) return { type: "tomorrow", label: "Tomorrow", daysUntil: 1 };
     if (diffDays <= 3) return { type: "soon", label: `In ${diffDays} days`, daysUntil: diffDays };
     return { type: "normal", label: `In ${diffDays} days`, daysUntil: diffDays };
-  }, [booking?.schedule?.startsAt]);
+  }, [booking?.bookingDate]);
 
   // Primary action based on booking state
   const primaryAction: PrimaryAction | null = useMemo(() => {
@@ -382,12 +355,6 @@ export default function BookingDetailPage() {
     cancelMutation.mutate({ id: bookingId, reason: cancelReason || undefined });
     setShowCancelDialog(false);
     setCancelReason("");
-  };
-
-  const handleReschedule = () => {
-    if (selectedScheduleId) {
-      rescheduleMutation.mutate({ id: bookingId, newScheduleId: selectedScheduleId });
-    }
   };
 
   const handleOpenPaymentModal = useCallback(() => {
@@ -475,14 +442,14 @@ export default function BookingDetailPage() {
       }
 
       // Escape - Go back
-      if (e.key === "Escape" && !showPaymentModal && !showRefundModal && !showCancelDialog && !showRescheduleModal) {
+      if (e.key === "Escape" && !showPaymentModal && !showRefundModal && !showCancelDialog) {
         router.back();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [balanceInfo, handleOpenPaymentModal, router, slug, bookingId, showPaymentModal, showRefundModal, showCancelDialog, showRescheduleModal]);
+  }, [balanceInfo, handleOpenPaymentModal, router, slug, bookingId, showPaymentModal, showRefundModal, showCancelDialog]);
 
   // ============================================================================
   // RENDER
@@ -745,14 +712,6 @@ export default function BookingDetailPage() {
             <div className="space-y-2">
               {(booking.status === "pending" || booking.status === "confirmed") && (
                 <>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2"
-                    onClick={() => setShowRescheduleModal(true)}
-                  >
-                    <CalendarClock className="h-4 w-4" />
-                    Reschedule
-                  </Button>
                   {booking.status === "confirmed" && (
                     <Button
                       variant="outline"
@@ -800,76 +759,6 @@ export default function BookingDetailPage() {
       {/* ================================================================== */}
       {/* MODALS & SHEETS */}
       {/* ================================================================== */}
-
-      {/* Reschedule Modal */}
-      <Dialog open={showRescheduleModal} onOpenChange={(open) => {
-        setShowRescheduleModal(open);
-        if (!open) setSelectedScheduleId(null);
-      }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Reschedule Booking</DialogTitle>
-            <DialogDescription>
-              Currently scheduled for{" "}
-              <strong>{booking.schedule && formatDate(booking.schedule.startsAt)}</strong> at{" "}
-              <strong>{booking.schedule && formatTime(booking.schedule.startsAt)}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {availableSchedules?.data && availableSchedules.data.length > 0 ? (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {availableSchedules.data
-                  .filter((schedule) => schedule.id !== booking.scheduleId)
-                  .map((schedule) => {
-                    const available = schedule.maxParticipants - (schedule.bookedCount || 0);
-                    const hasCapacity = available >= booking.totalParticipants;
-                    return (
-                      <label
-                        key={schedule.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors",
-                          selectedScheduleId === schedule.id
-                            ? "border-primary bg-primary/5"
-                            : hasCapacity
-                            ? "border-border hover:border-primary/50"
-                            : "border-border opacity-50 cursor-not-allowed"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="schedule"
-                            value={schedule.id}
-                            checked={selectedScheduleId === schedule.id}
-                            onChange={(e) => setSelectedScheduleId(e.target.value)}
-                            disabled={!hasCapacity}
-                            className="text-primary"
-                          />
-                          <div>
-                            <p className="font-medium">{formatShortDate(schedule.startsAt)}</p>
-                            <p className="text-sm text-muted-foreground">{formatTime(schedule.startsAt)}</p>
-                          </div>
-                        </div>
-                        <span className={cn("text-sm", hasCapacity ? "text-muted-foreground" : "text-destructive")}>
-                          {hasCapacity ? `${available} spots` : "Full"}
-                        </span>
-                      </label>
-                    );
-                  })}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">No other schedules available</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRescheduleModal(false)}>Cancel</Button>
-            <Button onClick={handleReschedule} disabled={!selectedScheduleId || rescheduleMutation.isPending}>
-              {rescheduleMutation.isPending && <ButtonSpinner />}
-              Confirm Reschedule
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Refund Modal */}
       <Dialog open={showRefundModal} onOpenChange={setShowRefundModal}>
@@ -1174,11 +1063,11 @@ export default function BookingDetailPage() {
         open={showAssignGuideSheet}
         onOpenChange={setShowAssignGuideSheet}
         bookingId={bookingId}
-        scheduleInfo={booking.schedule ? {
-          id: booking.schedule.id,
+        scheduleInfo={booking.bookingDate ? {
+          id: `${booking.tourId}-${booking.bookingDate}-${booking.bookingTime}`,
           tourName: booking.tour?.name || "Tour",
-          date: formatShortDate(booking.schedule.startsAt),
-          time: formatTime(booking.schedule.startsAt),
+          date: formatShortDate(new Date(booking.bookingDate)),
+          time: booking.bookingTime || "",
         } : undefined}
         availableGuides={availableGuides?.data
           ?.filter((guide) => !guideAssignments?.some((a) => a.guideId === guide.id))

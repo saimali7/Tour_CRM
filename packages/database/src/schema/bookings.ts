@@ -3,7 +3,6 @@ import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { customers } from "./customers";
-import { schedules } from "./schedules";
 import { tours } from "./tours";
 import { pickupAddresses } from "./pickup-addresses";
 import { pickupZones } from "./pickup-zones";
@@ -25,10 +24,9 @@ export const bookings = pgTable("bookings", {
     .notNull()
     .references(() => customers.id, { onDelete: "restrict" }),
 
-  // Schedule reference (primary booking method)
-  // Note: tourId/bookingDate/bookingTime are alternative fields for availability-based booking
-  scheduleId: text("schedule_id")
-    .references(() => schedules.id, { onDelete: "restrict" }),
+  // Schedule reference (DEPRECATED - kept for migration, no FK constraint)
+  // Legacy field - system now uses availability-based booking (tourId + bookingDate + bookingTime)
+  scheduleId: text("schedule_id"),
 
   // =========================================================================
   // NEW AVAILABILITY-BASED BOOKING FIELDS
@@ -202,12 +200,7 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     fields: [bookings.customerId],
     references: [customers.id],
   }),
-  // DEPRECATED: Schedule relation (use tour instead)
-  schedule: one(schedules, {
-    fields: [bookings.scheduleId],
-    references: [schedules.id],
-  }),
-  // NEW: Direct tour relation for availability-based model
+  // Direct tour relation for availability-based model
   tour: one(tours, {
     fields: [bookings.tourId],
     references: [tours.id],

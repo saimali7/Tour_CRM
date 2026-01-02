@@ -3,7 +3,6 @@ import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { tours } from "./tours";
-import { schedules } from "./schedules";
 import { bookings } from "./bookings";
 import { customers } from "./customers";
 
@@ -150,17 +149,17 @@ export const bookingOptions = pgTable("booking_options", {
 }));
 
 // ============================================================
-// SCHEDULE OPTION AVAILABILITY
-// Tracks per-option availability for each schedule
+// SCHEDULE OPTION AVAILABILITY (DEPRECATED)
+// This table was used for schedule-based availability tracking
+// Now using availability-based booking (tourId + bookingDate + bookingTime)
+// Kept for migration purposes - will be removed in future cleanup
 // ============================================================
 
 export const scheduleOptionAvailability = pgTable("schedule_option_availability", {
   id: text("id").primaryKey().$defaultFn(createId),
 
-  // References
-  scheduleId: text("schedule_id")
-    .notNull()
-    .references(() => schedules.id, { onDelete: "cascade" }),
+  // References - scheduleId kept for migration, no FK constraint
+  scheduleId: text("schedule_id").notNull(),
   bookingOptionId: text("booking_option_id")
     .notNull()
     .references(() => bookingOptions.id, { onDelete: "cascade" }),
@@ -199,10 +198,8 @@ export const waitlistEntries = pgTable("waitlist_entries", {
     .notNull()
     .references(() => organizations.id, { onDelete: "cascade" }),
 
-  // What they're waiting for
-  scheduleId: text("schedule_id")
-    .notNull()
-    .references(() => schedules.id, { onDelete: "cascade" }),
+  // What they're waiting for - scheduleId kept for migration, no FK constraint
+  scheduleId: text("schedule_id").notNull(),
   bookingOptionId: text("booking_option_id")
     .references(() => bookingOptions.id, { onDelete: "set null" }),
 
@@ -265,10 +262,7 @@ export const bookingOptionsRelations = relations(bookingOptions, ({ one, many })
 }));
 
 export const scheduleOptionAvailabilityRelations = relations(scheduleOptionAvailability, ({ one }) => ({
-  schedule: one(schedules, {
-    fields: [scheduleOptionAvailability.scheduleId],
-    references: [schedules.id],
-  }),
+  // Note: schedule relation removed - schedules table no longer exists
   bookingOption: one(bookingOptions, {
     fields: [scheduleOptionAvailability.bookingOptionId],
     references: [bookingOptions.id],
@@ -280,10 +274,7 @@ export const waitlistEntriesRelations = relations(waitlistEntries, ({ one }) => 
     fields: [waitlistEntries.organizationId],
     references: [organizations.id],
   }),
-  schedule: one(schedules, {
-    fields: [waitlistEntries.scheduleId],
-    references: [schedules.id],
-  }),
+  // Note: schedule relation removed - schedules table no longer exists
   bookingOption: one(bookingOptions, {
     fields: [waitlistEntries.bookingOptionId],
     references: [bookingOptions.id],

@@ -81,15 +81,36 @@ export default async function TourDetailPage({ params }: PageProps) {
   const pricingTiers = await services.tour.getPricingTiers(tour.id);
   const activeTiers = pricingTiers.filter((tier) => tier.isActive);
 
-  // Get available schedules for the next 90 days
-  const dateRange = {
-    from: new Date(),
-    to: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-  };
-  const availableSchedules = await services.schedule.getAvailableForTour(
+  // Get available dates for the current month and next 2 months using tour availability service
+  const now = new Date();
+  const currentMonth = await services.tourAvailability.getAvailableDatesForMonth(
     tour.id,
-    dateRange
+    now.getFullYear(),
+    now.getMonth() + 1
   );
+
+  // Get next month availability for calendar switching
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextMonthAvailability = await services.tourAvailability.getAvailableDatesForMonth(
+    tour.id,
+    nextMonth.getFullYear(),
+    nextMonth.getMonth() + 1
+  );
+
+  // Get month after next
+  const monthAfterNext = new Date(now.getFullYear(), now.getMonth() + 2, 1);
+  const monthAfterNextAvailability = await services.tourAvailability.getAvailableDatesForMonth(
+    tour.id,
+    monthAfterNext.getFullYear(),
+    monthAfterNext.getMonth() + 1
+  );
+
+  // Combine all available dates
+  const availableDates = [
+    ...currentMonth.dates,
+    ...nextMonthAvailability.dates,
+    ...monthAfterNextAvailability.dates,
+  ];
 
   const currency = org.settings?.defaultCurrency || "USD";
 
@@ -363,7 +384,7 @@ export default async function TourDetailPage({ params }: PageProps) {
                   Check Availability
                 </h3>
                 <AvailabilityCalendar
-                  schedules={availableSchedules}
+                  availableDates={availableDates}
                   currency={currency}
                 />
               </div>

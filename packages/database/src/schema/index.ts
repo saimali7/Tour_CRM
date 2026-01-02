@@ -7,7 +7,6 @@ export * from "./customers";
 export * from "./tours";
 export * from "./tour-availability"; // NEW: Availability-based scheduling
 export * from "./guides";
-export * from "./schedules"; // Tour schedules (still actively used)
 export * from "./bookings";
 export * from "./activity-logs";
 export * from "./refunds";

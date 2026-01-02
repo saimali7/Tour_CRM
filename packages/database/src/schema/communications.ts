@@ -5,7 +5,6 @@ import { organizations } from "./organizations";
 import { customers } from "./customers";
 import { bookings } from "./bookings";
 import { tours } from "./tours";
-import { schedules } from "./schedules";
 
 // ============================================
 // Communication Logs - Email/SMS history
@@ -34,8 +33,8 @@ export const communicationLogs = pgTable("communication_logs", {
     .references(() => bookings.id, { onDelete: "set null" }),
   tourId: text("tour_id")
     .references(() => tours.id, { onDelete: "set null" }),
-  scheduleId: text("schedule_id")
-    .references(() => schedules.id, { onDelete: "set null" }),
+  // scheduleId kept for migration, no FK constraint (schedules table removed)
+  scheduleId: text("schedule_id"),
 
   // Communication details
   type: text("type").$type<CommunicationType>().notNull(),
@@ -205,8 +204,8 @@ export const abandonedCarts = pgTable("abandoned_carts", {
   tourId: text("tour_id")
     .notNull()
     .references(() => tours.id, { onDelete: "cascade" }),
-  scheduleId: text("schedule_id")
-    .references(() => schedules.id, { onDelete: "set null" }),
+  // scheduleId kept for migration, no FK constraint (schedules table removed)
+  scheduleId: text("schedule_id"),
 
   // Participants
   adultCount: integer("adult_count").default(1),
@@ -331,8 +330,8 @@ export const availabilityAlerts = pgTable("availability_alerts", {
   tourId: text("tour_id")
     .notNull()
     .references(() => tours.id, { onDelete: "cascade" }),
-  scheduleId: text("schedule_id")
-    .references(() => schedules.id, { onDelete: "cascade" }), // Specific date
+  // scheduleId kept for migration, no FK constraint (schedules table removed)
+  scheduleId: text("schedule_id"),
 
   // Requested capacity
   requestedSpots: integer("requested_spots").default(1),
@@ -523,10 +522,6 @@ export const communicationLogsRelations = relations(communicationLogs, ({ one })
     fields: [communicationLogs.tourId],
     references: [tours.id],
   }),
-  schedule: one(schedules, {
-    fields: [communicationLogs.scheduleId],
-    references: [schedules.id],
-  }),
 }));
 
 export const emailTemplatesRelations = relations(emailTemplates, ({ one }) => ({
@@ -555,10 +550,6 @@ export const abandonedCartsRelations = relations(abandonedCarts, ({ one }) => ({
   tour: one(tours, {
     fields: [abandonedCarts.tourId],
     references: [tours.id],
-  }),
-  schedule: one(schedules, {
-    fields: [abandonedCarts.scheduleId],
-    references: [schedules.id],
   }),
   recoveredBooking: one(bookings, {
     fields: [abandonedCarts.recoveredBookingId],
@@ -593,10 +584,6 @@ export const availabilityAlertsRelations = relations(availabilityAlerts, ({ one 
   tour: one(tours, {
     fields: [availabilityAlerts.tourId],
     references: [tours.id],
-  }),
-  schedule: one(schedules, {
-    fields: [availabilityAlerts.scheduleId],
-    references: [schedules.id],
   }),
   booking: one(bookings, {
     fields: [availabilityAlerts.bookingId],

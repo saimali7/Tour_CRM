@@ -11,7 +11,6 @@ export type { ActionableAlertProps, AlertSeverity } from "./actionable-alert";
 export { SmartAlertsPanel } from "./smart-alerts-panel";
 export { GoalProgressRing } from "./goal-progress-ring";
 export { UrgencyCounter } from "./urgency-counter";
-export { PriorityScheduleList } from "./priority-schedule-list";
 export { UnassignedToursPanel } from "./UnassignedToursPanel";
 
 // QuickAssignGuideModal is used internally by UnassignedToursPanel

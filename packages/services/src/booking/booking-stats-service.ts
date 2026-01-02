@@ -13,7 +13,6 @@ import { eq, and, sql, count, gte, lte, or, isNotNull } from "drizzle-orm";
 import {
   bookings,
   customers,
-  schedules,
   tours,
 } from "@tour/database";
 import { BaseService } from "../base-service";
@@ -93,8 +92,8 @@ export class BookingStatsService extends BaseService {
    */
   async getGroupedByUrgency(): Promise<UrgencyGroupedBookings> {
     const now = new Date();
-    const sevenDaysOut = new Date(now);
-    sevenDaysOut.setDate(sevenDaysOut.getDate() + 30); // Look 30 days out for issues
+    const thirtyDaysOut = new Date(now);
+    thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30); // Look 30 days out for issues
 
     // Get all upcoming bookings that might need action
     const result = await this.db
@@ -107,12 +106,6 @@ export class BookingStatsService extends BaseService {
           lastName: customers.lastName,
           phone: customers.phone,
         },
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-          endsAt: schedules.endsAt,
-          status: schedules.status,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
@@ -123,7 +116,6 @@ export class BookingStatsService extends BaseService {
       })
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
       .leftJoin(tours, this.core.getTourJoinCondition())
       .where(
         and(
@@ -134,29 +126,21 @@ export class BookingStatsService extends BaseService {
             eq(bookings.status, "confirmed")
           ),
           // Only upcoming tours (within 30 days)
-          or(
-            and(
-              isNotNull(schedules.startsAt),
-              gte(schedules.startsAt, now),
-              lte(schedules.startsAt, sevenDaysOut)
-            ),
-            and(
-              isNotNull(bookings.bookingDate),
-              gte(bookings.bookingDate, now),
-              lte(bookings.bookingDate, sevenDaysOut)
-            )
+          and(
+            isNotNull(bookings.bookingDate),
+            gte(bookings.bookingDate, now),
+            lte(bookings.bookingDate, thirtyDaysOut)
           )
         )
       )
       .orderBy(
         // Sort by tour date (soonest first)
-        sql`COALESCE(${schedules.startsAt}, ${bookings.bookingDate}::timestamp)`
+        sql`${bookings.bookingDate}::timestamp`
       );
 
     const bookingsWithRelations = result.map((row) => ({
       ...row.booking,
       customer: row.customer?.id ? row.customer : undefined,
-      schedule: row.schedule?.id ? row.schedule : undefined,
       tour: row.tour?.id ? row.tour : undefined,
     }));
 
@@ -214,12 +198,6 @@ export class BookingStatsService extends BaseService {
           lastName: customers.lastName,
           phone: customers.phone,
         },
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-          endsAt: schedules.endsAt,
-          status: schedules.status,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
@@ -230,7 +208,6 @@ export class BookingStatsService extends BaseService {
       })
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
       .leftJoin(tours, this.core.getTourJoinCondition())
       .where(
         and(
@@ -241,10 +218,7 @@ export class BookingStatsService extends BaseService {
             eq(bookings.status, "confirmed")
           ),
           // Only upcoming tours
-          or(
-            and(isNotNull(schedules.startsAt), gte(schedules.startsAt, now)),
-            and(isNotNull(bookings.bookingDate), gte(bookings.bookingDate, now))
-          ),
+          and(isNotNull(bookings.bookingDate), gte(bookings.bookingDate, now)),
           // Has some issue (pending status OR unpaid)
           or(
             eq(bookings.status, "pending"),
@@ -261,7 +235,7 @@ export class BookingStatsService extends BaseService {
       )
       .orderBy(
         // Sort by tour date (soonest first)
-        sql`COALESCE(${schedules.startsAt}, ${bookings.bookingDate}::timestamp)`
+        sql`${bookings.bookingDate}::timestamp`
       );
 
     const unconfirmed: BookingWithRelations[] = [];
@@ -271,7 +245,6 @@ export class BookingStatsService extends BaseService {
       const booking: BookingWithRelations = {
         ...row.booking,
         customer: row.customer?.id ? row.customer : undefined,
-        schedule: row.schedule?.id ? row.schedule : undefined,
         tour: row.tour?.id ? row.tour : undefined,
       };
 
@@ -313,12 +286,6 @@ export class BookingStatsService extends BaseService {
           lastName: customers.lastName,
           phone: customers.phone,
         },
-        schedule: {
-          id: schedules.id,
-          startsAt: schedules.startsAt,
-          endsAt: schedules.endsAt,
-          status: schedules.status,
-        },
         tour: {
           id: tours.id,
           name: tours.name,
@@ -329,7 +296,6 @@ export class BookingStatsService extends BaseService {
       })
       .from(bookings)
       .leftJoin(customers, eq(bookings.customerId, customers.id))
-      .leftJoin(schedules, eq(bookings.scheduleId, schedules.id))
       .leftJoin(tours, this.core.getTourJoinCondition())
       .where(
         and(
@@ -340,22 +306,15 @@ export class BookingStatsService extends BaseService {
             eq(bookings.status, "confirmed")
           ),
           // Within date range
-          or(
-            and(
-              isNotNull(schedules.startsAt),
-              gte(schedules.startsAt, startOfToday),
-              lte(schedules.startsAt, endDate)
-            ),
-            and(
-              isNotNull(bookings.bookingDate),
-              gte(bookings.bookingDate, startOfToday),
-              lte(bookings.bookingDate, endDate)
-            )
+          and(
+            isNotNull(bookings.bookingDate),
+            gte(bookings.bookingDate, startOfToday),
+            lte(bookings.bookingDate, endDate)
           )
         )
       )
       .orderBy(
-        sql`COALESCE(${schedules.startsAt}, ${bookings.bookingDate}::timestamp)`
+        sql`${bookings.bookingDate}::timestamp`
       );
 
     // Group by day
@@ -367,20 +326,15 @@ export class BookingStatsService extends BaseService {
       const booking: BookingWithRelations = {
         ...row.booking,
         customer: row.customer?.id ? row.customer : undefined,
-        schedule: row.schedule?.id ? row.schedule : undefined,
         tour: row.tour?.id ? row.tour : undefined,
       };
 
       // Determine the tour date
-      let tourDate: Date;
-      if (booking.schedule?.startsAt) {
-        tourDate = new Date(booking.schedule.startsAt);
-      } else if (booking.bookingDate) {
-        tourDate = new Date(booking.bookingDate);
-      } else {
+      if (!booking.bookingDate) {
         continue; // Skip if no date
       }
 
+      const tourDate = new Date(booking.bookingDate);
       const dateKey = tourDate.toISOString().split("T")[0] ?? "";
       const existing = dayMap.get(dateKey) || [];
       existing.push(booking);
@@ -460,9 +414,7 @@ export class BookingStatsService extends BaseService {
       let timeUntil = "";
       let tourDate: Date | null = null;
 
-      if (booking.schedule?.startsAt) {
-        tourDate = new Date(booking.schedule.startsAt);
-      } else if (booking.bookingDate && booking.bookingTime) {
+      if (booking.bookingDate && booking.bookingTime) {
         const parts = booking.bookingTime.split(":");
         const hours = parseInt(parts[0] ?? "0", 10);
         const minutes = parseInt(parts[1] ?? "0", 10);
@@ -488,13 +440,20 @@ export class BookingStatsService extends BaseService {
       return { ...booking, urgency, timeUntil };
     });
 
-    // Sort by tour time (soonest first)
+    // Sort by booking time (soonest first)
     enhanced.sort((a, b) => {
-      const aTime = a.schedule?.startsAt || a.bookingDate;
-      const bTime = b.schedule?.startsAt || b.bookingDate;
-      if (!aTime) return 1;
-      if (!bTime) return -1;
-      return new Date(aTime).getTime() - new Date(bTime).getTime();
+      if (!a.bookingDate || !a.bookingTime) return 1;
+      if (!b.bookingDate || !b.bookingTime) return -1;
+
+      const aTime = new Date(a.bookingDate);
+      const aParts = a.bookingTime.split(":");
+      aTime.setHours(parseInt(aParts[0] ?? "0", 10), parseInt(aParts[1] ?? "0", 10));
+
+      const bTime = new Date(b.bookingDate);
+      const bParts = b.bookingTime.split(":");
+      bTime.setHours(parseInt(bParts[0] ?? "0", 10), parseInt(bParts[1] ?? "0", 10));
+
+      return aTime.getTime() - bTime.getTime();
     });
 
     return {

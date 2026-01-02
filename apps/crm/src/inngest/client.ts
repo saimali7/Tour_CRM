@@ -136,7 +136,7 @@ type BookingEvents = {
   "automation/check-availability-alerts": {
     data: {
       organizationId: string;
-      scheduleId: string;
+      tourId: string;
       availableSpots: number;
     };
   };

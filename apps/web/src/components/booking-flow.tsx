@@ -8,42 +8,57 @@ import { TicketSelection } from "./ticket-selection";
 import { CustomerDetailsForm } from "./customer-details-form";
 import { PaymentStep } from "./payment-step";
 import { BookingConfirmation } from "./booking-confirmation";
-import type { Tour, Schedule, TourPricingTier } from "@tour/database";
+import type { Tour, TourPricingTier } from "@tour/database";
 
 interface BookingFlowProps {
   tour: Tour;
-  schedule: Schedule;
+  bookingDate: Date;
+  bookingTime: string;
+  availableSpots: number;
   pricingTiers: TourPricingTier[];
   currency: string;
   organizationName: string;
 }
 
-function formatTime(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return format(d, "h:mm a");
+function formatTime(time: string): string {
+  // time is in HH:MM format
+  const [hours, minutes] = time.split(":");
+  const hour = parseInt(hours!, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
 }
 
-function formatDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return format(d, "EEEE, MMMM d, yyyy");
+function formatDate(date: Date): string {
+  return format(date, "EEEE, MMMM d, yyyy");
+}
+
+// Calculate end time based on tour duration
+function calculateEndTime(startTime: string, durationMinutes: number): string {
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const totalMinutes = hours! * 60 + minutes! + durationMinutes;
+  const endHours = Math.floor(totalMinutes / 60) % 24;
+  const endMinutes = totalMinutes % 60;
+  return `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`;
 }
 
 function BookingFlowContent({
   tour,
-  schedule,
+  bookingDate,
+  bookingTime,
+  availableSpots,
   pricingTiers,
   currency,
   organizationName,
 }: BookingFlowProps) {
-  const { state, setTourSchedule } = useBooking();
+  const { state, setTourAndAvailability } = useBooking();
 
-  // Initialize booking with tour and schedule
+  // Initialize booking with tour and availability info
   useEffect(() => {
-    setTourSchedule(tour, schedule, pricingTiers, currency);
-  }, [tour, schedule, pricingTiers, currency, setTourSchedule]);
+    setTourAndAvailability(tour, bookingDate, bookingTime, availableSpots, pricingTiers, currency);
+  }, [tour, bookingDate, bookingTime, availableSpots, pricingTiers, currency, setTourAndAvailability]);
 
-  const basePrice = parseFloat(schedule.price || tour.basePrice);
-  const availableSpots = schedule.maxParticipants - (schedule.bookedCount || 0);
+  const basePrice = parseFloat(tour.basePrice);
 
   const steps = [
     { id: "select", label: "Tickets", number: 1 },
@@ -53,6 +68,8 @@ function BookingFlowContent({
   ] as const;
 
   const currentStepIndex = steps.findIndex((s) => s.id === state.step);
+
+  const endTime = calculateEndTime(bookingTime, tour.durationMinutes);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -109,7 +126,7 @@ function BookingFlowContent({
           {state.step === "select" && (
             <TicketSelection
               basePrice={basePrice}
-              maxParticipants={schedule.maxParticipants}
+              maxParticipants={tour.maxParticipants}
               availableSpots={availableSpots}
               currency={currency}
             />
@@ -136,13 +153,13 @@ function BookingFlowContent({
 
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>{formatDate(schedule.startsAt)}</span>
+                <span>{formatDate(bookingDate)}</span>
               </div>
 
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 <span>
-                  {formatTime(schedule.startsAt)} - {formatTime(schedule.endsAt)}
+                  {formatTime(bookingTime)} - {formatTime(endTime)}
                 </span>
               </div>
 

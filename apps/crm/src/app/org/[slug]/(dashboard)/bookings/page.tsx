@@ -9,7 +9,6 @@ import {
   Users,
   Ban,
   Mail,
-  RefreshCw,
   Zap,
   Loader2,
   Search,
@@ -56,7 +55,6 @@ import {
 import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/status-badge";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { NoBookingsEmpty, NoResultsEmpty } from "@/components/ui/empty-state";
-import { BulkRescheduleModal } from "@/components/bookings/bulk-reschedule-modal";
 import { BulkEmailModal } from "@/components/bookings/bulk-email-modal";
 import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 import { BookingMobileCard, BookingMobileCardSkeleton } from "@/components/bookings/booking-mobile-card";
@@ -201,11 +199,10 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
   const confirmModal = useConfirmModal();
   const [showBulkCancelDialog, setShowBulkCancelDialog] = useState(false);
   const [bulkCancelReason, setBulkCancelReason] = useState("");
-  const [showBulkRescheduleModal, setShowBulkRescheduleModal] = useState(false);
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
 
   // Calculate date range based on quick filter
-  const scheduleDateRange = useMemo(() => {
+  const bookingDateRange = useMemo(() => {
     if (quickDateFilter === "all") return undefined;
 
     const now = new Date();
@@ -235,7 +232,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
       status: statusFilter === "all" ? undefined : statusFilter,
       paymentStatus: paymentFilter === "all" ? undefined : paymentFilter,
       search: search || undefined,
-      scheduleDateRange,
+      bookingDateRange,
     },
     sort: { field: "createdAt", direction: "desc" },
   });
@@ -322,18 +319,6 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
         },
         variant: "destructive" as const,
         loading: bulkCancelMutation.isPending,
-        disabled: cancellableCount === 0,
-      },
-      {
-        label: "Reschedule",
-        icon: <RefreshCw className="h-4 w-4" />,
-        onClick: () => {
-          if (cancellableCount > 0) {
-            setShowBulkRescheduleModal(true);
-          } else {
-            toast.info("No reschedulable bookings selected");
-          }
-        },
         disabled: cancellableCount === 0,
       },
       {
@@ -724,10 +709,10 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
                       >
                         {booking.tour?.name || "Unknown Tour"}
                       </div>
-                      {booking.schedule && (
+                      {booking.bookingDate && (
                         <div className="text-sm text-muted-foreground whitespace-nowrap">
-                          {formatDate(booking.schedule.startsAt)} at{" "}
-                          {formatTime(booking.schedule.startsAt)}
+                          {formatDate(new Date(booking.bookingDate))}
+                          {booking.bookingTime && ` at ${booking.bookingTime}`}
                         </div>
                       )}
                     </div>
@@ -915,18 +900,6 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Bulk Reschedule Modal */}
-      <BulkRescheduleModal
-        open={showBulkRescheduleModal}
-        onOpenChange={setShowBulkRescheduleModal}
-        selectedBookings={selection.getSelectedItems()}
-        onSuccess={() => {
-          utils.booking.list.invalidate();
-          utils.booking.getStats.invalidate();
-          selection.clearSelection();
-        }}
-      />
 
       {/* Bulk Email Modal */}
       <BulkEmailModal

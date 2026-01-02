@@ -4,7 +4,7 @@ import { createServices } from "@tour/services";
 import { TRPCError } from "@trpc/server";
 import { getGuideContext } from "../../lib/guide-auth";
 import { db, eq, and, gte, lte, inArray } from "@tour/database";
-import { schedules, bookings, guideAssignments } from "@tour/database/schema";
+import { bookings, guideAssignments } from "@tour/database/schema";
 
 /**
  * Guide-authenticated procedure
@@ -30,7 +30,7 @@ const guideProcedure = publicProcedure.use(async ({ next }) => {
 export const guidePortalRouter = createRouter({
   /**
    * Get dashboard data for the guide
-   * Returns upcoming tours and pending assignments
+   * Returns upcoming tour runs and pending assignments
    */
   getMyDashboard: guideProcedure.query(async ({ ctx }) => {
     const { guideId, organizationId } = ctx.guideContext;
@@ -40,7 +40,7 @@ export const guidePortalRouter = createRouter({
     const nextWeek = new Date();
     nextWeek.setDate(today.getDate() + 7);
 
-    // First get confirmed assignments for this guide that link to upcoming schedules
+    // First get confirmed assignments for this guide that link to upcoming bookings
     const confirmedAssignments = await db.query.guideAssignments.findMany({
       where: and(
         eq(guideAssignments.organizationId, organizationId),
@@ -50,41 +50,53 @@ export const guidePortalRouter = createRouter({
       with: {
         booking: {
           with: {
-            schedule: {
-              with: {
-                tour: true,
-              },
-            },
+            tour: true,
           },
         },
       },
     });
 
-    // Filter to upcoming schedules and deduplicate by scheduleId
-    // Type assertion needed because Drizzle's nested relation types aren't properly inferred
-    type ScheduleWithTour = typeof schedules.$inferSelect & { tour?: { id: string; name: string } | null };
-    const scheduleMap = new Map<string, ScheduleWithTour & { bookingCount: number }>();
+    // Filter to upcoming bookings and deduplicate by tour run key (tourId + bookingDate + bookingTime)
+    type TourRunInfo = {
+      tourId: string;
+      tourName: string;
+      bookingDate: Date;
+      bookingTime: string;
+      bookingCount: number;
+    };
+    type BookingWithTour = typeof confirmedAssignments[number]["booking"] & {
+      tour: { id: string; name: string } | null;
+    };
+    const tourRunMap = new Map<string, TourRunInfo>();
     for (const assignment of confirmedAssignments) {
-      // The with clause includes schedule but TypeScript doesn't know about it
-      const booking = assignment.booking as unknown as { schedule: ScheduleWithTour | null; scheduleId: string };
-      const schedule = booking.schedule;
+      const booking = assignment.booking as BookingWithTour;
       if (
-        schedule &&
-        schedule.startsAt >= today &&
-        schedule.startsAt <= nextWeek &&
-        schedule.status === "scheduled"
+        booking &&
+        booking.bookingDate &&
+        booking.bookingTime &&
+        booking.tour &&
+        booking.bookingDate >= today &&
+        booking.bookingDate <= nextWeek &&
+        (booking.status === "pending" || booking.status === "confirmed")
       ) {
-        if (!scheduleMap.has(schedule.id)) {
-          scheduleMap.set(schedule.id, { ...schedule, bookingCount: 1 });
+        const tourRunKey = `${booking.tourId}|${booking.bookingDate.toISOString().split("T")[0]}|${booking.bookingTime}`;
+        if (!tourRunMap.has(tourRunKey)) {
+          tourRunMap.set(tourRunKey, {
+            tourId: booking.tourId!,
+            tourName: booking.tour.name,
+            bookingDate: booking.bookingDate,
+            bookingTime: booking.bookingTime,
+            bookingCount: 1,
+          });
         } else {
-          const existing = scheduleMap.get(schedule.id)!;
+          const existing = tourRunMap.get(tourRunKey)!;
           existing.bookingCount++;
         }
       }
     }
 
-    const myUpcomingSchedules = Array.from(scheduleMap.values()).sort(
-      (a, b) => a.startsAt.getTime() - b.startsAt.getTime()
+    const myUpcomingTourRuns = Array.from(tourRunMap.values()).sort(
+      (a, b) => a.bookingDate.getTime() - b.bookingDate.getTime()
     );
 
     // Get pending assignments (via bookings)
@@ -97,11 +109,7 @@ export const guidePortalRouter = createRouter({
       with: {
         booking: {
           with: {
-            schedule: {
-              with: {
-                tour: true,
-              },
-            },
+            tour: true,
           },
         },
       },
@@ -109,10 +117,10 @@ export const guidePortalRouter = createRouter({
     });
 
     return {
-      upcomingSchedules: myUpcomingSchedules,
+      upcomingTourRuns: myUpcomingTourRuns,
       pendingAssignments,
       stats: {
-        upcomingCount: myUpcomingSchedules.length,
+        upcomingCount: myUpcomingTourRuns.length,
         pendingCount: pendingAssignments.length,
       },
     };
@@ -150,11 +158,7 @@ export const guidePortalRouter = createRouter({
         with: {
           booking: {
             with: {
-              schedule: {
-                with: {
-                  tour: true,
-                },
-              },
+              tour: true,
               customer: true,
             },
           },
@@ -162,18 +166,16 @@ export const guidePortalRouter = createRouter({
         orderBy: (guideAssignments, { desc }) => [desc(guideAssignments.createdAt)],
       });
 
-      // Filter by date range if provided (based on booking's schedule)
-      // Type assertion needed for nested relations
-      type AssignmentWithBooking = typeof assignments[number] & { booking: { schedule: { startsAt: Date } | null } };
-      let filteredAssignments = assignments as AssignmentWithBooking[];
+      // Filter by date range if provided (based on booking's bookingDate)
+      let filteredAssignments = assignments;
       if (input.dateRange?.from || input.dateRange?.to) {
-        filteredAssignments = (assignments as AssignmentWithBooking[]).filter((assignment) => {
-          const scheduleDate = assignment.booking.schedule?.startsAt;
-          if (!scheduleDate) return false;
-          if (input.dateRange?.from && scheduleDate < input.dateRange.from) {
+        filteredAssignments = assignments.filter((assignment) => {
+          const bookingDate = assignment.booking?.bookingDate;
+          if (!bookingDate) return false;
+          if (input.dateRange?.from && bookingDate < input.dateRange.from) {
             return false;
           }
-          if (input.dateRange?.to && scheduleDate > input.dateRange.to) {
+          if (input.dateRange?.to && bookingDate > input.dateRange.to) {
             return false;
           }
           return true;
@@ -200,11 +202,7 @@ export const guidePortalRouter = createRouter({
         with: {
           booking: {
             with: {
-              schedule: {
-                with: {
-                  tour: true,
-                },
-              },
+              tour: true,
               customer: true,
             },
           },
@@ -287,15 +285,22 @@ export const guidePortalRouter = createRouter({
     }),
 
   /**
-   * Get schedule manifest with participant details
+   * Get tour run manifest with participant details
    */
-  getScheduleManifest: guideProcedure
-    .input(z.object({ scheduleId: z.string() }))
+  getTourRunManifest: guideProcedure
+    .input(z.object({
+      tourId: z.string(),
+      date: z.coerce.date(),
+      time: z.string(),
+    }))
     .query(async ({ ctx, input }) => {
       const { guideId, organizationId } = ctx.guideContext;
 
-      // Verify the guide is assigned to this schedule (via any booking on this schedule)
-      const assignmentCheck = await db.query.guideAssignments.findFirst({
+      const dateStr = input.date.toISOString().split("T")[0];
+      const tourRunKey = `${input.tourId}|${dateStr}|${input.time}`;
+
+      // Verify the guide is assigned to this tour run (via any booking on this tour run)
+      const allAssignments = await db.query.guideAssignments.findMany({
         where: and(
           eq(guideAssignments.guideId, guideId),
           eq(guideAssignments.organizationId, organizationId),
@@ -306,76 +311,79 @@ export const guidePortalRouter = createRouter({
         },
       });
 
-      // Check if assignment's booking is for this schedule
-      if (!assignmentCheck || assignmentCheck.booking.scheduleId !== input.scheduleId) {
-        // Double-check with a more complete query
-        const allAssignments = await db.query.guideAssignments.findMany({
-          where: and(
-            eq(guideAssignments.guideId, guideId),
-            eq(guideAssignments.organizationId, organizationId),
-            eq(guideAssignments.status, "confirmed")
-          ),
-          with: {
-            booking: true,
-          },
-        });
-
-        const hasScheduleAssignment = allAssignments.some(
-          (a) => a.booking.scheduleId === input.scheduleId
-        );
-
-        if (!hasScheduleAssignment) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "You are not assigned to this schedule",
-          });
-        }
-      }
-
-      // Get the schedule with all details
-      const schedule = await db.query.schedules.findFirst({
-        where: and(
-          eq(schedules.id, input.scheduleId),
-          eq(schedules.organizationId, organizationId)
-        ),
-        with: {
-          tour: true,
-          bookings: {
-            where: eq(bookings.status, "confirmed"),
-            with: {
-              customer: true,
-            },
-            orderBy: (bookings, { asc }) => [asc(bookings.createdAt)],
-          },
-        },
+      const hasTourRunAssignment = allAssignments.some((a) => {
+        const booking = a.booking;
+        if (!booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) return false;
+        const assignmentTourRunKey = `${booking.tourId}|${booking.bookingDate.toISOString().split("T")[0]}|${booking.bookingTime}`;
+        return assignmentTourRunKey === tourRunKey;
       });
 
-      if (!schedule) {
+      if (!hasTourRunAssignment) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You are not assigned to this tour run",
+        });
+      }
+
+      // Get all confirmed bookings for this tour run
+      type BookingWithRelations = Awaited<ReturnType<typeof db.query.bookings.findMany>>[number] & {
+        tour: { id: string; name: string; maxParticipants: number } | null;
+        customer: { id: string; firstName: string; lastName: string; email: string | null } | null;
+      };
+      const tourRunBookings = await db.query.bookings.findMany({
+        where: and(
+          eq(bookings.tourId, input.tourId),
+          eq(bookings.organizationId, organizationId),
+          eq(bookings.status, "confirmed")
+        ),
+        with: {
+          customer: true,
+          tour: true,
+        },
+        orderBy: (bookings, { asc }) => [asc(bookings.createdAt)],
+      }) as BookingWithRelations[];
+
+      // Filter by date and time (date is stored as Date, need to compare)
+      const filteredBookings = tourRunBookings.filter((b) => {
+        if (!b.bookingDate || !b.bookingTime) return false;
+        const bookingDateStr = b.bookingDate.toISOString().split("T")[0];
+        return bookingDateStr === dateStr && b.bookingTime === input.time;
+      });
+
+      const tour = filteredBookings[0]?.tour;
+
+      if (filteredBookings.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Schedule not found",
+          message: "No bookings found for this tour run",
         });
       }
 
       // Calculate totals
-      const totalParticipants = schedule.bookings.reduce(
+      const totalParticipants = filteredBookings.reduce(
         (sum: number, booking) => sum + (booking.totalParticipants || 0),
         0
       );
 
-      const totalRevenue = schedule.bookings.reduce(
+      const totalRevenue = filteredBookings.reduce(
         (sum: number, booking) => sum + parseFloat(booking.total || "0"),
         0
       );
 
       return {
-        schedule,
-        manifest: schedule.bookings,
+        tourRun: {
+          tourId: input.tourId,
+          tourName: tour?.name || "Unknown Tour",
+          date: input.date,
+          time: input.time,
+          maxParticipants: tour?.maxParticipants || 0,
+        },
+        manifest: filteredBookings,
         stats: {
-          totalBookings: schedule.bookings.length,
+          totalBookings: filteredBookings.length,
           totalParticipants,
           totalRevenue: totalRevenue.toFixed(2),
-          spotsRemaining: (schedule.maxParticipants ?? 0) - totalParticipants,
+          spotsRemaining: (tour?.maxParticipants || 0) - totalParticipants,
         },
       };
     }),

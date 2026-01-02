@@ -14,10 +14,9 @@ const bookingFilterSchema = z.object({
   paymentStatus: z.enum(["pending", "partial", "paid", "refunded", "failed"]).optional(),
   source: z.enum(["manual", "website", "api", "phone", "walk_in"]).optional(),
   customerId: z.string().optional(),
-  scheduleId: z.string().optional(),
   tourId: z.string().optional(),
   dateRange: dateRangeSchema.optional(),
-  scheduleDateRange: dateRangeSchema.optional(), // Filter by schedule start date (for calendar view)
+  bookingDateRange: dateRangeSchema.optional(), // Filter by booking date (tour date)
   search: z.string().optional(),
 });
 
@@ -55,13 +54,10 @@ const pricingSnapshotSchema = z.object({
 const createBookingSchema = z.object({
   customerId: z.string().max(100),
 
-  // Schedule-based (legacy) - optional
-  scheduleId: z.string().max(100).optional(),
-
-  // Availability-based (new) - optional individually, but one pattern required
-  tourId: z.string().max(100).optional(),
-  bookingDate: z.string().optional(), // ISO date string YYYY-MM-DD
-  bookingTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format").optional(),
+  // Availability-based booking (required)
+  tourId: z.string().max(100),
+  bookingDate: z.string(), // ISO date string YYYY-MM-DD
+  bookingTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
 
   bookingOptionId: z.string().optional(),
 
@@ -88,13 +84,7 @@ const createBookingSchema = z.object({
   discount: priceStringSchema.optional(),
   tax: priceStringSchema.optional(),
   total: priceStringSchema.optional(),
-}).refine(
-  (data) => data.scheduleId || (data.tourId && data.bookingDate && data.bookingTime),
-  {
-    message: "Either scheduleId OR (tourId + bookingDate + bookingTime) is required",
-    path: ["scheduleId"]
-  }
-);
+});
 
 const updateBookingSchema = z.object({
   adultCount: z.number().min(1).max(100).optional(),
@@ -147,19 +137,37 @@ export const bookingRouter = createRouter({
 
       // Convert bookingDate string to Date and ensure adultCount is set for the service layer
       const serviceInput = {
-        ...input,
-        bookingDate: input.bookingDate ? new Date(input.bookingDate) : undefined,
+        customerId: input.customerId,
+        tourId: input.tourId,
+        bookingDate: new Date(input.bookingDate),
+        bookingTime: input.bookingTime,
+        bookingOptionId: input.bookingOptionId,
+        guestAdults: input.guestAdults,
+        guestChildren: input.guestChildren,
+        guestInfants: input.guestInfants,
+        pricingSnapshot: input.pricingSnapshot,
         // Ensure adultCount is always set - use legacy field if provided, otherwise use guestAdults
         adultCount: input.adultCount ?? input.guestAdults,
         childCount: input.childCount ?? input.guestChildren ?? 0,
         infantCount: input.infantCount ?? input.guestInfants ?? 0,
+        specialRequests: input.specialRequests,
+        dietaryRequirements: input.dietaryRequirements,
+        accessibilityNeeds: input.accessibilityNeeds,
+        internalNotes: input.internalNotes,
+        source: input.source,
+        sourceDetails: input.sourceDetails,
+        participants: input.participants,
+        subtotal: input.subtotal,
+        discount: input.discount,
+        tax: input.tax,
+        total: input.total,
       };
 
       const booking = await services.booking.create(serviceInput);
 
       // Send booking created email via Inngest (only if customer has email)
       // Wrapped in try-catch so Inngest failures don't break booking creation
-      if (booking.customer?.email && booking.schedule && booking.tour) {
+      if (booking.customer?.email && booking.bookingDate && booking.tour) {
         try {
           await inngest.send({
             name: "booking/created",
@@ -171,8 +179,8 @@ export const bookingRouter = createRouter({
               customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
               bookingReference: booking.referenceNumber,
               tourName: booking.tour.name,
-              tourDate: format(new Date(booking.schedule.startsAt), "MMMM d, yyyy"),
-              tourTime: format(new Date(booking.schedule.startsAt), "h:mm a"),
+              tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
+              tourTime: booking.bookingTime || "N/A",
               participants: booking.totalParticipants,
               totalAmount: booking.total,
               currency: booking.currency,
@@ -207,7 +215,7 @@ export const bookingRouter = createRouter({
       const booking = await services.booking.confirm(input.id);
 
       // Send confirmation email via Inngest if enabled (only if customer has email)
-      if (input.sendConfirmationEmail && booking.customer?.email && booking.schedule && booking.tour) {
+      if (input.sendConfirmationEmail && booking.customer?.email && booking.bookingDate && booking.tour) {
         await inngest.send({
           name: "booking/confirmed",
           data: {
@@ -218,8 +226,8 @@ export const bookingRouter = createRouter({
             customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
             bookingReference: booking.referenceNumber,
             tourName: booking.tour.name,
-            tourDate: format(new Date(booking.schedule.startsAt), "MMMM d, yyyy"),
-            tourTime: format(new Date(booking.schedule.startsAt), "h:mm a"),
+            tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
+            tourTime: booking.bookingTime || "N/A",
             participants: booking.totalParticipants,
             totalAmount: booking.total,
             currency: booking.currency,
@@ -242,7 +250,7 @@ export const bookingRouter = createRouter({
       const booking = await services.booking.cancel(input.id, input.reason);
 
       // Send cancellation email via Inngest if enabled (only if customer has email)
-      if (input.sendCancellationEmail && booking.customer?.email && booking.schedule && booking.tour) {
+      if (input.sendCancellationEmail && booking.customer?.email && booking.bookingDate && booking.tour) {
         await inngest.send({
           name: "booking/cancelled",
           data: {
@@ -253,8 +261,8 @@ export const bookingRouter = createRouter({
             customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
             bookingReference: booking.referenceNumber,
             tourName: booking.tour.name,
-            tourDate: format(new Date(booking.schedule.startsAt), "MMMM d, yyyy"),
-            tourTime: format(new Date(booking.schedule.startsAt), "h:mm a"),
+            tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
+            tourTime: booking.bookingTime || "N/A",
             cancellationReason: input.reason,
             refundAmount: input.refundAmount,
             currency: booking.currency,
@@ -277,90 +285,6 @@ export const bookingRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.booking.complete(input.id);
-    }),
-
-  reschedule: adminProcedure
-    .input(z.object({
-      id: z.string(),
-      newScheduleId: z.string(),
-      sendRescheduleEmail: z.boolean().default(true),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-
-      // Get old booking details for activity log
-      const oldBooking = await services.booking.getById(input.id);
-      const oldScheduleDate = oldBooking.schedule
-        ? format(new Date(oldBooking.schedule.startsAt), "MMMM d, yyyy 'at' h:mm a")
-        : "unknown";
-      const oldTourDate = oldBooking.schedule
-        ? format(new Date(oldBooking.schedule.startsAt), "MMMM d, yyyy")
-        : "unknown";
-      const oldTourTime = oldBooking.schedule
-        ? format(new Date(oldBooking.schedule.startsAt), "h:mm a")
-        : "unknown";
-
-      // Reschedule the booking
-      const booking = await services.booking.reschedule(input.id, input.newScheduleId);
-
-      const newScheduleDate = booking.schedule
-        ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy 'at' h:mm a")
-        : "unknown";
-      const newTourDate = booking.schedule
-        ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy")
-        : "unknown";
-      const newTourTime = booking.schedule
-        ? format(new Date(booking.schedule.startsAt), "h:mm a")
-        : "unknown";
-
-      // Log the activity
-      const userId = ctx.user?.id || "system";
-      const userName = ctx.user
-        ? `${ctx.user.firstName || ""} ${ctx.user.lastName || ""}`.trim() || ctx.user.id
-        : "System";
-
-      await services.activityLog.logBookingAction(
-        "booking.rescheduled",
-        booking.id,
-        booking.referenceNumber,
-        `Booking rescheduled from ${oldScheduleDate} to ${newScheduleDate}`,
-        {
-          actorType: "user",
-          actorId: userId,
-          actorName: userName,
-          metadata: {
-            oldScheduleId: oldBooking.scheduleId,
-            newScheduleId: input.newScheduleId,
-            oldDate: oldScheduleDate,
-            newDate: newScheduleDate,
-          },
-        }
-      );
-
-      // Send reschedule email via Inngest if enabled (only if customer has email)
-      if (input.sendRescheduleEmail && booking.customer?.email && booking.schedule && booking.tour) {
-        await inngest.send({
-          name: "booking/rescheduled",
-          data: {
-            organizationId: ctx.orgContext.organizationId,
-            bookingId: booking.id,
-            customerId: booking.customerId,
-            customerEmail: booking.customer.email,
-            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-            bookingReference: booking.referenceNumber,
-            tourName: booking.tour.name,
-            oldTourDate,
-            oldTourTime,
-            newTourDate,
-            newTourTime,
-            participants: booking.totalParticipants,
-            meetingPoint: booking.tour.meetingPoint || undefined,
-            meetingPointDetails: booking.tour.meetingPointDetails || undefined,
-          },
-        });
-      }
-
-      return booking;
     }),
 
   updatePaymentStatus: adminProcedure
@@ -412,13 +336,6 @@ export const bookingRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.booking.getStats(input.dateRange);
-    }),
-
-  getForSchedule: protectedProcedure
-    .input(z.object({ scheduleId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.booking.getForSchedule(input.scheduleId);
     }),
 
   getTodaysBookings: protectedProcedure.query(async ({ ctx }) => {
@@ -641,12 +558,10 @@ export const bookingRouter = createRouter({
         logoUrl: organization.logoUrl ?? undefined,
       });
 
-      const tourDate = booking.schedule
-        ? format(new Date(booking.schedule.startsAt), "MMMM d, yyyy")
+      const tourDate = booking.bookingDate
+        ? format(new Date(booking.bookingDate), "MMMM d, yyyy")
         : "Scheduled Date";
-      const tourTime = booking.schedule
-        ? format(new Date(booking.schedule.startsAt), "h:mm a")
-        : "Scheduled Time";
+      const tourTime = booking.bookingTime || "Scheduled Time";
 
       const emailResult = await emailService.sendPaymentLinkEmail({
         customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
@@ -715,7 +630,7 @@ export const bookingRouter = createRouter({
         // Get booking details for emails
         for (const id of result.confirmed) {
           const booking = await services.booking.getById(id);
-          if (booking.customer?.email && booking.schedule && booking.tour) {
+          if (booking.customer?.email && booking.bookingDate && booking.tour) {
             await inngest.send({
               name: "booking/confirmed",
               data: {
@@ -726,8 +641,8 @@ export const bookingRouter = createRouter({
                 customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
                 bookingReference: booking.referenceNumber,
                 tourName: booking.tour.name,
-                tourDate: format(booking.schedule.startsAt, "EEEE, MMMM d, yyyy"),
-                tourTime: format(booking.schedule.startsAt, "h:mm a"),
+                tourDate: format(new Date(booking.bookingDate), "EEEE, MMMM d, yyyy"),
+                tourTime: booking.bookingTime || "N/A",
                 participants: booking.totalParticipants,
                 totalAmount: booking.total,
                 currency: booking.currency,
@@ -756,7 +671,7 @@ export const bookingRouter = createRouter({
       if (input.sendCancellationEmails && result.cancelled.length > 0) {
         for (const id of result.cancelled) {
           const booking = await services.booking.getById(id);
-          if (booking.customer?.email && booking.schedule && booking.tour) {
+          if (booking.customer?.email && booking.bookingDate && booking.tour) {
             await inngest.send({
               name: "booking/cancelled",
               data: {
@@ -767,8 +682,8 @@ export const bookingRouter = createRouter({
                 customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
                 bookingReference: booking.referenceNumber,
                 tourName: booking.tour.name,
-                tourDate: format(booking.schedule.startsAt, "EEEE, MMMM d, yyyy"),
-                tourTime: format(booking.schedule.startsAt, "h:mm a"),
+                tourDate: format(new Date(booking.bookingDate), "EEEE, MMMM d, yyyy"),
+                tourTime: booking.bookingTime || "N/A",
                 cancellationReason: input.reason,
                 currency: booking.currency,
               },
@@ -788,51 +703,5 @@ export const bookingRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.booking.bulkUpdatePaymentStatus(input.ids, input.paymentStatus);
-    }),
-
-  bulkReschedule: bulkProcedure
-    .input(z.object({
-      ids: z.array(z.string()).min(1).max(100),
-      newScheduleId: z.string(),
-      sendRescheduleEmails: z.boolean().default(true),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      const result = await services.booking.bulkReschedule(input.ids, input.newScheduleId);
-
-      // Get new schedule info for emails
-      const newSchedule = await services.schedule.getById(input.newScheduleId);
-      const newTourDate = newSchedule ? format(new Date(newSchedule.startsAt), "MMMM d, yyyy") : "unknown";
-      const newTourTime = newSchedule ? format(new Date(newSchedule.startsAt), "h:mm a") : "unknown";
-
-      // Send reschedule emails via Inngest for successful reschedules
-      if (input.sendRescheduleEmails && result.rescheduled.length > 0) {
-        for (const id of result.rescheduled) {
-          const booking = await services.booking.getById(id);
-          if (booking.customer?.email && booking.tour) {
-            await inngest.send({
-              name: "booking/rescheduled",
-              data: {
-                organizationId: ctx.orgContext.organizationId,
-                bookingId: booking.id,
-                customerId: booking.customerId,
-                customerEmail: booking.customer.email,
-                customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-                bookingReference: booking.referenceNumber,
-                tourName: booking.tour.name,
-                oldTourDate: "Previous date",
-                oldTourTime: "Previous time",
-                newTourDate,
-                newTourTime,
-                participants: booking.totalParticipants,
-                meetingPoint: booking.tour.meetingPoint || undefined,
-                meetingPointDetails: booking.tour.meetingPointDetails || undefined,
-              },
-            });
-          }
-        }
-      }
-
-      return result;
     }),
 });

@@ -6,6 +6,7 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
+import { startOfDay, endOfDay } from "date-fns";
 
 interface ToursWeekViewProps {
   orgSlug: string;
@@ -13,12 +14,12 @@ interface ToursWeekViewProps {
   onDayClick?: (date: Date) => void;
 }
 
-function formatTime(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(d);
+function formatTime(time: string): string {
+  const [hours, minutes] = time.split(":");
+  const hour = parseInt(hours || "0", 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
 }
 
 function getWeekDates(start: Date): Date[] {
@@ -47,54 +48,70 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
       const now = new Date();
       return { from: now, to: now };
     }
-    const from = new Date(firstDate);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(lastDate);
-    to.setHours(23, 59, 59, 999);
+    const from = startOfDay(firstDate);
+    const to = endOfDay(lastDate);
     return { from, to };
   }, [weekDates]);
 
-  const { data, isLoading, error } = trpc.schedule.list.useQuery({
-    pagination: { page: 1, limit: 100 },
-    filters: {
-      dateRange,
-    },
-    sort: { field: "startsAt", direction: "asc" },
+  const { data, isLoading, error } = trpc.tourRun.list.useQuery({
+    dateFrom: dateRange.from,
+    dateTo: dateRange.to,
   });
 
-  const schedules = data?.data || [];
+  const tourRuns = data?.tourRuns || [];
 
-  // Group schedules by date
-  const schedulesByDate = useMemo(() => {
-    const grouped: Record<string, typeof schedules> = {};
+  // Define tour run type for grouping
+  type TourRunItem = {
+    tourId: string;
+    tourName: string;
+    time: string;
+    date: string;
+    bookedCount: number;
+    capacity: number;
+  };
+
+  // Group tour runs by date
+  const tourRunsByDate = useMemo(() => {
+    const grouped: Record<string, TourRunItem[]> = {};
     for (const date of weekDates) {
       grouped[date.toDateString()] = [];
     }
-    for (const schedule of schedules) {
-      const dateKey = new Date(schedule.startsAt).toDateString();
+    for (const tourRun of tourRuns) {
+      const dateKey = new Date(tourRun.date).toDateString();
+      // Convert Date to YYYY-MM-DD string for URL params
+      const dateStr = tourRun.date instanceof Date
+        ? tourRun.date.toISOString().split('T')[0]!
+        : String(tourRun.date);
       if (grouped[dateKey]) {
-        grouped[dateKey].push(schedule);
+        grouped[dateKey].push({
+          tourId: tourRun.tourId,
+          tourName: tourRun.tourName,
+          time: tourRun.time,
+          date: dateStr,
+          bookedCount: tourRun.bookedCount || 0,
+          capacity: tourRun.capacity || 0,
+        });
       }
     }
     return grouped;
-  }, [schedules, weekDates]);
+  }, [tourRuns, weekDates]);
 
   // Calculate daily stats
   const dailyStats = useMemo(() => {
-    const stats: Record<string, { totalSchedules: number; totalBooked: number; totalCapacity: number; spotsLeft: number }> = {};
+    const stats: Record<string, { totalTourRuns: number; totalBooked: number; totalCapacity: number; spotsLeft: number }> = {};
     for (const date of weekDates) {
-      const daySchedules = schedulesByDate[date.toDateString()] || [];
-      const totalCapacity = daySchedules.reduce((sum, s) => sum + s.maxParticipants, 0);
-      const totalBooked = daySchedules.reduce((sum, s) => sum + (s.bookedCount ?? 0), 0);
+      const dayTourRuns = tourRunsByDate[date.toDateString()] || [];
+      const totalCapacity = dayTourRuns.reduce((sum, tr) => sum + tr.capacity, 0);
+      const totalBooked = dayTourRuns.reduce((sum, tr) => sum + tr.bookedCount, 0);
       stats[date.toDateString()] = {
-        totalSchedules: daySchedules.length,
+        totalTourRuns: dayTourRuns.length,
         totalBooked,
         totalCapacity,
         spotsLeft: totalCapacity - totalBooked,
       };
     }
     return stats;
-  }, [schedulesByDate, weekDates]);
+  }, [tourRunsByDate, weekDates]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -102,7 +119,7 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
-        <p className="text-destructive">Failed to load schedules: {error.message}</p>
+        <p className="text-destructive">Failed to load tour runs: {error.message}</p>
       </div>
     );
   }
@@ -133,7 +150,7 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
           Week of {weekDates[0] ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(weekDates[0]) : ""}
         </span>
         <span>
-          {schedules.length} tours scheduled
+          {tourRuns.length} tours scheduled
         </span>
       </div>
 
@@ -141,7 +158,7 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
       <div className="grid grid-cols-7 gap-2">
         {weekDates.map((date) => {
           const dateKey = date.toDateString();
-          const daySchedules = schedulesByDate[dateKey] || [];
+          const dayTourRuns = tourRunsByDate[dateKey] || [];
           const stats = dailyStats[dateKey];
           const isToday = date.toDateString() === today.toDateString();
           const isPast = date < today;
@@ -174,10 +191,10 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
                   {date.getDate()}
                 </div>
                 {/* Day Stats */}
-                {stats && stats.totalSchedules > 0 && (
+                {stats && stats.totalTourRuns > 0 && (
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs text-muted-foreground">
-                      {stats.totalSchedules} tour{stats.totalSchedules !== 1 ? "s" : ""}
+                      {stats.totalTourRuns} tour{stats.totalTourRuns !== 1 ? "s" : ""}
                     </span>
                     <span className={cn(
                       "text-xs font-medium",
@@ -189,23 +206,23 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
                 )}
               </button>
 
-              {/* Schedules */}
+              {/* Tour Runs */}
               <div className="flex-1 p-2 space-y-1.5 overflow-y-auto max-h-[300px]">
-                {daySchedules.length === 0 ? (
+                {dayTourRuns.length === 0 ? (
                   <div className="text-xs text-muted-foreground text-center py-4">
                     No tours
                   </div>
                 ) : (
-                  daySchedules.map((schedule) => {
-                    const booked = schedule.bookedCount ?? 0;
-                    const max = schedule.maxParticipants;
+                  dayTourRuns.map((tourRun) => {
+                    const booked = tourRun.bookedCount;
+                    const max = tourRun.capacity;
                     const remaining = max - booked;
                     const percentage = max > 0 ? Math.round((booked / max) * 100) : 0;
 
                     return (
                       <Link
-                        key={schedule.id}
-                        href={`/org/${orgSlug}/availability/${schedule.id}` as Route}
+                        key={`${tourRun.tourId}-${tourRun.date}-${tourRun.time}`}
+                        href={`/org/${orgSlug}/availability/${tourRun.tourId}?date=${tourRun.date}&time=${encodeURIComponent(tourRun.time)}` as Route}
                         className={cn(
                           "block rounded p-2 text-xs hover:ring-1 hover:ring-primary/50 transition-all",
                           percentage >= 100 ? "bg-destructive/10" : percentage >= 80 ? "bg-warning/10" : "bg-muted/50"
@@ -213,11 +230,11 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
                       >
                         {/* Time */}
                         <div className="font-medium text-foreground">
-                          {formatTime(schedule.startsAt)}
+                          {formatTime(tourRun.time)}
                         </div>
                         {/* Tour Name */}
-                        <div className="text-muted-foreground truncate" title={schedule.tour?.name}>
-                          {schedule.tour?.name ?? "Unknown"}
+                        <div className="text-muted-foreground truncate" title={tourRun.tourName}>
+                          {tourRun.tourName ?? "Unknown"}
                         </div>
                         {/* Booking Stats */}
                         <div className="flex items-center gap-1 mt-1">

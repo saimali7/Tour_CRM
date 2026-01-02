@@ -14,62 +14,47 @@ import {
   CheckCircle2,
   XCircle,
   MoreHorizontal,
-  X,
-  Plus,
-  Calendar,
-  Search,
   Briefcase,
 } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
-import { NoSchedulesEmpty } from "@/components/ui/empty-state";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useConfirmModal } from "@/components/ui/confirm-modal";
+import { format, addDays, startOfDay, endOfDay } from "date-fns";
 
-type StatusFilter = "all" | "scheduled" | "completed" | "cancelled";
 type DateFilter = "next7" | "next14" | "next30" | "all";
 
-interface ScheduleGroup {
+interface TourRunGroup {
   date: string;
   dateLabel: string;
-  schedules: Array<{
-    id: string;
-    startsAt: Date;
-    time: string;
+  tourRuns: Array<{
     tourId: string;
     tourName: string;
+    time: string;
     bookedCount: number;
     maxParticipants: number;
     guidesAssigned: number;
     guidesRequired: number;
-    status: string;
-    bookings?: Array<{
-      id: string;
-      customerName: string;
-      participants: number;
-      status: string;
-    }>;
   }>;
 }
 
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date(date));
+function formatTime(time: string): string {
+  const [hours, minutes] = time.split(":");
+  const hour = parseInt(hours || "0", 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
 }
 
-function formatDateLabel(date: Date): string {
+function formatDateLabel(dateStr: string): string {
+  const date = new Date(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -83,44 +68,24 @@ function formatDateLabel(date: Date): string {
   if (targetDate.getTime() === tomorrow.getTime()) {
     return "Tomorrow";
   }
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(date);
+  return format(date, "EEE, MMM d");
 }
 
 function getDateRange(filter: DateFilter): { from: Date; to: Date } | undefined {
   if (filter === "all") return undefined;
 
-  const from = new Date();
-  from.setHours(0, 0, 0, 0);
-  const to = new Date(from);
-
-  switch (filter) {
-    case "next7":
-      to.setDate(to.getDate() + 7);
-      break;
-    case "next14":
-      to.setDate(to.getDate() + 14);
-      break;
-    case "next30":
-      to.setDate(to.getDate() + 30);
-      break;
-  }
-  to.setHours(23, 59, 59, 999);
+  const from = startOfDay(new Date());
+  const to = endOfDay(addDays(from, filter === "next7" ? 7 : filter === "next14" ? 14 : 30));
 
   return { from, to };
 }
 
-export default function SchedulesPage() {
+export default function AvailabilityPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const { confirm, ConfirmModal } = useConfirmModal();
 
   // Filters
   const [tourFilter, setTourFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("scheduled");
   const [dateFilter, setDateFilter] = useState<DateFilter>("next14");
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
@@ -133,77 +98,55 @@ export default function SchedulesPage() {
     filters: { status: "active" },
   });
 
-  // Fetch schedules
-  const { data, isLoading } = trpc.schedule.list.useQuery({
-    pagination: { page: 1, limit: 200 },
-    filters: {
-      tourId: tourFilter !== "all" ? tourFilter : undefined,
-      status: statusFilter !== "all" ? statusFilter : undefined,
-      dateRange,
+  // Fetch tour runs for the date range
+  const { data: tourRunsResult, isLoading } = trpc.tourRun.list.useQuery(
+    {
+      dateFrom: dateRange?.from || startOfDay(new Date()),
+      dateTo: dateRange?.to || endOfDay(addDays(new Date(), 14)),
     },
-    sort: { field: "startsAt", direction: "asc" },
-  });
+    { enabled: !!dateRange }
+  );
 
-  const utils = trpc.useUtils();
+  const tourRunsData = tourRunsResult?.tourRuns || [];
 
-  // Mutations
-  const cancelMutation = trpc.schedule.cancel.useMutation({
-    onSuccess: () => {
-      utils.schedule.list.invalidate();
-    },
-  });
+  // Group tour runs by date
+  const groupedTourRuns = useMemo(() => {
+    if (!tourRunsData.length) return [];
 
-  const handleCancel = async (id: string, tourName: string, time: string) => {
-    const confirmed = await confirm({
-      title: "Cancel Schedule",
-      description: `This will cancel the ${tourName} departure at ${time}. Customers with bookings will need to be notified.`,
-      confirmLabel: "Cancel Schedule",
-      variant: "destructive",
-    });
+    // Filter by tour if selected
+    const filtered = tourFilter === "all"
+      ? tourRunsData
+      : tourRunsData.filter((tr) => tr.tourId === tourFilter);
 
-    if (confirmed) {
-      cancelMutation.mutate({ id });
-    }
-  };
+    const groups = new Map<string, TourRunGroup>();
 
-  // Group schedules by date
-  const groupedSchedules = useMemo(() => {
-    if (!data?.data) return [];
-
-    const groups = new Map<string, ScheduleGroup>();
-
-    data.data.forEach((schedule) => {
-      const date = new Date(schedule.startsAt);
-      const dateKey = date.toISOString().split("T")[0]!;
+    filtered.forEach((tourRun) => {
+      const dateKey = format(new Date(tourRun.date), "yyyy-MM-dd");
 
       if (!groups.has(dateKey)) {
         groups.set(dateKey, {
           date: dateKey,
-          dateLabel: formatDateLabel(date),
-          schedules: [],
+          dateLabel: formatDateLabel(dateKey),
+          tourRuns: [],
         });
       }
 
-      const tour = toursData?.data.find((t) => t.id === schedule.tourId);
-
-      groups.get(dateKey)!.schedules.push({
-        id: schedule.id,
-        startsAt: date,
-        time: formatTime(date),
-        tourId: schedule.tourId,
-        tourName: tour?.name || "Unknown Tour",
-        bookedCount: schedule.bookedCount || 0,
-        maxParticipants: schedule.maxParticipants || tour?.maxParticipants || 0,
-        guidesAssigned: schedule.guidesAssigned || 0,
-        guidesRequired: schedule.guidesRequired || 1,
-        status: schedule.status,
+      groups.get(dateKey)!.tourRuns.push({
+        tourId: tourRun.tourId,
+        tourName: tourRun.tourName,
+        time: tourRun.time,
+        bookedCount: tourRun.bookedCount || 0,
+        maxParticipants: tourRun.capacity || 0,
+        guidesAssigned: tourRun.guidesAssigned || 0,
+        guidesRequired: tourRun.guidesRequired || 1,
       });
     });
 
+    // Sort dates
     return Array.from(groups.values()).sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-  }, [data?.data, toursData?.data]);
+  }, [tourRunsData, tourFilter]);
 
   const toggleDateExpanded = (dateKey: string) => {
     setExpandedDates((prev) => {
@@ -218,10 +161,10 @@ export default function SchedulesPage() {
   };
 
   // Stats
-  const totalSchedules = data?.data.length || 0;
-  const totalCapacity = data?.data.reduce((sum, s) => sum + (s.maxParticipants || 0), 0) || 0;
-  const totalBooked = data?.data.reduce((sum, s) => sum + (s.bookedCount || 0), 0) || 0;
-  const needsGuides = data?.data.filter((s) => (s.guidesAssigned || 0) < (s.guidesRequired || 1)).length || 0;
+  const totalTourRuns = tourRunsData.length;
+  const totalCapacity = tourRunsData.reduce((sum, tr) => sum + (tr.capacity || 0), 0);
+  const totalBooked = tourRunsData.reduce((sum, tr) => sum + (tr.bookedCount || 0), 0);
+  const needsGuides = tourRunsData.filter((tr) => (tr.guidesAssigned || 0) < (tr.guidesRequired || 1)).length;
 
   return (
     <div className="space-y-4">
@@ -232,7 +175,7 @@ export default function SchedulesPage() {
             <h1 className="text-lg font-semibold text-foreground">Catalog</h1>
             {/* Inline Stats */}
             <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
-              <span><span className="font-medium text-foreground">{totalSchedules}</span> schedules</span>
+              <span><span className="font-medium text-foreground">{totalTourRuns}</span> tour runs</span>
               <span><span className="font-medium text-foreground">{totalBooked}</span>/<span className="text-muted-foreground">{totalCapacity}</span> booked</span>
               {needsGuides > 0 && (
                 <span className="text-amber-600">
@@ -268,7 +211,7 @@ export default function SchedulesPage() {
           </Link>
           <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-foreground -mb-px">
             <CalendarClock className="h-4 w-4" />
-            Schedules
+            Availability
           </button>
         </nav>
       </header>
@@ -295,7 +238,6 @@ export default function SchedulesPage() {
             { value: "next7", label: "7 days" },
             { value: "next14", label: "14 days" },
             { value: "next30", label: "30 days" },
-            { value: "all", label: "All" },
           ].map((opt) => (
             <button
               key={opt.value}
@@ -311,54 +253,37 @@ export default function SchedulesPage() {
             </button>
           ))}
         </div>
-
-        {/* Status Filter */}
-        <div className="flex items-center gap-1 rounded-lg border border-input bg-background p-1">
-          {[
-            { value: "scheduled", label: "Active" },
-            { value: "completed", label: "Completed" },
-            { value: "cancelled", label: "Cancelled" },
-            { value: "all", label: "All" },
-          ].map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setStatusFilter(opt.value as StatusFilter)}
-              className={cn(
-                "px-3 py-1 text-sm rounded-md transition-colors",
-                statusFilter === opt.value
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Schedules Table */}
+      {/* Tour Runs Table */}
       {isLoading ? (
         <div className="rounded-lg border border-border bg-card p-12">
           <div className="flex justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         </div>
-      ) : groupedSchedules.length === 0 ? (
-        <NoSchedulesEmpty orgSlug={slug} />
+      ) : groupedTourRuns.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center">
+          <CalendarClock className="mx-auto h-12 w-12 text-muted-foreground/40" />
+          <h3 className="mt-4 text-lg font-semibold text-foreground">No tour runs</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            No bookings found for the selected date range. Tour runs appear automatically when customers book tours.
+          </p>
+        </div>
       ) : (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           {/* Table Header */}
           <div className="grid grid-cols-[1fr,100px,120px,100px,80px] gap-4 px-4 py-3 bg-muted/50 border-b border-border text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <div>Schedule</div>
+            <div>Tour Run</div>
             <div className="text-center">Capacity</div>
             <div className="text-center">Guides</div>
             <div className="text-center">Status</div>
             <div className="text-right">Actions</div>
           </div>
 
-          {/* Grouped Schedule Rows */}
+          {/* Grouped Tour Run Rows */}
           <div className="divide-y divide-border">
-            {groupedSchedules.map((group) => (
+            {groupedTourRuns.map((group) => (
               <div key={group.date}>
                 {/* Date Header */}
                 <button
@@ -372,39 +297,35 @@ export default function SchedulesPage() {
                   )}
                   <span className="text-sm font-medium text-foreground">{group.dateLabel}</span>
                   <span className="text-xs text-muted-foreground">
-                    ({group.schedules.length} departure{group.schedules.length !== 1 ? "s" : ""})
+                    ({group.tourRuns.length} departure{group.tourRuns.length !== 1 ? "s" : ""})
                   </span>
                 </button>
 
-                {/* Schedule Rows (expanded by default, collapsible) */}
+                {/* Tour Run Rows (expanded by default, collapsible) */}
                 {!expandedDates.has(group.date) && (
                   <div className="divide-y divide-border/50">
-                    {group.schedules.map((schedule) => {
-                      const utilization = schedule.maxParticipants > 0
-                        ? (schedule.bookedCount / schedule.maxParticipants) * 100
+                    {group.tourRuns.map((tourRun) => {
+                      const utilization = tourRun.maxParticipants > 0
+                        ? (tourRun.bookedCount / tourRun.maxParticipants) * 100
                         : 0;
                       const isFull = utilization >= 100;
-                      const needsGuide = schedule.guidesAssigned < schedule.guidesRequired;
-                      const isCancelled = schedule.status === "cancelled";
+                      const needsGuide = tourRun.guidesAssigned < tourRun.guidesRequired;
 
                       return (
                         <div
-                          key={schedule.id}
-                          className={cn(
-                            "grid grid-cols-[1fr,100px,120px,100px,80px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors",
-                            isCancelled && "opacity-50"
-                          )}
+                          key={`${tourRun.tourId}-${tourRun.time}`}
+                          className="grid grid-cols-[1fr,100px,120px,100px,80px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors"
                         >
                           {/* Time + Tour */}
                           <div className="flex items-center gap-3">
                             <span className="text-sm font-mono font-medium text-foreground w-20">
-                              {schedule.time}
+                              {formatTime(tourRun.time)}
                             </span>
                             <Link
-                              href={`/org/${slug}/tours/${schedule.tourId}` as Route}
+                              href={`/org/${slug}/tours/${tourRun.tourId}` as Route}
                               className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate"
                             >
-                              {schedule.tourName}
+                              {tourRun.tourName}
                             </Link>
                           </div>
 
@@ -424,7 +345,7 @@ export default function SchedulesPage() {
                               </div>
                             </div>
                             <span className="text-xs text-muted-foreground mt-1">
-                              {schedule.bookedCount}/{schedule.maxParticipants}
+                              {tourRun.bookedCount}/{tourRun.maxParticipants}
                             </span>
                           </div>
 
@@ -433,24 +354,19 @@ export default function SchedulesPage() {
                             {needsGuide ? (
                               <span className="flex items-center gap-1 text-sm text-amber-600">
                                 <AlertCircle className="h-4 w-4" />
-                                {schedule.guidesAssigned}/{schedule.guidesRequired}
+                                {tourRun.guidesAssigned}/{tourRun.guidesRequired}
                               </span>
                             ) : (
                               <span className="flex items-center gap-1 text-sm text-emerald-600">
                                 <UserCheck className="h-4 w-4" />
-                                {schedule.guidesAssigned}/{schedule.guidesRequired}
+                                {tourRun.guidesAssigned}/{tourRun.guidesRequired}
                               </span>
                             )}
                           </div>
 
                           {/* Status */}
                           <div className="flex justify-center">
-                            {isCancelled ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                <XCircle className="h-3 w-3" />
-                                Cancelled
-                              </span>
-                            ) : isFull ? (
+                            {isFull ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                                 <CheckCircle2 className="h-3 w-3" />
                                 Full
@@ -472,24 +388,20 @@ export default function SchedulesPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/org/${slug}/tour-run?tourId=${schedule.tourId}&date=${group.date}&time=${encodeURIComponent(schedule.time)}` as Route}>
+                                  <Link href={`/org/${slug}/availability/${tourRun.tourId}?date=${group.date}&time=${encodeURIComponent(tourRun.time)}` as Route}>
+                                    View Details
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/org/${slug}/tour-run?tourId=${tourRun.tourId}&date=${group.date}&time=${encodeURIComponent(tourRun.time)}` as Route}>
                                     View Manifest
                                   </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/org/${slug}/tours/${schedule.tourId}` as Route}>
+                                  <Link href={`/org/${slug}/tours/${tourRun.tourId}` as Route}>
                                     View Tour
                                   </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {!isCancelled && (
-                                  <DropdownMenuItem
-                                    onClick={() => handleCancel(schedule.id, schedule.tourName, schedule.time)}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    Cancel Departure
-                                  </DropdownMenuItem>
-                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -505,13 +417,11 @@ export default function SchedulesPage() {
       )}
 
       {/* Summary Footer */}
-      {!isLoading && groupedSchedules.length > 0 && (
+      {!isLoading && groupedTourRuns.length > 0 && (
         <div className="text-sm text-muted-foreground">
-          Showing {totalSchedules} schedule{totalSchedules !== 1 ? "s" : ""} across {groupedSchedules.length} day{groupedSchedules.length !== 1 ? "s" : ""}
+          Showing {totalTourRuns} tour run{totalTourRuns !== 1 ? "s" : ""} across {groupedTourRuns.length} day{groupedTourRuns.length !== 1 ? "s" : ""}
         </div>
       )}
-
-      {ConfirmModal}
     </div>
   );
 }

@@ -6,7 +6,6 @@ import { useBookingForm } from "./useBookingForm";
 import { CustomerSection } from "./CustomerSection";
 import { TourSection } from "./TourSection";
 import { DateTimeSection } from "./DateTimeSection";
-import { ScheduleSection } from "./ScheduleSection";
 import { ParticipantSection } from "./ParticipantSection";
 import { PricingSection } from "./PricingSection";
 import { NotesSection } from "./NotesSection";
@@ -15,7 +14,6 @@ import type { BookingFormProps } from "./types";
 export function BookingFormContainer({
   booking,
   preselectedCustomerId,
-  preselectedScheduleId,
 }: BookingFormProps) {
   const {
     // Form state
@@ -31,15 +29,12 @@ export function BookingFormContainer({
     setShowCreateCustomer,
     handleCustomerCreated,
 
-    // Data and options - Legacy schedule-based
+    // Data and options
     customerOptions,
     customersLoading,
-    scheduleOptions,
-    schedulesLoading,
-    selectedSchedule,
     pricingTiers,
 
-    // New availability-based handlers
+    // Availability-based handlers
     handleTourChange,
     handleDateChange,
     handleTimeChange,
@@ -50,7 +45,6 @@ export function BookingFormContainer({
   } = useBookingForm({
     booking,
     preselectedCustomerId,
-    preselectedScheduleId,
   });
 
   return (
@@ -111,28 +105,6 @@ export function BookingFormContainer({
                 onDateChange={handleDateChange}
                 onTimeChange={handleTimeChange}
                 disabled={isSubmitting}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Legacy Schedule Selection - Keep as fallback for edit mode */}
-        {isEditing && booking?.scheduleId && !formData.tourId && (
-          <div className="bg-card rounded-lg border border-border p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-foreground">
-              Schedule (Legacy)
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <ScheduleSection
-                scheduleId={formData.scheduleId}
-                updateField={updateField}
-                isEditing={isEditing}
-                booking={booking}
-                scheduleOptions={scheduleOptions}
-                schedulesLoading={schedulesLoading}
-                selectedSchedule={selectedSchedule}
-                pricingTiers={pricingTiers}
               />
             </div>
           </div>

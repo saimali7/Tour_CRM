@@ -2,7 +2,7 @@ import { eq, and, desc, asc, sql, count, ilike, or, inArray } from "drizzle-orm"
 import {
   products,
   tours,
-  schedules,
+  bookings,
   type Product,
   type ProductType,
   type ProductStatus,
@@ -214,45 +214,49 @@ export class ProductService extends BaseService {
 
       toursMap = new Map(toursResult.map(t => [t.productId, t]));
 
-      // Get schedule stats for tours
+      // Get booking stats for tours (availability-based model)
       if (toursResult.length > 0) {
         const tourIds = toursResult.map(t => t.id);
-        const now = new Date().toISOString();
+        const nowDate = new Date().toISOString().split("T")[0]!;
 
-        const scheduleStats = await this.db
+        const bookingStats = await this.db
           .select({
-            tourId: schedules.tourId,
-            upcomingCount: sql<number>`COUNT(*)::int`,
-            totalCapacity: sql<number>`COALESCE(SUM(${schedules.maxParticipants}), 0)::int`,
-            totalBooked: sql<number>`COALESCE(SUM(${schedules.bookedCount}), 0)::int`,
-            nextScheduleDate: sql<Date | null>`MIN(${schedules.startsAt})`,
+            tourId: bookings.tourId,
+            upcomingCount: sql<number>`COUNT(DISTINCT ${bookings.bookingDate})::int`,
+            totalBooked: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)::int`,
+            nextBookingDate: sql<Date | null>`MIN(${bookings.bookingDate})`,
           })
-          .from(schedules)
+          .from(bookings)
           .where(
             and(
-              inArray(schedules.tourId, tourIds),
-              eq(schedules.organizationId, this.organizationId),
-              sql`${schedules.startsAt} > ${now}`,
-              sql`${schedules.status} != 'cancelled'`
+              inArray(bookings.tourId, tourIds),
+              eq(bookings.organizationId, this.organizationId),
+              sql`${bookings.bookingDate}::text >= ${nowDate}`,
+              sql`${bookings.status} != 'cancelled'`
             )
           )
-          .groupBy(schedules.tourId);
+          .groupBy(bookings.tourId);
+
+        // Get tour max participants for capacity calculation
+        const tourMaxMap = new Map(toursResult.map(t => [t.id, t.maxParticipants || 1]));
 
         scheduleStatsMap = new Map(
-          scheduleStats.map(s => {
+          bookingStats.filter(s => s.tourId !== null).map(s => {
+            const tourId = s.tourId!;
             const upcomingCount = Number(s.upcomingCount) || 0;
-            const totalCapacity = Number(s.totalCapacity) || 0;
             const totalBooked = Number(s.totalBooked) || 0;
-            const utilizationPercent = totalCapacity > 0
-              ? Math.round((totalBooked / totalCapacity) * 100)
+            const tourMax = tourMaxMap.get(tourId) || 1;
+            const estimatedCapacity = upcomingCount * tourMax;
+            const utilizationPercent = estimatedCapacity > 0
+              ? Math.round((totalBooked / estimatedCapacity) * 100)
               : 0;
 
-            return [s.tourId, {
+            return [tourId, {
               upcomingCount,
-              totalCapacity,
+              totalCapacity: estimatedCapacity,
               totalBooked,
               utilizationPercent,
-              nextScheduleDate: s.nextScheduleDate,
+              nextScheduleDate: s.nextBookingDate,
             }];
           })
         );

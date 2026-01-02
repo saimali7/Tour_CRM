@@ -28,13 +28,19 @@ const guideAssignmentFiltersSchema = z.object({
 });
 
 export const guideAssignmentRouter = createRouter({
-  // Get all guide assignments for a schedule (via bookings)
-  getAssignmentsForSchedule: protectedProcedure
-    .input(z.object({ scheduleId: z.string() }))
+  // Get all guide assignments for a tour run (tourId + date + time)
+  getAssignmentsForTourRun: protectedProcedure
+    .input(z.object({
+      tourId: z.string(),
+      date: z.coerce.date(),
+      time: z.string(),
+    }))
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.getAssignmentsForSchedule(
-        input.scheduleId
+      return services.guideAssignment.getAssignmentsForTourRun(
+        input.tourId,
+        input.date,
+        input.time
       );
     }),
 
@@ -205,22 +211,26 @@ export const guideAssignmentRouter = createRouter({
       );
     }),
 
-  hasConflict: protectedProcedure
+  hasConflictForTourRun: protectedProcedure
     .input(
       z.object({
         guideId: z.string(),
         startsAt: z.coerce.date(),
         endsAt: z.coerce.date(),
-        excludeScheduleId: z.string().optional(),
+        excludeTourRun: z.object({
+          tourId: z.string(),
+          bookingDate: z.coerce.date(),
+          bookingTime: z.string(),
+        }),
       })
     )
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.hasConflict(
+      return services.guideAssignment.hasConflictForTourRun(
         input.guideId,
         input.startsAt,
         input.endsAt,
-        input.excludeScheduleId
+        input.excludeTourRun
       );
     }),
 });

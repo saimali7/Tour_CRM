@@ -1,9 +1,8 @@
-import { eq, and, sql, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import {
   tourGuideQualifications,
   tours,
   guides,
-  schedules,
   bookings,
   guideAssignments,
   type TourGuideQualification,
@@ -318,13 +317,13 @@ export class TourGuideQualificationService extends BaseService {
    * Returns guides who are:
    * 1. Qualified for the tour
    * 2. Active status
-   * 3. Available at the specified time (not assigned to another schedule)
+   * 3. Available at the specified time (not assigned to another tour run)
    */
   async getQualifiedGuidesForScheduling(
     tourId: string,
     startsAt: Date,
     endsAt: Date,
-    excludeScheduleId?: string
+    excludeTourRun?: { tourId: string; date: Date; time: string }
   ): Promise<QualifiedGuideWithAvailability[]> {
     // Verify tour exists and belongs to org
     await this.verifyTourOwnership(tourId);
@@ -344,27 +343,55 @@ export class TourGuideQualificationService extends BaseService {
     // Check availability for each guide via confirmed assignments
     const guideIds = activeQualifiedGuides.map((q) => q.guideId);
 
-    // Find guides with confirmed assignments on overlapping schedules
-    const conflictConditions = [
-      eq(guideAssignments.organizationId, this.organizationId),
-      eq(guideAssignments.status, "confirmed"),
-      inArray(guideAssignments.guideId, guideIds),
-      eq(schedules.status, "scheduled"),
-      sql`(${schedules.startsAt}, ${schedules.endsAt}) OVERLAPS (${startsAt}, ${endsAt})`,
-    ];
-
-    if (excludeScheduleId) {
-      conflictConditions.push(sql`${schedules.id} != ${excludeScheduleId}`);
-    }
-
-    const busyGuides = await this.db
-      .select({ guideId: guideAssignments.guideId })
+    // Get all confirmed assignments for these guides with booking info
+    const confirmedAssignments = await this.db
+      .select({
+        guideId: guideAssignments.guideId,
+        tourId: bookings.tourId,
+        bookingDate: bookings.bookingDate,
+        bookingTime: bookings.bookingTime,
+        tourDurationMinutes: tours.durationMinutes,
+      })
       .from(guideAssignments)
       .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
-      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
-      .where(and(...conflictConditions));
+      .innerJoin(tours, eq(bookings.tourId, tours.id))
+      .where(
+        and(
+          eq(guideAssignments.organizationId, this.organizationId),
+          eq(guideAssignments.status, "confirmed"),
+          inArray(guideAssignments.guideId, guideIds),
+          inArray(bookings.status, ["pending", "confirmed"])
+        )
+      );
 
-    const busyGuideIds = new Set(busyGuides.map((b) => b.guideId));
+    // Build exclude key for tour run
+    const excludeKey = excludeTourRun
+      ? `${excludeTourRun.tourId}|${excludeTourRun.date.toISOString().split("T")[0]}|${excludeTourRun.time}`
+      : null;
+
+    // Find busy guides by checking for time overlaps
+    const busyGuideIds = new Set<string>();
+
+    for (const assignment of confirmedAssignments) {
+      if (!assignment.guideId || !assignment.bookingDate || !assignment.bookingTime) continue;
+
+      // Skip if this is the same tour run we're checking for
+      const tourRunKey = `${assignment.tourId}|${assignment.bookingDate.toISOString().split("T")[0]}|${assignment.bookingTime}`;
+      if (excludeKey && tourRunKey === excludeKey) continue;
+
+      // Calculate assignment time window
+      const [hours, minutes] = assignment.bookingTime.split(":").map(Number);
+      const assignmentStart = new Date(assignment.bookingDate);
+      assignmentStart.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+
+      const durationMinutes = assignment.tourDurationMinutes || 60;
+      const assignmentEnd = new Date(assignmentStart.getTime() + durationMinutes * 60 * 1000);
+
+      // Check for time overlap: startA < endB AND endA > startB
+      if (assignmentStart < endsAt && assignmentEnd > startsAt) {
+        busyGuideIds.add(assignment.guideId);
+      }
+    }
 
     // Map to response with availability flag
     return activeQualifiedGuides.map((q) => ({

@@ -9,14 +9,17 @@ interface BookingConfirmationProps {
   organizationName: string;
 }
 
-function formatTime(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return format(d, "h:mm a");
+function formatTime(time: string): string {
+  // time is in HH:MM format
+  const [hours, minutes] = time.split(":");
+  const hour = parseInt(hours!, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
 }
 
-function formatDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return format(d, "EEEE, MMMM d, yyyy");
+function formatDate(date: Date): string {
+  return format(date, "EEEE, MMMM d, yyyy");
 }
 
 function formatPrice(price: number, currency: string): string {
@@ -28,14 +31,28 @@ function formatPrice(price: number, currency: string): string {
   }).format(price);
 }
 
+// Calculate end time based on tour duration
+function calculateEndTime(startTime: string, durationMinutes: number): string {
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const totalMinutes = hours! * 60 + minutes! + durationMinutes;
+  const endHours = Math.floor(totalMinutes / 60) % 24;
+  const endMinutes = totalMinutes % 60;
+  return `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`;
+}
+
 export function BookingConfirmation({ organizationName }: BookingConfirmationProps) {
   const { state, reset } = useBooking();
 
   const handleAddToCalendar = () => {
-    if (!state.schedule || !state.tour) return;
+    if (!state.bookingDate || !state.bookingTime || !state.tour) return;
 
-    const startDate = new Date(state.schedule.startsAt);
-    const endDate = new Date(state.schedule.endsAt);
+    // Create start and end dates from booking date and time
+    const [hours, minutes] = state.bookingTime.split(":").map(Number);
+    const startDate = new Date(state.bookingDate);
+    startDate.setHours(hours!, minutes!, 0, 0);
+
+    const endDate = new Date(startDate);
+    endDate.setMinutes(endDate.getMinutes() + state.tour.durationMinutes);
 
     // Create ICS file content
     const icsContent = `BEGIN:VCALENDAR
@@ -82,9 +99,11 @@ END:VCALENDAR`;
     }
   };
 
-  if (!state.tour || !state.schedule || !state.referenceNumber) {
+  if (!state.tour || !state.bookingDate || !state.bookingTime || !state.referenceNumber) {
     return null;
   }
+
+  const endTime = calculateEndTime(state.bookingTime, state.tour.durationMinutes);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 text-center">
@@ -122,7 +141,7 @@ END:VCALENDAR`;
             <div>
               <p className="font-medium">Date</p>
               <p className="text-sm text-muted-foreground">
-                {formatDate(state.schedule.startsAt)}
+                {formatDate(state.bookingDate)}
               </p>
             </div>
           </div>
@@ -132,7 +151,7 @@ END:VCALENDAR`;
             <div>
               <p className="font-medium">Time</p>
               <p className="text-sm text-muted-foreground">
-                {formatTime(state.schedule.startsAt)} - {formatTime(state.schedule.endsAt)}
+                {formatTime(state.bookingTime)} - {formatTime(endTime)}
               </p>
             </div>
           </div>

@@ -4,7 +4,6 @@ import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { guides } from "./guides";
 import { tours } from "./tours";
-import { schedules } from "./schedules";
 import { bookings } from "./bookings";
 
 // Guide Availability - Weekly recurring availability pattern (org-scoped)

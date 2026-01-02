@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, isNull } from "drizzle-orm";
+import { eq, and, desc, asc, isNull, sql } from "drizzle-orm";
 import { BaseService } from "./base-service";
 import {
   waiverTemplates,
@@ -7,7 +7,6 @@ import {
   tours,
   bookings,
   bookingParticipants,
-  schedules,
   customers,
   type WaiverTemplate,
   type NewWaiverTemplate,
@@ -486,14 +485,13 @@ export class WaiverService extends BaseService {
    * Check waiver status for a booking
    */
   async getBookingWaiverStatus(bookingId: string): Promise<BookingWaiverStatus> {
-    // Get the booking with its schedule to find the tour
-    const bookingWithSchedule = await this.db
+    // Get the booking to find the tour
+    const bookingResult = await this.db
       .select({
         bookingId: bookings.id,
-        tourId: schedules.tourId,
+        tourId: bookings.tourId,
       })
       .from(bookings)
-      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
       .where(
         and(
           eq(bookings.id, bookingId),
@@ -502,8 +500,8 @@ export class WaiverService extends BaseService {
       )
       .limit(1);
 
-    const booking = bookingWithSchedule[0];
-    if (!booking) {
+    const booking = bookingResult[0];
+    if (!booking || !booking.tourId) {
       return {
         bookingId,
         requiredWaivers: [],
@@ -607,28 +605,29 @@ export class WaiverService extends BaseService {
       };
     }>
   > {
-    const now = new Date();
+    const nowDate = new Date().toISOString().split("T")[0]!;
 
-    // Get upcoming confirmed bookings with customer and schedule info
+    // Get upcoming confirmed bookings with customer info (availability-based model)
     const upcomingBookings = await this.db
       .select({
         bookingId: bookings.id,
         referenceNumber: bookings.referenceNumber,
         customerFirstName: customers.firstName,
         customerLastName: customers.lastName,
-        tourId: schedules.tourId,
-        startsAt: schedules.startsAt,
+        tourId: bookings.tourId,
+        bookingDate: bookings.bookingDate,
+        bookingTime: bookings.bookingTime,
       })
       .from(bookings)
-      .innerJoin(schedules, eq(bookings.scheduleId, schedules.id))
       .innerJoin(customers, eq(bookings.customerId, customers.id))
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
-          eq(bookings.status, "confirmed")
+          eq(bookings.status, "confirmed"),
+          sql`${bookings.bookingDate}::text >= ${nowDate}`
         )
       )
-      .orderBy(asc(schedules.startsAt))
+      .orderBy(asc(bookings.bookingDate), asc(bookings.bookingTime))
       .limit(100);
 
     const pending: Array<{
@@ -637,8 +636,8 @@ export class WaiverService extends BaseService {
     }> = [];
 
     for (const booking of upcomingBookings) {
-      // Skip past bookings
-      if (new Date(booking.startsAt) < now) {
+      // Skip bookings without a tour
+      if (!booking.tourId) {
         continue;
       }
 

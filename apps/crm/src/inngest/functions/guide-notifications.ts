@@ -1,7 +1,7 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
 import { createServices, logger } from "@tour/services";
-import { eq, and, gte, lte, db, schedules, bookings, organizations, guideAssignments } from "@tour/database";
+import { eq, and, gte, lte, db, bookings, organizations, guideAssignments, tours } from "@tour/database";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
 /**
@@ -328,111 +328,107 @@ export const sendGuideDailyManifest = inngest.createFunction(
           const todayUtc = new Date(todayInOrgTz.getTime() - getTimezoneOffset(timezone, todayInOrgTz));
           const tomorrowUtc = new Date(tomorrowInOrgTz.getTime() - getTimezoneOffset(timezone, tomorrowInOrgTz));
 
-          const todaysSchedules = await db.query.schedules.findMany({
+          // Get today's bookings with confirmed guide assignments
+          const todaysBookings = await db.query.bookings.findMany({
             where: and(
-              eq(schedules.organizationId, orgData.organizationId),
-              gte(schedules.startsAt, todayUtc),
-              lte(schedules.startsAt, tomorrowUtc),
-              eq(schedules.status, "scheduled")
+              eq(bookings.organizationId, orgData.organizationId),
+              gte(bookings.bookingDate, todayUtc),
+              lte(bookings.bookingDate, tomorrowUtc),
+              eq(bookings.status, "confirmed")
             ),
             with: {
               tour: true,
-              bookings: {
+              guideAssignments: {
+                where: eq(guideAssignments.status, "confirmed"),
                 with: {
-                  guideAssignments: {
-                    where: eq(guideAssignments.status, "confirmed"),
-                    with: {
-                      guide: true,
-                    },
-                  },
+                  guide: true,
                 },
               },
             },
           });
 
-          // Group schedules by guide (via booking assignments)
-          const schedulesByGuide = new Map<
+          // Group bookings by guide (via booking assignments)
+          const bookingsByGuide = new Map<
             string,
-            Array<typeof todaysSchedules[number]>
+            Array<typeof todaysBookings[number]>
           >();
 
-          for (const schedule of todaysSchedules) {
-            // Get all unique guides assigned to bookings in this schedule
+          for (const booking of todaysBookings) {
+            // Get all unique guides assigned to this booking
             const guideIds = new Set<string>();
-            for (const booking of schedule.bookings) {
-              // Use type assertion since the relation is defined dynamically
-              const bookingWithAssignments = booking as typeof booking & {
-                guideAssignments: Array<{ guideId: string; guide: { id: string; firstName: string; lastName: string; email: string } }>;
-              };
-              for (const assignment of bookingWithAssignments.guideAssignments) {
-                guideIds.add(assignment.guideId);
-              }
+            // Use type assertion since the relation is defined dynamically
+            const bookingWithAssignments = booking as typeof booking & {
+              guideAssignments: Array<{ guideId: string; guide: { id: string; firstName: string; lastName: string; email: string } }>;
+            };
+            for (const assignment of bookingWithAssignments.guideAssignments) {
+              guideIds.add(assignment.guideId);
             }
 
-            // Add this schedule to each assigned guide's list
+            // Add this booking to each assigned guide's list
             for (const guideId of guideIds) {
-              if (!schedulesByGuide.has(guideId)) {
-                schedulesByGuide.set(guideId, []);
+              if (!bookingsByGuide.has(guideId)) {
+                bookingsByGuide.set(guideId, []);
               }
-              schedulesByGuide.get(guideId)!.push(schedule);
+              bookingsByGuide.get(guideId)!.push(booking);
             }
           }
 
           // Send manifest email to each guide
           const emailResults = [];
 
-          for (const [guideId, guideSchedules] of schedulesByGuide) {
+          for (const [guideId, guideBookings] of bookingsByGuide) {
             // Get guide info from first assignment we find
             let guide = null;
-            for (const gs of guideSchedules) {
-              for (const booking of gs.bookings) {
-                // Use type assertion since the relation is defined dynamically
-                const bookingWithAssignments = booking as typeof booking & {
-                  guideAssignments: Array<{ guideId: string; guide: { id: string; firstName: string; lastName: string; email: string } }>;
-                };
-                const assignment = bookingWithAssignments.guideAssignments.find((a) => a.guideId === guideId);
-                if (assignment?.guide) {
-                  guide = assignment.guide;
-                  break;
-                }
+            for (const bk of guideBookings) {
+              // Use type assertion since the relation is defined dynamically
+              const bookingWithAssignments = bk as typeof bk & {
+                guideAssignments: Array<{ guideId: string; guide: { id: string; firstName: string; lastName: string; email: string } }>;
+              };
+              const assignment = bookingWithAssignments.guideAssignments.find((a) => a.guideId === guideId);
+              if (assignment?.guide) {
+                guide = assignment.guide;
+                break;
               }
-              if (guide) break;
             }
 
             if (!guide) continue;
 
-            // Get participant counts for each schedule
-            const toursWithCounts = await Promise.all(
-              guideSchedules.map(async (gs) => {
-                const bookingCount = await db
-                  .select()
-                  .from(bookings)
-                  .where(
-                    and(
-                      eq(bookings.scheduleId, gs.id),
-                      eq(bookings.organizationId, orgData.organizationId)
-                    )
-                  );
+            // Group bookings by tour and time, then get participant counts
+            const tourTimeKey = (bk: typeof guideBookings[number]) =>
+              `${bk.tourId}|${bk.bookingTime || ''}`;
 
-                const participantCount = bookingCount.reduce(
-                  (sum: number, booking) => sum + (booking.totalParticipants || 0),
-                  0
-                );
+            const groupedBookings = new Map<string, typeof guideBookings>();
+            for (const bk of guideBookings) {
+              const key = tourTimeKey(bk);
+              if (!groupedBookings.has(key)) {
+                groupedBookings.set(key, []);
+              }
+              groupedBookings.get(key)!.push(bk);
+            }
 
-                // Format time in org timezone
-                const startTime = formatInTimeZone(new Date(gs.startsAt), timezone, "h:mm a");
-                const endTime = formatInTimeZone(new Date(gs.endsAt), timezone, "h:mm a");
-                const tourTime = `${startTime} - ${endTime}`;
+            const toursWithCounts = Array.from(groupedBookings.entries()).map(([_key, bks]) => {
+              const firstBooking = bks[0]!;
+              const participantCount = bks.reduce(
+                (sum: number, bk) => sum + (bk.totalParticipants || 0),
+                0
+              );
 
-                return {
-                  tourName: gs.tour?.name || "Unknown Tour",
-                  time: tourTime,
-                  participantCount,
-                  meetingPoint: gs.meetingPoint || undefined,
-                  manifestUrl: `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${gs.id}/manifest`,
-                };
-              })
-            );
+              // Use bookingTime directly
+              const tourTime = firstBooking.bookingTime || "N/A";
+
+              // Cast booking to include tour relation from query
+              const bookingWithTour = firstBooking as typeof firstBooking & {
+                tour?: { id: string; name: string; meetingPoint: string | null };
+              };
+
+              return {
+                tourName: bookingWithTour.tour?.name || "Unknown Tour",
+                time: tourTime,
+                participantCount,
+                meetingPoint: bookingWithTour.tour?.meetingPoint || undefined,
+                manifestUrl: `${process.env.NEXT_PUBLIC_APP_URL}/guide/bookings/${firstBooking.id}/manifest`,
+              };
+            });
 
             // Get organization details
             const org = await services.organization.get();

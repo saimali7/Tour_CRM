@@ -20,10 +20,9 @@ export default function NewBookingPage() {
     // Extract any pre-selection params from URL
     const customerId = searchParams.get("customerId") || undefined;
     const tourId = searchParams.get("tourId") || undefined;
-    const scheduleId = searchParams.get("scheduleId") || undefined;
 
     // Open the booking sheet with pre-selections
-    openQuickBooking({ customerId, tourId, scheduleId });
+    openQuickBooking({ customerId, tourId });
 
     // Redirect to bookings list
     router.replace(`/org/${slug}/bookings` as Route);

@@ -4,17 +4,16 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { Route } from "next";
-import { LayoutDashboard, FileText, Calendar, DollarSign } from "lucide-react";
+import { LayoutDashboard, FileText, DollarSign } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TourPageHeader } from "@/components/tours/tour-page-header";
 import { TourOverviewTab } from "@/components/tours/tour-overview-tab";
 import { TourDetailsTab } from "@/components/tours/tour-details-tab";
 import { TourBookingOptionsTab } from "@/components/tours/tour-booking-options-tab";
-import { TourScheduleManager } from "@/components/tours/tour-schedule-manager";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { toast } from "sonner";
 
-type TabValue = "overview" | "details" | "schedules" | "pricing";
+type TabValue = "overview" | "details" | "pricing";
 
 export default function TourDetailPage() {
   const params = useParams();
@@ -182,13 +181,6 @@ export default function TourDetailPage() {
             Details
           </TabsTrigger>
           <TabsTrigger
-            value="schedules"
-            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
-          >
-            <Calendar className="h-4 w-4" />
-            Schedules
-          </TabsTrigger>
-          <TabsTrigger
             value="pricing"
             className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
           >
@@ -208,20 +200,6 @@ export default function TourDetailPage() {
             tourId={tourId}
             tour={tour}
             onSuccess={handleDetailsSave}
-          />
-        </TabsContent>
-
-        {/* Schedules Tab */}
-        <TabsContent value="schedules">
-          <TourScheduleManager
-            tourId={tourId}
-            orgSlug={slug}
-            tourDefaults={{
-              durationMinutes: tour.durationMinutes,
-              maxParticipants: tour.maxParticipants,
-              meetingPoint: tour.meetingPoint,
-              meetingPointDetails: tour.meetingPointDetails,
-            }}
           />
         </TabsContent>
 

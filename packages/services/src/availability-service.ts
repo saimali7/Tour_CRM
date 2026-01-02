@@ -5,14 +5,15 @@
  * Given a tour, date, and guests → returns all options with calculated prices.
  */
 
-import { eq, and, gte, lt, asc } from "drizzle-orm";
+import { eq, and, gte, asc, sql } from "drizzle-orm";
 import {
   bookingOptions,
-  schedules,
-  scheduleOptionAvailability,
+  bookings,
+  tourDepartureTimes,
+  tourAvailabilityWindows,
+  tourBlackoutDates,
   tours,
   type BookingOption,
-  type Schedule,
   type PricingModel,
 } from "@tour/database";
 import { BaseService } from "./base-service";
@@ -40,8 +41,8 @@ export interface CheckAvailabilityInput {
 }
 
 export interface TimeSlot {
-  time: string;          // "10:00 AM"
-  scheduleId: string;
+  time: string;          // "10:00" (24-hour format)
+  timeFormatted: string; // "10:00 AM"
   available: boolean;
   spotsLeft?: number;
   almostFull: boolean;
@@ -139,22 +140,27 @@ export class AvailabilityService extends BaseService {
       throw new NotFoundError("Tour", tourId);
     }
 
-    // 2. Get schedules for this date
-    const startOfDay = new Date(`${date}T00:00:00`);
-    const endOfDay = new Date(`${date}T23:59:59`);
+    // 2. Check if this date is available (availability windows + blackout dates)
+    const dateAvailable = await this.isDateAvailable(tourId, date);
+    if (!dateAvailable) {
+      return {
+        tour: {
+          id: tour.id,
+          name: tour.name,
+          imageUrl: tour.coverImageUrl ?? undefined,
+        },
+        date,
+        guests: { ...guests, total: totalGuests },
+        options: [],
+        soldOut: true,
+        alternatives: await this.findAlternatives(tourId, date),
+      };
+    }
 
-    const daySchedules = await this.db.query.schedules.findMany({
-      where: and(
-        eq(schedules.tourId, tourId),
-        eq(schedules.organizationId, this.organizationId),
-        gte(schedules.startsAt, startOfDay),
-        lt(schedules.startsAt, endOfDay),
-        eq(schedules.status, "scheduled")
-      ),
-      orderBy: [asc(schedules.startsAt)],
-    });
+    // 3. Get departure times for this tour
+    const departureTimes = await this.getDepartureTimes(tourId);
 
-    // 3. Get booking options for this tour
+    // 4. Get booking options for this tour
     // Note: If booking_options table doesn't exist yet, gracefully return empty
     let options: BookingOption[] = [];
     try {
@@ -173,11 +179,26 @@ export class AvailabilityService extends BaseService {
 
     // If no options configured, create a default "legacy" option from tour data
     if (options.length === 0) {
-      // Check if there are schedules available - if so, create a virtual option
-      if (daySchedules.length > 0) {
-        const schedule = daySchedules[0];
+      // Check if there are departure times - if so, create a virtual option
+      if (departureTimes.length > 0) {
         const pricePerPerson = tour.basePrice ? parseFloat(tour.basePrice) : 0;
         const totalPrice = pricePerPerson * totalGuests;
+        const maxParticipants = tour.maxParticipants ?? 30;
+
+        // Get booked counts for each time slot
+        const timeSlots = await Promise.all(
+          departureTimes.map(async (dt) => {
+            const bookedCount = await this.getBookedCount(tourId, date, dt.time);
+            const spotsLeft = maxParticipants - bookedCount;
+            return {
+              time: dt.time,
+              timeFormatted: this.formatTimeString(dt.time),
+              available: spotsLeft >= totalGuests,
+              spotsLeft,
+              almostFull: spotsLeft <= 3,
+            };
+          })
+        );
 
         return {
           tour: {
@@ -196,26 +217,18 @@ export class AvailabilityService extends BaseService {
               amount: Math.round(totalPrice * 100),
               currency: "AED",
             },
-            priceBreakdown: `${totalGuests} × $${pricePerPerson.toFixed(2)}`,
+            priceBreakdown: `${totalGuests} x $${pricePerPerson.toFixed(2)}`,
             scheduling: {
               type: "fixed" as const,
-              timeSlots: daySchedules.map(s => ({
-                time: this.formatTime(s.startsAt),
-                scheduleId: s.id,
-                available: (s.maxParticipants ?? 30) - (s.bookedCount ?? 0) >= totalGuests,
-                spotsLeft: (s.maxParticipants ?? 30) - (s.bookedCount ?? 0),
-                almostFull: ((s.maxParticipants ?? 30) - (s.bookedCount ?? 0)) <= 3,
-              })),
+              timeSlots,
             },
             capacityFit: {
               fits: true,
               statement: `${totalGuests} guests`,
             },
-            available: daySchedules.some(s =>
-              (s.maxParticipants ?? 30) - (s.bookedCount ?? 0) >= totalGuests
-            ),
+            available: timeSlots.some(s => s.available),
           }],
-          soldOut: false,
+          soldOut: !timeSlots.some(s => s.available),
         };
       }
 
@@ -232,7 +245,7 @@ export class AvailabilityService extends BaseService {
       };
     }
 
-    // 4. Calculate prices and availability for each option
+    // 5. Calculate prices and availability for each option
     const calculatedOptions: CalculatedOption[] = [];
     let sharedOption: CalculatedOption | null = null;
 
@@ -240,7 +253,9 @@ export class AvailabilityService extends BaseService {
       const calculated = await this.calculateOption(
         option,
         guests,
-        daySchedules
+        tourId,
+        date,
+        departureTimes
       );
 
       if (calculated) {
@@ -253,7 +268,7 @@ export class AvailabilityService extends BaseService {
       }
     }
 
-    // 5. Generate comparisons to shared option
+    // 6. Generate comparisons to shared option
     if (sharedOption) {
       for (const option of calculatedOptions) {
         if (option.id !== sharedOption.id) {
@@ -268,13 +283,13 @@ export class AvailabilityService extends BaseService {
       }
     }
 
-    // 6. Generate smart recommendations
+    // 7. Generate smart recommendations
     this.generateRecommendations(calculatedOptions, guests, sharedOption);
 
-    // 7. Check if sold out
+    // 8. Check if sold out
     const soldOut = calculatedOptions.every((o) => !o.available);
 
-    // 8. If sold out, check for alternatives
+    // 9. If sold out, check for alternatives
     let alternatives: CheckAvailabilityResponse["alternatives"];
     if (soldOut) {
       alternatives = await this.findAlternatives(tourId, date);
@@ -295,12 +310,98 @@ export class AvailabilityService extends BaseService {
   }
 
   /**
-   * Calculate a single option for given guests and schedules
+   * Check if a date is available for a tour (within availability windows and not blacked out)
+   */
+  private async isDateAvailable(tourId: string, dateStr: string): Promise<boolean> {
+    const checkDate = new Date(dateStr);
+    const dayOfWeek = checkDate.getDay(); // 0 = Sunday, 6 = Saturday
+
+    // Check for blackout date
+    const blackout = await this.db.query.tourBlackoutDates.findFirst({
+      where: and(
+        eq(tourBlackoutDates.tourId, tourId),
+        eq(tourBlackoutDates.organizationId, this.organizationId),
+        sql`${tourBlackoutDates.date} = ${dateStr}::date`
+      ),
+    });
+
+    if (blackout) {
+      return false;
+    }
+
+    // Check availability windows
+    const windows = await this.db.query.tourAvailabilityWindows.findMany({
+      where: and(
+        eq(tourAvailabilityWindows.tourId, tourId),
+        eq(tourAvailabilityWindows.organizationId, this.organizationId),
+        eq(tourAvailabilityWindows.isActive, true),
+        sql`${tourAvailabilityWindows.startDate} <= ${dateStr}::date`,
+        sql`(${tourAvailabilityWindows.endDate} IS NULL OR ${tourAvailabilityWindows.endDate} >= ${dateStr}::date)`
+      ),
+    });
+
+    // If no windows defined, assume always available
+    if (windows.length === 0) {
+      return true;
+    }
+
+    // Check if any window includes this day of week
+    return windows.some((window) => {
+      const daysOfWeek = window.daysOfWeek as number[];
+      return daysOfWeek.includes(dayOfWeek);
+    });
+  }
+
+  /**
+   * Get departure times for a tour
+   */
+  private async getDepartureTimes(tourId: string): Promise<Array<{ time: string; label?: string }>> {
+    const times = await this.db.query.tourDepartureTimes.findMany({
+      where: and(
+        eq(tourDepartureTimes.tourId, tourId),
+        eq(tourDepartureTimes.organizationId, this.organizationId),
+        eq(tourDepartureTimes.isActive, true)
+      ),
+      orderBy: [asc(tourDepartureTimes.sortOrder), asc(tourDepartureTimes.time)],
+    });
+
+    return times.map((t) => ({
+      time: t.time,
+      label: t.label ?? undefined,
+    }));
+  }
+
+  /**
+   * Get the number of guests already booked for a tour on a specific date and time
+   */
+  private async getBookedCount(tourId: string, dateStr: string, time: string): Promise<number> {
+    const result = await this.db
+      .select({
+        total: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)`,
+      })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.tourId, tourId),
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate} = ${dateStr}::date`,
+          eq(bookings.bookingTime, time),
+          sql`${bookings.status} NOT IN ('cancelled')`
+        )
+      );
+
+    return result[0]?.total ?? 0;
+  }
+
+  /**
+   * Calculate a single option for given guests and departure times
    */
   private async calculateOption(
     option: BookingOption,
     guests: GuestBreakdown,
-    daySchedules: Schedule[]
+    tourId: string,
+    date: string,
+    departureTimes: Array<{ time: string; label?: string }>
   ): Promise<CalculatedOption | null> {
     const pricingModel = option.pricingModel as PricingModel;
 
@@ -322,7 +423,9 @@ export class AvailabilityService extends BaseService {
     // 4. Calculate scheduling and availability
     const scheduling = await this.calculateScheduling(
       option,
-      daySchedules,
+      tourId,
+      date,
+      departureTimes,
       guests,
       capacityFit.unitsNeeded
     );
@@ -358,7 +461,9 @@ export class AvailabilityService extends BaseService {
    */
   private async calculateScheduling(
     option: BookingOption,
-    daySchedules: Schedule[],
+    tourId: string,
+    date: string,
+    departureTimes: Array<{ time: string; label?: string }>,
     guests: GuestBreakdown,
     unitsNeeded?: number
   ): Promise<SchedulingInfo> {
@@ -366,14 +471,15 @@ export class AvailabilityService extends BaseService {
     const totalGuests = guests.adults + guests.children + guests.infants;
 
     if (schedulingType === "fixed") {
-      // Fixed schedules: show available time slots
+      // Fixed times: show available time slots
       const timeSlots: TimeSlot[] = [];
 
-      for (const schedule of daySchedules) {
-        // Get availability for this option on this schedule
-        const availability = await this.getOptionAvailability(
-          schedule.id,
-          option.id,
+      for (const dt of departureTimes) {
+        // Get availability for this option on this time slot
+        const availability = await this.getOptionAvailabilityForTime(
+          tourId,
+          date,
+          dt.time,
           option
         );
 
@@ -395,8 +501,8 @@ export class AvailabilityService extends BaseService {
         }
 
         timeSlots.push({
-          time: this.formatTime(schedule.startsAt),
-          scheduleId: schedule.id,
+          time: dt.time,
+          timeFormatted: this.formatTimeString(dt.time),
           available,
           spotsLeft,
           almostFull: spotsLeft !== undefined && spotsLeft <= 3,
@@ -405,8 +511,8 @@ export class AvailabilityService extends BaseService {
 
       return { type: "fixed", timeSlots };
     } else {
-      // Flexible schedules: show time range
-      if (daySchedules.length === 0) {
+      // Flexible: show time range
+      if (departureTimes.length === 0) {
         return {
           type: "flexible",
           earliestDeparture: "Any time",
@@ -414,28 +520,27 @@ export class AvailabilityService extends BaseService {
         };
       }
 
-      const sortedSchedules = [...daySchedules].sort(
-        (a, b) => a.startsAt.getTime() - b.startsAt.getTime()
-      );
+      const sortedTimes = [...departureTimes].sort((a, b) => a.time.localeCompare(b.time));
 
-      const firstSchedule = sortedSchedules[0];
-      const lastSchedule = sortedSchedules[sortedSchedules.length - 1];
+      const firstTime = sortedTimes[0];
+      const lastTime = sortedTimes[sortedTimes.length - 1];
 
       return {
         type: "flexible",
-        earliestDeparture: firstSchedule ? this.formatTime(firstSchedule.startsAt) : "Any time",
-        latestDeparture: lastSchedule ? this.formatTime(lastSchedule.startsAt) : "Any time",
-        suggestedTime: firstSchedule ? this.formatTime(firstSchedule.startsAt) : undefined,
+        earliestDeparture: firstTime ? this.formatTimeString(firstTime.time) : "Any time",
+        latestDeparture: lastTime ? this.formatTimeString(lastTime.time) : "Any time",
+        suggestedTime: firstTime ? this.formatTimeString(firstTime.time) : undefined,
       };
     }
   }
 
   /**
-   * Get availability for an option on a schedule
+   * Get availability for an option on a specific date/time
    */
-  private async getOptionAvailability(
-    scheduleId: string,
-    optionId: string,
+  private async getOptionAvailabilityForTime(
+    tourId: string,
+    date: string,
+    time: string,
     option: BookingOption
   ): Promise<{
     totalSeats: number | null;
@@ -443,40 +548,56 @@ export class AvailabilityService extends BaseService {
     totalUnits: number | null;
     bookedUnits: number;
   } | null> {
-    // Try to get from schedule_option_availability table
-    const availability = await this.db.query.scheduleOptionAvailability.findFirst({
-      where: and(
-        eq(scheduleOptionAvailability.scheduleId, scheduleId),
-        eq(scheduleOptionAvailability.bookingOptionId, optionId)
-      ),
-    });
+    // Get booked count from bookings table
+    const bookedCount = await this.getBookedCount(tourId, date, time);
 
-    if (availability) {
-      return {
-        totalSeats: availability.totalSeats,
-        bookedSeats: availability.bookedSeats ?? 0,
-        totalUnits: availability.totalUnits,
-        bookedUnits: availability.bookedUnits ?? 0,
-      };
-    }
-
-    // Fallback: derive from option's capacity model
+    // Derive capacity from option's capacity model
     const capacity = option.capacityModel;
     if (capacity.type === "shared") {
       return {
         totalSeats: capacity.totalSeats,
-        bookedSeats: 0,
+        bookedSeats: bookedCount,
         totalUnits: null,
         bookedUnits: 0,
       };
     } else {
+      // For unit-based, we need to count units booked
+      const unitsBooked = await this.getBookedUnits(tourId, date, time, option.id);
       return {
         totalSeats: null,
         bookedSeats: 0,
         totalUnits: capacity.totalUnits,
-        bookedUnits: 0,
+        bookedUnits: unitsBooked,
       };
     }
+  }
+
+  /**
+   * Get the number of units already booked for a specific option on a date/time
+   */
+  private async getBookedUnits(
+    tourId: string,
+    dateStr: string,
+    time: string,
+    optionId: string
+  ): Promise<number> {
+    const result = await this.db
+      .select({
+        total: sql<number>`COALESCE(SUM(COALESCE(${bookings.unitsBooked}, 1)), 0)`,
+      })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.tourId, tourId),
+          eq(bookings.organizationId, this.organizationId),
+          sql`${bookings.bookingDate} = ${dateStr}::date`,
+          eq(bookings.bookingTime, time),
+          eq(bookings.bookingOptionId, optionId),
+          sql`${bookings.status} NOT IN ('cancelled')`
+        )
+      );
+
+    return result[0]?.total ?? 0;
   }
 
   /**
@@ -593,27 +714,18 @@ export class AvailabilityService extends BaseService {
       const isoString = checkDate.toISOString();
       const dateStr = isoString.split("T")[0] ?? isoString.slice(0, 10);
 
-      // Quick check if any schedules exist
-      const startOfDay = new Date(`${dateStr}T00:00:00`);
-      const endOfDay = new Date(`${dateStr}T23:59:59`);
+      // Check if this date is available
+      const dateAvailable = await this.isDateAvailable(tourId, dateStr);
 
-      const daySchedules = await this.db.query.schedules.findMany({
-        where: and(
-          eq(schedules.tourId, tourId),
-          eq(schedules.organizationId, this.organizationId),
-          gte(schedules.startsAt, startOfDay),
-          lt(schedules.startsAt, endOfDay),
-          eq(schedules.status, "scheduled")
-        ),
-        limit: 1,
-      });
-
-      if (daySchedules.length > 0) {
-        // TODO: Check actual availability
-        nearbyDates.push({
-          date: dateStr,
-          availability: "available",
-        });
+      if (dateAvailable) {
+        // Check if there are departure times configured
+        const departureTimes = await this.getDepartureTimes(tourId);
+        if (departureTimes.length > 0) {
+          nearbyDates.push({
+            date: dateStr,
+            availability: "available",
+          });
+        }
       }
     }
 
@@ -624,13 +736,13 @@ export class AvailabilityService extends BaseService {
   }
 
   /**
-   * Format time for display
+   * Format time string (HH:MM) for display
    */
-  private formatTime(date: Date): string {
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+  private formatTimeString(time: string): string {
+    const [hours, minutes] = time.split(":");
+    const hour = parseInt(hours ?? "0", 10);
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
   }
 }

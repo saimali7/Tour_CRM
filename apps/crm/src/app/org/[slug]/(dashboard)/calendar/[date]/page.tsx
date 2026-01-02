@@ -51,42 +51,37 @@ export default function CalendarDayPage() {
     router.push(`/org/${slug}/calendar/${format(nextDay, "yyyy-MM-dd")}` as Route);
   };
 
-  // Fetch schedules for this date
-  const { data: schedulesData, isLoading: schedulesLoading } =
-    trpc.schedule.list.useQuery({
-      pagination: { page: 1, limit: 50 },
-      filters: {
-        dateRange: { from: startOfDay(date), to: endOfDay(date) },
-      },
-      sort: { field: "startsAt", direction: "asc" },
-    });
+  // Fetch tour runs for this date
+  const { data: tourRunsData, isLoading: tourRunsLoading } =
+    trpc.tourRun.getForDate.useQuery({ date });
 
   // Fetch bookings for this date
   const { data: bookingsData, isLoading: bookingsLoading } =
     trpc.booking.list.useQuery({
       pagination: { page: 1, limit: 100 },
       filters: {
-        scheduleDateRange: { from: startOfDay(date), to: endOfDay(date) },
+        bookingDateRange: { from: startOfDay(date), to: endOfDay(date) },
       },
       sort: { field: "createdAt", direction: "desc" },
     });
 
-  const schedules = schedulesData?.data || [];
+  const tourRuns = tourRunsData || [];
   const bookings = bookingsData?.data || [];
 
-  // Group bookings by schedule (use scheduleId directly from booking)
-  const bookingsBySchedule = useMemo(() => {
+  // Group bookings by tour run key (tourId + time)
+  const bookingsByTourRun = useMemo(() => {
     const grouped: Record<string, typeof bookings> = {};
     for (const booking of bookings) {
-      // Use scheduleId directly from booking, fallback to schedule.id for backwards compat
-      const scheduleId = booking.scheduleId || booking.schedule?.id || "unassigned";
-      if (!grouped[scheduleId]) grouped[scheduleId] = [];
-      grouped[scheduleId].push(booking);
+      if (booking.tourId && booking.bookingTime) {
+        const key = `${booking.tourId}-${booking.bookingTime}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(booking);
+      }
     }
     return grouped;
   }, [bookings]);
 
-  // Calculate stats - only count tours that have bookings
+  // Calculate stats - only count tour runs that have bookings
   const stats = useMemo(() => {
     const totalGuests = bookings.reduce(
       (sum, b) => sum + b.totalParticipants,
@@ -96,15 +91,15 @@ export default function CalendarDayPage() {
       (sum, b) => sum + parseFloat(b.total || "0"),
       0
     );
-    // Count only schedules that have bookings
-    const toursWithBookings = schedules.filter((s) => {
-      const scheduleBookings = bookingsBySchedule[s.id] || [];
-      return scheduleBookings.length > 0;
+    // Count only tour runs that have bookings
+    const tourRunsWithBookings = tourRuns.filter((tr) => {
+      const key = `${tr.tourId}-${tr.time}`;
+      return (bookingsByTourRun[key] || []).length > 0;
     });
-    const tourCount = toursWithBookings.length;
-    const needsGuide = toursWithBookings.filter((s) => {
-      const required = s.guidesRequired ?? 1;
-      const assigned = s.guidesAssigned ?? 0;
+    const tourCount = tourRunsWithBookings.length;
+    const needsGuide = tourRunsWithBookings.filter((tr) => {
+      const required = tr.guidesRequired ?? 1;
+      const assigned = tr.guidesAssigned ?? 0;
       return assigned < required;
     }).length;
     const pendingPayments = bookings.filter(
@@ -122,9 +117,9 @@ export default function CalendarDayPage() {
       pendingPayments,
       unconfirmed,
     };
-  }, [bookings, schedules, bookingsBySchedule]);
+  }, [bookings, tourRuns, bookingsByTourRun]);
 
-  const isLoading = schedulesLoading || bookingsLoading;
+  const isLoading = tourRunsLoading || bookingsLoading;
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -224,7 +219,6 @@ export default function CalendarDayPage() {
           <h3 className="text-lg font-semibold">No bookings</h3>
           <p className="text-sm text-muted-foreground mt-1 mb-4">
             {format(date, "EEEE, MMMM d")} has no bookings yet
-            {schedules.length > 0 && ` (${schedules.length} tour${schedules.length !== 1 ? 's' : ''} scheduled)`}
           </p>
           <Button asChild variant="outline">
             <Link href={`/org/${slug}/bookings/new?date=${dateStr}` as Route}>
@@ -238,18 +232,39 @@ export default function CalendarDayPage() {
       {/* Tour Sections - only tours with bookings */}
       {!isLoading && bookings.length > 0 && (
         <div className="space-y-4">
-          {schedules
-            .filter((schedule) => {
-              const scheduleBookings = bookingsBySchedule[schedule.id] || [];
-              return scheduleBookings.length > 0;
+          {tourRuns
+            .filter((tourRun) => {
+              const key = `${tourRun.tourId}-${tourRun.time}`;
+              return (bookingsByTourRun[key] || []).length > 0;
             })
-            .map((schedule) => {
-              const scheduleBookings = bookingsBySchedule[schedule.id] || [];
+            .map((tourRun) => {
+              const key = `${tourRun.tourId}-${tourRun.time}`;
+              const tourRunBookings = bookingsByTourRun[key] || [];
+
+              // Create a schedule-like object for backward compatibility with DayTourSection
+              const startsAt = new Date(`${dateStr}T${tourRun.time}:00`);
+              const endsAt = new Date(startsAt.getTime() + (tourRun.durationMinutes || 60) * 60000);
+              const scheduleCompatible = {
+                id: key,
+                tourId: tourRun.tourId,
+                startsAt,
+                endsAt,
+                maxParticipants: tourRun.capacity,
+                bookedCount: tourRun.bookedCount,
+                guidesRequired: tourRun.guidesRequired,
+                guidesAssigned: tourRun.guidesAssigned,
+                status: "scheduled" as const,
+                tour: {
+                  id: tourRun.tourId,
+                  name: tourRun.tourName,
+                },
+              };
+
               return (
                 <DayTourSection
-                  key={schedule.id}
-                  schedule={schedule}
-                  bookings={scheduleBookings}
+                  key={key}
+                  schedule={scheduleCompatible}
+                  bookings={tourRunBookings}
                   orgSlug={slug}
                 />
               );

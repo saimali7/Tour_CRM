@@ -97,12 +97,12 @@ export function GuideQuickView({
       <div className="grid grid-cols-2 gap-4">
         <div className="border border-border rounded-lg p-3 text-center">
           <Calendar className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
-          <p className="text-2xl font-bold">{guide.upcomingSchedules || 0}</p>
+          <p className="text-2xl font-bold">{guide.upcomingAssignments || 0}</p>
           <p className="text-xs text-muted-foreground">upcoming tours</p>
         </div>
         <div className="border border-border rounded-lg p-3 text-center">
           <Clock className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
-          <p className="text-2xl font-bold">{guide.totalSchedules || 0}</p>
+          <p className="text-2xl font-bold">{guide.totalAssignments || 0}</p>
           <p className="text-xs text-muted-foreground">total assigned</p>
         </div>
       </div>
