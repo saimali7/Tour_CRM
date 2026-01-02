@@ -30,6 +30,12 @@ export interface SlotAvailabilityCheck {
   date: Date;
   time: string;
   requestedSpots: number;
+  /**
+   * Optional booking ID to exclude from capacity calculation.
+   * Used when rescheduling a booking to a new slot - the booking
+   * being moved should not count against the new slot's capacity.
+   */
+  excludeBookingId?: string;
 }
 
 export interface SlotAvailabilityResult {
@@ -151,7 +157,7 @@ export class TourAvailabilityService extends BaseService {
    * Check if a specific slot is bookable
    */
   async checkSlotAvailability(input: SlotAvailabilityCheck): Promise<SlotAvailabilityResult> {
-    const { tourId, date, time, requestedSpots } = input;
+    const { tourId, date, time, requestedSpots, excludeBookingId } = input;
 
     // 1. Get tour for capacity
     const tour = await this.db.query.tours.findFirst({
@@ -209,8 +215,8 @@ export class TourAvailabilityService extends BaseService {
       };
     }
 
-    // 5. Get booked count for this slot
-    const bookedCount = await this.getBookedCountForSlot(tourId, date, time);
+    // 5. Get booked count for this slot (optionally excluding a booking being rescheduled)
+    const bookedCount = await this.getBookedCountForSlot(tourId, date, time, excludeBookingId);
     const effectiveCapacity = operates.maxCapacity ?? maxCapacity;
     const spotsRemaining = effectiveCapacity - bookedCount;
 
@@ -236,24 +242,37 @@ export class TourAvailabilityService extends BaseService {
   /**
    * Get the booked count for a specific tour run (slot)
    * Counts from confirmed/pending bookings
+   *
+   * @param excludeBookingId - Optional booking ID to exclude from the count
+   *                           (used when rescheduling a booking to a new slot)
    */
-  async getBookedCountForSlot(tourId: string, date: Date, time: string): Promise<number> {
+  async getBookedCountForSlot(
+    tourId: string,
+    date: Date,
+    time: string,
+    excludeBookingId?: string
+  ): Promise<number> {
     const dateStr = this.formatDateForDb(date);
+
+    const conditions = [
+      eq(bookings.organizationId, this.organizationId),
+      eq(bookings.tourId, tourId),
+      sql`${bookings.bookingDate}::text = ${dateStr}`,
+      eq(bookings.bookingTime, time),
+      inArray(bookings.status, ["pending", "confirmed"]),
+    ];
+
+    // Exclude specified booking from capacity count (for rescheduling)
+    if (excludeBookingId) {
+      conditions.push(sql`${bookings.id} != ${excludeBookingId}`);
+    }
 
     const result = await this.db
       .select({
         total: sql<number>`COALESCE(SUM(${bookings.totalParticipants}), 0)`.as("total"),
       })
       .from(bookings)
-      .where(
-        and(
-          eq(bookings.organizationId, this.organizationId),
-          eq(bookings.tourId, tourId),
-          sql`${bookings.bookingDate}::text = ${dateStr}`,
-          eq(bookings.bookingTime, time),
-          inArray(bookings.status, ["pending", "confirmed"])
-        )
-      );
+      .where(and(...conditions));
 
     return Number(result[0]?.total ?? 0);
   }

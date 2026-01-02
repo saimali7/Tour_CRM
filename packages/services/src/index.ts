@@ -220,6 +220,7 @@ export { WaiverService } from "./waiver-service";
 export { AddOnService } from "./add-on-service";
 export { VoucherService } from "./voucher-service";
 export { CheckInService } from "./check-in-service";
+export type { TourRunCheckInStatus } from "./check-in-service";
 export { DepositService, type DepositCalculation } from "./deposit-service";
 // Phase 7: Operations Excellence
 export { GoalService } from "./goal-service";
@@ -462,6 +463,7 @@ export type {
   ScheduleManifest,
   GuideManifestSummary,
   DateManifestSummary,
+  TourRunScheduleManifest,
 } from "./manifest-service";
 // Phase 4 types
 export type {

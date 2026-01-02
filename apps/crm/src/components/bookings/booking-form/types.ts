@@ -17,12 +17,17 @@ export interface BookingFormSchedule {
 export interface BookingFormTour {
   id: string;
   name: string;
+  basePrice?: string;
 }
 
 export interface ExistingBooking {
   id: string;
   customerId: string;
   scheduleId: string | null;
+  // New availability-based fields
+  tourId?: string | null;
+  bookingDate?: Date | null; // Date object from database
+  bookingTime?: string | null;
   adultCount: number;
   childCount: number | null;
   infantCount: number | null;
@@ -43,10 +48,16 @@ export interface BookingFormProps {
   booking?: ExistingBooking;
   preselectedCustomerId?: string;
   preselectedScheduleId?: string;
+  preselectedTourId?: string;
 }
 
 export interface BookingFormData {
   customerId: string;
+  // New availability-based fields
+  tourId: string;
+  bookingDate: string | null; // YYYY-MM-DD format
+  bookingTime: string | null; // HH:MM format
+  // Legacy field - kept for backward compatibility
   scheduleId: string;
   adultCount: number;
   childCount: number;

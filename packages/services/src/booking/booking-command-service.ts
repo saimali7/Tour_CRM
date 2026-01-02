@@ -200,28 +200,32 @@ export class BookingCommandService extends BaseService {
 
     // Use a transaction to ensure all-or-nothing semantics
     const bookingId = await this.db.transaction(async (tx) => {
-      // 1. Insert the booking with both old and new fields
+      // 1. Insert the booking
+      // For availability-based bookings: only write new fields (tourId, bookingDate, bookingTime, guestAdults, etc.)
+      // For schedule-based bookings: write both old and new fields for backward compatibility
       const [booking] = await tx
         .insert(bookings)
         .values({
           organizationId: this.organizationId,
           referenceNumber,
           customerId: input.customerId,
-          // Legacy field (nullable for availability-based bookings)
-          scheduleId: scheduleId,
+          // Legacy field - only write for schedule-based bookings
+          scheduleId: useScheduleModel ? scheduleId : null,
           // New fields for availability-based model
           tourId: tourId,
           bookingDate: bookingDate,
           bookingTime: bookingTime,
           // Rest of the fields
           bookingOptionId: input.bookingOptionId,
+          // Guest counts - always use new fields
           guestAdults: input.guestAdults ?? input.adultCount,
           guestChildren: input.guestChildren ?? input.childCount ?? 0,
           guestInfants: input.guestInfants ?? input.infantCount ?? 0,
           pricingSnapshot: input.pricingSnapshot,
-          adultCount: input.adultCount,
-          childCount: input.childCount || 0,
-          infantCount: input.infantCount || 0,
+          // Legacy guest count fields - only write for schedule-based bookings
+          adultCount: useScheduleModel ? input.adultCount : 0,
+          childCount: useScheduleModel ? (input.childCount || 0) : 0,
+          infantCount: useScheduleModel ? (input.infantCount || 0) : 0,
           totalParticipants,
           subtotal,
           discount,
@@ -664,6 +668,108 @@ export class BookingCommandService extends BaseService {
       recalcPromises.push(this.core.recalculateGuideRequirements(oldScheduleId));
     }
     await Promise.all(recalcPromises);
+
+    return this.queryService.getById(updated.id);
+  }
+
+  /**
+   * Reschedule an availability-based booking to a different date/time.
+   *
+   * This method handles rescheduling for bookings that use the new availability model
+   * (tourId + bookingDate + bookingTime) rather than the legacy schedule model.
+   * It validates availability at the new slot and updates the booking date/time.
+   */
+  async rescheduleByAvailability(
+    id: string,
+    input: {
+      tourId?: string;
+      bookingDate: Date;
+      bookingTime: string;
+    }
+  ): Promise<BookingWithRelations> {
+    const booking = await this.queryService.getById(id);
+
+    if (booking.status === "cancelled" || booking.status === "completed") {
+      throw new ValidationError(
+        `Cannot reschedule a ${booking.status} booking`
+      );
+    }
+
+    // Use existing tourId if not provided
+    const newTourId = input.tourId || booking.tourId;
+    if (!newTourId) {
+      throw new ValidationError(
+        "Cannot reschedule: booking has no tourId and none was provided"
+      );
+    }
+
+    // Validate tour exists
+    const tour = await this.db.query.tours.findFirst({
+      where: and(
+        eq(tours.id, newTourId),
+        eq(tours.organizationId, this.organizationId)
+      ),
+    });
+
+    if (!tour) {
+      throw new NotFoundError("Tour", newTourId);
+    }
+
+    // Check availability at the new slot
+    const availabilityService = new TourAvailabilityService(this.ctx);
+    const availability = await availabilityService.checkSlotAvailability({
+      tourId: newTourId,
+      date: input.bookingDate,
+      time: input.bookingTime,
+      requestedSpots: booking.totalParticipants,
+      // Exclude this booking from capacity check (it's being moved, not added)
+      excludeBookingId: id,
+    });
+
+    if (!availability.available) {
+      const reasons: Record<string, string> = {
+        blackout: "Tour is not operating on this date (blackout)",
+        not_operating: "Tour does not operate on this date",
+        sold_out: "This tour is sold out",
+        insufficient_capacity: `Not enough availability. Only ${availability.spotsRemaining} spots remaining.`,
+        past_date: "Cannot reschedule to a date in the past",
+      };
+      throw new ValidationError(
+        reasons[availability.reason || ""] || "Slot is not available"
+      );
+    }
+
+    // Update the booking with new date/time (and optionally new tour)
+    const [updated] = await this.db
+      .update(bookings)
+      .set({
+        tourId: newTourId,
+        bookingDate: input.bookingDate,
+        bookingTime: input.bookingTime,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(bookings.id, id),
+          eq(bookings.organizationId, this.organizationId)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      throw new NotFoundError("Booking", id);
+    }
+
+    bookingLogger.info({
+      organizationId: this.organizationId,
+      bookingId: id,
+      oldTourId: booking.tourId,
+      newTourId,
+      oldDate: booking.bookingDate?.toISOString().split("T")[0],
+      newDate: input.bookingDate.toISOString().split("T")[0],
+      oldTime: booking.bookingTime,
+      newTime: input.bookingTime,
+    }, "Booking rescheduled (availability model)");
 
     return this.queryService.getById(updated.id);
   }
