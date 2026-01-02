@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { AlertOctagon, RefreshCw } from "lucide-react";
-import { logger } from "@tour/services";
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -15,7 +15,13 @@ interface GlobalErrorProps {
  */
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   useEffect(() => {
-    logger.error({ err: error, digest: error.digest }, "Global error");
+    // Log to console for debugging
+    console.error("Global error:", error);
+    // Report to Sentry for monitoring
+    Sentry.captureException(error, {
+      tags: { errorBoundary: "global" },
+      extra: { digest: error.digest },
+    });
   }, [error]);
 
   return (
