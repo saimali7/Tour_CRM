@@ -76,8 +76,9 @@ Auto-Solve   Open CC   Warnings   Send to Guides
 | Warnings | Unassigned guides, conflicts | ✅ Done |
 | Optimize | Auto-assignment algorithm | ✅ Done |
 | Dispatch | Button, Inngest notifications | ✅ Done |
-| Adjust Mode | Drag-drop, ghost preview | ⬜ Todo |
-| Timeline UI | Guide rows, segmented tape | ⬜ Todo |
+| Three-Panel Layout | Hopper, Timeline, Map | ✅ Done |
+| Adjust Mode | Drag-drop, ghost preview | 🔄 Partial |
+| Zone Colors | Geographic color coding | ⬜ Todo |
 
 ### What's Working Now
 
@@ -88,13 +89,17 @@ Auto-Solve   Open CC   Warnings   Send to Guides
 - **Warning list** — Shows tours needing guide assignment
 - **Optimize button** — Auto-assigns available guides
 - **Dispatch button** — Finalizes assignments, triggers notifications
-- **Sidebar link** — "Dispatch" nav item (⌘2) — *Turbopack cache bug in dev*
+- **Sidebar link** — "Dispatch" nav item (⌘2)
+- **Three-panel adjust mode layout:**
+  - Hopper (left) — Unassigned bookings with search/filter/sort
+  - Timeline (center) — Guide rows with segmented tape
+  - Map (right) — Route context with efficiency feedback
 
-### Remaining (Nice-to-have)
+### Remaining (Polish)
 
-- **Adjust Mode** — Drag-drop guide reassignment
-- **Timeline UI** — Visual guide schedule tape
-- **Guest Cards** — Expandable participant details
+- **Zone color integration** — Wire pickup zones to segment colors
+- **Ghost preview during drag** — Real-time efficiency calculations
+- **Map panel enhancements** — Actual zone coordinates
 
 ---
 
