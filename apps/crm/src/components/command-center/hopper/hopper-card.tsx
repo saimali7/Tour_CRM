@@ -113,11 +113,12 @@ export function HopperCard({
   const zoneColor = useMemo(() => getZoneColor(booking.pickupZone), [booking.pickupZone]);
 
   const initials = useMemo(() => {
+    if (!booking.customerName) return "?";
     const parts = booking.customerName.split(" ");
-    if (parts.length >= 2) {
-      return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
+    if (parts.length >= 2 && parts[0] && parts[1]) {
+      return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
     }
-    return (parts[0]?.[0] || "?").toUpperCase();
+    return (parts[0]?.[0] ?? "?").toUpperCase();
   }, [booking.customerName]);
 
   // Determine if this booking has special indicators
@@ -129,6 +130,9 @@ export function HopperCard({
     booking.hasChildren ||
     (booking.childCount > 0 || booking.infantCount > 0);
 
+  // Accessible label for screen readers
+  const accessibleLabel = `${booking.customerName}, ${booking.guestCount} guests, ${booking.tourName} at ${booking.tourTime}${booking.pickupZone ? `, pickup from ${booking.pickupZone.name}` : ""}`;
+
   return (
     <div
       ref={setNodeRef}
@@ -136,9 +140,21 @@ export function HopperCard({
       {...attributes}
       {...listeners}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      aria-label={accessibleLabel}
+      aria-grabbed={isDndDragging}
+      aria-selected={isSelected}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
       className={cn(
         "group relative rounded-lg border bg-card p-3 transition-all duration-150 cursor-grab active:cursor-grabbing",
         "hover:shadow-md hover:border-primary/30",
+        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
         isSelected && "ring-2 ring-primary border-primary",
         (isDragging || isDndDragging) && "shadow-lg opacity-90",
         "touch-manipulation select-none"

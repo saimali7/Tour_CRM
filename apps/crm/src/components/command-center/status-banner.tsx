@@ -152,11 +152,21 @@ export function StatusBanner({
           ) : isDispatched ? (
             // Dispatched - show manifest and undo buttons
             <>
-              <Button variant="outline" size="sm" className="gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                aria-label="View guide manifests for dispatched tours"
+              >
                 <Settings className="h-4 w-4" />
                 View Manifests
               </Button>
-              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+                aria-label="Undo dispatch and allow changes"
+              >
                 <RefreshCw className="h-4 w-4" />
                 Undo Dispatch
               </Button>
@@ -169,6 +179,7 @@ export function StatusBanner({
                 size="sm"
                 onClick={onAdjust}
                 className="gap-1.5"
+                aria-label="Enter adjust mode to manually reassign guides"
               >
                 <Settings className="h-4 w-4" />
                 Adjust
@@ -178,6 +189,7 @@ export function StatusBanner({
                 size="sm"
                 onClick={onOptimize}
                 className="gap-1.5"
+                aria-label="Run optimization algorithm to assign guides"
               >
                 <RefreshCw className="h-4 w-4" />
                 Optimize
@@ -186,6 +198,7 @@ export function StatusBanner({
                 size="sm"
                 onClick={onDispatch}
                 disabled={needsReview}
+                aria-label={needsReview ? "Resolve warnings before dispatching" : "Send assignments to guides"}
                 className={cn(
                   "gap-1.5",
                   isReady && "bg-emerald-600 hover:bg-emerald-700 text-white"
