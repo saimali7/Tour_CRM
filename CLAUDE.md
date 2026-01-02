@@ -1,6 +1,14 @@
 # Tour CRM
 
-Multi-tenant tour operations platform. **Every database query MUST include organizationId.**
+> **The operations platform tour companies actually want to use.**
+
+We're building a world-class, YC-caliber tour operations CRM that makes running a tour company effortless. Not a generic CRM retrofitted for tours — purpose-built for how operators actually work: morning briefings, 60-second phone bookings, intelligent dispatch, and day-of operations.
+
+**Quality bar:** Every feature ships production-ready. No half-measures, no "good enough." Code that would make a senior engineer at Stripe or Linear nod in approval.
+
+**Multi-tenant architecture:** Every query MUST include `organizationId`. No exceptions.
+
+---
 
 ## The Iron Rule
 
