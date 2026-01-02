@@ -199,7 +199,8 @@
       "Bash(xargs:*)",
       "Bash(comm:*)",
       "Bash(paste:*)",
-      "Bash(pnpm exec eslint:*)"
+      "Bash(pnpm exec eslint:*)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -1)"
     ]
   }
 }
