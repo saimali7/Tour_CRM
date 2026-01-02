@@ -10,13 +10,13 @@
 
 | Phase | Name | Status | Archive |
 |-------|------|--------|---------|
-| 0 | Foundation | ✅ 100% | [Details](./archive/phases/PHASE_0_FOUNDATION.md) |
-| 1 | Booking Engine | ✅ 100% | [Details](./archive/phases/PHASE_1_BOOKING.md) |
-| 2 | Communications | ✅ 100% | [Details](./archive/phases/PHASE_2_COMMUNICATIONS.md) |
-| 3 | Guide Operations | ✅ 100% | [Details](./archive/phases/PHASE_3_GUIDES.md) |
-| 4 | Pricing & Promotions | ✅ 100% | [Details](./archive/phases/PHASE_4_PRICING.md) |
-| 5 | Analytics & Reports | ✅ 100% | [Details](./archive/phases/PHASE_5_ANALYTICS.md) |
-| 6 | UX Overhaul | ✅ 100% | [Details](./archive/phases/PHASE_6_UX.md) |
+| 0 | Foundation | ✅ 100% | [Details](./phases/PHASE_0_FOUNDATION.md) |
+| 1 | Booking Engine | ✅ 100% | [Details](./phases/PHASE_1_BOOKING.md) |
+| 2 | Communications | ✅ 100% | [Details](./phases/PHASE_2_COMMUNICATIONS.md) |
+| 3 | Guide Operations | ✅ 100% | [Details](./phases/PHASE_3_GUIDES.md) |
+| 4 | Pricing & Promotions | ✅ 100% | [Details](./phases/PHASE_4_PRICING.md) |
+| 5 | Analytics & Reports | ✅ 100% | [Details](./phases/PHASE_5_ANALYTICS.md) |
+| 6 | UX Overhaul | ✅ 100% | [Details](./phases/PHASE_6_UX.md) |
 | **7** | **Operations Excellence** | **🔄 80%** | Current |
 | 8 | Web App & Booking | ⏳ 0% | Planned |
 | 9+ | SaaS Platform | ⏳ 0% | Future |
@@ -28,7 +28,7 @@
 ## Phase 7: Operations Excellence 🔄 IN PROGRESS
 
 > **Goal:** Transform from feature-complete to operations-first world-class CRM.
-> **Detailed Plan:** See [`docs/GUIDE_DISPATCH_SYSTEM.md`](./GUIDE_DISPATCH_SYSTEM.md)
+> **Detailed Plan:** See [`GUIDE_DISPATCH_SYSTEM.md`](../GUIDE_DISPATCH_SYSTEM.md)
 
 ### Sub-Phase Status
 
@@ -63,7 +63,7 @@
 
 ### 7.6 Tour Command Center 🔄 NEXT
 
-> **Full Design:** See [`docs/GUIDE_DISPATCH_SYSTEM.md`](./GUIDE_DISPATCH_SYSTEM.md)
+> **Full Design:** See [`GUIDE_DISPATCH_SYSTEM.md`](../GUIDE_DISPATCH_SYSTEM.md)
 
 The operations nerve center — **computer solves the puzzle, humans review and dispatch**.
 
@@ -122,10 +122,10 @@ Customer-facing booking website:
 | Document | Purpose |
 |----------|---------|
 | [CHANGELOG.md](./CHANGELOG.md) | Full history of changes |
-| [TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md) | Debt tracking (7.2/10) |
-| [GUIDE_DISPATCH_SYSTEM.md](./GUIDE_DISPATCH_SYSTEM.md) | Command Center design |
-| [PRODUCTION_READINESS_AUDIT.md](./PRODUCTION_READINESS_AUDIT.md) | Production checklist |
-| [INFRASTRUCTURE_PLAN.md](./INFRASTRUCTURE_PLAN.md) | Self-hosted infra guide |
+| [TECHNICAL_DEBT.md](../TECHNICAL_DEBT.md) | Debt tracking (7.2/10) |
+| [GUIDE_DISPATCH_SYSTEM.md](../GUIDE_DISPATCH_SYSTEM.md) | Command Center design |
+| [PRODUCTION_READINESS_AUDIT.md](../PRODUCTION_READINESS_AUDIT.md) | Production checklist |
+| [INFRASTRUCTURE_PLAN.md](../INFRASTRUCTURE_PLAN.md) | Self-hosted infra guide |
 
 ---
 

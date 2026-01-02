@@ -153,7 +153,7 @@ Phases 0-6 complete. Phase 7 Operations Excellence in progress:
 
 | Doc | Purpose |
 |-----|---------|
-| `docs/PROGRESS.md` | Implementation tracker (source of truth) |
+| `docs/progress/PROGRESS.md` | Implementation tracker (source of truth) |
 | `docs/TECHNICAL_DEBT.md` | Technical debt analysis & remediation plan |
 | `docs/INFRASTRUCTURE_PLAN.md` | Self-hosted infrastructure (Postgres, PgBouncer, Redis, MinIO) |
 | `docs/DESIGN_SYSTEM_V2.md` | Full design system |
