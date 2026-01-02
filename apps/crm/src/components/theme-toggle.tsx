@@ -39,6 +39,7 @@ export function ThemeToggle({ collapsed, minimal }: ThemeToggleProps) {
         <button
           className="flex items-center justify-center rounded-lg p-2 text-muted-foreground"
           disabled
+          aria-label="Theme"
         >
           <Sun className="h-4 w-4" />
         </button>
@@ -55,6 +56,7 @@ export function ThemeToggle({ collapsed, minimal }: ThemeToggleProps) {
                   "flex items-center justify-center rounded-lg p-2 text-muted-foreground transition-all duration-150",
                   "hover:bg-accent hover:text-foreground hover:scale-105 active:scale-95"
                 )}
+                aria-label="Toggle theme"
               >
                 <CurrentIcon className="h-4 w-4" />
               </button>
@@ -91,6 +93,7 @@ export function ThemeToggle({ collapsed, minimal }: ThemeToggleProps) {
           collapsed && "justify-center px-2"
         )}
         disabled
+        aria-label="Theme"
       >
         <Sun className="h-[18px] w-[18px]" />
         {!collapsed && <span>Theme</span>}
@@ -106,6 +109,7 @@ export function ThemeToggle({ collapsed, minimal }: ThemeToggleProps) {
             <DropdownMenuTrigger asChild>
               <button
                 className="flex w-full items-center justify-center rounded-lg p-2 text-muted-foreground transition-all duration-150 hover:bg-accent hover:text-foreground"
+                aria-label="Toggle theme"
               >
                 <CurrentIcon className="h-[18px] w-[18px]" />
               </button>

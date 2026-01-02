@@ -158,6 +158,7 @@ export function NotificationCenter() {
         variant="ghost"
         size="icon"
         className="relative h-9 w-9"
+        aria-label="Notifications"
       >
         <Bell className="h-4 w-4" />
       </Button>
@@ -171,6 +172,7 @@ export function NotificationCenter() {
           variant="ghost"
           size="icon"
           className="relative h-9 w-9"
+          aria-label={unreadCount > 0 ? `${unreadCount} notifications` : "Notifications"}
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
@@ -225,6 +227,7 @@ export function NotificationCenter() {
                       handleDismiss(notification.id);
                     }}
                     className="absolute top-2 right-2 p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity"
+                    aria-label="Dismiss notification"
                   >
                     <X className="h-3 w-3 text-muted-foreground" />
                   </button>
