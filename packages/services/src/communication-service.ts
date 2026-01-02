@@ -21,6 +21,8 @@ import {
   type PaginatedResult,
   type SortOptions,
   NotFoundError,
+  ServiceError,
+  ForbiddenError,
 } from "./types";
 import { sanitizeEmailHtml } from "./lib/sanitize";
 
@@ -230,7 +232,7 @@ export class CommunicationService extends BaseService {
       .returning();
 
     if (!log) {
-      throw new Error("Failed to create communication log");
+      throw new ServiceError("Failed to create communication log", "CREATE_FAILED", 500);
     }
 
     return log;
@@ -397,7 +399,7 @@ export class CommunicationService extends BaseService {
       .returning();
 
     if (!template) {
-      throw new Error("Failed to create email template");
+      throw new ServiceError("Failed to create email template", "CREATE_FAILED", 500);
     }
 
     return template;
@@ -435,7 +437,7 @@ export class CommunicationService extends BaseService {
     const template = await this.getEmailTemplateById(id);
 
     if (template.isDefault) {
-      throw new Error("Cannot delete system default template");
+      throw new ForbiddenError("Cannot delete system default template");
     }
 
     await this.db
@@ -496,7 +498,7 @@ export class CommunicationService extends BaseService {
       .returning();
 
     if (!template) {
-      throw new Error("Failed to create SMS template");
+      throw new ServiceError("Failed to create SMS template", "CREATE_FAILED", 500);
     }
 
     return template;
@@ -528,7 +530,7 @@ export class CommunicationService extends BaseService {
     const template = await this.getSmsTemplateById(id);
 
     if (template.isDefault) {
-      throw new Error("Cannot delete system default template");
+      throw new ForbiddenError("Cannot delete system default template");
     }
 
     await this.db
@@ -594,7 +596,7 @@ export class CommunicationService extends BaseService {
       .returning();
 
     if (!automation) {
-      throw new Error("Failed to create automation");
+      throw new ServiceError("Failed to create automation", "CREATE_FAILED", 500);
     }
 
     return automation;
@@ -670,7 +672,7 @@ export class CommunicationService extends BaseService {
       .returning();
 
     if (!created) {
-      throw new Error("Failed to create notification preferences");
+      throw new ServiceError("Failed to create notification preferences", "CREATE_FAILED", 500);
     }
 
     return created;

@@ -15,6 +15,7 @@ import {
   type DateRangeFilter,
   NotFoundError,
   ConflictError,
+  ServiceError,
 } from "./types";
 
 export interface GuideFilters {
@@ -195,7 +196,7 @@ export class GuideService extends BaseService {
       .returning();
 
     if (!guide) {
-      throw new Error("Failed to create guide");
+      throw new ServiceError("Failed to create guide", "CREATE_FAILED", 500);
     }
 
     return guide;

@@ -185,20 +185,23 @@ export class AvailabilityService extends BaseService {
         const totalPrice = pricePerPerson * totalGuests;
         const maxParticipants = tour.maxParticipants ?? 30;
 
-        // Get booked counts for each time slot
-        const timeSlots = await Promise.all(
-          departureTimes.map(async (dt) => {
-            const bookedCount = await this.getBookedCount(tourId, date, dt.time);
-            const spotsLeft = maxParticipants - bookedCount;
-            return {
-              time: dt.time,
-              timeFormatted: this.formatTimeString(dt.time),
-              available: spotsLeft >= totalGuests,
-              spotsLeft,
-              almostFull: spotsLeft <= 3,
-            };
-          })
+        // Get booked counts for all time slots in parallel to avoid N+1 queries
+        const bookedCounts = await Promise.all(
+          departureTimes.map((dt) => this.getBookedCount(tourId, date, dt.time))
         );
+
+        // Build time slots with booked counts
+        const timeSlots = departureTimes.map((dt, index) => {
+          const bookedCount = bookedCounts[index] ?? 0;
+          const spotsLeft = maxParticipants - bookedCount;
+          return {
+            time: dt.time,
+            timeFormatted: this.formatTimeString(dt.time),
+            available: spotsLeft >= totalGuests,
+            spotsLeft,
+            almostFull: spotsLeft <= 3,
+          };
+        });
 
         return {
           tour: {
@@ -458,6 +461,7 @@ export class AvailabilityService extends BaseService {
 
   /**
    * Calculate scheduling info for an option
+   * Optimized to fetch availability for all time slots in parallel
    */
   private async calculateScheduling(
     option: BookingOption,
@@ -472,17 +476,15 @@ export class AvailabilityService extends BaseService {
 
     if (schedulingType === "fixed") {
       // Fixed times: show available time slots
-      const timeSlots: TimeSlot[] = [];
+      // Fetch availability for all time slots in parallel to avoid N+1 queries
+      const availabilities = await Promise.all(
+        departureTimes.map((dt) =>
+          this.getOptionAvailabilityForTime(tourId, date, dt.time, option)
+        )
+      );
 
-      for (const dt of departureTimes) {
-        // Get availability for this option on this time slot
-        const availability = await this.getOptionAvailabilityForTime(
-          tourId,
-          date,
-          dt.time,
-          option
-        );
-
+      const timeSlots: TimeSlot[] = departureTimes.map((dt, index) => {
+        const availability = availabilities[index];
         let available = false;
         let spotsLeft: number | undefined;
 
@@ -500,14 +502,14 @@ export class AvailabilityService extends BaseService {
           }
         }
 
-        timeSlots.push({
+        return {
           time: dt.time,
           timeFormatted: this.formatTimeString(dt.time),
           available,
           spotsLeft,
           almostFull: spotsLeft !== undefined && spotsLeft <= 3,
-        });
-      }
+        };
+      });
 
       return { type: "fixed", timeSlots };
     } else {
@@ -697,15 +699,16 @@ export class AvailabilityService extends BaseService {
 
   /**
    * Find alternative dates if requested date is sold out
+   * Optimized to check all nearby dates in parallel
    */
   private async findAlternatives(
     tourId: string,
     date: string
   ): Promise<CheckAvailabilityResponse["alternatives"]> {
     const baseDate = new Date(date);
-    const nearbyDates: Array<{ date: string; availability: "available" | "limited" }> = [];
 
-    // Check 3 days before and after
+    // Build list of dates to check (3 days before and after, excluding the requested date)
+    const datesToCheck: string[] = [];
     for (let offset = -3; offset <= 3; offset++) {
       if (offset === 0) continue;
 
@@ -713,19 +716,40 @@ export class AvailabilityService extends BaseService {
       checkDate.setDate(checkDate.getDate() + offset);
       const isoString = checkDate.toISOString();
       const dateStr = isoString.split("T")[0] ?? isoString.slice(0, 10);
+      datesToCheck.push(dateStr);
+    }
 
-      // Check if this date is available
-      const dateAvailable = await this.isDateAvailable(tourId, dateStr);
+    // Check availability for all dates in parallel to avoid N+1 queries
+    const availabilityResults = await Promise.all(
+      datesToCheck.map(async (dateStr) => {
+        const dateAvailable = await this.isDateAvailable(tourId, dateStr);
+        return { dateStr, dateAvailable };
+      })
+    );
 
-      if (dateAvailable) {
-        // Check if there are departure times configured
-        const departureTimes = await this.getDepartureTimes(tourId);
-        if (departureTimes.length > 0) {
-          nearbyDates.push({
-            date: dateStr,
-            availability: "available",
-          });
-        }
+    // Filter to available dates
+    const availableDates = availabilityResults.filter((r) => r.dateAvailable);
+
+    // If no available dates, return early
+    if (availableDates.length === 0) {
+      return {
+        nearbyDates: undefined,
+        waitlistAvailable: true,
+      };
+    }
+
+    // Check departure times once (they're the same for all dates)
+    const departureTimes = await this.getDepartureTimes(tourId);
+
+    // Build nearby dates list
+    const nearbyDates: Array<{ date: string; availability: "available" | "limited" }> = [];
+
+    if (departureTimes.length > 0) {
+      for (const { dateStr } of availableDates) {
+        nearbyDates.push({
+          date: dateStr,
+          availability: "available",
+        });
       }
     }
 

@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { db, communicationLogs } from "@tour/database";
 import { eq } from "drizzle-orm";
 import { webhookLogger } from "@tour/services";
@@ -115,6 +116,21 @@ export async function POST(req: Request) {
 
   if (!isValid) {
     webhookLogger.error("Webhook signature verification failed");
+
+    // Capture signature verification failures in Sentry
+    Sentry.captureMessage("Resend webhook signature verification failed", {
+      tags: {
+        service: "resend-webhook",
+        operation: "signature-verification",
+      },
+      extra: {
+        hasSvixId: !!svixId,
+        hasSvixTimestamp: !!svixTimestamp,
+        hasSignature: !!signature,
+      },
+      level: "warning",
+    });
+
     return NextResponse.json(
       { error: "Webhook signature verification failed" },
       { status: 400 }
@@ -312,6 +328,21 @@ export async function POST(req: Request) {
       },
       "Error processing Resend webhook event"
     );
+
+    // Capture webhook processing errors in Sentry
+    Sentry.captureException(error, {
+      tags: {
+        service: "resend-webhook",
+        operation: "event-processing",
+        eventType: event.type,
+      },
+      extra: {
+        eventType: event.type,
+        emailId: event.data.email_id,
+        to: event.data.to,
+        subject: event.data.subject,
+      },
+    });
 
     return NextResponse.json(
       { error: "Webhook processing failed" },

@@ -7,6 +7,7 @@ import {
   type SortOptions,
   NotFoundError,
   ValidationError,
+  ServiceError,
 } from "./types";
 
 export interface GroupDiscountFilters {
@@ -172,7 +173,7 @@ export class GroupDiscountService extends BaseService {
       .returning();
 
     if (!discount) {
-      throw new Error("Failed to create group discount");
+      throw new ServiceError("Failed to create group discount", "CREATE_FAILED", 500);
     }
 
     return discount;

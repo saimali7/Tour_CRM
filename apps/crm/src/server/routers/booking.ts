@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { format } from "date-fns";
 import { createRouter, protectedProcedure, adminProcedure, bulkProcedure } from "../trpc";
-import { createServices } from "@tour/services";
-import { inngest } from "@/inngest";
+import { createServices, bookingLogger, NotFoundError, ValidationError, ServiceError } from "@tour/services";
+import { sendEvent } from "@/inngest/helpers";
+import { priceStringSchema } from "@tour/validators";
 
 const dateRangeSchema = z.object({
   from: z.coerce.date().optional(),
@@ -41,7 +42,7 @@ const participantSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
-const priceStringSchema = z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid decimal (e.g., 99.99)");
+// priceStringSchema is imported from @tour/validators
 
 const pricingSnapshotSchema = z.object({
   optionId: z.string().optional(),
@@ -166,10 +167,10 @@ export const bookingRouter = createRouter({
       const booking = await services.booking.create(serviceInput);
 
       // Send booking created email via Inngest (only if customer has email)
-      // Wrapped in try-catch so Inngest failures don't break booking creation
+      // Uses fire-and-forget helper - failures are logged but don't block booking creation
       if (booking.customer?.email && booking.bookingDate && booking.tour) {
-        try {
-          await inngest.send({
+        await sendEvent(
+          {
             name: "booking/created",
             data: {
               organizationId: ctx.orgContext.organizationId,
@@ -187,10 +188,9 @@ export const bookingRouter = createRouter({
               meetingPoint: booking.tour.meetingPoint || undefined,
               meetingPointDetails: booking.tour.meetingPointDetails || undefined,
             },
-          });
-        } catch (inngestError) {
-          console.error("Failed to send booking created event to Inngest:", inngestError);
-        }
+          },
+          { operation: "createBooking", id: booking.id }
+        );
       }
 
       return booking;
@@ -216,23 +216,26 @@ export const bookingRouter = createRouter({
 
       // Send confirmation email via Inngest if enabled (only if customer has email)
       if (input.sendConfirmationEmail && booking.customer?.email && booking.bookingDate && booking.tour) {
-        await inngest.send({
-          name: "booking/confirmed",
-          data: {
-            organizationId: ctx.orgContext.organizationId,
-            bookingId: booking.id,
-            customerId: booking.customerId,
-            customerEmail: booking.customer.email,
-            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-            bookingReference: booking.referenceNumber,
-            tourName: booking.tour.name,
-            tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
-            tourTime: booking.bookingTime || "N/A",
-            participants: booking.totalParticipants,
-            totalAmount: booking.total,
-            currency: booking.currency,
+        await sendEvent(
+          {
+            name: "booking/confirmed",
+            data: {
+              organizationId: ctx.orgContext.organizationId,
+              bookingId: booking.id,
+              customerId: booking.customerId,
+              customerEmail: booking.customer.email,
+              customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+              bookingReference: booking.referenceNumber,
+              tourName: booking.tour.name,
+              tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
+              tourTime: booking.bookingTime || "N/A",
+              participants: booking.totalParticipants,
+              totalAmount: booking.total,
+              currency: booking.currency,
+            },
           },
-        });
+          { operation: "confirmBooking", id: booking.id }
+        );
       }
 
       return booking;
@@ -251,23 +254,26 @@ export const bookingRouter = createRouter({
 
       // Send cancellation email via Inngest if enabled (only if customer has email)
       if (input.sendCancellationEmail && booking.customer?.email && booking.bookingDate && booking.tour) {
-        await inngest.send({
-          name: "booking/cancelled",
-          data: {
-            organizationId: ctx.orgContext.organizationId,
-            bookingId: booking.id,
-            customerId: booking.customerId,
-            customerEmail: booking.customer.email,
-            customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-            bookingReference: booking.referenceNumber,
-            tourName: booking.tour.name,
-            tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
-            tourTime: booking.bookingTime || "N/A",
-            cancellationReason: input.reason,
-            refundAmount: input.refundAmount,
-            currency: booking.currency,
+        await sendEvent(
+          {
+            name: "booking/cancelled",
+            data: {
+              organizationId: ctx.orgContext.organizationId,
+              bookingId: booking.id,
+              customerId: booking.customerId,
+              customerEmail: booking.customer.email,
+              customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+              bookingReference: booking.referenceNumber,
+              tourName: booking.tour.name,
+              tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
+              tourTime: booking.bookingTime || "N/A",
+              cancellationReason: input.reason,
+              refundAmount: input.refundAmount,
+              currency: booking.currency,
+            },
           },
-        });
+          { operation: "cancelBooking", id: booking.id }
+        );
       }
 
       return booking;
@@ -381,24 +387,24 @@ export const bookingRouter = createRouter({
       // Get booking with all details
       const booking = await services.booking.getById(input.bookingId);
       if (!booking) {
-        throw new Error("Booking not found");
+        throw new NotFoundError("Booking", input.bookingId);
       }
 
       // Get organization for URLs
       const organization = await services.organization.get();
       if (!organization) {
-        throw new Error("Organization not found");
+        throw new NotFoundError("Organization");
       }
 
       // Check if Stripe is configured
       const { isStripeConfigured } = await import("@/lib/stripe");
       if (!isStripeConfigured()) {
-        throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY to your environment.");
+        throw new ServiceError("Stripe is not configured. Add STRIPE_SECRET_KEY to your environment.", "STRIPE_NOT_CONFIGURED", 503);
       }
 
       // Check if already paid
       if (booking.paymentStatus === "paid") {
-        throw new Error("This booking has already been paid");
+        throw new ValidationError("This booking has already been paid");
       }
 
       // Import stripe functions dynamically to avoid circular dependencies
@@ -410,7 +416,7 @@ export const bookingRouter = createRouter({
       const amountDue = totalAmount - paidAmount;
 
       if (amountDue <= 0) {
-        throw new Error("No payment due for this booking");
+        throw new ValidationError("No payment due for this booking");
       }
 
       // Convert to cents
@@ -450,7 +456,7 @@ export const bookingRouter = createRouter({
 
       const booking = await services.booking.getById(input.bookingId);
       if (!booking) {
-        throw new Error("Booking not found");
+        throw new NotFoundError("Booking", input.bookingId);
       }
 
       // Get all manual payments
@@ -490,18 +496,18 @@ export const bookingRouter = createRouter({
       // Get booking with all details
       const booking = await services.booking.getById(input.bookingId);
       if (!booking) {
-        throw new Error("Booking not found");
+        throw new NotFoundError("Booking", input.bookingId);
       }
 
       // Check if customer has email
       if (!booking.customer?.email) {
-        throw new Error("Customer does not have an email address");
+        throw new ValidationError("Customer does not have an email address");
       }
 
       // Get organization and settings
       const organization = await services.organization.get();
       if (!organization) {
-        throw new Error("Organization not found");
+        throw new NotFoundError("Organization");
       }
 
       const orgSettings = await services.organization.getSettings();
@@ -509,7 +515,7 @@ export const bookingRouter = createRouter({
       // Check if Stripe is configured
       const { isStripeConfigured, createCheckoutSession } = await import("@/lib/stripe");
       if (!isStripeConfigured()) {
-        throw new Error("Stripe is not configured. Add STRIPE_SECRET_KEY to your environment.");
+        throw new ServiceError("Stripe is not configured. Add STRIPE_SECRET_KEY to your environment.", "STRIPE_NOT_CONFIGURED", 503);
       }
 
       // Get payment settings with defaults
@@ -517,7 +523,7 @@ export const bookingRouter = createRouter({
 
       // Check if already paid
       if (booking.paymentStatus === "paid") {
-        throw new Error("This booking has already been paid");
+        throw new ValidationError("This booking has already been paid");
       }
 
       // Calculate amount due
@@ -526,7 +532,7 @@ export const bookingRouter = createRouter({
       const amountDue = totalAmount - paidAmount;
 
       if (amountDue <= 0) {
-        throw new Error("No payment due for this booking");
+        throw new ValidationError("No payment due for this booking");
       }
 
       // Create Stripe Checkout session
@@ -546,7 +552,7 @@ export const bookingRouter = createRouter({
       });
 
       if (!session.url) {
-        throw new Error("Failed to create payment link");
+        throw new ServiceError("Failed to create payment link", "PAYMENT_LINK_FAILED", 500);
       }
 
       // Send email with payment link
@@ -631,25 +637,28 @@ export const bookingRouter = createRouter({
         for (const id of result.confirmed) {
           const booking = await services.booking.getById(id);
           if (booking.customer?.email && booking.bookingDate && booking.tour) {
-            await inngest.send({
-              name: "booking/confirmed",
-              data: {
-                organizationId: ctx.orgContext.organizationId,
-                bookingId: booking.id,
-                customerId: booking.customerId,
-                customerEmail: booking.customer.email,
-                customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-                bookingReference: booking.referenceNumber,
-                tourName: booking.tour.name,
-                tourDate: format(new Date(booking.bookingDate), "EEEE, MMMM d, yyyy"),
-                tourTime: booking.bookingTime || "N/A",
-                participants: booking.totalParticipants,
-                totalAmount: booking.total,
-                currency: booking.currency,
-                meetingPoint: booking.tour.meetingPoint ?? undefined,
-                meetingPointDetails: booking.tour.meetingPointDetails ?? undefined,
+            await sendEvent(
+              {
+                name: "booking/confirmed",
+                data: {
+                  organizationId: ctx.orgContext.organizationId,
+                  bookingId: booking.id,
+                  customerId: booking.customerId,
+                  customerEmail: booking.customer.email,
+                  customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+                  bookingReference: booking.referenceNumber,
+                  tourName: booking.tour.name,
+                  tourDate: format(new Date(booking.bookingDate), "EEEE, MMMM d, yyyy"),
+                  tourTime: booking.bookingTime || "N/A",
+                  participants: booking.totalParticipants,
+                  totalAmount: booking.total,
+                  currency: booking.currency,
+                  meetingPoint: booking.tour.meetingPoint ?? undefined,
+                  meetingPointDetails: booking.tour.meetingPointDetails ?? undefined,
+                },
               },
-            });
+              { operation: "bulkConfirm", id }
+            );
           }
         }
       }
@@ -672,22 +681,25 @@ export const bookingRouter = createRouter({
         for (const id of result.cancelled) {
           const booking = await services.booking.getById(id);
           if (booking.customer?.email && booking.bookingDate && booking.tour) {
-            await inngest.send({
-              name: "booking/cancelled",
-              data: {
-                organizationId: ctx.orgContext.organizationId,
-                bookingId: booking.id,
-                customerId: booking.customerId,
-                customerEmail: booking.customer.email,
-                customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-                bookingReference: booking.referenceNumber,
-                tourName: booking.tour.name,
-                tourDate: format(new Date(booking.bookingDate), "EEEE, MMMM d, yyyy"),
-                tourTime: booking.bookingTime || "N/A",
-                cancellationReason: input.reason,
-                currency: booking.currency,
+            await sendEvent(
+              {
+                name: "booking/cancelled",
+                data: {
+                  organizationId: ctx.orgContext.organizationId,
+                  bookingId: booking.id,
+                  customerId: booking.customerId,
+                  customerEmail: booking.customer.email,
+                  customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
+                  bookingReference: booking.referenceNumber,
+                  tourName: booking.tour.name,
+                  tourDate: format(new Date(booking.bookingDate), "EEEE, MMMM d, yyyy"),
+                  tourTime: booking.bookingTime || "N/A",
+                  cancellationReason: input.reason,
+                  currency: booking.currency,
+                },
               },
-            });
+              { operation: "bulkCancel", id }
+            );
           }
         }
       }

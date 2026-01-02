@@ -573,5 +573,94 @@ export {
   authLogger,
 } from "./lib/logger";
 
+// Correlation ID utilities for distributed tracing
+export {
+  requestContext,
+  getCorrelationId,
+  getRequestContext,
+  getOrganizationId,
+  getUserId,
+  runWithCorrelation,
+  runWithCorrelationAsync,
+  type RequestContext,
+} from "./lib/correlation";
+
 // Sanitization utilities
 export { sanitizeEmailHtml, escapeHtml } from "./lib/sanitize";
+
+// Tour run key utilities
+export {
+  createTourRunKey,
+  parseTourRunKey,
+  formatDateForKey,
+  isValidTourRunKey,
+} from "./lib/tour-run-utils";
+
+// Entity validation helpers
+export {
+  requireEntity,
+  requireEntityArray,
+  requireEntitySync,
+  requireDefined,
+} from "./lib/validation-helpers";
+
+// Type guards for Drizzle ORM query results
+export {
+  // Assert functions (narrow TypeScript types)
+  assertBookingWithRelations,
+  assertBookingWithRelationsArray,
+  assertBookingWithDateFieldsArray,
+  assertGuideAssignmentWithRelations,
+  assertGuideAssignmentWithRelationsArray,
+  assertGuidePortalBookingArray,
+  // Validate functions (runtime validation without type narrowing)
+  validateBookingWithRelations,
+  validateBookingWithRelationsArray,
+  validateBookingWithDateFieldsArray,
+  validateGuideAssignmentWithRelationsArray,
+  validateGuidePortalBookingArray,
+  // Type predicates
+  isBookingWithRelations,
+  isBookingWithDateFields,
+  isGuideAssignmentWithRelations,
+  isGuidePortalBooking,
+  // Types
+  type BookingWithRelationsShape,
+  type BookingWithDateFieldsShape,
+  type GuideAssignmentWithRelationsShape,
+  type GuidePortalBookingShape,
+} from "./lib/type-guards";
+
+// Pricing type guards for JSONB validation
+export {
+  // Money validation
+  isMoney,
+  assertMoney,
+  // Pricing tier validation
+  isPricingTier,
+  isGroupTier,
+  // Pricing model validation (discriminated union)
+  isPricingModel,
+  assertPricingModel,
+  isPerPersonPricing,
+  isPerUnitPricing,
+  isFlatRatePricing,
+  isTieredGroupPricing,
+  isBasePerPersonPricing,
+  // Capacity model validation
+  isCapacityModel,
+  assertCapacityModel,
+  isSharedCapacity,
+  isUnitCapacity,
+  // Booking snapshot validation
+  isBookingOptionSnapshot,
+  assertBookingOptionSnapshot,
+  isPricingSnapshot,
+  // Utility functions
+  extractPricingModel,
+  getPricingType,
+  getBasePriceFromModel,
+  getCurrencyFromModel,
+  // Types
+  type PricingSnapshotShape,
+} from "./lib/pricing-type-guards";

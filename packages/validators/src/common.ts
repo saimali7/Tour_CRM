@@ -27,6 +27,32 @@ export const paginationSchema = z.object({
 
 export const idSchema = z.string().min(1, "ID is required");
 
+/**
+ * Price string validation schema.
+ *
+ * Validates a string representing a decimal price with up to 2 decimal places.
+ * Examples: "99", "99.9", "99.99", "0.50", "1234.56"
+ *
+ * @example
+ * ```typescript
+ * import { priceStringSchema } from "@tour/validators";
+ *
+ * const schema = z.object({
+ *   total: priceStringSchema,
+ *   discount: priceStringSchema.optional(),
+ * });
+ * ```
+ */
+export const priceStringSchema = z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/, "Must be a valid decimal (e.g., 99.99)");
+
+/**
+ * Price regex pattern for use in custom schemas.
+ * Matches: "99", "99.9", "99.99", "0.50", "1234.56"
+ */
+export const PRICE_REGEX = /^\d+(\.\d{1,2})?$/;
+
 export const dateRangeSchema = z.object({
   start: z.coerce.date(),
   end: z.coerce.date(),

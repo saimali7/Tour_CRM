@@ -11,9 +11,8 @@ function getDateFromParam(dateParam: string | null): Date {
   if (!dateParam) return new Date();
   try {
     return parseISO(dateParam);
-  } catch (error) {
+  } catch {
     // Invalid date format, fall back to today
-    console.debug("Invalid date param, using today:", error);
     return new Date();
   }
 }

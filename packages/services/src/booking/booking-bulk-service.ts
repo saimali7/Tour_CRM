@@ -249,6 +249,7 @@ export class BookingBulkService extends BaseService {
   /**
    * Bulk reschedule multiple bookings to a new date/time
    * Uses the availability-based reschedule method for proper validation
+   * Optimized to process reschedules in parallel using Promise.allSettled
    */
   async bulkReschedule(
     ids: string[],
@@ -258,20 +259,33 @@ export class BookingBulkService extends BaseService {
       bookingTime: string;
     }
   ): Promise<BulkRescheduleResult> {
+    if (ids.length === 0) {
+      return { rescheduled: [], errors: [] };
+    }
+
+    // Process all reschedules in parallel using Promise.allSettled
+    // to handle individual failures without stopping other operations
+    const results = await Promise.allSettled(
+      ids.map(async (id) => {
+        await this.commandService.reschedule(id, input);
+        return id;
+      })
+    );
+
     const rescheduled: string[] = [];
     const errors: Array<{ id: string; error: string }> = [];
 
-    for (const id of ids) {
-      try {
-        await this.commandService.reschedule(id, input);
-        rescheduled.push(id);
-      } catch (error) {
+    // Process results and separate successes from failures
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        rescheduled.push(result.value);
+      } else {
         errors.push({
-          id,
-          error: error instanceof Error ? error.message : "Unknown error",
+          id: ids[index]!,
+          error: result.reason instanceof Error ? result.reason.message : "Unknown error",
         });
       }
-    }
+    });
 
     return { rescheduled, errors };
   }

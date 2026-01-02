@@ -7,6 +7,7 @@
  * All amounts are in minor units (cents) for precision.
  */
 
+import { ServiceError } from "./types";
 import type {
   PricingModel,
   PerPersonPricing,
@@ -268,7 +269,7 @@ export function calculatePrice(
     default:
       // Exhaustive check
       const _exhaustive: never = pricingModel;
-      throw new Error(`Unknown pricing model type: ${(_exhaustive as PricingModel).type}`);
+      throw new ServiceError(`Unknown pricing model type: ${(_exhaustive as PricingModel).type}`, "UNKNOWN_PRICING_MODEL", 500);
   }
 }
 
@@ -424,7 +425,7 @@ export function calculateAddOnPrice(
     default:
       // Exhaustive check
       const _exhaustive: never = pricing;
-      throw new Error(`Unknown add-on pricing type: ${(_exhaustive as AddOnPricingStructure).type}`);
+      throw new ServiceError(`Unknown add-on pricing type: ${(_exhaustive as AddOnPricingStructure).type}`, "UNKNOWN_ADDON_PRICING", 500);
   }
 }
 

@@ -13,6 +13,7 @@ import {
   type DateRangeFilter,
   NotFoundError,
   ValidationError,
+  ServiceError,
 } from "./types";
 
 export interface RefundFilters {
@@ -224,7 +225,7 @@ export class RefundService extends BaseService {
       .returning();
 
     if (!refund) {
-      throw new Error("Failed to create refund");
+      throw new ServiceError("Failed to create refund", "CREATE_FAILED", 500);
     }
 
     return refund;

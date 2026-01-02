@@ -14,8 +14,9 @@ import {
   type DateRangeFilter,
   NotFoundError,
   ValidationError,
+  ServiceError,
 } from "./types";
-import { paymentLogger } from "./lib/logger";
+import { createServiceLogger } from "./lib/logger";
 
 export interface PaymentFilters {
   bookingId?: string;
@@ -44,6 +45,8 @@ export interface PaymentStats {
 }
 
 export class PaymentService extends BaseService {
+  private logger = createServiceLogger("payment", this.organizationId);
+
   /**
    * Get all payments with filters and pagination
    */
@@ -190,6 +193,16 @@ export class PaymentService extends BaseService {
    * Create a new payment record
    */
   async create(input: CreatePaymentInput): Promise<Payment> {
+    this.logger.info(
+      {
+        bookingId: input.bookingId,
+        amount: input.amount,
+        method: input.method,
+        recordedBy: input.recordedBy,
+      },
+      "Recording payment"
+    );
+
     // Get booking and verify it exists
     const booking = await this.db.query.bookings.findFirst({
       where: and(
@@ -199,6 +212,7 @@ export class PaymentService extends BaseService {
     });
 
     if (!booking) {
+      this.logger.warn({ bookingId: input.bookingId }, "Payment recording failed: booking not found");
       throw new NotFoundError("Booking", input.bookingId);
     }
 
@@ -245,12 +259,11 @@ export class PaymentService extends BaseService {
       .returning();
 
     if (!payment) {
-      paymentLogger.error({
-        organizationId: this.organizationId,
-        bookingId: input.bookingId,
-        amount: input.amount,
-      }, "Failed to create payment record");
-      throw new Error("Failed to create payment");
+      this.logger.error(
+        { bookingId: input.bookingId, amount: input.amount },
+        "Failed to create payment record"
+      );
+      throw new ServiceError("Failed to create payment", "CREATE_FAILED", 500);
     }
 
     // Calculate new total paid
@@ -280,17 +293,19 @@ export class PaymentService extends BaseService {
         )
       );
 
-    paymentLogger.info({
-      organizationId: this.organizationId,
-      paymentId: payment.id,
-      bookingId: input.bookingId,
-      amount: input.amount,
-      method: input.method,
-      previousStatus: booking.paymentStatus,
-      newStatus: newPaymentStatus,
-      totalPaid: newBalanceInfo.totalPaid,
-      balance: newBalanceInfo.balance,
-    }, "Payment recorded successfully");
+    this.logger.info(
+      {
+        paymentId: payment.id,
+        bookingId: input.bookingId,
+        amount: input.amount,
+        method: input.method,
+        previousStatus: booking.paymentStatus,
+        newStatus: newPaymentStatus,
+        totalPaid: newBalanceInfo.totalPaid,
+        balance: newBalanceInfo.balance,
+      },
+      "Payment recorded successfully"
+    );
 
     return payment;
   }

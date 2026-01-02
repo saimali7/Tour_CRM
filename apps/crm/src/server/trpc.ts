@@ -8,7 +8,7 @@ import {
   createRateLimitKey,
   RATE_LIMITS,
 } from "../lib/rate-limit";
-import { logger } from "@tour/services";
+import { logger, runWithCorrelation, getCorrelationId } from "@tour/services";
 
 /**
  * tRPC context type
@@ -17,6 +17,17 @@ export interface Context {
   orgSlug: string | null;
   orgContext: OrgContext | null;
   user: User | null;
+  /** Correlation ID for request tracing */
+  correlationId: string;
+}
+
+/**
+ * Generate a correlation ID for request tracing
+ */
+function generateCorrelationId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 10);
+  return `trpc_${timestamp}_${random}`;
 }
 
 /**
@@ -25,6 +36,11 @@ export interface Context {
 export const createContext = async (opts: {
   headers: Headers;
 }): Promise<Context> => {
+  // Generate or extract correlation ID
+  // Check for existing correlation ID from upstream (e.g., API gateway)
+  const correlationId =
+    opts.headers.get("x-correlation-id") ?? generateCorrelationId();
+
   // Extract org slug from headers (set by middleware)
   const orgSlug = opts.headers.get("x-org-slug");
 
@@ -37,7 +53,7 @@ export const createContext = async (opts: {
     try {
       orgContext = await getOrgContext(orgSlug);
     } catch (error) {
-      logger.debug({ err: error, orgSlug }, "User may not have access to this org");
+      logger.debug({ err: error, orgSlug, correlationId }, "User may not have access to this org");
     }
   }
 
@@ -45,6 +61,7 @@ export const createContext = async (opts: {
     orgSlug,
     orgContext,
     user: user ?? null,
+    correlationId,
   };
 };
 
@@ -72,14 +89,38 @@ export const createRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 
 /**
+ * Base middleware that wraps all procedure calls with correlation context.
+ * This ensures the correlation ID is propagated to all service methods
+ * via AsyncLocalStorage, enabling distributed tracing across the request lifecycle.
+ */
+const correlationMiddleware = t.middleware(async ({ ctx, next }) => {
+  // Run the next handler within the correlation context
+  // This makes the correlation ID available to all downstream service calls
+  return runWithCorrelation(
+    {
+      correlationId: ctx.correlationId,
+      organizationId: ctx.orgContext?.organizationId,
+      userId: ctx.user?.id,
+    },
+    () => next({ ctx })
+  );
+});
+
+/**
+ * Base procedure with correlation context
+ * All other procedures should build on this
+ */
+const baseProcedure = t.procedure.use(correlationMiddleware);
+
+/**
  * Public procedure - no auth required
  */
-export const publicProcedure = t.procedure;
+export const publicProcedure = baseProcedure;
 
 /**
  * Protected procedure - requires auth and org context
  */
-export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
+export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   if (!ctx.orgContext) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
@@ -114,7 +155,7 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
  * Authenticated procedure - requires logged in user but not org context
  * Used for user-level operations like onboarding
  */
-export const authenticatedProcedure = t.procedure.use(async ({ ctx, next }) => {
+export const authenticatedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   if (!ctx.user) {
     throw new TRPCError({
       code: "UNAUTHORIZED",

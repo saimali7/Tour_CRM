@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { db, sql } from "@tour/database";
 import { env } from "@tour/config";
 import {
@@ -40,6 +41,16 @@ async function checkDatabase(): Promise<ServiceHealth> {
       latency: Date.now() - startTime,
     };
   } catch (error) {
+    // Capture database connection failures in Sentry - this is critical
+    Sentry.captureException(error, {
+      tags: {
+        service: "health-check",
+        operation: "database-check",
+        severity: "critical",
+      },
+      level: "error",
+    });
+
     return {
       name: "database",
       status: "unhealthy",

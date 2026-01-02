@@ -1,6 +1,7 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
+import * as Sentry from "@sentry/nextjs";
 import { db, eq } from "@tour/database";
 import { users } from "@tour/database/schema";
 import { webhookLogger } from "@tour/services";
@@ -43,6 +44,20 @@ export async function POST(req: Request) {
     }) as WebhookEvent;
   } catch (err) {
     webhookLogger.error({ err }, "Error verifying Clerk webhook");
+
+    // Capture webhook verification failures in Sentry
+    Sentry.captureException(err, {
+      tags: {
+        service: "clerk-webhook",
+        operation: "signature-verification",
+      },
+      extra: {
+        hasSvixId: !!svix_id,
+        hasSvixTimestamp: !!svix_timestamp,
+        hasSvixSignature: !!svix_signature,
+      },
+    });
+
     return new Response("Error verifying webhook", { status: 400 });
   }
 
@@ -72,6 +87,19 @@ export async function POST(req: Request) {
     return new Response("Webhook processed successfully", { status: 200 });
   } catch (error) {
     webhookLogger.error({ eventType, error }, "Error processing Clerk webhook");
+
+    // Capture webhook processing errors in Sentry
+    Sentry.captureException(error, {
+      tags: {
+        service: "clerk-webhook",
+        operation: "event-processing",
+        eventType,
+      },
+      extra: {
+        eventType,
+      },
+    });
+
     return new Response("Error processing webhook", { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure } from "../trpc";
-import { createServices } from "@tour/services";
+import { createServices, UnauthorizedError } from "@tour/services";
 
 const checkedInStatusSchema = z.enum(["yes", "no", "no_show"]);
 
@@ -17,7 +17,7 @@ export const checkInRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user) throw new Error("User not authenticated");
+      if (!ctx.user) throw new UnauthorizedError("User not authenticated");
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.checkIn.checkInParticipant(
         input.participantId,
@@ -29,7 +29,7 @@ export const checkInRouter = createRouter({
   markNoShow: protectedProcedure
     .input(z.object({ participantId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user) throw new Error("User not authenticated");
+      if (!ctx.user) throw new UnauthorizedError("User not authenticated");
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.checkIn.markNoShow(input.participantId, ctx.user.id);
     }),
@@ -53,7 +53,7 @@ export const checkInRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user) throw new Error("User not authenticated");
+      if (!ctx.user) throw new UnauthorizedError("User not authenticated");
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.checkIn.checkInAllForBooking(
         input.bookingId,
@@ -81,7 +81,7 @@ export const checkInRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user) throw new Error("User not authenticated");
+      if (!ctx.user) throw new UnauthorizedError("User not authenticated");
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.checkIn.bulkCheckIn(
         input.participantIds,

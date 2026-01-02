@@ -13,7 +13,7 @@ import {
   type CapacityModel,
 } from "@tour/database";
 import { BaseService } from "./base-service";
-import { NotFoundError, ValidationError } from "./types";
+import { NotFoundError, ValidationError, ServiceError } from "./types";
 
 export interface CreateBookingOptionInput {
   tourId: string;
@@ -165,7 +165,7 @@ export class BookingOptionService extends BaseService {
       .returning();
 
     if (!created) {
-      throw new Error("Failed to create booking option");
+      throw new ServiceError("Failed to create booking option", "CREATE_FAILED", 500);
     }
 
     return created;

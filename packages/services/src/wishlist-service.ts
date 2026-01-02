@@ -10,6 +10,8 @@ import {
   type PaginationOptions,
   type PaginatedResult,
   NotFoundError,
+  ValidationError,
+  ServiceError,
 } from "./types";
 
 export interface WishlistWithTour extends Wishlist {
@@ -153,7 +155,7 @@ export class WishlistService extends BaseService {
       .returning();
 
     if (!wishlist) {
-      throw new Error("Failed to add to wishlist");
+      throw new ServiceError("Failed to add to wishlist", "CREATE_FAILED", 500);
     }
 
     return wishlist;
@@ -170,7 +172,7 @@ export class WishlistService extends BaseService {
     } else if (identifier.sessionId) {
       conditions.push(eq(wishlists.sessionId, identifier.sessionId));
     } else {
-      throw new Error("Must provide customerId or sessionId");
+      throw new ValidationError("Must provide customerId or sessionId", { identifier: ["Either customerId or sessionId is required"] });
     }
 
     await this.db.delete(wishlists).where(and(...conditions));
@@ -244,6 +246,10 @@ export class WishlistService extends BaseService {
     return wishlist;
   }
 
+  /**
+   * Merge session wishlists to a customer account
+   * Optimized to check existing wishlists and process updates in parallel
+   */
   async mergeSessionToCustomer(sessionId: string, customerId: string, email: string): Promise<void> {
     // Get all session wishlists
     const sessionWishlists = await this.db
@@ -256,13 +262,31 @@ export class WishlistService extends BaseService {
         )
       );
 
-    for (const item of sessionWishlists) {
-      // Check if customer already has this tour wishlisted
-      const existing = await this.getByCustomerAndTour(customerId, item.tourId);
+    if (sessionWishlists.length === 0) {
+      return;
+    }
 
-      if (!existing) {
-        // Transfer to customer
-        await this.db
+    // Get all existing customer wishlists for these tours in parallel
+    const tourIds = sessionWishlists.map((w) => w.tourId);
+    const existingChecks = await Promise.all(
+      tourIds.map((tourId) => this.getByCustomerAndTour(customerId, tourId))
+    );
+
+    // Build a set of existing tour IDs
+    const existingTourIds = new Set(
+      existingChecks.filter((w) => w !== null).map((w) => w!.tourId)
+    );
+
+    // Separate items to transfer vs delete
+    const toTransfer = sessionWishlists.filter((item) => !existingTourIds.has(item.tourId));
+    const toDelete = sessionWishlists.filter((item) => existingTourIds.has(item.tourId));
+
+    // Process transfers and deletes in parallel using Promise.allSettled
+    // to ensure all operations complete even if some fail
+    await Promise.allSettled([
+      // Transfer non-duplicate wishlists to customer
+      ...toTransfer.map((item) =>
+        this.db
           .update(wishlists)
           .set({
             customerId,
@@ -275,19 +299,20 @@ export class WishlistService extends BaseService {
               eq(wishlists.id, item.id),
               eq(wishlists.organizationId, this.organizationId)
             )
-          );
-      } else {
-        // Delete duplicate
-        await this.db
+          )
+      ),
+      // Delete duplicate wishlists
+      ...toDelete.map((item) =>
+        this.db
           .delete(wishlists)
           .where(
             and(
               eq(wishlists.id, item.id),
               eq(wishlists.organizationId, this.organizationId)
             )
-          );
-      }
-    }
+          )
+      ),
+    ]);
   }
 
   async getWishlistsForPriceDropAlert(tourId: string): Promise<Wishlist[]> {

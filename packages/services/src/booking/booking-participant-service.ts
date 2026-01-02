@@ -15,7 +15,7 @@ import {
 } from "@tour/database";
 import { BaseService } from "../base-service";
 import type { ServiceContext } from "../types";
-import { NotFoundError } from "../types";
+import { NotFoundError, ServiceError } from "../types";
 import { BookingCore } from "./booking-core";
 import { BookingQueryService } from "./booking-query-service";
 import type { ParticipantInput } from "./types";
@@ -58,7 +58,7 @@ export class BookingParticipantService extends BaseService {
       .returning();
 
     if (!created) {
-      throw new Error("Failed to add participant");
+      throw new ServiceError("Failed to add participant", "CREATE_FAILED", 500);
     }
 
     return created;

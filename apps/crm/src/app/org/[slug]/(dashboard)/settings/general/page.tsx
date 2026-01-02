@@ -36,7 +36,6 @@ export default function GeneralSettingsPage() {
       setTimeout(() => setSaveSuccess(false), 3000);
     },
     onError: (error) => {
-      console.error("Save failed:", error);
       setSaveError(error.message);
       setTimeout(() => setSaveError(null), 5000);
     },

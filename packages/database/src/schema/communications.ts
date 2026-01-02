@@ -77,6 +77,7 @@ export const communicationLogs = pgTable("communication_logs", {
   statusIdx: index("communication_logs_status_idx").on(table.status),
   createdAtIdx: index("communication_logs_created_at_idx").on(table.createdAt),
   orgTypeCreatedIdx: index("communication_logs_org_type_created_idx").on(table.organizationId, table.type, table.createdAt),
+  customerOrgIdx: index("comm_logs_customer_org_idx").on(table.customerId, table.organizationId),
 }));
 
 // ============================================

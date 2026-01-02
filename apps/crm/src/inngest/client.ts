@@ -1,4 +1,5 @@
 import { Inngest, EventSchemas } from "inngest";
+import * as Sentry from "@sentry/nextjs";
 
 // Define event types for type safety
 type BookingEvents = {
@@ -284,5 +285,28 @@ export const inngest = new Inngest({
   id: "tour-crm",
   schemas: new EventSchemas().fromRecord<AllEvents>(),
 });
+
+/**
+ * Helper function to capture Inngest function errors in Sentry
+ * Call this in catch blocks of Inngest function handlers
+ */
+export function captureInngestError(
+  error: unknown,
+  context: { functionName: string; eventName?: string; extra?: Record<string, unknown> }
+) {
+  Sentry.captureException(error, {
+    tags: {
+      service: "inngest",
+      function: context.functionName,
+      operation: "function-execution",
+      eventName: context.eventName,
+    },
+    extra: {
+      functionName: context.functionName,
+      eventName: context.eventName,
+      ...context.extra,
+    },
+  });
+}
 
 export type { BookingEvents, TeamEvents, TestEvents, AllEvents };

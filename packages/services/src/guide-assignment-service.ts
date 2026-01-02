@@ -16,7 +16,9 @@ import {
   NotFoundError,
   ConflictError,
   ValidationError,
+  ServiceError,
 } from "./types";
+import { createServiceLogger } from "./lib/logger";
 
 export interface GuideAssignmentFilters {
   status?: GuideAssignmentStatus;
@@ -52,6 +54,7 @@ export interface CreateOutsourcedGuideAssignmentInput {
  * same tour run (shared guide pool).
  */
 export class GuideAssignmentService extends BaseService {
+  private logger = createServiceLogger("guide-assignment", this.organizationId);
   /**
    * Get all assignments for a specific booking
    */
@@ -237,6 +240,11 @@ export class GuideAssignmentService extends BaseService {
   async createAssignment(
     input: CreateGuideAssignmentInput
   ): Promise<GuideAssignment> {
+    this.logger.info(
+      { bookingId: input.bookingId, guideId: input.guideId },
+      "Creating guide assignment"
+    );
+
     // Verify booking exists and belongs to organization
     const booking = await this.db.query.bookings.findFirst({
       where: and(
@@ -246,6 +254,7 @@ export class GuideAssignmentService extends BaseService {
     });
 
     if (!booking) {
+      this.logger.warn({ bookingId: input.bookingId }, "Guide assignment failed: booking not found");
       throw new NotFoundError("Booking", input.bookingId);
     }
 
@@ -334,8 +343,24 @@ export class GuideAssignmentService extends BaseService {
       .returning();
 
     if (!assignment) {
-      throw new Error("Failed to create guide assignment");
+      this.logger.error(
+        { bookingId: input.bookingId, guideId: input.guideId },
+        "Failed to create guide assignment"
+      );
+      throw new ServiceError("Failed to create guide assignment", "CREATE_FAILED", 500);
     }
+
+    this.logger.info(
+      {
+        assignmentId: assignment.id,
+        bookingId: input.bookingId,
+        guideId: input.guideId,
+        tourId: booking.tourId,
+        bookingDate: booking.bookingDate?.toISOString().split("T")[0],
+        bookingTime: booking.bookingTime,
+      },
+      "Guide assignment created successfully"
+    );
 
     return assignment;
   }
@@ -357,7 +382,7 @@ export class GuideAssignmentService extends BaseService {
 
     const booking = assignment.booking;
     if (!booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) {
-      throw new Error("Assignment booking not found or missing tour run info");
+      throw new ValidationError("Assignment booking not found or missing tour run info");
     }
 
     // Check for conflicts only for insourced guides (outsourced guides don't have guideId)
@@ -663,7 +688,7 @@ export class GuideAssignmentService extends BaseService {
       .returning();
 
     if (!assignment) {
-      throw new Error("Failed to create outsourced guide assignment");
+      throw new ServiceError("Failed to create outsourced guide assignment", "CREATE_FAILED", 500);
     }
 
     return assignment;

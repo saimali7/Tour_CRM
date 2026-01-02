@@ -46,8 +46,8 @@ export function GuideStatusEditor({
     try {
       await onStatusChange(newStatus);
       setOpen(false);
-    } catch (error) {
-      console.error("Failed to update status:", error);
+    } catch {
+      // Error should be handled by the caller
     } finally {
       setLoading(false);
       setPendingStatus(null);

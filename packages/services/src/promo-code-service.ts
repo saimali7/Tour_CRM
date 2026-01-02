@@ -8,6 +8,7 @@ import {
   NotFoundError,
   ValidationError,
   ConflictError,
+  ServiceError,
 } from "./types";
 
 export interface PromoCodeFilters {
@@ -185,7 +186,7 @@ export class PromoCodeService extends BaseService {
       .returning();
 
     if (!promoCode) {
-      throw new Error("Failed to create promo code");
+      throw new ServiceError("Failed to create promo code", "CREATE_FAILED", 500);
     }
 
     return promoCode;
@@ -416,7 +417,7 @@ export class PromoCodeService extends BaseService {
       .returning();
 
     if (!usage) {
-      throw new Error("Failed to record promo code usage");
+      throw new ServiceError("Failed to record promo code usage", "CREATE_FAILED", 500);
     }
 
     // Atomic increment with max uses check to prevent race conditions
@@ -507,7 +508,7 @@ export class PromoCodeService extends BaseService {
       attempts++;
     }
 
-    throw new Error("Failed to generate unique promo code after multiple attempts");
+    throw new ServiceError("Failed to generate unique promo code after multiple attempts", "GENERATION_FAILED", 500);
   }
 
   /**

@@ -1,5 +1,6 @@
 import { eq, and, desc, asc, isNull, sql } from "drizzle-orm";
 import { BaseService } from "./base-service";
+import { NotFoundError, ServiceError } from "./types";
 import {
   waiverTemplates,
   tourWaivers,
@@ -224,7 +225,7 @@ export class WaiverService extends BaseService {
       .returning();
 
     if (!template) {
-      throw new Error("Failed to create waiver template");
+      throw new ServiceError("Failed to create waiver template", "CREATE_FAILED", 500);
     }
     return template;
   }
@@ -314,7 +315,7 @@ export class WaiverService extends BaseService {
       .returning();
 
     if (!tourWaiver) {
-      throw new Error("Failed to add waiver to tour");
+      throw new ServiceError("Failed to add waiver to tour", "CREATE_FAILED", 500);
     }
     return tourWaiver;
   }
@@ -476,7 +477,7 @@ export class WaiverService extends BaseService {
       .returning();
 
     if (!signed) {
-      throw new Error("Failed to sign waiver");
+      throw new ServiceError("Failed to sign waiver", "CREATE_FAILED", 500);
     }
     return signed;
   }
@@ -575,15 +576,27 @@ export class WaiverService extends BaseService {
 
   /**
    * Check if all required waivers are signed for multiple bookings
+   * Optimized to check all bookings in parallel using Promise.all
    */
   async checkWaiversSignedForBookings(
     bookingIds: string[]
   ): Promise<Map<string, boolean>> {
     const result = new Map<string, boolean>();
 
-    for (const bookingId of bookingIds) {
-      const status = await this.getBookingWaiverStatus(bookingId);
-      result.set(bookingId, status.allWaiversSigned);
+    if (bookingIds.length === 0) {
+      return result;
+    }
+
+    // Check all bookings in parallel to avoid N+1 queries
+    const statuses = await Promise.all(
+      bookingIds.map(async (bookingId) => {
+        const status = await this.getBookingWaiverStatus(bookingId);
+        return { bookingId, allWaiversSigned: status.allWaiversSigned };
+      })
+    );
+
+    for (const { bookingId, allWaiversSigned } of statuses) {
+      result.set(bookingId, allWaiversSigned);
     }
 
     return result;
@@ -591,6 +604,7 @@ export class WaiverService extends BaseService {
 
   /**
    * Get pending waivers across all upcoming bookings
+   * Optimized to fetch waiver statuses in parallel using Promise.all
    */
   async getPendingWaivers(): Promise<
     Array<{
@@ -630,18 +644,27 @@ export class WaiverService extends BaseService {
       .orderBy(asc(bookings.bookingDate), asc(bookings.bookingTime))
       .limit(100);
 
+    // Filter to only bookings with tours
+    const bookingsWithTours = upcomingBookings.filter((b) => b.tourId);
+
+    if (bookingsWithTours.length === 0) {
+      return [];
+    }
+
+    // Fetch all waiver statuses in parallel to avoid N+1 queries
+    const statusResults = await Promise.all(
+      bookingsWithTours.map(async (booking) => ({
+        booking,
+        status: await this.getBookingWaiverStatus(booking.bookingId),
+      }))
+    );
+
     const pending: Array<{
       booking: { id: string; referenceNumber: string; customerName: string };
       waiver: { id: string; name: string };
     }> = [];
 
-    for (const booking of upcomingBookings) {
-      // Skip bookings without a tour
-      if (!booking.tourId) {
-        continue;
-      }
-
-      const status = await this.getBookingWaiverStatus(booking.bookingId);
+    for (const { booking, status } of statusResults) {
       for (const waiver of status.requiredWaivers) {
         if (!waiver.isSigned) {
           pending.push({

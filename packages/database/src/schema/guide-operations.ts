@@ -166,6 +166,7 @@ export const guideAssignments = pgTable("guide_assignments", {
   bookingIdx: index("guide_assignments_booking_idx").on(table.bookingId),
   guideIdx: index("guide_assignments_guide_idx").on(table.guideId),
   statusIdx: index("guide_assignments_status_idx").on(table.status),
+  guideOrgIdx: index("guide_assignments_guide_org_idx").on(table.guideId, table.organizationId),
   // Note: unique constraint removed since we now support outsourced guides without guideId
 }));
 

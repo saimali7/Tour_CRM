@@ -10,7 +10,7 @@ import {
   type Tour,
 } from "@tour/database";
 import { BaseService } from "./base-service";
-import { NotFoundError, ConflictError, ValidationError } from "./types";
+import { NotFoundError, ConflictError, ValidationError, ServiceError } from "./types";
 
 export interface QualificationWithGuide extends TourGuideQualification {
   guide: Guide;
@@ -124,7 +124,7 @@ export class TourGuideQualificationService extends BaseService {
       .returning();
 
     if (!qualification) {
-      throw new Error("Failed to create tour-guide qualification");
+      throw new ServiceError("Failed to create tour-guide qualification", "CREATE_FAILED", 500);
     }
 
     return qualification;
@@ -264,7 +264,7 @@ export class TourGuideQualificationService extends BaseService {
       .returning();
 
     if (!qualification) {
-      throw new Error("Failed to set primary guide");
+      throw new ServiceError("Failed to set primary guide", "UPDATE_FAILED", 500);
     }
 
     return qualification;

@@ -7,7 +7,7 @@ import {
   type GuideAvailabilityOverride,
 } from "@tour/database";
 import { BaseService } from "./base-service";
-import { NotFoundError, ValidationError } from "./types";
+import { NotFoundError, ValidationError, ServiceError } from "./types";
 
 /**
  * Weekly availability slot input
@@ -186,7 +186,7 @@ export class GuideAvailabilityService extends BaseService {
       .returning();
 
     if (!newSlot) {
-      throw new Error("Failed to create weekly availability slot");
+      throw new ServiceError("Failed to create weekly availability slot", "CREATE_FAILED", 500);
     }
 
     return newSlot;
@@ -362,7 +362,7 @@ export class GuideAvailabilityService extends BaseService {
       .returning();
 
     if (!override) {
-      throw new Error("Failed to create availability override");
+      throw new ServiceError("Failed to create availability override", "CREATE_FAILED", 500);
     }
 
     return override;

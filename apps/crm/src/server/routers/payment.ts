@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure, adminProcedure, sensitiveProcedure } from "../trpc";
 import { createServices } from "@tour/services";
+import { priceStringSchema } from "@tour/validators";
 
 const dateRangeSchema = z.object({
   from: z.coerce.date().optional(),
@@ -27,7 +28,7 @@ const sortSchema = z.object({
 
 const createPaymentSchema = z.object({
   bookingId: z.string(),
-  amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Amount must be a valid number with up to 2 decimal places"),
+  amount: priceStringSchema, // Uses shared price validation from @tour/validators
   currency: z.string().optional(),
   method: paymentMethodSchema,
   reference: z.string().optional(),

@@ -6,7 +6,7 @@ import {
   type ActivityEntity,
 } from "@tour/database";
 import { BaseService } from "./base-service";
-import { type PaginationOptions, type PaginatedResult, type DateRangeFilter } from "./types";
+import { type PaginationOptions, type PaginatedResult, type DateRangeFilter, ServiceError } from "./types";
 
 export interface ActivityLogFilters {
   entityType?: ActivityEntity;
@@ -143,7 +143,7 @@ export class ActivityLogService extends BaseService {
       .returning();
 
     if (!log) {
-      throw new Error("Failed to create activity log");
+      throw new ServiceError("Failed to create activity log", "CREATE_FAILED", 500);
     }
 
     return log;

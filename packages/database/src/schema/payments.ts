@@ -47,6 +47,7 @@ export const payments = pgTable("payments", {
   bookingIdx: index("payments_booking_idx").on(table.bookingId),
   orgBookingIdx: index("payments_org_booking_idx").on(table.organizationId, table.bookingId),
   recordedAtIdx: index("payments_recorded_at_idx").on(table.recordedAt),
+  orgCreatedAtIdx: index("payments_org_created_at_idx").on(table.organizationId, table.createdAt),
 }));
 
 // Relations

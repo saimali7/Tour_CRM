@@ -22,8 +22,8 @@ import {
 } from "@tour/database";
 import { BaseService } from "../base-service";
 import type { ServiceContext } from "../types";
-import { NotFoundError, ValidationError } from "../types";
-import { bookingLogger } from "../lib/logger";
+import { NotFoundError, ValidationError, ServiceError } from "../types";
+import { createServiceLogger } from "../lib/logger";
 import { TourAvailabilityService } from "../tour-availability-service";
 import { BookingCore } from "./booking-core";
 import { BookingQueryService } from "./booking-query-service";
@@ -35,6 +35,7 @@ import type {
 
 export class BookingCommandService extends BaseService {
   private queryService: BookingQueryService;
+  private logger: ReturnType<typeof createServiceLogger>;
 
   constructor(
     ctx: ServiceContext,
@@ -42,6 +43,7 @@ export class BookingCommandService extends BaseService {
   ) {
     super(ctx);
     this.queryService = new BookingQueryService(ctx, core);
+    this.logger = createServiceLogger("booking-command", ctx.organizationId);
   }
 
   /**
@@ -51,8 +53,22 @@ export class BookingCommandService extends BaseService {
    * by counting existing bookings against tour availability settings.
    */
   async create(input: CreateBookingInput): Promise<BookingWithRelations> {
+    this.logger.info(
+      {
+        tourId: input.tourId,
+        customerId: input.customerId,
+        bookingDate: input.bookingDate?.toISOString().split("T")[0],
+        bookingTime: input.bookingTime,
+        adultCount: input.adultCount,
+        childCount: input.childCount,
+        source: input.source || "manual",
+      },
+      "Creating booking"
+    );
+
     // Validate required fields for availability-based model
     if (!input.tourId || !input.bookingDate || !input.bookingTime) {
+      this.logger.warn({ input: { tourId: input.tourId, bookingDate: !!input.bookingDate, bookingTime: input.bookingTime } }, "Booking creation failed: missing required fields");
       throw new ValidationError(
         "Must provide tourId, bookingDate, and bookingTime"
       );
@@ -169,7 +185,7 @@ export class BookingCommandService extends BaseService {
         .returning();
 
       if (!booking) {
-        throw new Error("Failed to create booking");
+        throw new ServiceError("Failed to create booking", "CREATE_FAILED", 500);
       }
 
       // 2. Insert participants if provided
@@ -195,18 +211,20 @@ export class BookingCommandService extends BaseService {
       return booking.id;
     });
 
-    bookingLogger.info({
-      organizationId: this.organizationId,
-      bookingId,
-      referenceNumber,
-      customerId: input.customerId,
-      tourId,
-      bookingDate: bookingDate.toISOString().split("T")[0],
-      bookingTime,
-      totalParticipants,
-      total,
-      source: input.source || "manual",
-    }, "Booking created successfully");
+    this.logger.info(
+      {
+        bookingId,
+        referenceNumber,
+        customerId: input.customerId,
+        tourId,
+        bookingDate: bookingDate.toISOString().split("T")[0],
+        bookingTime,
+        totalParticipants,
+        total,
+        source: input.source || "manual",
+      },
+      "Booking created successfully"
+    );
 
     return this.queryService.getById(bookingId);
   }
@@ -215,6 +233,11 @@ export class BookingCommandService extends BaseService {
    * Update booking fields (counts, notes, etc.)
    */
   async update(id: string, input: UpdateBookingInput): Promise<BookingWithRelations> {
+    this.logger.info(
+      { bookingId: id, fields: Object.keys(input) },
+      "Updating booking"
+    );
+
     const booking = await this.queryService.getById(id);
 
     const updateData: Record<string, unknown> = { ...input, updatedAt: new Date() };
@@ -267,6 +290,8 @@ export class BookingCommandService extends BaseService {
       throw new NotFoundError("Booking", id);
     }
 
+    this.logger.info({ bookingId: id }, "Booking updated successfully");
+
     return this.queryService.getById(updated.id);
   }
 
@@ -308,13 +333,20 @@ export class BookingCommandService extends BaseService {
    * Cancel a booking and release capacity
    */
   async cancel(id: string, reason?: string): Promise<BookingWithRelations> {
+    this.logger.info(
+      { bookingId: id, reason: reason || "not provided" },
+      "Cancelling booking"
+    );
+
     const booking = await this.queryService.getById(id);
 
     if (booking.status === "cancelled") {
+      this.logger.warn({ bookingId: id }, "Booking cancellation failed: already cancelled");
       throw new ValidationError("Booking is already cancelled");
     }
 
     if (booking.status === "completed") {
+      this.logger.warn({ bookingId: id }, "Booking cancellation failed: already completed");
       throw new ValidationError("Cannot cancel a completed booking");
     }
 
@@ -339,6 +371,16 @@ export class BookingCommandService extends BaseService {
     if (!updated) {
       throw new NotFoundError("Booking", id);
     }
+
+    this.logger.info(
+      {
+        bookingId: id,
+        referenceNumber: booking.referenceNumber,
+        customerId: booking.customerId,
+        reason,
+      },
+      "Booking cancelled successfully"
+    );
 
     return this.queryService.getById(updated.id);
   }
@@ -496,16 +538,18 @@ export class BookingCommandService extends BaseService {
       throw new NotFoundError("Booking", id);
     }
 
-    bookingLogger.info({
-      organizationId: this.organizationId,
-      bookingId: id,
-      oldTourId: booking.tourId,
-      newTourId,
-      oldDate: booking.bookingDate?.toISOString().split("T")[0],
-      newDate: input.bookingDate.toISOString().split("T")[0],
-      oldTime: booking.bookingTime,
-      newTime: input.bookingTime,
-    }, "Booking rescheduled");
+    this.logger.info(
+      {
+        bookingId: id,
+        oldTourId: booking.tourId,
+        newTourId,
+        oldDate: booking.bookingDate?.toISOString().split("T")[0],
+        newDate: input.bookingDate.toISOString().split("T")[0],
+        oldTime: booking.bookingTime,
+        newTime: input.bookingTime,
+      },
+      "Booking rescheduled"
+    );
 
     return this.queryService.getById(updated.id);
   }

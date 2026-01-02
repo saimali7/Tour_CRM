@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
-import { createServices } from "@tour/services";
+import { createServices, ValidationError, ServiceError } from "@tour/services";
 import { stripe } from "@/lib/stripe";
 import { inngest } from "@/inngest";
 
@@ -112,14 +112,14 @@ export const refundRouter = createRouter({
       const refund = await services.refund.getById(input.id);
 
       if (refund.status !== "pending") {
-        throw new Error(`Cannot process refund in '${refund.status}' status`);
+        throw new ValidationError(`Cannot process refund in '${refund.status}' status`);
       }
 
       // Get organization for Stripe Connect account
       const org = await services.organization.get();
 
       if (!refund.stripePaymentIntentId) {
-        throw new Error("No Stripe payment intent associated with this refund");
+        throw new ServiceError("No Stripe payment intent associated with this refund", "MISSING_PAYMENT_INTENT", 400);
       }
 
       // Mark as processing

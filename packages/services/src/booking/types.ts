@@ -11,6 +11,8 @@ import type {
   BookingStatus,
   PaymentStatus,
   BookingSource,
+  PricingModel,
+  ExperienceMode,
 } from "@tour/database";
 import type { DateRangeFilter } from "../types";
 
@@ -60,8 +62,8 @@ export interface BookingWithRelations extends Booking {
 export interface PricingSnapshot {
   optionId?: string;
   optionName?: string;
-  pricingModel?: unknown;
-  experienceMode?: "join" | "book" | "charter";
+  pricingModel?: PricingModel;
+  experienceMode?: ExperienceMode;
   priceBreakdown?: string;
 }
 

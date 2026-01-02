@@ -4,7 +4,7 @@ import {
   bookings,
   tours,
 } from "@tour/database/schema";
-import type { ServiceContext } from "./types";
+import { type ServiceContext, NotFoundError } from "./types";
 
 export interface DepositCalculation {
   total: number;
@@ -99,7 +99,7 @@ export class DepositService {
   ) {
     const booking = await this.getBookingById(bookingId);
     if (!booking) {
-      throw new Error("Booking not found");
+      throw new NotFoundError("Booking", bookingId);
     }
 
     const currentDeposit = parseFloat(booking.depositPaid || "0");
@@ -145,7 +145,7 @@ export class DepositService {
   ) {
     const booking = await this.getBookingById(bookingId);
     if (!booking) {
-      throw new Error("Booking not found");
+      throw new NotFoundError("Booking", bookingId);
     }
 
     const totalPaid = parseFloat(booking.paidAmount || "0") + amount;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
-import { createServices } from "@tour/services";
+import { createServices, NotFoundError } from "@tour/services";
 
 const paginationSchema = z.object({
   page: z.number().min(1).default(1),
@@ -371,7 +371,7 @@ export const communicationRouter = createRouter({
       // Get template
       const template = await services.communication.getEmailTemplateByType(input.templateType);
       if (!template) {
-        throw new Error(`Email template "${input.templateType}" not found`);
+        throw new NotFoundError("Email template", input.templateType);
       }
 
       for (const bookingId of input.bookingIds) {

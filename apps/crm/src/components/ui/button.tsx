@@ -115,13 +115,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const isDisabled = disabled || loading;
     const Comp = asChild ? Slot : "button";
 
-    // Warn in development if icon button lacks aria-label
-    if (process.env.NODE_ENV === "development") {
-      if (size === "icon" && !props["aria-label"]) {
-        console.warn(
-          "Button: Icon-only buttons should have an aria-label for accessibility."
-        );
-      }
+    // Development-only accessibility warning - shown in browser console
+    if (process.env.NODE_ENV === "development" && size === "icon" && !props["aria-label"]) {
+      // Using console.warn for client-side dev warnings (appropriate for browser devtools)
+      // eslint-disable-next-line no-console
+      console.warn("Button: Icon-only buttons should have an aria-label for accessibility.");
     }
 
     // When asChild is true, don't show loading state in the button

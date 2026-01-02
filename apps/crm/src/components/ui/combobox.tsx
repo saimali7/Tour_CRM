@@ -184,10 +184,8 @@ export function AsyncCombobox({
           setOptions(results);
         }
       })
-      .catch((error) => {
-        if (isMounted) {
-          console.error("Failed to load initial options:", error);
-        }
+      .catch(() => {
+        // Silently fail - user can retry
       })
       .finally(() => {
         if (isMounted) {
@@ -219,10 +217,8 @@ export function AsyncCombobox({
         if (!abortControllerRef.current.signal.aborted) {
           setOptions(results);
         }
-      } catch (error) {
-        if (!abortControllerRef.current.signal.aborted) {
-          console.error("Failed to load options:", error);
-        }
+      } catch {
+        // Silently fail - user can retry
       } finally {
         if (!abortControllerRef.current.signal.aborted) {
           setIsLoading(false);

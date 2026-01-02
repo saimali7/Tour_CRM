@@ -5,6 +5,9 @@ import { db, eq, and } from "@tour/database";
 import { organizationMembers, users } from "@tour/database/schema";
 import type { OrganizationRole } from "@tour/database";
 import { inngest } from "@/inngest/client";
+import { createServiceLogger } from "@tour/services";
+
+const log = createServiceLogger("team");
 
 const roleSchema = z.enum(["owner", "admin", "manager", "support", "guide"]);
 
@@ -166,7 +169,7 @@ export const teamRouter = createRouter({
         });
       } catch (error) {
         // Log but don't fail the invite - membership was created
-        console.error("Failed to send invite email event:", error);
+        log.error({ err: error, membershipId: membership.id }, "Failed to send invite email event");
       }
 
       return {
