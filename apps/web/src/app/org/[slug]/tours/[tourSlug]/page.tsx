@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { requireOrganization } from "@/lib/organization";
-import { createServices } from "@tour/services";
+import { createServices, logger } from "@tour/services";
 import { Clock, Users, MapPin, Check, X, Info, Calendar, Shield } from "lucide-react";
 import { AvailabilityCalendar } from "@/components/availability-calendar";
 import { TourStructuredData } from "@/components/structured-data";
@@ -29,7 +29,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         type: "website",
       },
     };
-  } catch {
+  } catch (error) {
+    logger.debug({ err: error, tourSlug, orgSlug: slug }, "Tour not found for metadata generation");
     return {
       title: "Tour Not Found",
     };
@@ -66,7 +67,8 @@ export default async function TourDetailPage({ params }: PageProps) {
   let tour;
   try {
     tour = await services.tour.getBySlug(tourSlug);
-  } catch {
+  } catch (error) {
+    logger.debug({ err: error, tourSlug, orgSlug: slug }, "Tour not found for tour detail page");
     notFound();
   }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure } from "../trpc";
-import { createServices, type UpdateCustomerInput } from "@tour/services";
+import { createServices, logger, type UpdateCustomerInput } from "@tour/services";
 import { updateCustomerSchema as validatorUpdateCustomerSchema } from "@tour/validators";
 
 const customerFilterSchema = z.object({
@@ -127,8 +127,9 @@ export const customerRouter = createRouter({
         try {
           await services.customer.delete(id);
           deletedCount++;
-        } catch {
+        } catch (error) {
           // Skip failed deletions (e.g., customer has bookings)
+          logger.debug({ err: error, customerId: id }, "Failed to delete customer in bulk operation");
         }
       }
       return { deletedCount, requestedCount: input.ids.length };

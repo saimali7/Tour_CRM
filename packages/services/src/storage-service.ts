@@ -8,6 +8,7 @@ import {
   HeadBucketCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { logger } from "./lib/logger";
 
 // Default bucket name
 const DEFAULT_BUCKET = "tour-images";
@@ -297,7 +298,8 @@ export class StorageService {
         return pathname.slice(bucketPrefix.length);
       }
       return pathname.slice(1); // Remove leading slash
-    } catch {
+    } catch (error) {
+      logger.debug({ err: error, url }, "Failed to extract path from URL");
       return null;
     }
   }

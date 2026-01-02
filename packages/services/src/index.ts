@@ -1,7 +1,8 @@
 import type { ServiceContext } from "./types";
 import { TourService } from "./tour-service";
 import { ScheduleService } from "./schedule-service";
-import { BookingService } from "./booking-service";
+// Booking module - refactored into focused services
+import { BookingService } from "./booking";
 import { CustomerService } from "./customer-service";
 import { GuideService } from "./guide-service";
 import { GuideAssignmentService } from "./guide-assignment-service";
@@ -36,6 +37,7 @@ import { CheckInService } from "./check-in-service";
 import { DepositService } from "./deposit-service";
 // Phase 7: Operations Excellence
 import { GoalService } from "./goal-service";
+import { CommandCenterService } from "./command-center-service";
 // Booking System v2: Customer-first booking with options
 import { BookingOptionService } from "./booking-option-service";
 import { AvailabilityService } from "./availability-service";
@@ -89,6 +91,7 @@ export interface Services {
   deposit: DepositService;
   // Phase 7: Operations Excellence
   goal: GoalService;
+  commandCenter: CommandCenterService;
   // Booking System v2: Customer-first booking
   bookingOption: BookingOptionService;
   availability: AvailabilityService;
@@ -154,6 +157,7 @@ export function createServices(ctx: ServiceContext): Services {
     deposit: new DepositService(ctx),
     // Phase 7: Operations Excellence
     goal: new GoalService(ctx),
+    commandCenter: new CommandCenterService(ctx),
     // Booking System v2: Customer-first booking
     bookingOption: new BookingOptionService(ctx),
     availability: new AvailabilityService(ctx),
@@ -174,7 +178,17 @@ export function createServices(ctx: ServiceContext): Services {
 // Export individual services for direct use if needed
 export { TourService } from "./tour-service";
 export { ScheduleService } from "./schedule-service";
-export { BookingService } from "./booking-service";
+// Booking module - facade and specialized services
+export {
+  BookingService,
+  BookingCore,
+  BookingQueryService,
+  BookingCommandService,
+  BookingStatsService,
+  BookingParticipantService,
+  BookingBulkService,
+  type UrgencyLevel,
+} from "./booking";
 export { CustomerService } from "./customer-service";
 export { GuideService } from "./guide-service";
 export { GuideAssignmentService } from "./guide-assignment-service";
@@ -209,12 +223,31 @@ export { CheckInService } from "./check-in-service";
 export { DepositService, type DepositCalculation } from "./deposit-service";
 // Phase 7: Operations Excellence
 export { GoalService } from "./goal-service";
+export { CommandCenterService } from "./command-center-service";
 export type {
   CreateGoalInput,
   UpdateGoalInput,
   GoalWithProgress,
   GoalFilters,
 } from "./goal-service";
+export type {
+  DispatchStatus,
+  DispatchStatusType,
+  TourRun as CommandCenterTourRun,
+  BookingWithCustomer,
+  GuideAssignmentInfo,
+  AvailableGuide,
+  CurrentAssignment,
+  GuideTimeline,
+  TimelineSegment,
+  OptimizationResult,
+  OptimizedAssignment,
+  Warning,
+  WarningType,
+  WarningResolution,
+  DispatchResult,
+  GuestDetails,
+} from "./command-center-service";
 // Booking System v2: Customer-first booking
 export { BookingOptionService } from "./booking-option-service";
 export { AvailabilityService } from "./availability-service";
@@ -328,12 +361,26 @@ export type {
   BulkCreateScheduleInput,
   AutoGenerateScheduleInput,
 } from "./schedule-service";
+// Booking types - from refactored module
 export type {
   BookingFilters,
+  BookingSortField,
   BookingWithRelations,
   CreateBookingInput,
   UpdateBookingInput,
-} from "./booking-service";
+  ParticipantInput,
+  PricingSnapshot,
+  BulkConfirmResult,
+  BulkCancelResult,
+  BulkPaymentUpdateResult,
+  BulkRescheduleResult,
+  BookingStats as BookingServiceStats,
+  UrgencyGroupedBookings,
+  ActionableBookings,
+  DayBookings,
+  UpcomingBookings,
+  TodayBookingsWithUrgency,
+} from "./booking";
 export type {
   CustomerFilters,
   CustomerWithStats,
@@ -535,3 +582,6 @@ export {
   webhookLogger,
   authLogger,
 } from "./lib/logger";
+
+// Sanitization utilities
+export { sanitizeEmailHtml, escapeHtml } from "./lib/sanitize";

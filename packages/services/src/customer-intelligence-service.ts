@@ -7,6 +7,9 @@ import {
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { NotFoundError } from "./types";
+import { logger } from "./lib/logger";
+
+const customerIntelligenceLogger = logger.child({ service: "customer-intelligence" });
 
 // ============================================
 // Types
@@ -255,18 +258,19 @@ export class CustomerIntelligenceService extends BaseService {
       .from(customers)
       .where(eq(customers.organizationId, this.organizationId));
 
-    const scores: CustomerScore[] = [];
-    for (const customer of allCustomers) {
-      try {
-        const score = await this.calculateCustomerScore(customer.id);
-        scores.push(score);
-      } catch (error) {
-        // Skip customers that error out
-        console.error(`Failed to calculate score for customer ${customer.id}:`, error);
-      }
-    }
+    const scores = await Promise.all(
+      allCustomers.map((customer) =>
+        this.calculateCustomerScore(customer.id).catch((error) => {
+          customerIntelligenceLogger.error(
+            { err: error, customerId: customer.id },
+            "Failed to calculate score"
+          );
+          return null;
+        })
+      )
+    );
 
-    return scores;
+    return scores.filter((s): s is CustomerScore => s !== null);
   }
 
   /**
@@ -371,21 +375,22 @@ export class CustomerIntelligenceService extends BaseService {
       .from(customers)
       .where(eq(customers.organizationId, this.organizationId));
 
-    const customersWithScores: CustomerWithScore[] = [];
+    const customersWithScores = await Promise.all(
+      allCustomers.map((customer) =>
+        this.getCustomerWithScore(customer.id).catch((error) => {
+          customerIntelligenceLogger.error(
+            { err: error, customerId: customer.id },
+            "Failed to get customer score"
+          );
+          return null;
+        })
+      )
+    );
 
-    for (const customer of allCustomers) {
-      try {
-        const customerWithScore = await this.getCustomerWithScore(customer.id);
-        if (customerWithScore.segment === segment) {
-          customersWithScores.push(customerWithScore);
-        }
-      } catch (error) {
-        console.error(`Failed to get score for customer ${customer.id}:`, error);
-      }
-    }
-
-    // Sort by score descending
-    return customersWithScores.sort((a, b) => b.score - a.score);
+    // Filter to segment and remove nulls, then sort by score descending
+    return customersWithScores
+      .filter((c): c is CustomerWithScore => c !== null && c.segment === segment)
+      .sort((a, b) => b.score - a.score);
   }
 
   // ============================================
@@ -643,36 +648,49 @@ export class CustomerIntelligenceService extends BaseService {
       .where(eq(customers.organizationId, this.organizationId))
       .groupBy(customers.id, customers.email, customers.firstName, customers.lastName);
 
-    const candidates: ReengagementCandidate[] = [];
-
-    for (const row of customerBookings) {
-      if (!row.lastBookingAt) continue;
-
+    // Filter customers that fall in the date range
+    const eligibleCustomers = customerBookings.filter((row) => {
+      if (!row.lastBookingAt) return false;
       const lastBookingDate = new Date(row.lastBookingAt);
       const daysSinceLast = Math.floor(
         (Date.now() - lastBookingDate.getTime()) / (1000 * 60 * 60 * 24)
       );
+      return daysSinceLast >= minDays && (!maxDays || daysSinceLast <= maxDays);
+    });
 
-      // Check if customer falls in the range
-      if (daysSinceLast >= minDays && (!maxDays || daysSinceLast <= maxDays)) {
-        const scoreData = await this.calculateCustomerScore(row.customerId);
+    // Calculate scores in parallel
+    const candidatesWithScores = await Promise.all(
+      eligibleCustomers.map(async (row) => {
+        const lastBookingDate = new Date(row.lastBookingAt!);
+        const daysSinceLast = Math.floor(
+          (Date.now() - lastBookingDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
 
-        candidates.push({
-          customerId: row.customerId,
-          email: row.email,
-          firstName: row.firstName,
-          lastName: row.lastName,
-          triggerType,
-          daysSinceLastBooking: daysSinceLast,
-          totalBookings: row.totalBookings,
-          totalSpent: row.totalSpent,
-          segment: scoreData.segment,
-          lastBookingAt: row.lastBookingAt,
-        });
-      }
-    }
+        try {
+          const scoreData = await this.calculateCustomerScore(row.customerId);
+          return {
+            customerId: row.customerId,
+            email: row.email,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            triggerType,
+            daysSinceLastBooking: daysSinceLast,
+            totalBookings: row.totalBookings,
+            totalSpent: row.totalSpent,
+            segment: scoreData.segment,
+            lastBookingAt: row.lastBookingAt,
+          } as ReengagementCandidate;
+        } catch (error) {
+          customerIntelligenceLogger.error(
+            { err: error, customerId: row.customerId },
+            "Failed to calculate score for reengagement candidate"
+          );
+          return null;
+        }
+      })
+    );
 
-    return candidates;
+    return candidatesWithScores.filter((c): c is ReengagementCandidate => c !== null);
   }
 
   /**

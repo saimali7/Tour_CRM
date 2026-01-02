@@ -32,6 +32,10 @@ export {
 } from "./functions/guide-notifications";
 
 export {
+  sendDispatchNotifications,
+} from "./functions/dispatch-notifications";
+
+export {
   sendReviewRequestEmail,
   sendReviewReminderEmail,
   dailyReviewRequestCheck,
@@ -76,6 +80,10 @@ import {
 } from "./functions/guide-notifications";
 
 import {
+  sendDispatchNotifications,
+} from "./functions/dispatch-notifications";
+
+import {
   sendReviewRequestEmail,
   sendReviewReminderEmail,
   dailyReviewRequestCheck,
@@ -111,6 +119,8 @@ export const inngestFunctions = [
   sendPendingAssignmentReminder,
   sendGuideScheduleReminder,
   sendGuideDailyManifest,
+  // Dispatch notifications (Command Center)
+  sendDispatchNotifications,
   // Review requests
   sendReviewRequestEmail,
   sendReviewReminderEmail,

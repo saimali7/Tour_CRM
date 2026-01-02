@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getOrgContext } from "@/lib/auth";
+import { logger } from "@tour/services";
 import { DashboardProviders } from "./providers";
 import { NavigationProgress } from "@/components/navigation-progress";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
@@ -26,7 +27,8 @@ export async function generateMetadata({
       },
       description: `Tour operations dashboard for ${organization.name}`,
     };
-  } catch {
+  } catch (error) {
+    logger.debug({ err: error, slug }, "Could not get org context for metadata, using defaults");
     return {
       title: {
         template: "%s | Tour CRM",

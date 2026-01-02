@@ -151,6 +151,14 @@ export const guideAssignments = pgTable("guide_assignments", {
   // Assignment notes
   notes: text("notes"),
 
+  // =========================================================================
+  // DISPATCH FIELDS (Tour Command Center)
+  // =========================================================================
+  isLeadGuide: boolean("is_lead_guide").notNull().default(false),
+  pickupOrder: integer("pickup_order"), // 1, 2, 3... sequence for this guide's pickups
+  calculatedPickupTime: text("calculated_pickup_time"), // Calculated time, e.g., "08:15"
+  driveTimeMinutes: integer("drive_time_minutes"), // Minutes to reach this pickup from previous location
+
   // Timestamps
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

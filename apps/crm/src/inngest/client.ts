@@ -199,6 +199,14 @@ type BookingEvents = {
       organizationId: string;
     };
   };
+  // Dispatch events (Command Center)
+  "dispatch.completed": {
+    data: {
+      organizationId: string;
+      dispatchDate: string; // ISO date string YYYY-MM-DD
+      dispatchedBy: string; // User ID who triggered dispatch
+    };
+  };
   // Refund events
   "refund/processed": {
     data: {

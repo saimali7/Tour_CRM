@@ -242,7 +242,8 @@ export function TourScheduleManager({ tourId, orgSlug, tourDefaults }: TourSched
             maxParticipants: recurringCapacity,
           });
           created++;
-        } catch {
+        } catch (error) {
+          console.debug("Failed to create schedule:", { startsAt, tourId, error });
           failed++;
         }
       }

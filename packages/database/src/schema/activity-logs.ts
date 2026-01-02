@@ -46,6 +46,9 @@ export type ActivityAction =
   | "guide.activated"
   | "guide.deactivated"
   | "guide.daily_manifest_sent"
+  // Dispatch actions (Command Center)
+  | "dispatch.manifest_sent"
+  | "dispatch.notifications_completed"
   // Assignment actions
   | "assignment.email_sent"
   | "assignment.reminder_sent"

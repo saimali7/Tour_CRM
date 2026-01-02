@@ -237,8 +237,9 @@ function HighlightedText({
         )}
       </span>
     );
-  } catch {
+  } catch (error) {
     // If regex fails for any reason, return plain text
+    console.debug("Highlight text regex failed:", error);
     return <span>{text}</span>;
   }
 }

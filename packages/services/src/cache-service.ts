@@ -1,4 +1,7 @@
 import Redis from "ioredis";
+import { createServiceLogger } from "./lib/logger";
+
+const logger = createServiceLogger("cache");
 
 // Cache key prefixes for different data types
 export const CachePrefix = {
@@ -84,7 +87,7 @@ export class CacheService {
       this.isConnected = true;
 
       this.redis.on("error", (err) => {
-        console.error("[CacheService] Redis error:", err.message);
+        logger.error({ err }, "Redis error");
         this.isConnected = false;
       });
 
@@ -93,10 +96,10 @@ export class CacheService {
       });
 
       this.redis.on("reconnecting", () => {
-        console.log("[CacheService] Redis reconnecting...");
+        logger.info("Redis reconnecting");
       });
     } catch (error) {
-      console.warn("[CacheService] Failed to connect to Redis:", error);
+      logger.warn({ err: error }, "Failed to connect to Redis");
       this.redis = null;
       this.isConnected = false;
     }
@@ -121,7 +124,7 @@ export class CacheService {
       if (!value) return null;
       return JSON.parse(value) as T;
     } catch (error) {
-      console.error("[CacheService] Get error:", error);
+      logger.error({ err: error, key }, "Cache get failed");
       return null;
     }
   }
@@ -138,7 +141,7 @@ export class CacheService {
       await redis.set(this.buildKey(key), JSON.stringify(value), "EX", ttl);
       return true;
     } catch (error) {
-      console.error("[CacheService] Set error:", error);
+      logger.error({ err: error, key }, "Cache set failed");
       return false;
     }
   }
@@ -154,7 +157,7 @@ export class CacheService {
       await redis.del(this.buildKey(key));
       return true;
     } catch (error) {
-      console.error("[CacheService] Delete error:", error);
+      logger.error({ err: error, key }, "Cache delete failed");
       return false;
     }
   }
@@ -172,7 +175,7 @@ export class CacheService {
       if (keys.length === 0) return 0;
       return await redis.del(...keys);
     } catch (error) {
-      console.error("[CacheService] DeletePattern error:", error);
+      logger.error({ err: error, pattern }, "Cache delete pattern failed");
       return 0;
     }
   }
@@ -216,7 +219,7 @@ export class CacheService {
       }
       return value;
     } catch (error) {
-      console.error("[CacheService] Increment error:", error);
+      logger.error({ err: error, key }, "Cache increment failed");
       return 0;
     }
   }
@@ -232,7 +235,7 @@ export class CacheService {
       const result = await redis.exists(this.buildKey(key));
       return result === 1;
     } catch (error) {
-      console.error("[CacheService] Exists error:", error);
+      logger.error({ err: error, key }, "Cache exists check failed");
       return false;
     }
   }
@@ -248,7 +251,7 @@ export class CacheService {
       await redis.hset(this.buildKey(key), field, JSON.stringify(value));
       return true;
     } catch (error) {
-      console.error("[CacheService] Hset error:", error);
+      logger.error({ err: error, key, field }, "Cache hset failed");
       return false;
     }
   }
@@ -265,7 +268,7 @@ export class CacheService {
       if (!value) return null;
       return JSON.parse(value) as T;
     } catch (error) {
-      console.error("[CacheService] Hget error:", error);
+      logger.error({ err: error, key, field }, "Cache hget failed");
       return null;
     }
   }
@@ -285,13 +288,15 @@ export class CacheService {
       for (const [field, value] of Object.entries(data)) {
         try {
           result[field] = JSON.parse(value);
-        } catch {
+        } catch (error) {
+          // Value is not JSON, use as plain string (expected behavior)
+          logger.trace({ err: error, field }, "Cache field value is not JSON, using raw value");
           result[field] = value;
         }
       }
       return result as T;
     } catch (error) {
-      console.error("[CacheService] Hgetall error:", error);
+      logger.error({ err: error, key }, "Cache hgetall failed");
       return null;
     }
   }

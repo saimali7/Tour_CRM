@@ -11,6 +11,9 @@ import {
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { type DateRangeFilter } from "./types";
+import { createServiceLogger } from "./lib/logger";
+
+const logger = createServiceLogger("analytics");
 
 // Revenue metrics interfaces
 export interface RevenueStats {
@@ -759,7 +762,7 @@ export class AnalyticsService extends BaseService {
       guidesWorking = Number(guidesQuery[0]?.guideCount || 0);
     } catch (error) {
       // Log error but continue - guides count is non-critical
-      console.error("Failed to get guides working count:", error);
+      logger.error({ err: error }, "Failed to get guides working count");
       guidesWorking = 0;
     }
 

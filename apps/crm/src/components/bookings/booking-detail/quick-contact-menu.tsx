@@ -48,7 +48,8 @@ export function QuickContactMenu({
       setCopied(type);
       toast.success(`${type === "phone" ? "Phone number" : "Email"} copied`);
       setTimeout(() => setCopied(null), 2000);
-    } catch {
+    } catch (error) {
+      console.debug("Failed to copy to clipboard:", error);
       toast.error("Failed to copy to clipboard");
     }
   };
