@@ -5,6 +5,8 @@ export { BookingFormContainer as BookingForm } from "./BookingFormContainer";
 
 // Individual sections for advanced use cases
 export { CustomerSection } from "./CustomerSection";
+export { TourSection } from "./TourSection";
+export { DateTimeSection } from "./DateTimeSection";
 export { ScheduleSection } from "./ScheduleSection";
 export { ParticipantSection } from "./ParticipantSection";
 export { PricingSection } from "./PricingSection";

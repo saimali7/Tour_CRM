@@ -54,15 +54,29 @@ const pricingSnapshotSchema = z.object({
 
 const createBookingSchema = z.object({
   customerId: z.string().max(100),
-  scheduleId: z.string().max(100),
+
+  // Schedule-based (legacy) - optional
+  scheduleId: z.string().max(100).optional(),
+
+  // Availability-based (new) - optional individually, but one pattern required
+  tourId: z.string().max(100).optional(),
+  bookingDate: z.string().optional(), // ISO date string YYYY-MM-DD
+  bookingTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format").optional(),
+
   bookingOptionId: z.string().optional(),
-  guestAdults: z.number().min(0).max(100).optional(),
-  guestChildren: z.number().min(0).max(100).optional(),
-  guestInfants: z.number().min(0).max(100).optional(),
+
+  // Primary guest counts
+  guestAdults: z.number().int().min(1).max(100).default(1),
+  guestChildren: z.number().int().min(0).max(100).default(0),
+  guestInfants: z.number().int().min(0).max(100).default(0),
+
   pricingSnapshot: pricingSnapshotSchema,
-  adultCount: z.number().min(1).max(100),
-  childCount: z.number().min(0).max(100).optional(),
-  infantCount: z.number().min(0).max(100).optional(),
+
+  // Legacy guest counts (backward compat)
+  adultCount: z.number().int().min(1).max(100).optional(),
+  childCount: z.number().int().min(0).max(100).optional(),
+  infantCount: z.number().int().min(0).max(100).optional(),
+
   specialRequests: z.string().max(2000).optional(),
   dietaryRequirements: z.string().max(500).optional(),
   accessibilityNeeds: z.string().max(500).optional(),
@@ -74,7 +88,13 @@ const createBookingSchema = z.object({
   discount: priceStringSchema.optional(),
   tax: priceStringSchema.optional(),
   total: priceStringSchema.optional(),
-});
+}).refine(
+  (data) => data.scheduleId || (data.tourId && data.bookingDate && data.bookingTime),
+  {
+    message: "Either scheduleId OR (tourId + bookingDate + bookingTime) is required",
+    path: ["scheduleId"]
+  }
+);
 
 const updateBookingSchema = z.object({
   adultCount: z.number().min(1).max(100).optional(),
@@ -124,7 +144,18 @@ export const bookingRouter = createRouter({
     .input(createBookingSchema)
     .mutation(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      const booking = await services.booking.create(input);
+
+      // Convert bookingDate string to Date and ensure adultCount is set for the service layer
+      const serviceInput = {
+        ...input,
+        bookingDate: input.bookingDate ? new Date(input.bookingDate) : undefined,
+        // Ensure adultCount is always set - use legacy field if provided, otherwise use guestAdults
+        adultCount: input.adultCount ?? input.guestAdults,
+        childCount: input.childCount ?? input.guestChildren ?? 0,
+        infantCount: input.infantCount ?? input.guestInfants ?? 0,
+      };
+
+      const booking = await services.booking.create(serviceInput);
 
       // Send booking created email via Inngest (only if customer has email)
       // Wrapped in try-catch so Inngest failures don't break booking creation

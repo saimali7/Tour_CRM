@@ -17,21 +17,78 @@ interface UseBookingFormOptions {
   booking?: ExistingBooking;
   preselectedCustomerId?: string;
   preselectedScheduleId?: string;
+  preselectedTourId?: string;
+}
+
+// Helper to derive tourId/date/time from existing booking's schedule
+function deriveAvailabilityFromBooking(booking?: ExistingBooking): {
+  tourId: string;
+  bookingDate: string | null;
+  bookingTime: string | null;
+} {
+  if (!booking) {
+    return { tourId: "", bookingDate: null, bookingTime: null };
+  }
+
+  // If booking already has availability fields, use them
+  if (booking.tourId && booking.bookingDate && booking.bookingTime) {
+    // bookingDate might be a Date object from the database, convert to string
+    const dateValue = booking.bookingDate;
+    let dateString: string | null = null;
+    if (dateValue instanceof Date) {
+      // toISOString() returns "YYYY-MM-DDTHH:MM:SS.sssZ", split gives us the date part
+      const parts = dateValue.toISOString().split("T");
+      dateString = parts[0] ?? null;
+    } else if (typeof dateValue === "string") {
+      dateString = dateValue;
+    }
+
+    return {
+      tourId: booking.tourId,
+      bookingDate: dateString,
+      bookingTime: booking.bookingTime ?? null,
+    };
+  }
+
+  // Derive from tour/schedule for legacy bookings
+  const tourId = booking.tour?.id ?? "";
+  let bookingDate: string | null = null;
+  let bookingTime: string | null = null;
+
+  if (booking.schedule?.startsAt) {
+    const date = new Date(booking.schedule.startsAt);
+    // Format as YYYY-MM-DD - toISOString() returns "YYYY-MM-DDTHH:MM:SS.sssZ"
+    const parts = date.toISOString().split("T");
+    bookingDate = parts[0] ?? null;
+    // Format as HH:MM
+    bookingTime = date.toTimeString().slice(0, 5);
+  }
+
+  return { tourId, bookingDate, bookingTime };
 }
 
 export function useBookingForm({
   booking,
   preselectedCustomerId,
   preselectedScheduleId,
+  preselectedTourId,
 }: UseBookingFormOptions) {
   const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
   const isEditing = !!booking;
 
+  // Derive initial availability values from booking (for edit mode backward compat)
+  const initialAvailability = deriveAvailabilityFromBooking(booking);
+
   // Form state
   const [formData, setFormData] = useState<BookingFormData>({
     customerId: booking?.customerId ?? preselectedCustomerId ?? "",
+    // New availability-based fields
+    tourId: initialAvailability.tourId || preselectedTourId || "",
+    bookingDate: initialAvailability.bookingDate,
+    bookingTime: initialAvailability.bookingTime,
+    // Legacy field - kept for backward compat
     scheduleId: booking?.scheduleId ?? preselectedScheduleId ?? "",
     adultCount: booking?.adultCount ?? 1,
     childCount: booking?.childCount ?? 0,
@@ -64,7 +121,50 @@ export function useBookingForm({
       pagination: { page: 1, limit: 100 },
     });
 
-  // Find selected schedule
+  // Fetch tours for tour selector (new availability-based flow)
+  const { data: toursData, isLoading: toursLoading } = trpc.tour.list.useQuery({
+    pagination: { page: 1, limit: 100 },
+    filters: { status: "active" },
+    sort: { field: "name", direction: "asc" },
+  });
+
+  // Find selected tour
+  const selectedTour = useMemo(
+    () => toursData?.data.find((t) => t.id === formData.tourId),
+    [toursData?.data, formData.tourId]
+  );
+
+  // Fetch available dates for the selected tour and current month
+  const currentDate = new Date();
+  // Parse year and month from bookingDate (YYYY-MM-DD format)
+  let availabilityYear = currentDate.getFullYear();
+  let availabilityMonth = currentDate.getMonth() + 1;
+  if (formData.bookingDate) {
+    const dateParts = formData.bookingDate.split("-");
+    if (dateParts[0] && dateParts[1]) {
+      availabilityYear = parseInt(dateParts[0], 10);
+      availabilityMonth = parseInt(dateParts[1], 10);
+    }
+  }
+
+  const { data: availableDates, isLoading: availableDatesLoading } =
+    trpc.availability.getAvailableDatesForMonth.useQuery(
+      {
+        tourId: formData.tourId,
+        year: availabilityYear,
+        month: availabilityMonth,
+      },
+      { enabled: !!formData.tourId }
+    );
+
+  // Fetch departure times for the selected tour
+  const { data: departureTimes, isLoading: departureTimesLoading } =
+    trpc.availability.getDepartureTimes.useQuery(
+      { tourId: formData.tourId },
+      { enabled: !!formData.tourId }
+    );
+
+  // Find selected schedule (legacy support)
   const selectedSchedule = useMemo(
     () =>
       schedulesData?.data.find(
@@ -73,10 +173,13 @@ export function useBookingForm({
     [schedulesData?.data, formData.scheduleId]
   );
 
+  // Get tour ID for pricing tiers - prefer direct tourId, fallback to schedule's tour
+  const tourIdForPricing = formData.tourId || selectedSchedule?.tour?.id || "";
+
   // Fetch pricing tiers for selected tour
   const { data: pricingTiers } = trpc.tour.listPricingTiers.useQuery(
-    { tourId: selectedSchedule?.tour?.id || "" },
-    { enabled: !!selectedSchedule?.tour?.id }
+    { tourId: tourIdForPricing },
+    { enabled: !!tourIdForPricing }
   ) as { data: PricingTier[] | undefined };
 
   // tRPC mutations
@@ -118,7 +221,7 @@ export function useBookingForm({
     }));
   }, [customersData?.data]);
 
-  // Convert schedules to Combobox options with availability info
+  // Convert schedules to Combobox options with availability info (legacy)
   const scheduleOptions: ComboboxOption[] = useMemo(() => {
     if (!schedulesData?.data) return [];
     return schedulesData.data.map((schedule) => {
@@ -136,55 +239,85 @@ export function useBookingForm({
     });
   }, [schedulesData?.data]);
 
-  // Calculate price when schedule or guest count changes
+  // Convert tours to Combobox options (new availability-based flow)
+  const tourOptions: ComboboxOption[] = useMemo(() => {
+    if (!toursData?.data) return [];
+    return toursData.data.map((tour) => ({
+      value: tour.id,
+      label: tour.name,
+      sublabel: tour.basePrice ? `From $${parseFloat(tour.basePrice).toFixed(2)}` : undefined,
+    }));
+  }, [toursData?.data]);
+
+  // Format departure times as options
+  const timeOptions: ComboboxOption[] = useMemo(() => {
+    if (!departureTimes) return [];
+    return departureTimes
+      .filter((dt) => dt.isActive)
+      .map((dt) => ({
+        value: dt.time,
+        label: formatTime(dt.time),
+        sublabel: dt.label || undefined,
+      }));
+  }, [departureTimes]);
+
+  // Calculate price when tour or guest count changes
+  // Supports both availability-based (tourId) and legacy (scheduleId) models
   useEffect(() => {
-    if (formData.scheduleId && schedulesData?.data) {
-      const schedule = schedulesData.data.find(
-        (s) => s.id === formData.scheduleId
-      );
+    // Get base price from tour (new model) or schedule (legacy)
+    let basePrice = 0;
+
+    if (formData.tourId && selectedTour) {
+      // New availability-based model
+      basePrice = parseFloat(selectedTour.basePrice || "0");
+    } else if (formData.scheduleId && schedulesData?.data) {
+      // Legacy schedule-based model
+      const schedule = schedulesData.data.find((s) => s.id === formData.scheduleId);
       if (schedule) {
-        const basePrice = parseFloat(
-          schedule.price || schedule.tour?.basePrice || "0"
-        );
-
-        // Find pricing tiers from database
-        const adultTier = pricingTiers?.find((t) => t.name === "adult");
-        const childTier = pricingTiers?.find((t) => t.name === "child");
-        const infantTier = pricingTiers?.find((t) => t.name === "infant");
-
-        // Use tier prices if available, otherwise fall back to base price
-        const adultPrice = adultTier?.price
-          ? parseFloat(adultTier.price)
-          : basePrice;
-        const childPrice = childTier?.price
-          ? parseFloat(childTier.price)
-          : basePrice;
-        const infantPrice = infantTier?.price
-          ? parseFloat(infantTier.price)
-          : 0;
-
-        const subtotal =
-          adultPrice * formData.adultCount +
-          childPrice * formData.childCount +
-          infantPrice * formData.infantCount;
-
-        const discount = parseFloat(formData.discount || "0");
-        const tax = parseFloat(formData.tax || "0");
-        const total = subtotal - discount + tax;
-
-        setCalculatedPrice({
-          subtotal: subtotal.toFixed(2),
-          total: total.toFixed(2),
-        });
+        basePrice = parseFloat(schedule.price || schedule.tour?.basePrice || "0");
       }
     }
+
+    if (basePrice > 0 || pricingTiers?.length) {
+      // Find pricing tiers from database
+      const adultTier = pricingTiers?.find((t) => t.name === "adult");
+      const childTier = pricingTiers?.find((t) => t.name === "child");
+      const infantTier = pricingTiers?.find((t) => t.name === "infant");
+
+      // Use tier prices if available, otherwise fall back to base price
+      const adultPrice = adultTier?.price
+        ? parseFloat(adultTier.price)
+        : basePrice;
+      const childPrice = childTier?.price
+        ? parseFloat(childTier.price)
+        : basePrice;
+      const infantPrice = infantTier?.price
+        ? parseFloat(infantTier.price)
+        : 0;
+
+      const subtotal =
+        adultPrice * formData.adultCount +
+        childPrice * formData.childCount +
+        infantPrice * formData.infantCount;
+
+      const discount = parseFloat(formData.discount || "0");
+      const tax = parseFloat(formData.tax || "0");
+      const total = subtotal - discount + tax;
+
+      setCalculatedPrice({
+        subtotal: subtotal.toFixed(2),
+        total: total.toFixed(2),
+      });
+    }
   }, [
+    formData.tourId,
     formData.scheduleId,
     formData.adultCount,
     formData.childCount,
     formData.infantCount,
     formData.discount,
     formData.tax,
+    selectedTour,
     schedulesData?.data,
     pricingTiers,
   ]);
@@ -197,6 +330,44 @@ export function useBookingForm({
     []
   );
 
+  // Handle tour selection (new availability-based flow)
+  const handleTourChange = useCallback((tourId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      tourId,
+      // Reset date and time when tour changes
+      bookingDate: null,
+      bookingTime: null,
+      // Clear legacy scheduleId when using new flow
+      scheduleId: "",
+    }));
+  }, []);
+
+  // Handle date selection (new availability-based flow)
+  const handleDateChange = useCallback((date: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      bookingDate: date,
+      // Reset time when date changes (user should select new time)
+      bookingTime: null,
+    }));
+  }, []);
+
+  // Handle time selection (new availability-based flow)
+  const handleTimeChange = useCallback((time: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      bookingTime: time,
+    }));
+  }, []);
+
+  // Determine if we're using availability-based or schedule-based model
+  const isAvailabilityBasedBooking = !!(
+    formData.tourId &&
+    formData.bookingDate &&
+    formData.bookingTime
+  );
+
   // Handle form submission
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -206,23 +377,42 @@ export function useBookingForm({
         toast.error("Please select a customer");
         return;
       }
-      if (!formData.scheduleId) {
-        toast.error("Please select a schedule");
-        return;
-      }
 
-      // Validate available spots (overbooking protection)
-      if (!isEditing && selectedSchedule) {
-        const totalParticipants =
-          formData.adultCount + formData.childCount + formData.infantCount;
-        const availableSpots =
-          selectedSchedule.maxParticipants -
-          (selectedSchedule.bookedCount ?? 0);
-        if (totalParticipants > availableSpots) {
-          toast.error(
-            `Only ${availableSpots} spots available. You're trying to book ${totalParticipants} participants.`
-          );
+      // Validate based on booking model
+      if (isAvailabilityBasedBooking) {
+        // New availability-based validation
+        if (!formData.tourId) {
+          toast.error("Please select a tour");
           return;
+        }
+        if (!formData.bookingDate) {
+          toast.error("Please select a date");
+          return;
+        }
+        if (!formData.bookingTime) {
+          toast.error("Please select a time");
+          return;
+        }
+      } else {
+        // Legacy schedule-based validation
+        if (!formData.scheduleId) {
+          toast.error("Please select a schedule");
+          return;
+        }
+
+        // Validate available spots (overbooking protection) - only for legacy model
+        if (!isEditing && selectedSchedule) {
+          const totalParticipants =
+            formData.adultCount + formData.childCount + formData.infantCount;
+          const availableSpots =
+            selectedSchedule.maxParticipants -
+            (selectedSchedule.bookedCount ?? 0);
+          if (totalParticipants > availableSpots) {
+            toast.error(
+              `Only ${availableSpots} spots available. You're trying to book ${totalParticipants} participants.`
+            );
+            return;
+          }
         }
       }
 
@@ -254,9 +444,16 @@ export function useBookingForm({
           },
         });
       } else {
+        // Build mutation payload - supports both models
         createMutation.mutate({
           customerId: formData.customerId,
-          scheduleId: formData.scheduleId,
+          // Schedule-based (legacy) - optional
+          scheduleId: formData.scheduleId || undefined,
+          // Availability-based (new) - used when scheduleId is empty
+          tourId: formData.tourId || undefined,
+          bookingDate: formData.bookingDate || undefined,
+          bookingTime: formData.bookingTime || undefined,
+          // Guest counts
           adultCount: formData.adultCount,
           childCount: formData.childCount || undefined,
           infantCount: formData.infantCount || undefined,
@@ -278,6 +475,7 @@ export function useBookingForm({
       isEditing,
       booking,
       selectedSchedule,
+      isAvailabilityBasedBooking,
       createMutation,
       updateMutation,
     ]
@@ -316,7 +514,7 @@ export function useBookingForm({
     setShowCreateCustomer,
     handleCustomerCreated,
 
-    // Data and options
+    // Data and options - Legacy schedule-based
     customerOptions,
     customersLoading,
     scheduleOptions,
@@ -324,13 +522,28 @@ export function useBookingForm({
     selectedSchedule,
     pricingTiers,
 
+    // Data and options - New availability-based
+    tourOptions,
+    toursLoading,
+    selectedTour,
+    availableDates,
+    availableDatesLoading,
+    timeOptions,
+    departureTimesLoading,
+
+    // New availability-based handlers
+    handleTourChange,
+    handleDateChange,
+    handleTimeChange,
+    isAvailabilityBasedBooking,
+
     // Actions
     handleSubmit,
     handleCancel,
   };
 }
 
-// Helper function
+// Helper function for formatting schedule dates
 function formatScheduleDate(startsAt: Date) {
   const date = new Date(startsAt);
   return new Intl.DateTimeFormat("en-US", {
@@ -342,4 +555,29 @@ function formatScheduleDate(startsAt: Date) {
   }).format(date);
 }
 
-export { formatScheduleDate };
+// Helper function for formatting time (HH:MM to readable format)
+function formatTime(time: string): string {
+  const parts = time.split(":");
+  const hours = parseInt(parts[0] ?? "0", 10);
+  const minutes = parseInt(parts[1] ?? "0", 10);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
+// Helper function for formatting date (YYYY-MM-DD to readable format)
+function formatBookingDate(dateString: string): string {
+  const date = new Date(dateString + "T00:00:00");
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+export { formatScheduleDate, formatTime, formatBookingDate };

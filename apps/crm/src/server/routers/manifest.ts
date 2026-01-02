@@ -28,4 +28,25 @@ export const manifestRouter = createRouter({
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
       return services.manifest.getManifestsForDate(input.date);
     }),
+
+  /**
+   * Get manifest for a tour run (availability-based booking model)
+   * Uses tourId + date + time instead of scheduleId
+   */
+  getForTourRun: protectedProcedure
+    .input(
+      z.object({
+        tourId: z.string(),
+        date: z.string(), // YYYY-MM-DD format
+        time: z.string(), // HH:MM format
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.manifest.getForTourRun(
+        input.tourId,
+        new Date(input.date),
+        input.time
+      );
+    }),
 });

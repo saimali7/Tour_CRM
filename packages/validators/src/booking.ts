@@ -33,18 +33,29 @@ export const pricingSnapshotSchema = z.object({
 // Create booking validation
 export const createBookingSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
-  scheduleId: z.string().min(1, "Schedule is required"),
+
+  // Schedule-based (legacy) - optional
+  scheduleId: z.string().max(100).optional(),
+
+  // Availability-based (new) - optional individually, but one pattern required
+  tourId: z.string().max(100).optional(),
+  bookingDate: z.string().optional(), // ISO date string YYYY-MM-DD
+  bookingTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format").optional(),
+
   bookingOptionId: z.string().optional(), // Link to booking option
-  guestAdults: z.number().int().min(0).optional(), // New guest tracking
-  guestChildren: z.number().int().min(0).optional(),
-  guestInfants: z.number().int().min(0).optional(),
+
+  // Primary guest counts
+  guestAdults: z.number().int().min(1).max(100).default(1),
+  guestChildren: z.number().int().min(0).max(100).default(0),
+  guestInfants: z.number().int().min(0).max(100).default(0),
+
   pricingSnapshot: pricingSnapshotSchema, // Preserve pricing at booking time
-  adultCount: z
-    .number()
-    .int("Adult count must be a whole number")
-    .min(1, "At least 1 adult is required"),
-  childCount: z.number().int().min(0).default(0),
-  infantCount: z.number().int().min(0).default(0),
+
+  // Legacy guest counts (backward compat)
+  adultCount: z.number().int().min(1).max(100).optional(),
+  childCount: z.number().int().min(0).max(100).optional(),
+  infantCount: z.number().int().min(0).max(100).optional(),
+
   specialRequests: z.string().max(1000).optional(),
   dietaryRequirements: z.string().max(1000).optional(),
   accessibilityNeeds: z.string().max(1000).optional(),
@@ -56,7 +67,13 @@ export const createBookingSchema = z.object({
   discount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format").optional(),
   tax: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format").optional(),
   total: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format").optional(),
-});
+}).refine(
+  (data) => data.scheduleId || (data.tourId && data.bookingDate && data.bookingTime),
+  {
+    message: "Either scheduleId OR (tourId + bookingDate + bookingTime) is required",
+    path: ["scheduleId"]
+  }
+);
 
 // Update booking validation
 export const updateBookingSchema = z.object({

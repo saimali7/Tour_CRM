@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc, inArray, sql, asc } from "drizzle-orm";
 import {
   schedules,
   tours,
@@ -7,6 +7,7 @@ import {
   customers,
   guideAssignments,
   type BookingParticipant,
+  type Tour,
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { NotFoundError } from "./types";
@@ -117,6 +118,41 @@ export interface DateManifestSummary {
     totalSchedules: number;
     totalParticipants: number;
     totalRevenue: string;
+  };
+}
+
+/**
+ * Tour run manifest - for availability-based booking model
+ * Uses tourId + date + time instead of scheduleId
+ * This follows the same structure as ScheduleManifest for consistency
+ */
+export interface TourRunScheduleManifest {
+  tourRun: {
+    tourId: string;
+    date: Date;
+    time: string;
+    meetingPoint: string | null;
+    meetingPointDetails: string | null;
+  };
+  tour: {
+    id: string;
+    name: string;
+    slug: string;
+    durationMinutes: number;
+  };
+  guides: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string | null;
+  }>;
+  bookings: ManifestBooking[];
+  summary: {
+    totalBookings: number;
+    totalParticipants: number;
+    totalRevenue: string;
+    currency: string;
   };
 }
 
@@ -500,6 +536,189 @@ export class ManifestService extends BaseService {
         totalSchedules,
         totalParticipants,
         totalRevenue: totalRevenue.toFixed(2),
+      },
+    };
+  }
+
+  /**
+   * Get manifest for a tour run (availability-based booking model)
+   * Uses tourId + date + time instead of scheduleId
+   */
+  async getForTourRun(tourId: string, date: Date, time: string): Promise<TourRunScheduleManifest> {
+    // Get tour info
+    const tour = await this.db.query.tours.findFirst({
+      where: and(
+        eq(tours.id, tourId),
+        eq(tours.organizationId, this.organizationId)
+      ),
+    });
+
+    if (!tour) {
+      throw new NotFoundError("Tour", tourId);
+    }
+
+    // Format date for SQL comparison
+    const dateStr = date.toISOString().split("T")[0]!;
+
+    // Get all confirmed bookings for this tour run
+    const bookingResults = await this.db
+      .select({
+        booking: bookings,
+        customer: {
+          id: customers.id,
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+          email: customers.email,
+          phone: customers.phone,
+        },
+      })
+      .from(bookings)
+      .leftJoin(customers, eq(bookings.customerId, customers.id))
+      .where(
+        and(
+          eq(bookings.organizationId, this.organizationId),
+          eq(bookings.tourId, tourId),
+          sql`${bookings.bookingDate}::text = ${dateStr}`,
+          eq(bookings.bookingTime, time),
+          eq(bookings.status, "confirmed")
+        )
+      )
+      .orderBy(asc(bookings.createdAt));
+
+    // Get participants for all bookings
+    const bookingIds = bookingResults.map((r) => r.booking.id);
+    const participants: BookingParticipant[] = [];
+
+    if (bookingIds.length > 0) {
+      const participantResults = await this.db.query.bookingParticipants.findMany({
+        where: (bp, { inArray, and, eq }) => and(
+          inArray(bp.bookingId, bookingIds),
+          eq(bp.organizationId, this.organizationId)
+        ),
+      });
+      participants.push(...participantResults);
+    }
+
+    // Group participants by booking
+    const participantsByBooking = participants.reduce((acc, participant) => {
+      if (!acc[participant.bookingId]) {
+        acc[participant.bookingId] = [];
+      }
+      acc[participant.bookingId]!.push({
+        id: participant.id,
+        bookingId: participant.bookingId,
+        firstName: participant.firstName,
+        lastName: participant.lastName,
+        email: participant.email,
+        phone: participant.phone,
+        type: participant.type,
+        dietaryRequirements: participant.dietaryRequirements,
+        accessibilityNeeds: participant.accessibilityNeeds,
+        notes: participant.notes,
+      });
+      return acc;
+    }, {} as Record<string, ManifestParticipant[]>);
+
+    // Build manifest bookings
+    const manifestBookings: ManifestBooking[] = bookingResults.map((result) => ({
+      id: result.booking.id,
+      referenceNumber: result.booking.referenceNumber,
+      customerId: result.booking.customerId,
+      customerName: result.customer?.id
+        ? `${result.customer.firstName} ${result.customer.lastName}`
+        : "Unknown",
+      customerEmail: result.customer?.email || "",
+      customerPhone: result.customer?.phone || null,
+      adultCount: result.booking.adultCount,
+      childCount: result.booking.childCount || 0,
+      infantCount: result.booking.infantCount || 0,
+      totalParticipants: result.booking.totalParticipants,
+      specialRequests: result.booking.specialRequests,
+      dietaryRequirements: result.booking.dietaryRequirements,
+      accessibilityNeeds: result.booking.accessibilityNeeds,
+      internalNotes: result.booking.internalNotes,
+      paymentStatus: result.booking.paymentStatus,
+      total: result.booking.total,
+      currency: result.booking.currency,
+      participants: participantsByBooking[result.booking.id] || [],
+    }));
+
+    // Get all confirmed guides for bookings in this tour run (via assignments)
+    let confirmedGuides: Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string | null;
+    }> = [];
+
+    if (bookingIds.length > 0) {
+      const guideResults = await this.db
+        .select({
+          guideId: guideAssignments.guideId,
+          firstName: guides.firstName,
+          lastName: guides.lastName,
+          email: guides.email,
+          phone: guides.phone,
+        })
+        .from(guideAssignments)
+        .innerJoin(guides, eq(guideAssignments.guideId, guides.id))
+        .where(
+          and(
+            inArray(guideAssignments.bookingId, bookingIds),
+            eq(guideAssignments.organizationId, this.organizationId),
+            eq(guideAssignments.status, "confirmed"),
+            sql`${guideAssignments.guideId} is not null`
+          )
+        );
+
+      // Deduplicate guides by ID
+      const guideMap = new Map<string, { guideId: string; firstName: string; lastName: string; email: string; phone: string | null }>();
+      for (const guide of guideResults) {
+        if (guide.guideId) {
+          guideMap.set(guide.guideId, { ...guide, guideId: guide.guideId });
+        }
+      }
+      confirmedGuides = Array.from(guideMap.values()).map((g) => ({
+        id: g.guideId,
+        firstName: g.firstName,
+        lastName: g.lastName,
+        email: g.email,
+        phone: g.phone,
+      }));
+    }
+
+    // Calculate summary
+    const totalBookings = manifestBookings.length;
+    const totalParticipants = manifestBookings.reduce(
+      (sum, booking) => sum + booking.totalParticipants,
+      0
+    );
+    const totalRevenue = manifestBookings
+      .reduce((sum, booking) => sum + parseFloat(booking.total), 0)
+      .toFixed(2);
+
+    return {
+      tourRun: {
+        tourId: tour.id,
+        date,
+        time,
+        meetingPoint: tour.meetingPoint,
+        meetingPointDetails: tour.meetingPointDetails,
+      },
+      tour: {
+        id: tour.id,
+        name: tour.name,
+        slug: tour.slug,
+        durationMinutes: tour.durationMinutes,
+      },
+      guides: confirmedGuides,
+      bookings: manifestBookings,
+      summary: {
+        totalBookings,
+        totalParticipants,
+        totalRevenue,
+        currency: tour.currency ?? "USD",
       },
     };
   }
