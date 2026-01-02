@@ -26,7 +26,7 @@ tour-platform/
 
 - **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript (strict mode)
-- **Database**: Supabase (PostgreSQL)
+- **Database**: Self-hosted PostgreSQL 16 + PgBouncer
 - **ORM**: Drizzle
 - **Auth**: Clerk
 - **Styling**: Tailwind CSS + shadcn/ui
@@ -47,7 +47,7 @@ tour-platform/
 pnpm install
 
 # Copy environment variables
-cp .env.example .env.local
+cp .env.local.example .env.local
 # Fill in your values in .env.local
 
 # Run development servers
@@ -85,10 +85,12 @@ Customer-facing booking website.
 
 ## Documentation
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Technical architecture and decisions
-- [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md) - Multi-tenant system design
-- [FEATURES.md](./FEATURES.md) - Feature specifications by phase
-- [CLAUDE.md](./CLAUDE.md) - AI assistant guidelines
+- [CLAUDE.md](./CLAUDE.md) - Quick reference and code patterns
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Technical architecture and decisions
+- [docs/PROGRESS.md](./docs/PROGRESS.md) - Implementation tracker (source of truth)
+- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Production deployment guide
+- [docs/INFRASTRUCTURE_PLAN.md](./docs/INFRASTRUCTURE_PLAN.md) - Self-hosted infrastructure
+- [docs/TECHNICAL_DEBT.md](./docs/TECHNICAL_DEBT.md) - Technical debt analysis
 
 ## License
 
