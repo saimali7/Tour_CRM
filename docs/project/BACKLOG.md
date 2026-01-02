@@ -1,6 +1,6 @@
 # Backlog
 
-> Prioritized future work. Move to [ACTIVE.md](./ACTIVE.md) when starting.
+> Prioritized future work. Move to [ACTIVE-PROGRESS.md](./ACTIVE-PROGRESS.md) when starting.
 
 ## Next Up
 

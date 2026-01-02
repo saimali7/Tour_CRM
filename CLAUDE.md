@@ -314,7 +314,7 @@ openPanel({ type: "booking", bookingId: "..." });
 
 | Need | Path |
 |------|------|
-| Current work | `docs/project/ACTIVE.md` |
+| Current work | `docs/project/ACTIVE-PROGRESS.md` |
 | Product vision | `docs/strategy/VISION.md` |
 | Full roadmap | `docs/strategy/ROADMAP.md` |
 | Architecture deep-dive | `docs/reference/ARCHITECTURE.md` |

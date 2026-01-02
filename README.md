@@ -112,7 +112,7 @@ Customer-facing booking website.
 | Document | Purpose |
 |----------|---------|
 | [CLAUDE.md](./CLAUDE.md) | Engineering reference & code patterns |
-| [docs/project/ACTIVE.md](./docs/project/ACTIVE.md) | Current work |
+| [docs/project/ACTIVE-PROGRESS.md](./docs/project/ACTIVE-PROGRESS.md) | Current work |
 | [docs/strategy/VISION.md](./docs/strategy/VISION.md) | Product vision |
 | [docs/strategy/ROADMAP.md](./docs/strategy/ROADMAP.md) | All milestones |
 | [docs/reference/ARCHITECTURE.md](./docs/reference/ARCHITECTURE.md) | Technical architecture |
@@ -122,7 +122,7 @@ Customer-facing booking website.
 
 **Milestone 7: Operations Excellence** — 80% complete
 
-See [docs/project/ACTIVE.md](./docs/project/ACTIVE.md) for current work.
+See [docs/project/ACTIVE-PROGRESS.md](./docs/project/ACTIVE-PROGRESS.md) for current work.
 
 ## License
 

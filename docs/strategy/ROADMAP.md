@@ -1,6 +1,6 @@
 # Roadmap
 
-> High-level milestone overview. Details in [project/ACTIVE.md](../project/ACTIVE.md).
+> High-level milestone overview. Details in [project/ACTIVE-PROGRESS.md](../project/ACTIVE-PROGRESS.md).
 
 ## Milestones
 
