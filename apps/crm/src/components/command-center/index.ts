@@ -50,6 +50,7 @@
 // =============================================================================
 
 export { CommandCenter } from "./command-center";
+export { CommandCenterErrorBoundary } from "./command-center-error-boundary";
 export { DispatchHeader } from "./dispatch-header";
 export { StatusBanner } from "./status-banner";
 export { WarningsPanel } from "./warnings-panel";

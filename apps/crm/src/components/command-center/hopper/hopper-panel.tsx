@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useDroppable } from "@dnd-kit/core";
+import { useDebounce } from "@/hooks/use-debounce";
 import { HopperCard, type HopperBooking } from "./hopper-card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +139,9 @@ export function HopperPanel({
   const [sortBy, setSortBy] = useState<SortOption>("priority");
   const [filterZone, setFilterZone] = useState<string>("all");
 
+  // Debounce search for performance (300ms delay)
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
   // Set up droppable for returning bookings to the hopper
   const { setNodeRef, isOver } = useDroppable({
     id: "hopper",
@@ -148,9 +152,9 @@ export function HopperPanel({
   const filteredBookings = useMemo(() => {
     let result = bookings;
 
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    // Filter by search query (using debounced value)
+    if (debouncedSearch) {
+      const query = debouncedSearch.toLowerCase();
       result = result.filter(
         (b) =>
           b.customerName.toLowerCase().includes(query) ||
@@ -167,7 +171,7 @@ export function HopperPanel({
 
     // Sort
     return sortBookings(result, sortBy);
-  }, [bookings, searchQuery, sortBy, filterZone]);
+  }, [bookings, debouncedSearch, sortBy, filterZone]);
 
   // Group by zone for the stats
   const zoneStats = useMemo(() => {

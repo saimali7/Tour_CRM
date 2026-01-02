@@ -157,8 +157,8 @@ function transformTimelineSegment(
               specialOccasion: segment.booking.specialOccasion,
               customer: {
                 id: segment.booking.id,
-                firstName: segment.booking.customerName.split(" ")[0] || "",
-                lastName: segment.booking.customerName.split(" ").slice(1).join(" ") || "",
+                firstName: segment.booking.customerName?.split(" ")[0] ?? "",
+                lastName: segment.booking.customerName?.split(" ").slice(1).join(" ") ?? "",
                 email: segment.booking.customerEmail,
               },
             }
@@ -722,8 +722,11 @@ function CommandCenterContent({
     return format(date, "MMMM d, yyyy");
   }, [date]);
 
-  const previousDayLabel = format(new Date(date.getTime() - 86400000), "MMM d");
-  const nextDayLabel = format(new Date(date.getTime() + 86400000), "MMM d");
+  // Memoize date navigation labels to prevent recalculation on every render
+  const { previousDayLabel, nextDayLabel } = useMemo(() => ({
+    previousDayLabel: format(new Date(date.getTime() - 86400000), "MMM d"),
+    nextDayLabel: format(new Date(date.getTime() + 86400000), "MMM d"),
+  }), [date]);
 
   // Loading state
   if (isLoading) {
@@ -845,17 +848,26 @@ function CommandCenterContent({
           /* ============================================================
            * THREE-PANEL LAYOUT (Adjust Mode)
            * Hopper (left) | Timeline (center) | Map (right)
+           * Responsive: xl=3-panel, lg=2-panel, md/sm=timeline only
            * ============================================================ */
-          <div className="grid grid-cols-[280px_1fr_260px] gap-0 h-[calc(100vh-280px)] min-h-[500px] rounded-lg border border-border overflow-hidden">
-            {/* Left Panel: Hopper - Unassigned Bookings */}
-            <HopperPanel
-              bookings={hopperBookings}
-              onBookingClick={(booking) => {
-                // Could open booking details
-                toast.info(`Selected: ${booking.customerName}`);
-              }}
-              isLoading={isLoading}
-            />
+          <div className={cn(
+            "rounded-lg border border-border overflow-hidden",
+            "h-[calc(100vh-280px)] min-h-[500px]",
+            // Responsive grid
+            "grid grid-cols-1",
+            "lg:grid-cols-[280px_1fr]",
+            "xl:grid-cols-[280px_1fr_260px]"
+          )}>
+            {/* Left Panel: Hopper - Unassigned Bookings (hidden on mobile) */}
+            <div className="hidden lg:block">
+              <HopperPanel
+                bookings={hopperBookings}
+                onBookingClick={(booking) => {
+                  toast.info(`Selected: ${booking.customerName}`);
+                }}
+                isLoading={isLoading}
+              />
+            </div>
 
             {/* Center Panel: Guide Dispatch Timeline */}
             <div className="overflow-hidden bg-card">
@@ -873,14 +885,16 @@ function CommandCenterContent({
               />
             </div>
 
-            {/* Right Panel: Map / Route Context */}
-            <MapPanel
-              selectedGuideId={selectedTimelineGuideId}
-              selectedGuideName={selectedGuideInfo?.name}
-              routeStops={selectedGuideRouteStops}
-              totalDriveMinutes={selectedGuideInfo?.totalDriveMinutes}
-              ghostPreview={ghostPreview}
-            />
+            {/* Right Panel: Map / Route Context (hidden on lg and below) */}
+            <div className="hidden xl:block">
+              <MapPanel
+                selectedGuideId={selectedTimelineGuideId}
+                selectedGuideName={selectedGuideInfo?.name}
+                routeStops={selectedGuideRouteStops}
+                totalDriveMinutes={selectedGuideInfo?.totalDriveMinutes}
+                ghostPreview={ghostPreview}
+              />
+            </div>
           </div>
         ) : (
           /* ============================================================
@@ -938,16 +952,21 @@ function CommandCenterContent({
 // EXPORTED COMPONENT WITH PROVIDERS
 // =============================================================================
 
+import { CommandCenterErrorBoundary } from "./command-center-error-boundary";
+
 /**
- * Command Center with Adjust Mode support
+ * Command Center with Adjust Mode and Error Boundary support
  *
- * Wraps the main content with AdjustModeProvider to enable
- * drag-and-drop guide reassignment functionality.
+ * Wraps the main content with:
+ * - ErrorBoundary for graceful error handling
+ * - AdjustModeProvider for drag-and-drop guide reassignment
  */
 export function CommandCenter(props: CommandCenterProps) {
   return (
-    <AdjustModeProvider>
-      <CommandCenterContent {...props} />
-    </AdjustModeProvider>
+    <CommandCenterErrorBoundary>
+      <AdjustModeProvider>
+        <CommandCenterContent {...props} />
+      </AdjustModeProvider>
+    </CommandCenterErrorBoundary>
   );
 }
