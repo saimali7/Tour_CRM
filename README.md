@@ -1,37 +1,55 @@
-# Tour Platform
+# Tour CRM
 
-A multi-tenant tour operations platform with CRM and booking capabilities.
+> **The operations platform tour companies actually want to use.**
 
-## Project Structure
+A world-class, multi-tenant tour operations CRM built for how operators actually work: morning briefings, 60-second phone bookings, intelligent guide dispatch, and seamless day-of operations.
+
+## Why This Exists
+
+Tour operators are stuck with either generic CRMs that don't understand tours, or legacy software that feels like it's from 2005. We're building what a modern tour company deserves — purpose-built software that makes running tours effortless.
+
+**Key Differentiators:**
+- ⚡ **60-second phone bookings** — Staff can book while on a call
+- 🧠 **Intelligent dispatch** — Algorithm assigns guides, humans review and send
+- 📱 **Operations-first** — Built around morning briefings and day-of workflows
+- 🏢 **True multi-tenant** — Every organization is completely isolated
+
+## Architecture
 
 ```
-tour-platform/
 ├── apps/
-│   ├── crm/          # Staff CRM (Next.js 15) - Port 3000
-│   └── web/          # Public booking site (Next.js 15) - Port 3001
+│   ├── crm/                 # Staff dashboard (Next.js 15)
+│   └── web/                 # Customer booking site (planned)
+│
 ├── packages/
-│   ├── database/     # @tour/database - Drizzle schema & queries
-│   ├── ui/           # @tour/ui - Shared React components
-│   ├── validators/   # @tour/validators - Zod schemas
-│   ├── config/       # @tour/config - Shared configuration
-│   ├── typescript-config/  # Shared TypeScript configs
-│   └── eslint-config/      # Shared ESLint configs
+│   ├── database/            # Drizzle schema (23 tables)
+│   ├── services/            # Business logic (32+ services)
+│   ├── validators/          # Zod schemas
+│   ├── ui/                  # shadcn/ui components
+│   ├── emails/              # React Email templates
+│   └── config/              # Shared configuration
+│
 └── docs/
-    ├── ARCHITECTURE.md
-    ├── SYSTEM_DESIGN.md
-    └── FEATURES.md
+    ├── strategy/            # Vision, roadmap
+    ├── project/             # Active work, backlog
+    ├── history/             # Changelog, completed milestones
+    └── reference/           # Architecture, design system
 ```
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript (strict mode)
-- **Database**: Self-hosted PostgreSQL 16 + PgBouncer
-- **ORM**: Drizzle
-- **Auth**: Clerk
-- **Styling**: Tailwind CSS + shadcn/ui
-- **Monorepo**: Turborepo + pnpm
-- **Hosting**: Hostinger VPS + Coolify
+| Layer | Technology |
+|-------|------------|
+| **Framework** | Next.js 15 (App Router) |
+| **API** | tRPC v11 + React Query |
+| **Database** | PostgreSQL 16 + Drizzle ORM |
+| **Auth** | Clerk Organizations |
+| **Payments** | Stripe Connect |
+| **Background Jobs** | Inngest |
+| **Email** | Resend + React Email |
+| **Storage** | MinIO (S3-compatible) |
+| **Cache** | Redis |
+| **Monorepo** | Turborepo + pnpm |
 
 ## Getting Started
 
@@ -39,61 +57,73 @@ tour-platform/
 
 - Node.js 20+
 - pnpm 10+
+- Docker (for local infrastructure)
 
-### Installation
+### Setup
 
 ```bash
 # Install dependencies
 pnpm install
 
-# Copy environment variables
-cp .env.local.example .env.local
-# Fill in your values in .env.local
+# Start local infrastructure (Postgres, Redis, MinIO, Mailpit)
+docker-compose up -d
 
-# Run development servers
+# Copy environment variables
+cp .env.example .env.local
+
+# Push database schema
+pnpm db:push
+
+# Start development
 pnpm dev
 ```
 
 ### Commands
 
 ```bash
-pnpm dev              # Run all apps in development
-pnpm build            # Build all apps
-pnpm lint             # Run ESLint
-pnpm typecheck        # Run TypeScript checks
-pnpm format           # Format code with Prettier
-pnpm db:generate      # Generate Drizzle migrations
-pnpm db:push          # Push schema to database
-pnpm db:studio        # Open Drizzle Studio
+pnpm dev                  # Start all apps
+pnpm dev --filter crm     # CRM only (port 3000)
+pnpm build                # Production build
+pnpm typecheck            # TypeScript validation
+pnpm lint                 # ESLint
+pnpm db:push              # Push schema changes
+pnpm db:studio            # Drizzle Studio GUI
 ```
 
 ## Apps
 
 ### CRM (`apps/crm`)
 
-Staff-facing application for managing tours, bookings, and customers.
+Staff dashboard for tour operations management.
 
-- URL: `http://localhost:3000` (dev) / `app.yourdomain.com` (prod)
-- Authentication: Clerk
+- **URL:** `localhost:3000` (dev)
+- **Auth:** Clerk Organizations
+- **Features:** Bookings, customers, tours, guides, dispatch, reports
 
-### Web (`apps/web`)
+### Web (`apps/web`) — *Planned*
 
 Customer-facing booking website.
 
-- URL: `http://localhost:3001` (dev) / `book.yourdomain.com` (prod)
-- Authentication: Magic link (lightweight)
+- **URL:** `localhost:3001` (dev)
+- **Features:** Tour catalog, booking flow, Stripe checkout
 
 ## Documentation
 
-- [CLAUDE.md](./CLAUDE.md) - Quick reference and code patterns
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Technical architecture and decisions
-- [docs/PROGRESS.md](./docs/PROGRESS.md) - Implementation tracker (source of truth)
-- [docs/CODEBASE_ORGANIZATION.md](./docs/CODEBASE_ORGANIZATION.md) - New developer onboarding guide
-- [docs/DESIGN_SYSTEM_V2.md](./docs/DESIGN_SYSTEM_V2.md) - UI patterns and tokens
-- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Production deployment guide
-- [docs/INFRASTRUCTURE_PLAN.md](./docs/INFRASTRUCTURE_PLAN.md) - Self-hosted infrastructure
-- [docs/TECHNICAL_DEBT.md](./docs/TECHNICAL_DEBT.md) - Technical debt analysis
+| Document | Purpose |
+|----------|---------|
+| [CLAUDE.md](./CLAUDE.md) | Engineering reference & code patterns |
+| [docs/project/ACTIVE.md](./docs/project/ACTIVE.md) | Current work |
+| [docs/strategy/VISION.md](./docs/strategy/VISION.md) | Product vision |
+| [docs/strategy/ROADMAP.md](./docs/strategy/ROADMAP.md) | All milestones |
+| [docs/reference/ARCHITECTURE.md](./docs/reference/ARCHITECTURE.md) | Technical architecture |
+| [docs/reference/DESIGN_SYSTEM.md](./docs/reference/DESIGN_SYSTEM.md) | UI patterns |
+
+## Status
+
+**Milestone 7: Operations Excellence** — 80% complete
+
+See [docs/project/ACTIVE.md](./docs/project/ACTIVE.md) for current work.
 
 ## License
 
-Private - All rights reserved
+Private — All rights reserved
