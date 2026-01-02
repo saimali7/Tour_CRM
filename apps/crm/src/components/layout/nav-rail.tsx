@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
+  Send,
   Calendar,
   ClipboardList,
   MapPin,
@@ -31,12 +32,13 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: "Dashboard", href: "", icon: LayoutDashboard, shortcut: "1" },
-  { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "2" },
-  { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "3" },
-  { name: "Tours", href: "/tours", icon: MapPin, shortcut: "4" },
-  { name: "Customers", href: "/customers", icon: Users, shortcut: "5" },
-  { name: "Guides", href: "/guides", icon: Flag, shortcut: "6" },
-  { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "7" },
+  { name: "Dispatch", href: "/command-center", icon: Send, shortcut: "2" },
+  { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "3" },
+  { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "4" },
+  { name: "Tours", href: "/tours", icon: MapPin, shortcut: "5" },
+  { name: "Customers", href: "/customers", icon: Users, shortcut: "6" },
+  { name: "Guides", href: "/guides", icon: Flag, shortcut: "7" },
+  { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "8" },
 ];
 
 interface NavRailProps {
@@ -57,7 +59,7 @@ export function NavRail({ orgSlug, orgName, userButton }: NavRailProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
       const num = parseInt(e.key);
-      if (num >= 1 && num <= 7) {
+      if (num >= 1 && num <= 8) {
         e.preventDefault();
         const item = navItems[num - 1];
         if (item) router.push(`${basePath}${item.href}` as Route);
