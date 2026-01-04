@@ -31,6 +31,7 @@ import {
   type GuideAssignment,
   type Customer,
   type BookingParticipant,
+  type PickupZone,
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { NotFoundError, ValidationError, ConflictError } from "./types";
@@ -58,6 +59,7 @@ interface BookingWithRelations extends Booking {
   customer: Customer | null;
   tour: Tour | null;
   participants: BookingParticipant[];
+  pickupZone: PickupZone | null;
 }
 
 /**
@@ -124,6 +126,11 @@ export interface BookingWithCustomer {
   paymentStatus: string;
   // Pickup info (if available)
   pickupZoneId: string | null;
+  pickupZone: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
   pickupLocation: string | null;
   pickupTime: string | null;
   specialOccasion: string | null;
@@ -184,6 +191,8 @@ export interface TimelineSegment {
   // For pickup segments
   booking?: BookingWithCustomer;
   pickupLocation?: string;
+  pickupZoneName?: string;
+  pickupZoneColor?: string;
   guestCount?: number;
   // For tour segments
   tour?: Pick<Tour, "id" | "name" | "slug">;
@@ -404,6 +413,7 @@ export class CommandCenterService extends BaseService {
         customer: true,
         tour: true,
         participants: true,
+        pickupZone: true,
       },
     });
 
@@ -476,9 +486,16 @@ export class CommandCenterService extends BaseService {
           internalNotes: booking.internalNotes,
           status: booking.status,
           paymentStatus: booking.paymentStatus,
-          pickupZoneId: null, // TODO [Phase 7.2]: Add when pickup zones are implemented
-          pickupLocation: null,
-          pickupTime: null,
+          pickupZoneId: booking.pickupZoneId ?? null,
+          pickupZone: booking.pickupZone
+            ? {
+                id: booking.pickupZone.id,
+                name: booking.pickupZone.name,
+                color: booking.pickupZone.color || "#6B7280",
+              }
+            : null,
+          pickupLocation: booking.pickupLocation ?? null,
+          pickupTime: booking.pickupTime ?? null,
           specialOccasion: null, // TODO [Phase 7.2]: Add when special occasions field is added
           isFirstTime,
         });
@@ -1723,6 +1740,7 @@ export class CommandCenterService extends BaseService {
         customer: true,
         tour: true,
         participants: true,
+        pickupZone: true,
       },
     });
 
@@ -1780,9 +1798,16 @@ export class CommandCenterService extends BaseService {
         internalNotes: booking.internalNotes,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
-        pickupZoneId: null,
-        pickupLocation: null,
-        pickupTime: null,
+        pickupZoneId: booking.pickupZoneId ?? null,
+        pickupZone: booking.pickupZone
+          ? {
+              id: booking.pickupZone.id,
+              name: booking.pickupZone.name,
+              color: booking.pickupZone.color || "#6B7280",
+            }
+          : null,
+        pickupLocation: booking.pickupLocation ?? null,
+        pickupTime: booking.pickupTime ?? null,
         specialOccasion: null,
         isFirstTime,
       },

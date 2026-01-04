@@ -175,6 +175,11 @@ interface SegmentWrapperProps {
   className?: string;
 
   /**
+   * Inline styles (for zone colors, etc.)
+   */
+  style?: React.CSSProperties;
+
+  /**
    * Children to render inside the segment
    */
   children: React.ReactNode;
@@ -195,6 +200,7 @@ export function SegmentWrapper({
   isInteractive = true,
   onClick,
   className,
+  style,
   children,
   ariaLabel,
 }: SegmentWrapperProps) {
@@ -226,6 +232,7 @@ export function SegmentWrapper({
         isInteractive && "active:scale-[0.98]",
         className
       )}
+      style={style}
       onClick={isInteractive ? onClick : undefined}
       onKeyDown={handleKeyDown}
       tabIndex={isInteractive ? 0 : undefined}

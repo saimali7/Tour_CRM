@@ -78,7 +78,11 @@ export function parseTourRunKey(key: string): {
  * @returns The date string in YYYY-MM-DD format
  */
 export function formatDateForKey(date: Date): string {
-  return date.toISOString().split("T")[0]!;
+  // Use UTC date components for consistency
+  // The date is typically sent as local midnight which becomes previous day in UTC
+  // We add 12 hours to ensure we're in the middle of the intended day
+  const adjusted = new Date(date.getTime() + 12 * 60 * 60 * 1000);
+  return adjusted.toISOString().split("T")[0]!;
 }
 
 /**

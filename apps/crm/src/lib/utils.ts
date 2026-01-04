@@ -58,3 +58,31 @@ export function downloadCsv<T extends Record<string, unknown>>(
   link.click();
   document.body.removeChild(link);
 }
+
+/**
+ * Pluralize a word based on count.
+ * @param count - The number to check
+ * @param singular - The singular form of the word
+ * @param plural - Optional plural form (defaults to singular + 's')
+ * @returns The appropriate form of the word
+ *
+ * @example
+ * pluralize(1, 'guest') // 'guest'
+ * pluralize(3, 'guest') // 'guests'
+ * pluralize(2, 'person', 'people') // 'people'
+ */
+export function pluralize(count: number, singular: string, plural?: string): string {
+  return count === 1 ? singular : (plural ?? `${singular}s`);
+}
+
+/**
+ * Format a duration in minutes to a human-readable string.
+ * @param minutes - The duration in minutes
+ * @returns Formatted string like "1h 30m" or "45m"
+ */
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}

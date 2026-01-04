@@ -112,13 +112,13 @@ export function StatusBanner({
             <div className="flex items-center gap-1.5">
               <Users className="h-4 w-4" />
               <span className="font-medium text-foreground tabular-nums">{totalGuests}</span>
-              <span>guests</span>
+              <span>{totalGuests === 1 ? "guest" : "guests"}</span>
             </div>
             <span className="text-muted-foreground/50">|</span>
             <div className="flex items-center gap-1.5">
               <Car className="h-4 w-4" />
               <span className="font-medium text-foreground tabular-nums">{totalGuides}</span>
-              <span>guides</span>
+              <span>{totalGuides === 1 ? "guide" : "guides"}</span>
             </div>
             <span className="text-muted-foreground/50">|</span>
             <div className="flex items-center gap-1.5">

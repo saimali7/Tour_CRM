@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import { format, isToday, isTomorrow, isYesterday } from "date-fns";
 import { cn } from "@/lib/utils";
-import { DispatchHeader } from "./dispatch-header";
-import { StatusBanner } from "./status-banner";
+import { CommandStrip } from "./command-strip";
 import { WarningsPanel } from "./warnings-panel";
+import { MapPanel, type RouteStop, type ZoneDistribution, type TourRunSummary } from "./map-panel";
 import { TimelineContainer } from "./timeline/timeline-container";
 import { GuestCard, type GuestCardBooking } from "./guest-card";
 import { GuideCard, type GuideCardData } from "./guide-card";
-import { HopperPanel, type HopperBooking } from "./hopper";
-import { MapPanel, type RouteStop, type GhostPreviewData } from "./map-panel";
+import { HopperPanel, type HopperBooking, MobileHopperSheet } from "./hopper";
+import { LiveAnnouncerProvider, useLiveAnnouncer } from "./live-announcer";
+import { DispatchConfirmDialog } from "./dispatch-confirm-dialog";
+import { CapacityOverrideDialog } from "./capacity-override-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, Calendar } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -20,8 +22,11 @@ import {
   AdjustModeProvider,
   AdjustModeToggle,
   DndProvider,
+  GhostPreviewProvider,
+  PendingChangesPanel,
   useAdjustMode,
   type PendingChange,
+  type PendingAssignChange,
 } from "./adjust-mode";
 
 // =============================================================================
@@ -121,6 +126,8 @@ function transformTimelineSegment(
       isFirstTime: boolean;
     };
     pickupLocation?: string;
+    pickupZoneName?: string;
+    pickupZoneColor?: string;
     guestCount?: number;
     tour?: { id: string; name: string; slug: string };
     tourRunKey?: string;
@@ -128,8 +135,22 @@ function transformTimelineSegment(
   },
   index: number
 ): TimelineSegment {
+  // Generate stable segment ID based on type and content
+  // This ensures IDs are consistent across re-renders
+  let segmentId: string;
+  if (segment.type === "pickup" && segment.booking?.id) {
+    segmentId = `pickup_${segment.booking.id}`;
+  } else if (segment.type === "tour" && segment.tourRunKey) {
+    segmentId = `tour_${segment.tourRunKey}`;
+  } else if (segment.type === "tour" && segment.tour?.id) {
+    segmentId = `tour_${segment.tour.id}_${segment.startTime}`;
+  } else {
+    // Fallback for idle/drive segments - use type + time for uniqueness
+    segmentId = `${segment.type}_${segment.startTime}_${index}`;
+  }
+
   const baseSegment = {
-    id: `seg_${index}`,
+    id: segmentId,
     startTime: segment.startTime,
     endTime: segment.endTime,
     durationMinutes: segment.durationMinutes,
@@ -146,6 +167,8 @@ function transformTimelineSegment(
         ...baseSegment,
         type: "pickup",
         pickupLocation: segment.pickupLocation || "Unknown Location",
+        pickupZoneName: segment.pickupZoneName,
+        pickupZoneColor: segment.pickupZoneColor,
         guestCount: segment.guestCount || 0,
         booking: segment.booking
           ? {
@@ -187,6 +210,7 @@ function transformTimelineSegment(
               durationMinutes: segment.durationMinutes,
             },
         totalGuests: segment.guestCount || 0,
+        scheduleId: segment.tourRunKey, // For tracking which tour run this belongs to
       };
     default:
       return { ...baseSegment, type: "idle" };
@@ -253,6 +277,77 @@ function transformGuideTimeline(
 }
 
 /**
+ * Apply pending assign changes to guide timelines
+ * This creates tour segments for bookings that have been dragged from hopper
+ */
+function applyPendingAssignments(
+  timelines: GuideTimeline[],
+  pendingChanges: PendingChange[]
+): GuideTimeline[] {
+  // Filter to only assign type changes
+  const assignChanges = pendingChanges.filter(
+    (c): c is PendingAssignChange => c.type === "assign"
+  );
+
+  if (assignChanges.length === 0) return timelines;
+
+  // Group assign changes by timeline index (not just guide ID)
+  const changesByTimelineIndex = new Map<number, PendingAssignChange[]>();
+  for (const change of assignChanges) {
+    const existing = changesByTimelineIndex.get(change.timelineIndex) || [];
+    existing.push(change);
+    changesByTimelineIndex.set(change.timelineIndex, existing);
+  }
+
+  // Apply changes to each timeline by index
+  return timelines.map((timeline, index) => {
+    const timelineChanges = changesByTimelineIndex.get(index);
+    if (!timelineChanges || timelineChanges.length === 0) return timeline;
+
+    // Create new segments for assigned bookings
+    const newSegments: TimelineSegment[] = timelineChanges.map((change, idx) => {
+      const { bookingData } = change;
+      // Parse tour time to calculate end time (assume 2 hour tour)
+      const [hours, minutes] = bookingData.tourTime.split(":").map(Number);
+      const endHours = (hours ?? 0) + 2;
+      const endTime = `${endHours.toString().padStart(2, "0")}:${(minutes ?? 0).toString().padStart(2, "0")}`;
+
+      return {
+        id: `pending_${change.bookingId}_${idx}`,
+        type: "tour" as const,
+        startTime: bookingData.tourTime,
+        endTime,
+        durationMinutes: 120,
+        confidence: "good" as const,
+        tour: {
+          id: `tour_${change.bookingId}`,
+          name: bookingData.tourName,
+          durationMinutes: 120,
+        },
+        totalGuests: bookingData.guestCount,
+        scheduleId: change.bookingId,
+      };
+    });
+
+    // Merge new segments with existing, sorted by start time
+    const allSegments = [...timeline.segments, ...newSegments].sort((a, b) => {
+      const aTime = a.startTime.split(":").map(Number);
+      const bTime = b.startTime.split(":").map(Number);
+      return ((aTime[0] ?? 0) * 60 + (aTime[1] ?? 0)) - ((bTime[0] ?? 0) * 60 + (bTime[1] ?? 0));
+    });
+
+    // Calculate updated totals
+    const addedGuests = timelineChanges.reduce((sum, c) => sum + c.bookingData.guestCount, 0);
+
+    return {
+      ...timeline,
+      segments: allSegments,
+      totalGuests: timeline.totalGuests + addedGuests,
+    };
+  });
+}
+
+/**
  * Transform service warnings to component warnings format
  */
 function transformWarnings(
@@ -295,7 +390,8 @@ function CommandCenterContent({
   onNextDay,
   onToday,
 }: CommandCenterProps) {
-  const { isAdjustMode, pendingChanges, exitAdjustMode, enterAdjustMode } = useAdjustMode();
+  const { isAdjustMode, pendingChanges, pendingChangesCount, hasPendingChanges, exitAdjustMode, enterAdjustMode } = useAdjustMode();
+  const { announce } = useLiveAnnouncer();
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
 
   // Panel state for guest and guide details
@@ -304,7 +400,20 @@ function CommandCenterContent({
 
   // State for the three-panel layout
   const [selectedTimelineGuideId, setSelectedTimelineGuideId] = useState<string | null>(null);
-  const [ghostPreview, setGhostPreview] = useState<GhostPreviewData | null>(null);
+
+  // Dispatch confirmation dialog state
+  const [showDispatchConfirm, setShowDispatchConfirm] = useState(false);
+
+  // Ref for timeline container (used for time calculations in drag/drop)
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+  // Timeline configuration for time-shift calculations
+  const timelineConfig = useMemo(() => ({
+    startHour: 6,
+    endHour: 20,
+    snapMinutes: 15,
+    guideColumnWidth: 200, // Must match the guideColumnWidth prop in TimelineContainer
+  }), []);
 
   // Get tRPC utils for query invalidation
   const utils = trpc.useUtils();
@@ -367,11 +476,17 @@ function CommandCenterContent({
       toast.success("Dispatch sent successfully", {
         description: `${result.guidesNotified.length} guides notified`,
       });
+
+      // Announce for screen readers
+      announce(`Dispatch sent. ${result.guidesNotified.length} guides notified.`, "assertive");
     },
     onError: (error) => {
       toast.error("Dispatch failed", {
         description: error.message,
       });
+
+      // Announce error for screen readers
+      announce(`Dispatch failed: ${error.message}`, "assertive");
     },
   });
 
@@ -398,8 +513,15 @@ function CommandCenterContent({
     optimizeMutation.mutate({ date });
   }, [date, optimizeMutation]);
 
+  // Open dispatch confirmation dialog
   const handleDispatch = useCallback(() => {
+    setShowDispatchConfirm(true);
+  }, []);
+
+  // Actually send dispatch after confirmation
+  const handleConfirmDispatch = useCallback(() => {
     dispatchMutation.mutate({ date });
+    setShowDispatchConfirm(false);
   }, [date, dispatchMutation]);
 
   const handleResolveWarning = useCallback(
@@ -461,26 +583,84 @@ function CommandCenterContent({
       // Transform pending changes to the mutation format
       // Each change may have multiple booking IDs or a single segment
       const changes = pendingChanges.flatMap((change) => {
-        if (change.bookingIds && change.bookingIds.length > 0) {
-          // Multiple bookings in this segment
-          return change.bookingIds.map((bookingId) => ({
-            bookingId,
-            fromGuideId: change.fromGuideId || null,
+        // Handle new booking assignments from hopper
+        if (change.type === "assign") {
+          return [{
+            bookingId: change.bookingId,
+            fromGuideId: null, // No previous guide for hopper assignments
             toGuideId: change.toGuideId,
-          }));
+          }];
         }
-        // Single segment - extract booking ID from segment if available
-        // For now, we'll use the segmentId as a fallback
-        return [{
-          bookingId: change.segmentId,
-          fromGuideId: change.fromGuideId || null,
-          toGuideId: change.toGuideId,
-        }];
+
+        // Handle time-shift changes (for now just log them - backend support needed)
+        if (change.type === "time-shift") {
+          // TODO: Implement time-shift mutations when backend is ready
+          console.log("Time shift pending:", {
+            segmentId: change.segmentId,
+            originalStartTime: change.originalStartTime,
+            newStartTime: change.newStartTime,
+          });
+          // For now, skip time-shift changes (visual feedback is the main feature)
+          return [];
+        }
+
+        // Handle reassign/swap changes
+        if (change.type === "reassign" || change.type === "swap") {
+          if (change.bookingIds && change.bookingIds.length > 0) {
+            // Has explicit booking IDs - use them
+            return change.bookingIds.map((bookingId) => ({
+              bookingId,
+              fromGuideId: change.fromGuideId || null,
+              toGuideId: change.toGuideId,
+            }));
+          }
+
+          // For segments without explicit booking IDs (like tour segments),
+          // extract booking ID from segment ID format: "pickup_{bookingId}" or "tour_{tourRunKey}"
+          const segmentId = change.segmentId;
+          if (segmentId.startsWith("pickup_")) {
+            // Extract booking ID from pickup segment
+            const bookingId = segmentId.replace("pickup_", "");
+            return [{
+              bookingId,
+              fromGuideId: change.fromGuideId || null,
+              toGuideId: change.toGuideId,
+            }];
+          }
+
+          // For tour segments, we use the tourRunId which should be the schedule/run key
+          // The backend will need to look up all bookings for this tour run
+          if (segmentId.startsWith("tour_")) {
+            // Tour reassignment - use tourRunId (which is the tourRunKey)
+            return [{
+              bookingId: change.tourRunId, // Backend handles tour run reassignment
+              fromGuideId: change.fromGuideId || null,
+              toGuideId: change.toGuideId,
+              isTourRun: true, // Flag for backend to handle differently
+            }];
+          }
+
+          // Skip segments without proper IDs (shouldn't happen with fixed ID generation)
+          console.warn("Skipping segment without proper ID:", segmentId);
+          return [];
+        }
+
+        // Unknown change type - skip
+        return [];
       });
+
+      // Filter out empty changes
+      const validChanges = changes.filter((c) => c.bookingId);
+
+      if (validChanges.length === 0) {
+        toast.warning("No valid changes to apply");
+        setIsApplyingChanges(false);
+        return;
+      }
 
       await applyReassignmentsMutation.mutateAsync({
         date,
-        changes,
+        changes: validChanges,
       });
 
       // Exit adjust mode and refresh data
@@ -581,7 +761,7 @@ function CommandCenterContent({
           warnings.push({
             id: `warning_${run.key}_unassigned`,
             type: "no_guide",
-            message: `${run.tour?.name || "Tour"} at ${run.time} has no guide assigned (${run.totalGuests} guests)`,
+            message: `${run.tour?.name || "Tour"} at ${run.time} has no guide assigned (${run.totalGuests} ${run.totalGuests === 1 ? "guest" : "guests"})`,
             suggestions: [], // Could populate with available guides
           });
         } else if (run.status === "partial") {
@@ -640,13 +820,7 @@ function CommandCenterContent({
             adultCount: booking.adultCount,
             childCount: booking.childCount,
             infantCount: booking.infantCount,
-            pickupZone: booking.pickupZoneId
-              ? {
-                  id: booking.pickupZoneId,
-                  name: booking.pickupLocation || "Unknown Zone",
-                  color: "#6B7280", // Default color, will be enhanced with actual zone data
-                }
-              : null,
+            pickupZone: booking.pickupZone ?? null,
             pickupLocation: booking.pickupLocation,
             pickupTime: booking.pickupTime,
             tourName: run.tour?.name || "Tour",
@@ -665,11 +839,27 @@ function CommandCenterContent({
     return unassigned;
   }, [dispatchResponse]);
 
+  // Apply pending assign changes to timelines (for visual preview in adjust mode)
+  const timelinesWithPendingChanges = useMemo(() => {
+    if (!data?.guideTimelines) return [];
+    return applyPendingAssignments(data.guideTimelines, pendingChanges);
+  }, [data?.guideTimelines, pendingChanges]);
+
+  // Filter out bookings that have been assigned via pending changes
+  const filteredHopperBookings = useMemo(() => {
+    const assignedBookingIds = new Set(
+      pendingChanges
+        .filter((c): c is PendingAssignChange => c.type === "assign")
+        .map((c) => c.bookingId)
+    );
+    return hopperBookings.filter((b) => !assignedBookingIds.has(b.id));
+  }, [hopperBookings, pendingChanges]);
+
   // Get route stops for the selected guide (for map panel)
   const selectedGuideRouteStops = useMemo<RouteStop[]>(() => {
-    if (!selectedTimelineGuideId || !data?.guideTimelines) return [];
+    if (!selectedTimelineGuideId || timelinesWithPendingChanges.length === 0) return [];
 
-    const timeline = data.guideTimelines.find(
+    const timeline = timelinesWithPendingChanges.find(
       (t) => t.guide.id === selectedTimelineGuideId
     );
     if (!timeline) return [];
@@ -697,13 +887,13 @@ function CommandCenterContent({
     }
 
     return stops;
-  }, [selectedTimelineGuideId, data?.guideTimelines]);
+  }, [selectedTimelineGuideId, timelinesWithPendingChanges]);
 
   // Get the selected guide's name and total drive minutes
   const selectedGuideInfo = useMemo(() => {
-    if (!selectedTimelineGuideId || !data?.guideTimelines) return null;
+    if (!selectedTimelineGuideId || timelinesWithPendingChanges.length === 0) return null;
 
-    const timeline = data.guideTimelines.find(
+    const timeline = timelinesWithPendingChanges.find(
       (t) => t.guide.id === selectedTimelineGuideId
     );
     if (!timeline) return null;
@@ -712,21 +902,89 @@ function CommandCenterContent({
       name: `${timeline.guide.firstName} ${timeline.guide.lastName}`.trim(),
       totalDriveMinutes: timeline.totalDriveMinutes,
     };
-  }, [selectedTimelineGuideId, data?.guideTimelines]);
+  }, [selectedTimelineGuideId, timelinesWithPendingChanges]);
 
-  // Format date for display
+  // Format date for display - simpler format for CommandStrip
   const formattedDate = useMemo(() => {
-    if (isToday(date)) return `${format(date, "MMMM d, yyyy")} (Today)`;
-    if (isTomorrow(date)) return `${format(date, "MMMM d, yyyy")} (Tomorrow)`;
-    if (isYesterday(date)) return `${format(date, "MMMM d, yyyy")} (Yesterday)`;
-    return format(date, "MMMM d, yyyy");
+    if (isToday(date)) return "Today";
+    if (isTomorrow(date)) return "Tomorrow";
+    if (isYesterday(date)) return "Yesterday";
+    return format(date, "EEE, MMM d");
   }, [date]);
 
-  // Memoize date navigation labels to prevent recalculation on every render
-  const { previousDayLabel, nextDayLabel } = useMemo(() => ({
-    previousDayLabel: format(new Date(date.getTime() - 86400000), "MMM d"),
-    nextDayLabel: format(new Date(date.getTime() + 86400000), "MMM d"),
-  }), [date]);
+  // Compute zone distribution for map panel
+  const zoneDistribution = useMemo<ZoneDistribution[]>(() => {
+    if (!dispatchResponse?.tourRuns) return [];
+
+    const zoneMap = new Map<string, ZoneDistribution>();
+
+    for (const run of dispatchResponse.tourRuns) {
+      for (const booking of run.bookings) {
+        const zone = booking.pickupZone;
+        if (!zone) continue;
+
+        const existing = zoneMap.get(zone.id);
+        const isAssigned = run.guidesAssigned > 0;
+
+        if (existing) {
+          existing.bookingCount += 1;
+          existing.guestCount += booking.totalParticipants;
+          if (isAssigned) {
+            existing.assignedCount += 1;
+          } else {
+            existing.unassignedCount += 1;
+          }
+        } else {
+          zoneMap.set(zone.id, {
+            id: zone.id,
+            name: zone.name,
+            color: zone.color || "#6B7280",
+            bookingCount: 1,
+            guestCount: booking.totalParticipants,
+            assignedCount: isAssigned ? 1 : 0,
+            unassignedCount: isAssigned ? 0 : 1,
+          });
+        }
+      }
+    }
+
+    return Array.from(zoneMap.values());
+  }, [dispatchResponse]);
+
+  // Compute tour run summary for map panel
+  const tourRunSummary = useMemo<TourRunSummary[]>(() => {
+    if (!dispatchResponse?.tourRuns) return [];
+
+    return dispatchResponse.tourRuns.map((run) => ({
+      tourRunKey: run.key,
+      tourName: run.tour?.name || "Tour",
+      time: run.time,
+      guestCount: run.totalGuests,
+      hasGuide: run.guidesAssigned > 0,
+    }));
+  }, [dispatchResponse]);
+
+  // Compute assigned guests count
+  const assignedGuests = useMemo(() => {
+    if (!dispatchResponse?.tourRuns) return 0;
+
+    return dispatchResponse.tourRuns
+      .filter((run) => run.guidesAssigned > 0)
+      .reduce((sum, run) => sum + run.totalGuests, 0);
+  }, [dispatchResponse]);
+
+  // Compute guide capacities for PendingChangesPanel capacity validation
+  const guideCapacities = useMemo(() => {
+    const capacityMap = new Map<string, { current: number; capacity: number; name: string }>();
+    for (const timeline of timelinesWithPendingChanges) {
+      capacityMap.set(timeline.guide.id, {
+        current: timeline.totalGuests,
+        capacity: timeline.guide.vehicleCapacity,
+        name: `${timeline.guide.firstName} ${timeline.guide.lastName}`.trim(),
+      });
+    }
+    return capacityMap;
+  }, [timelinesWithPendingChanges]);
 
   // Handler to select a guide when clicking their row (for map panel)
   // IMPORTANT: This hook must be defined before any early returns to maintain hooks order
@@ -734,6 +992,48 @@ function CommandCenterContent({
     setSelectedTimelineGuideId(guide.id);
     handleGuideClick(guide); // Also open the guide card
   }, [handleGuideClick]);
+
+  // ==========================================================================
+  // KEYBOARD SHORTCUTS
+  // ==========================================================================
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      switch (event.key) {
+        case "Escape":
+          if (isAdjustMode) {
+            event.preventDefault();
+            exitAdjustMode(false); // Discard changes
+          }
+          break;
+        case "ArrowLeft":
+          event.preventDefault();
+          onPreviousDay();
+          break;
+        case "ArrowRight":
+          event.preventDefault();
+          onNextDay();
+          break;
+        case "t":
+        case "T":
+          event.preventDefault();
+          onToday();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isAdjustMode, exitAdjustMode, onPreviousDay, onNextDay, onToday]);
 
   // Loading state
   if (isLoading) {
@@ -773,23 +1073,33 @@ function CommandCenterContent({
   // Empty state - no bookings for this day
   if (!data || data.totalGuests === 0) {
     return (
-      <div className="space-y-4">
-        <DispatchHeader
+      <div className="space-y-2">
+        <CommandStrip
+          date={date}
           formattedDate={formattedDate}
-          previousDayLabel={previousDayLabel}
-          nextDayLabel={nextDayLabel}
           onPreviousDay={onPreviousDay}
           onNextDay={onNextDay}
           onToday={onToday}
           status="pending"
-          isToday={isToday(date)}
+          totalGuests={0}
+          totalGuides={0}
+          efficiencyScore={0}
+          unassignedCount={0}
+          warningsCount={0}
+          isAdjustMode={false}
+          pendingChangesCount={0}
+          onEnterAdjustMode={enterAdjustMode}
+          onExitAdjustMode={() => exitAdjustMode(false)}
+          onApplyChanges={handleApplyAdjustChanges}
+          onOptimize={handleOptimize}
+          onDispatch={handleDispatch}
         />
 
-        <div className="rounded-lg border border-border bg-card p-12 text-center">
-          <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">No Tours Scheduled</h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            There are no confirmed bookings for this date. Tours will appear here once customers book and confirm.
+        <div className="rounded-lg border border-border bg-card p-8 text-center">
+          <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+          <h3 className="text-base font-medium text-foreground mb-1.5">No Tours Scheduled</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            No confirmed bookings for this date. Tours appear here once booked.
           </p>
         </div>
       </div>
@@ -797,72 +1107,84 @@ function CommandCenterContent({
   }
 
   const hasWarnings = data.warnings.length > 0;
-  const isReady = data.status === "ready";
+  const hasUnassigned = hopperBookings.length > 0;
   const isDispatched = data.status === "dispatched";
 
+  // Show three-panel layout when:
+  // 1. In adjust mode (always), OR
+  // 2. There are unassigned bookings (even in normal mode)
+  const showThreePanelLayout = isAdjustMode || hasUnassigned;
+
   return (
-    <div className="space-y-4">
-      {/* Date Navigation Header */}
-      <DispatchHeader
+    <div className="space-y-2">
+      {/* Command Strip - Unified header with date nav, status, and actions */}
+      <CommandStrip
+        date={date}
         formattedDate={formattedDate}
-        previousDayLabel={previousDayLabel}
-        nextDayLabel={nextDayLabel}
         onPreviousDay={onPreviousDay}
         onNextDay={onNextDay}
         onToday={onToday}
         status={data.status}
-        isToday={isToday(date)}
-      />
-
-      {/* Status Banner with Adjust Mode Toggle */}
-      <StatusBanner
-        status={data.status}
         totalGuests={data.totalGuests}
         totalGuides={data.totalGuides}
-        totalDriveMinutes={data.totalDriveMinutes}
         efficiencyScore={data.efficiencyScore}
+        unassignedCount={hopperBookings.length}
         warningsCount={data.warnings.length}
         dispatchedAt={data.dispatchedAt}
-        onAdjust={enterAdjustMode}
+        isAdjustMode={isAdjustMode}
+        pendingChangesCount={pendingChangesCount}
+        onEnterAdjustMode={enterAdjustMode}
+        onExitAdjustMode={() => exitAdjustMode(false)}
+        onApplyChanges={handleApplyAdjustChanges}
         onOptimize={handleOptimize}
         onDispatch={handleDispatch}
-        adjustModeSlot={
-          <AdjustModeToggle
-            onApplyChanges={handleApplyAdjustChanges}
-            isApplying={isApplyingChanges}
-          />
-        }
-        isAdjustMode={isAdjustMode}
+        isApplying={isApplyingChanges}
       />
 
-      {/* Warnings Panel (if any) - only show when not in adjust mode */}
+      {/* Warnings Panel - collapsed by default, only in normal mode */}
       {hasWarnings && !isAdjustMode && (
         <WarningsPanel
           warnings={data.warnings}
           onResolve={handleResolveWarning}
+          defaultCollapsed={true}
         />
       )}
 
       {/* Main Content Area */}
-      <DndProvider>
-        {isAdjustMode ? (
+      <DndProvider
+        guideTimelines={timelinesWithPendingChanges.map((t) => ({
+          guide: t.guide,
+          totalGuests: t.totalGuests,
+          vehicleCapacity: t.guide.vehicleCapacity,
+        }))}
+        timelineConfig={timelineConfig}
+        timelineContainerRef={timelineContainerRef}
+        onBookingAssign={(bookingId, guideId) => {
+          // Toast notification - pending change is added by DndProvider
+          const guide = timelinesWithPendingChanges.find((t) => t.guide.id === guideId);
+          const guideName = guide ? `${guide.guide.firstName} ${guide.guide.lastName}` : "guide";
+          toast.success(`Assigned booking to ${guideName}`);
+        }}
+      >
+        {showThreePanelLayout ? (
           /* ============================================================
-           * THREE-PANEL LAYOUT (Adjust Mode)
+           * THREE-PANEL LAYOUT
+           * Shown when: adjust mode OR there are unassigned bookings
            * Hopper (left) | Timeline (center) | Map (right)
            * Responsive: xl=3-panel, lg=2-panel, md/sm=timeline only
            * ============================================================ */
           <div className={cn(
             "rounded-lg border border-border overflow-hidden",
-            "h-[calc(100vh-280px)] min-h-[500px]",
-            // Responsive grid
+            "h-[calc(100vh-180px)] min-h-[480px]",
+            // Responsive grid - tighter panels
             "grid grid-cols-1",
-            "lg:grid-cols-[280px_1fr]",
-            "xl:grid-cols-[280px_1fr_260px]"
+            "lg:grid-cols-[260px_1fr]",
+            "xl:grid-cols-[260px_1fr_260px]"
           )}>
             {/* Left Panel: Hopper - Unassigned Bookings (hidden on mobile) */}
             <div className="hidden lg:block">
               <HopperPanel
-                bookings={hopperBookings}
+                bookings={filteredHopperBookings}
                 onBookingClick={(booking) => {
                   toast.info(`Selected: ${booking.customerName}`);
                 }}
@@ -871,9 +1193,9 @@ function CommandCenterContent({
             </div>
 
             {/* Center Panel: Guide Dispatch Timeline */}
-            <div className="overflow-hidden bg-card">
+            <div className="overflow-hidden bg-card border-x border-border">
               <TimelineContainer
-                timelines={data.guideTimelines}
+                timelines={timelinesWithPendingChanges}
                 startHour={6}
                 endHour={20}
                 onSegmentClick={handleSegmentClick}
@@ -883,33 +1205,38 @@ function CommandCenterContent({
                   isDispatched && "opacity-75 pointer-events-none"
                 )}
                 isAdjustMode={isAdjustMode}
+                timelineContentRef={timelineContainerRef}
               />
             </div>
 
-            {/* Right Panel: Map / Route Context (hidden on lg and below) */}
+            {/* Right Panel: Route Context & Zone Distribution */}
             <div className="hidden xl:block">
               <MapPanel
                 selectedGuideId={selectedTimelineGuideId}
                 selectedGuideName={selectedGuideInfo?.name}
                 routeStops={selectedGuideRouteStops}
                 totalDriveMinutes={selectedGuideInfo?.totalDriveMinutes}
-                ghostPreview={ghostPreview}
+                zoneDistribution={zoneDistribution}
+                tourRunSummary={tourRunSummary}
+                totalGuests={data.totalGuests}
+                assignedGuests={assignedGuests}
               />
             </div>
           </div>
         ) : (
           /* ============================================================
-           * STANDARD LAYOUT (Normal Mode)
-           * Full-width timeline
+           * STANDARD LAYOUT (All Assigned)
+           * Full-width timeline - no hopper needed
            * ============================================================ */
           <TimelineContainer
-            timelines={data.guideTimelines}
+            timelines={timelinesWithPendingChanges}
             startHour={6}
             endHour={20}
             onSegmentClick={handleSegmentClick}
             onGuideClick={handleGuideClick}
             className={isDispatched ? "opacity-75 pointer-events-none" : undefined}
             isAdjustMode={isAdjustMode}
+            timelineContentRef={timelineContainerRef}
           />
         )}
       </DndProvider>
@@ -936,13 +1263,57 @@ function CommandCenterContent({
         }}
       />
 
+      {/* Mobile Hopper Sheet - FAB and bottom sheet for mobile booking assignment */}
+      <MobileHopperSheet
+        bookings={filteredHopperBookings}
+        guideTimelines={timelinesWithPendingChanges}
+        onAssign={(bookingId, guideId, guideName) => {
+          toast.success(`Assigned booking to ${guideName}`);
+          announce(`Booking assigned to ${guideName}`);
+        }}
+        isLoading={isLoading}
+      />
+
+      {/* Pending Changes Panel - Floating panel in adjust mode */}
+      {isAdjustMode && hasPendingChanges && (
+        <div className="fixed bottom-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)] shadow-lg">
+          <PendingChangesPanel
+            onApply={handleApplyAdjustChanges}
+            isApplying={isApplyingChanges}
+            guideCapacities={guideCapacities}
+          />
+        </div>
+      )}
+
+      {/* Dispatch Confirmation Dialog */}
+      <DispatchConfirmDialog
+        open={showDispatchConfirm}
+        onOpenChange={setShowDispatchConfirm}
+        onConfirm={handleConfirmDispatch}
+        isLoading={dispatchMutation.isPending}
+        date={date}
+        guideCount={timelinesWithPendingChanges.length}
+        totalGuests={data?.totalGuests ?? 0}
+        efficiencyScore={data?.efficiencyScore ?? 0}
+        warningsCount={data?.warnings?.length ?? 0}
+      />
+
       {/* Keyboard Shortcut Hints */}
-      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-        <span><kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">{"<-"}</kbd> Previous day</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">{"->"}</kbd> Next day</span>
-        <span><kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">T</kbd> Today</span>
+      <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground/70 py-1">
+        <span className="flex items-center gap-1">
+          <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">←</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">→</kbd>
+          <span className="ml-0.5">days</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">T</kbd>
+          <span className="ml-0.5">today</span>
+        </span>
         {isAdjustMode && (
-          <span><kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">Esc</kbd> Exit adjust mode</span>
+          <span className="flex items-center gap-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">Esc</kbd>
+            <span className="ml-0.5">cancel</span>
+          </span>
         )}
       </div>
     </div>
@@ -961,12 +1332,17 @@ import { CommandCenterErrorBoundary } from "./command-center-error-boundary";
  * Wraps the main content with:
  * - ErrorBoundary for graceful error handling
  * - AdjustModeProvider for drag-and-drop guide reassignment
+ * - GhostPreviewProvider for real-time drag feedback on map
  */
 export function CommandCenter(props: CommandCenterProps) {
   return (
     <CommandCenterErrorBoundary>
       <AdjustModeProvider>
-        <CommandCenterContent {...props} />
+        <GhostPreviewProvider>
+          <LiveAnnouncerProvider>
+            <CommandCenterContent {...props} />
+          </LiveAnnouncerProvider>
+        </GhostPreviewProvider>
       </AdjustModeProvider>
     </CommandCenterErrorBoundary>
   );
