@@ -20,6 +20,14 @@ export interface DraggableSegmentData {
   guideId: string;
   tourRunId: string;
   segmentType: "pickup" | "tour" | "drive" | "idle";
+  /** Booking IDs associated with this segment (for reassignment tracking) */
+  bookingIds?: string[];
+  /** Segment start time in HH:MM format (for time-shift tracking) */
+  startTime?: string;
+  /** Segment end time in HH:MM format (for time-shift tracking) */
+  endTime?: string;
+  /** Duration in minutes (for time-shift tracking) */
+  durationMinutes?: number;
 }
 
 interface DraggableSegmentProps {
@@ -31,6 +39,14 @@ interface DraggableSegmentProps {
   tourRunId: string;
   /** Type of segment (for filtering what can be dragged) */
   segmentType: "pickup" | "tour" | "drive" | "idle";
+  /** Booking IDs associated with this segment */
+  bookingIds?: string[];
+  /** Segment start time in HH:MM format (for time-shift tracking) */
+  startTime?: string;
+  /** Segment end time in HH:MM format (for time-shift tracking) */
+  endTime?: string;
+  /** Duration in minutes (for time-shift tracking) */
+  durationMinutes?: number;
   /** Content to render inside the draggable wrapper */
   children: ReactNode;
   /** Whether dragging is disabled for this segment */
@@ -54,6 +70,10 @@ export function DraggableSegment({
   guideId,
   tourRunId,
   segmentType,
+  bookingIds,
+  startTime,
+  endTime,
+  durationMinutes,
   children,
   disabled = false,
   className,
@@ -72,6 +92,10 @@ export function DraggableSegment({
         guideId,
         tourRunId,
         segmentType,
+        bookingIds,
+        startTime,
+        endTime,
+        durationMinutes,
       } satisfies DraggableSegmentData,
       disabled: !isAdjustMode || disabled || !canDrag,
     });

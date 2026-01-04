@@ -121,6 +121,7 @@ export interface PickupSegment extends BaseSegment {
   booking: BookingWithCustomer;
   pickupLocation: string;
   pickupZoneName?: string;
+  pickupZoneColor?: string; // Hex color for zone-based coloring
   guestCount: number;
   isFirstTimer?: boolean;
   hasSpecialOccasion?: boolean;
@@ -310,4 +311,59 @@ export function getGuideFullName(guide: GuideInfo | Pick<GuideInfo, "firstName" 
  */
 export function getGuideInitials(guide: GuideInfo | Pick<GuideInfo, "firstName" | "lastName">): string {
   return `${guide.firstName[0] || ""}${guide.lastName[0] || ""}`.toUpperCase();
+}
+
+// =============================================================================
+// ZONE COLOR UTILITIES
+// =============================================================================
+
+/**
+ * Default zone colors based on feature doc spec
+ * These map common zone name patterns to colors
+ */
+export const DEFAULT_ZONE_COLORS: Record<string, string> = {
+  marina: "#0EA5E9", // Teal - coastal/water
+  downtown: "#F97316", // Orange - urban/energy
+  palm: "#22C55E", // Green - palm tree
+  jbr: "#8B5CF6", // Purple - luxury
+  business: "#3B82F6", // Blue - corporate
+  airport: "#64748B", // Slate - transit
+  beach: "#06B6D4", // Cyan - coastal
+  creek: "#14B8A6", // Teal - waterway
+  old: "#D97706", // Amber - historic
+  jumeirah: "#A855F7", // Purple - premium
+};
+
+/**
+ * Get zone color from name with fallback
+ * Attempts to match zone name to known patterns
+ */
+export function getZoneColorFromName(zoneName: string | null | undefined): string {
+  if (!zoneName) return "#6B7280"; // Gray fallback
+
+  const nameLower = zoneName.toLowerCase();
+
+  // Check for known zone patterns
+  for (const [key, color] of Object.entries(DEFAULT_ZONE_COLORS)) {
+    if (nameLower.includes(key)) return color;
+  }
+
+  // Generate a consistent color from the name hash
+  return generateColorFromString(zoneName);
+}
+
+/**
+ * Generate a consistent pastel color from a string
+ * Uses simple hash to ensure same input always produces same color
+ */
+function generateColorFromString(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash;
+  }
+
+  // Convert to HSL with fixed saturation/lightness for consistent pastel look
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 65%, 50%)`;
 }

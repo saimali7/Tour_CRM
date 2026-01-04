@@ -37,11 +37,14 @@ export function TourSegment({
   const { tour, totalGuests, confidence } = segment;
   const colors = confidenceColors[confidence];
 
+  // Check if this is a pending (uncommitted) segment
+  const isPending = segment.id.startsWith("pending_");
+
   const startTimeDisplay = formatTimeDisplay(segment.startTime);
   const endTimeDisplay = formatTimeDisplay(segment.endTime);
   const durationDisplay = formatDuration(segment.durationMinutes);
 
-  const ariaLabel = tour.name + ": " + totalGuests + " guests, " + startTimeDisplay + " to " + endTimeDisplay + " (" + durationDisplay + ")";
+  const ariaLabel = tour.name + ": " + totalGuests + " " + (totalGuests === 1 ? "guest" : "guests") + ", " + startTimeDisplay + " to " + endTimeDisplay + " (" + durationDisplay + ")";
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -61,6 +64,12 @@ export function TourSegment({
                 "opacity-100",
                 "shadow-md",
                 "bg-gradient-to-b from-white/10 to-transparent",
+                // Pending segment styling - dashed border, subtle animation
+                isPending && [
+                  "border-2 border-dashed border-primary/50",
+                  "animate-pulse",
+                  "ring-1 ring-primary/20",
+                ],
                 className
               )}
             >
@@ -70,6 +79,11 @@ export function TourSegment({
                   <span className="truncate text-xs font-semibold leading-tight">
                     {tour.name}
                   </span>
+                  {isPending && (
+                    <span className="flex-shrink-0 rounded bg-white/30 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide">
+                      Pending
+                    </span>
+                  )}
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-[10px] opacity-80">
                   <span className="tabular-nums">

@@ -1,10 +1,10 @@
-import { pgTable, text, timestamp, integer, numeric, jsonb, index, unique, date } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, numeric, jsonb, index, unique, date, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { customers } from "./customers";
 import { tours } from "./tours";
-import { pickupAddresses } from "./pickup-addresses";
+import { guides } from "./guides";
 import { pickupZones } from "./pickup-zones";
 import type { PricingModel, ExperienceMode } from "./booking-options";
 
@@ -43,14 +43,6 @@ export const bookings = pgTable("bookings", {
   // Booking Option (nullable for backward compatibility)
   bookingOptionId: text("booking_option_id"),
 
-  // Pickup address for guest pickups
-  pickupAddressId: text("pickup_address_id")
-    .references(() => pickupAddresses.id, { onDelete: "set null" }),
-  pickupNotes: text("pickup_notes"), // Specific pickup instructions for this booking
-
-  // Private/charter booking
-  isPrivate: integer("is_private").default(0), // 0 = shared, 1 = private/charter
-
   // Guest breakdown (new customer-first approach)
   guestAdults: integer("guest_adults"),
   guestChildren: integer("guest_children"),
@@ -79,7 +71,7 @@ export const bookings = pgTable("bookings", {
   discount: numeric("discount", { precision: 10, scale: 2 }).default("0"),
   tax: numeric("tax", { precision: 10, scale: 2 }).default("0"),
   total: numeric("total", { precision: 10, scale: 2 }).notNull(),
-  currency: text("currency").notNull().default("AED"),
+  currency: text("currency").notNull().default("USD"),
 
   // Payment
   paymentStatus: text("payment_status").$type<PaymentStatus>().notNull().default("pending"),
@@ -120,6 +112,14 @@ export const bookings = pgTable("bookings", {
   pickupNotes: text("pickup_notes"), // Additional notes, e.g., "Tower 2 lobby"
   specialOccasion: text("special_occasion"), // "Birthday", "Anniversary", etc.
 
+  // =========================================================================
+  // GUIDE ASSIGNMENT (Direct booking → guide relationship)
+  // =========================================================================
+  // Direct guide assignment for dispatch (replaces guide_assignments table for simple cases)
+  assignedGuideId: text("assigned_guide_id").references(() => guides.id, { onDelete: "set null" }),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }), // When the guide was assigned
+  isFirstTime: boolean("is_first_time").default(false), // First time customer with this org
+
   // Internal notes
   internalNotes: text("internal_notes"),
 
@@ -144,10 +144,12 @@ export const bookings = pgTable("bookings", {
   bookingDateIdx: index("bookings_booking_date_idx").on(table.bookingDate),
   // Composite index for capacity computation (tour run lookups)
   tourDateTimeIdx: index("bookings_tour_date_time_idx").on(table.organizationId, table.tourId, table.bookingDate, table.bookingTime),
-  // Pickup address index for operations
-  pickupAddressIdx: index("bookings_pickup_address_idx").on(table.pickupAddressId),
   // Pickup zone index for dispatch/command center queries
   pickupZoneIdx: index("bookings_pickup_zone_idx").on(table.pickupZoneId),
+  // Guide assignment index for dispatch queries
+  assignedGuideIdx: index("bookings_assigned_guide_idx").on(table.assignedGuideId),
+  // Composite index for guide schedule lookups (all bookings for a guide on a date)
+  guideBookingDateIdx: index("bookings_guide_date_idx").on(table.assignedGuideId, table.bookingDate),
 }));
 
 // Booking participants - Individual people on a booking
@@ -211,9 +213,13 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
     fields: [bookings.pickupZoneId],
     references: [pickupZones.id],
   }),
+  // Direct guide assignment for dispatch
+  assignedGuide: one(guides, {
+    fields: [bookings.assignedGuideId],
+    references: [guides.id],
+  }),
   participants: many(bookingParticipants),
   // Note: payments relation added in payments.ts to avoid circular dependencies
-  // Note: guideAssignments relation needs to be defined elsewhere to avoid circular import
 }));
 
 export const bookingParticipantsRelations = relations(bookingParticipants, ({ one }) => ({

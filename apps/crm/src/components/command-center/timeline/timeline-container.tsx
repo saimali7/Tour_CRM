@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { TimelineHeader } from "./timeline-header";
 import { GuideRow } from "./guide-row";
 import { DroppableGuideRow } from "../adjust-mode";
-import { getGuideFullName } from "./types";
+import { getGuideFullName, timeToPercent } from "./types";
 import type { GuideTimeline, TimelineSegment, GuideInfo } from "./types";
 
 // =============================================================================
@@ -79,6 +80,11 @@ export interface TimelineContainerProps {
   isAdjustMode?: boolean;
 
   /**
+   * Ref for the timeline content area (used for time calculations in drag/drop)
+   */
+  timelineContentRef?: React.RefObject<HTMLDivElement | null>;
+
+  /**
    * Additional CSS classes
    */
   className?: string;
@@ -100,6 +106,7 @@ export function TimelineContainer({
   showGridLines = true,
   isLocked = false,
   isAdjustMode = false,
+  timelineContentRef,
   className,
 }: TimelineContainerProps) {
   // Support both `timelines` and legacy `guideTimelines` prop
@@ -148,113 +155,185 @@ export function TimelineContainer({
   }
 
   return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-lg border bg-card",
-        isLocked && "opacity-90 pointer-events-auto",
-        className
-      )}
-      aria-disabled={isLocked}
-    >
-      {/* Scrollable container */}
+    <TooltipProvider delayDuration={200}>
       <div
-        ref={scrollContainerRef}
-        className="overflow-x-auto"
-        style={{
-          // Minimum width to ensure timeline is readable
-          minWidth: "100%",
-        }}
+        role="grid"
+        aria-label="Guide dispatch timeline"
+        aria-readonly={isLocked}
+        className={cn(
+          "relative overflow-hidden rounded-lg border bg-card",
+          isLocked && "opacity-90 pointer-events-auto",
+          className
+        )}
+        aria-disabled={isLocked}
       >
-        {/* Inner container with minimum width based on hours */}
+        {/* Scrollable container */}
         <div
+          ref={scrollContainerRef}
+          className="overflow-x-auto"
           style={{
-            // Each hour takes at least 80px, plus guide column
-            minWidth: `${guideColumnWidth + totalHours * 80}px`,
+            // Minimum width to ensure timeline is readable
+            minWidth: "100%",
           }}
         >
-          {/* Sticky header with time axis */}
+          {/* Inner container with minimum width based on hours */}
           <div
-            className={cn(
-              "sticky top-0 z-20 border-b bg-card transition-shadow duration-150",
-              isScrolled && "shadow-sm"
-            )}
+            ref={timelineContentRef}
+            style={{
+              // Each hour takes at least 80px, plus guide column
+              minWidth: `${guideColumnWidth + totalHours * 80}px`,
+            }}
           >
-            <TimelineHeader
-              startHour={startHour}
-              endHour={endHour}
-              guideColumnWidth={guideColumnWidth}
-              showGridLines={showGridLines}
-            />
-          </div>
+            {/* Sticky header with time axis */}
+            <div
+              className={cn(
+                "sticky top-0 z-20 border-b bg-card transition-shadow duration-150",
+                isScrolled && "shadow-sm"
+              )}
+            >
+              <TimelineHeader
+                startHour={startHour}
+                endHour={endHour}
+                guideColumnWidth={guideColumnWidth}
+                showGridLines={showGridLines}
+              />
+            </div>
 
-          {/* Guide rows */}
-          <div className="relative">
-            {/* Vertical grid lines */}
-            {showGridLines && (
-              <div
-                className="pointer-events-none absolute inset-0 z-0"
-                style={{ marginLeft: `${guideColumnWidth}px` }}
-                aria-hidden="true"
-              >
-                <div className="relative h-full w-full">
-                  {Array.from({ length: totalHours + 1 }).map((_, index) => {
-                    const percent = (index / totalHours) * 100;
-                    return (
-                      <div
-                        key={index}
-                        className={cn(
-                          "absolute top-0 h-full w-px",
-                          index === 0 || index === totalHours
-                            ? "bg-border"
-                            : "bg-border/50"
-                        )}
-                        style={{ left: `${percent}%` }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Guide rows list */}
-            <div className="relative z-10 divide-y divide-border">
-              {timelines.map((timeline) => (
-                <DroppableGuideRow
-                  key={timeline.guide.id}
-                  guideId={timeline.guide.id}
-                  guideName={getGuideFullName(timeline.guide)}
-                  vehicleCapacity={timeline.guide.vehicleCapacity}
+            {/* Guide rows */}
+            <div className="relative">
+              {/* Vertical grid lines */}
+              {showGridLines && (
+                <div
+                  className="pointer-events-none absolute inset-0 z-0"
+                  style={{ marginLeft: `${guideColumnWidth}px` }}
+                  aria-hidden="true"
                 >
-                  <GuideRow
-                    guide={timeline.guide}
-                    timeline={timeline}
-                    startHour={startHour}
-                    endHour={endHour}
-                    guideColumnWidth={guideColumnWidth}
-                    selectedSegmentId={selectedSegmentId}
-                    onSegmentClick={
-                      !isLocked && onSegmentClick
-                        ? (segment) => onSegmentClick(segment, timeline.guide)
-                        : undefined
-                    }
-                    onGuideClick={!isLocked ? onGuideClick : undefined}
-                    isAdjustMode={isAdjustMode}
-                  />
-                </DroppableGuideRow>
-              ))}
+                  <div className="relative h-full w-full">
+                    {Array.from({ length: totalHours + 1 }).map((_, index) => {
+                      const percent = (index / totalHours) * 100;
+                      return (
+                        <div
+                          key={index}
+                          className={cn(
+                            "absolute top-0 h-full w-px",
+                            index === 0 || index === totalHours
+                              ? "bg-border"
+                              : "bg-border/50"
+                          )}
+                          style={{ left: `${percent}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Current time indicator spanning all rows */}
+              <CurrentTimeIndicatorOverlay
+                startHour={startHour}
+                endHour={endHour}
+                guideColumnWidth={guideColumnWidth}
+              />
+
+              {/* Guide rows list */}
+              <div className="relative z-10 divide-y divide-border">
+                {timelines.map((timeline, index) => (
+                  <DroppableGuideRow
+                    key={`${timeline.guide.id}-${index}`}
+                    rowId={`${timeline.guide.id}-${index}`}
+                    guideId={timeline.guide.id}
+                    guideName={getGuideFullName(timeline.guide)}
+                    vehicleCapacity={timeline.guide.vehicleCapacity}
+                    currentGuests={timeline.totalGuests}
+                    timelineIndex={index}
+                  >
+                    <GuideRow
+                      guide={timeline.guide}
+                      timeline={timeline}
+                      startHour={startHour}
+                      endHour={endHour}
+                      guideColumnWidth={guideColumnWidth}
+                      selectedSegmentId={selectedSegmentId}
+                      onSegmentClick={
+                        !isLocked && onSegmentClick
+                          ? (segment) => onSegmentClick(segment, timeline.guide)
+                          : undefined
+                      }
+                      onGuideClick={!isLocked ? onGuideClick : undefined}
+                      isAdjustMode={isAdjustMode}
+                    />
+                  </DroppableGuideRow>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Left edge shadow when scrolled */}
+        {/* Left edge shadow when scrolled */}
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-y-0 left-0 z-30 w-4 bg-gradient-to-r from-card to-transparent opacity-0 transition-opacity duration-150",
+            isScrolled && "opacity-100"
+          )}
+          style={{ left: `${guideColumnWidth}px` }}
+          aria-hidden="true"
+        />
+      </div>
+    </TooltipProvider>
+  );
+}
+
+// =============================================================================
+// CURRENT TIME INDICATOR OVERLAY
+// =============================================================================
+
+interface CurrentTimeIndicatorOverlayProps {
+  startHour: number;
+  endHour: number;
+  guideColumnWidth: number;
+}
+
+/**
+ * Shows a vertical line indicating current time across all guide rows
+ */
+function CurrentTimeIndicatorOverlay({
+  startHour,
+  endHour,
+  guideColumnWidth,
+}: CurrentTimeIndicatorOverlayProps) {
+  const [currentPercent, setCurrentPercent] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    function updateCurrentTime() {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const timeString = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+
+      // Check if within range
+      if (hours >= startHour && hours < endHour) {
+        setCurrentPercent(timeToPercent(timeString, startHour, endHour));
+      } else {
+        setCurrentPercent(null);
+      }
+    }
+
+    updateCurrentTime();
+    const interval = setInterval(updateCurrentTime, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, [startHour, endHour]);
+
+  if (currentPercent === null) return null;
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-20"
+      style={{ marginLeft: `${guideColumnWidth}px` }}
+      aria-hidden="true"
+    >
       <div
-        className={cn(
-          "pointer-events-none absolute inset-y-0 left-0 z-30 w-4 bg-gradient-to-r from-card to-transparent opacity-0 transition-opacity duration-150",
-          isScrolled && "opacity-100"
-        )}
-        style={{ left: `${guideColumnWidth}px` }}
-        aria-hidden="true"
+        className="absolute top-0 h-full w-0.5 bg-primary/70"
+        style={{ left: `${currentPercent}%` }}
       />
     </div>
   );

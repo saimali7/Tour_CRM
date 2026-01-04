@@ -11,7 +11,7 @@ import {
 import { MapPin, Users, Cake, Star, MessageSquare } from "lucide-react";
 import { SegmentWrapper } from "./segment";
 import type { PickupSegment as PickupSegmentType } from "./types";
-import { formatDuration, formatTimeDisplay, confidenceColors } from "./types";
+import { formatDuration, formatTimeDisplay, confidenceColors, getZoneColorFromName } from "./types";
 
 // =============================================================================
 // TYPES
@@ -60,13 +60,18 @@ export function PickupSegment({
   className,
 }: PickupSegmentProps) {
   const { booking, pickupLocation, guestCount, confidence } = segment;
-  const colors = confidenceColors[confidence];
+
+  // Use zone color if available, otherwise fall back to confidence colors
+  // Zone colors provide geographic visual clustering in the timeline
+  const zoneColor = segment.pickupZoneColor || getZoneColorFromName(segment.pickupZoneName);
+  const useZoneColor = !!zoneColor && zoneColor !== "#6B7280"; // Don't use fallback gray
+  const confidenceClasses = confidenceColors[confidence];
 
   const customerName = booking.customer
     ? `${booking.customer.firstName} ${booking.customer.lastName}`
     : "Guest";
 
-  const ariaLabel = `Pickup at ${pickupLocation}: ${guestCount} guests (${customerName}) at ${formatTimeDisplay(segment.startTime)}`;
+  const ariaLabel = `Pickup at ${pickupLocation}: ${guestCount} ${guestCount === 1 ? "guest" : "guests"} (${customerName}) at ${formatTimeDisplay(segment.startTime)}`;
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -80,16 +85,20 @@ export function PickupSegment({
               onClick={onClick}
               ariaLabel={ariaLabel}
               className={cn(
-                // Base confidence color
-                colors.bg,
-                colors.bgHover,
-                colors.text,
                 // Full opacity for pickups (important)
                 "opacity-90",
                 // Shadow for depth
                 "shadow-sm",
+                // Use confidence colors as fallback when no zone color
+                !useZoneColor && confidenceClasses.bg,
+                !useZoneColor && confidenceClasses.bgHover,
+                !useZoneColor && confidenceClasses.text,
                 className
               )}
+              style={useZoneColor ? {
+                backgroundColor: zoneColor,
+                color: "#FFFFFF",
+              } : undefined}
             >
               <div className="flex h-full items-center justify-between gap-1 overflow-hidden px-1.5">
                 {/* Location and count */}
@@ -153,7 +162,11 @@ interface PickupTooltipContentProps {
  */
 function PickupTooltipContent({ segment }: PickupTooltipContentProps) {
   const { booking, pickupLocation, guestCount, confidence } = segment;
-  const colors = confidenceColors[confidence];
+
+  // Use zone color if available for header
+  const zoneColor = segment.pickupZoneColor || getZoneColorFromName(segment.pickupZoneName);
+  const useZoneColor = !!zoneColor && zoneColor !== "#6B7280";
+  const confidenceClasses = confidenceColors[confidence];
 
   const customerName = booking.customer
     ? `${booking.customer.firstName} ${booking.customer.lastName}`
@@ -162,7 +175,10 @@ function PickupTooltipContent({ segment }: PickupTooltipContentProps) {
   return (
     <div className="divide-y divide-border">
       {/* Header */}
-      <div className={cn("px-3 py-2", colors.bg, colors.text)}>
+      <div
+        className={cn("px-3 py-2", !useZoneColor && confidenceClasses.bg, !useZoneColor && confidenceClasses.text)}
+        style={useZoneColor ? { backgroundColor: zoneColor, color: "#FFFFFF" } : undefined}
+      >
         <div className="flex items-center justify-between gap-2">
           <span className="font-semibold">{customerName}</span>
           <span className="rounded bg-white/20 px-1.5 py-0.5 text-xs font-bold tabular-nums">
@@ -275,7 +291,7 @@ export function GuestDots({ count, maxDots = 6, className }: GuestDotsProps) {
   }
 
   return (
-    <div className={cn("flex items-center gap-0.5", className)} aria-label={`${count} guests`}>
+    <div className={cn("flex items-center gap-0.5", className)} aria-label={`${count} ${count === 1 ? "guest" : "guests"}`}>
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}

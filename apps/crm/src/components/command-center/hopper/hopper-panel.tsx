@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useDroppable } from "@dnd-kit/core";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useAdjustMode } from "../adjust-mode";
 import { HopperCard, type HopperBooking } from "./hopper-card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,11 +17,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Search,
   ArrowUpDown,
   MapPin,
-  Clock,
+  CheckCircle2,
   Users,
+  LayoutList,
+  LayoutGrid,
 } from "lucide-react";
 
 // =============================================================================
@@ -60,6 +69,15 @@ interface HopperPanelProps {
 }
 
 type SortOption = "priority" | "time" | "zone" | "guests";
+type DisplayMode = "full" | "compact";
+
+// =============================================================================
+// HELPER - Pluralize
+// =============================================================================
+
+function pluralize(count: number, singular: string, plural?: string): string {
+  return count === 1 ? singular : (plural || `${singular}s`);
+}
 
 // =============================================================================
 // SORTING HELPERS
@@ -138,6 +156,10 @@ export function HopperPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("priority");
   const [filterZone, setFilterZone] = useState<string>("all");
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("full");
+
+  // Get pending assigned booking IDs from adjust mode
+  const { pendingAssignedBookingIds, isAdjustMode } = useAdjustMode();
 
   // Debounce search for performance (300ms delay)
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -166,7 +188,11 @@ export function HopperPanel({
 
     // Filter by zone
     if (filterZone !== "all") {
-      result = result.filter((b) => b.pickupZone?.id === filterZone);
+      if (filterZone === "no-zone") {
+        result = result.filter((b) => !b.pickupZone);
+      } else {
+        result = result.filter((b) => b.pickupZone?.id === filterZone);
+      }
     }
 
     // Sort
@@ -200,8 +226,8 @@ export function HopperPanel({
       )}
     >
       {/* Header */}
-      <div className="flex-none p-3 border-b border-border">
-        <div className="flex items-center justify-between mb-3">
+      <div className="flex-none px-2.5 py-2 border-b border-border">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-foreground">
               Unassigned
@@ -210,25 +236,72 @@ export function HopperPanel({
               {bookings.length}
             </Badge>
           </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users className="h-3 w-3" />
-            <span className="tabular-nums">{totalGuests}</span>
+          <div className="flex items-center gap-2">
+            {/* Guest count */}
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Users className="h-3 w-3" />
+              <span className="tabular-nums">{totalGuests}</span>
+            </div>
+
+            {/* Display mode toggle */}
+            <TooltipProvider delayDuration={300}>
+              <div className="flex items-center border rounded-md">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-6 w-6 p-0 rounded-r-none",
+                        displayMode === "full" && "bg-muted"
+                      )}
+                      onClick={() => setDisplayMode("full")}
+                      aria-label="Full view"
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    Full cards
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-6 w-6 p-0 rounded-l-none border-l",
+                        displayMode === "compact" && "bg-muted"
+                      )}
+                      onClick={() => setDisplayMode("compact")}
+                      aria-label="Compact view"
+                    >
+                      <LayoutList className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    Compact list
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           </div>
         </div>
 
         {/* Search */}
-        <div className="relative mb-2">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <div className="relative mb-1.5">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
           <Input
-            placeholder="Search bookings..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 pl-8 text-xs"
+            className="h-7 pl-7 text-xs"
           />
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
             <SelectTrigger className="h-7 text-xs flex-1">
               <ArrowUpDown className="h-3 w-3 mr-1" />
@@ -269,7 +342,7 @@ export function HopperPanel({
 
       {/* Zone stats quick view */}
       {Object.keys(zoneStats).length > 1 && (
-        <div className="flex-none px-3 py-2 border-b border-border/50 flex flex-wrap gap-1.5">
+        <div className="flex-none px-2 py-1.5 border-b border-border/50 flex flex-wrap gap-1">
           {Object.entries(zoneStats).map(([zoneName, { count, color }]) => (
             <Badge
               key={zoneName}
@@ -280,8 +353,12 @@ export function HopperPanel({
                 color: color,
               }}
               onClick={() => {
-                const zone = zones.find((z) => z.name === zoneName);
-                if (zone) setFilterZone(zone.id);
+                if (zoneName === "No Zone") {
+                  setFilterZone("no-zone");
+                } else {
+                  const zone = zones.find((z) => z.name === zoneName);
+                  if (zone) setFilterZone(zone.id);
+                }
               }}
             >
               {zoneName} ({count})
@@ -292,45 +369,48 @@ export function HopperPanel({
 
       {/* Booking list */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-2 space-y-2">
+        <div
+          className={cn(
+            "p-1.5",
+            displayMode === "compact" ? "space-y-0.5" : "space-y-1.5"
+          )}
+          role={filteredBookings.length > 0 ? "list" : undefined}
+          aria-label={filteredBookings.length > 0 ? "Unassigned bookings" : undefined}
+        >
           {isLoading ? (
             // Loading skeleton
             Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="h-24 rounded-lg bg-muted/50 animate-pulse"
+                className={cn(
+                  "rounded-lg bg-muted/50 animate-pulse",
+                  displayMode === "compact" ? "h-8" : "h-24"
+                )}
+                aria-hidden="true"
               />
             ))
           ) : filteredBookings.length === 0 ? (
             // Empty state
-            <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="flex flex-col items-center justify-center py-6 text-center">
               {bookings.length === 0 ? (
                 <>
-                  <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center mb-3">
-                    <Clock className="h-5 w-5 text-green-500" />
+                  <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center mb-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
                   </div>
-                  <p className="text-sm font-medium text-foreground">
-                    All Assigned!
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Every booking has a guide
-                  </p>
+                  <p className="text-sm font-medium text-foreground">All Assigned!</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Every booking has a guide</p>
                 </>
               ) : (
                 <>
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-3">
-                    <Search className="h-5 w-5 text-muted-foreground" />
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center mb-2">
+                    <Search className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <p className="text-sm font-medium text-foreground">
-                    No matches
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Try a different search or filter
-                  </p>
+                  <p className="text-sm font-medium text-foreground">No matches</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Try different filters</p>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="mt-2 text-xs"
+                    className="mt-1.5 h-6 text-[11px]"
                     onClick={() => {
                       setSearchQuery("");
                       setFilterZone("all");
@@ -342,15 +422,21 @@ export function HopperPanel({
               )}
             </div>
           ) : (
-            // Booking cards
-            filteredBookings.map((booking) => (
-              <HopperCard
-                key={booking.id}
-                booking={booking}
-                isSelected={selectedBookingId === booking.id}
-                onClick={() => onBookingClick?.(booking)}
-              />
-            ))
+            // Booking cards with list item semantics
+            filteredBookings.map((booking) => {
+              const isPending = isAdjustMode && pendingAssignedBookingIds.has(booking.id);
+              return (
+                <div key={booking.id} role="listitem">
+                  <HopperCard
+                    booking={booking}
+                    isSelected={selectedBookingId === booking.id}
+                    onClick={() => onBookingClick?.(booking)}
+                    displayMode={displayMode}
+                    isPendingAssignment={isPending}
+                  />
+                </div>
+              );
+            })
           )}
         </div>
       </div>
