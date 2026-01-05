@@ -11,26 +11,59 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   type DragOverEvent,
+  type DragMoveEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useState, useCallback, useRef, type ReactNode } from "react";
-import { useAdjustMode, type PendingReassignChange, type PendingAssignChange, type PendingTimeShiftChange } from "./adjust-mode-context";
-import { useGhostPreview, calculateEfficiency, estimateDriveTimeImpact } from "./ghost-preview-context";
+import { toast } from "sonner";
+
 import { cn } from "@/lib/utils";
 import { ArrowRight, Users, MapPin, Clock } from "lucide-react";
-import { toast } from "sonner";
-import type { DraggableSegmentData } from "./draggable-segment";
-import type { DroppableGuideRowData } from "./droppable-guide-row";
-import type { HopperBooking } from "../hopper/hopper-card";
+
+import { useAdjustMode, type PendingTimeShiftChange } from "./adjust-mode-context";
+import { useGhostPreview, calculateEfficiency, estimateDriveTimeImpact } from "./ghost-preview-context";
+import { useLiveAssignmentContextSafe } from "../live-assignment-context";
+
+// Import centralized types and utilities
+import {
+  type ActiveDragData,
+  type DraggableSegmentData,
+  type DroppableGuideRowData,
+  type DragState,
+  type DragStartCapture,
+  type DndTimelineConfig,
+  isSegmentDrag,
+  isHopperBookingDrag,
+  isGuideRowDrop,
+  isHopperDrop,
+} from "./types";
+
+import {
+  formatTimeDisplay,
+  calculateTimeShift,
+  hasTimeChanged,
+  durationToWidthPercent,
+  timeToPercent,
+  DEFAULT_TIMELINE_CONFIG,
+} from "../timeline/time-utils";
+
+// Re-export types that other components need
+export type { DraggableSegmentData } from "./types";
 
 // =============================================================================
-// TYPES
+// CONSTANTS
+// =============================================================================
+
+const DRAG_ACTIVATION_DISTANCE = 8; // pixels before drag starts
+
+// =============================================================================
+// PROPS
 // =============================================================================
 
 interface DndProviderProps {
   /** Children to wrap with drag and drop context */
   children: ReactNode;
-  /** Callback when a booking is assigned to a guide */
+  /** Callback when a booking is assigned to a guide (legacy, kept for compatibility) */
   onBookingAssign?: (bookingId: string, guideId: string) => void;
   /** Guide timelines for calculating impact */
   guideTimelines?: Array<{
@@ -39,31 +72,11 @@ interface DndProviderProps {
     vehicleCapacity?: number;
   }>;
   /** Timeline configuration for time-based drops */
-  timelineConfig?: {
-    startHour: number;
-    endHour: number;
-    /** Snap to nearest N minutes (default: 15) */
-    snapMinutes?: number;
-    /** Width of the guide column in pixels (default: 200) */
-    guideColumnWidth?: number;
-  };
+  timelineConfig?: DndTimelineConfig;
   /** Reference to the timeline container for position calculations */
   timelineContainerRef?: React.RefObject<HTMLDivElement | null>;
-}
-
-/**
- * Data from hopper booking drag
- */
-interface HopperBookingDragData {
-  type: "hopper-booking";
-  booking: HopperBooking;
-}
-
-type ActiveDragData = DraggableSegmentData | HopperBookingDragData;
-
-interface DragState {
-  activeId: string;
-  data: ActiveDragData;
+  /** Additional CSS classes for the container */
+  className?: string;
 }
 
 // =============================================================================
@@ -73,130 +86,84 @@ interface DragState {
 /**
  * Provides the DnD context for adjust mode
  *
- * Handles:
- * - Setting up sensors (pointer with distance constraint)
- * - Tracking active drag state
- * - Processing drop events and creating pending changes
- * - Updating ghost preview for map panel
- * - Rendering the drag overlay
+ * Responsibilities:
+ * - Configure drag sensors (pointer, keyboard)
+ * - Track active drag state
+ * - Process drop events (assign, reassign, unassign, time-shift)
+ * - Update ghost preview for visual feedback
+ * - Render drag overlay
  */
 export function DndProvider({
   children,
-  onBookingAssign,
   guideTimelines = [],
   timelineConfig,
   timelineContainerRef,
+  className,
 }: DndProviderProps) {
-  const { addPendingChange, isAdjustMode } = useAdjustMode();
-  const { startDrag, setDragTarget, clearDragTarget, endDrag } = useGhostPreview();
+  const { isAdjustMode, addPendingChange } = useAdjustMode();
+  const liveAssignment = useLiveAssignmentContextSafe();
+  const { startDrag, setDragTarget, setTargetTime, clearDragTarget, endDrag } = useGhostPreview();
+
   const [dragState, setDragState] = useState<DragState | null>(null);
+  const dragStartRef = useRef<DragStartCapture | null>(null);
 
-  // Track the initial drag position for time calculations
-  const dragStartRef = useRef<{
-    clientX: number;
-    segmentStartTime?: string;
-    segmentEndTime?: string;
-    durationMinutes?: number;
-  } | null>(null);
-
-  // Configure sensors with pointer and keyboard support for accessibility
-  // Pointer: Requires 8px of movement to start dragging (prevents accidental drags)
-  // Keyboard: Enables drag-and-drop via keyboard navigation
+  // Configure sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
+      activationConstraint: { distance: DRAG_ACTIVATION_DISTANCE },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
-  // Find guide timeline by ID
+  // ==========================================================================
+  // HELPER FUNCTIONS
+  // ==========================================================================
+
   const findGuideTimeline = useCallback(
     (guideId: string) => guideTimelines.find((t) => t.guide.id === guideId),
     [guideTimelines]
   );
 
-  // Calculate time from horizontal position delta
-  const calculateTimeFromDelta = useCallback(
-    (deltaX: number, startTime: string): { newStartTime: string; newEndTime: string } | null => {
-      if (!timelineConfig || !timelineContainerRef?.current) return null;
-
-      const { startHour, endHour, snapMinutes = 15, guideColumnWidth = 200 } = timelineConfig;
-      // Subtract guide column width from container width to get just the timeline area
-      const fullWidth = timelineContainerRef.current.offsetWidth;
-      const containerWidth = Math.max(1, fullWidth - guideColumnWidth); // Ensure positive
-
-      // Calculate total minutes in timeline
-      const totalMinutes = (endHour - startHour) * 60;
-
-      // Calculate minutes delta from pixel delta
-      const minutesDelta = Math.round((deltaX / containerWidth) * totalMinutes);
-
-      // Parse original start time
-      const [startH, startM] = startTime.split(":").map(Number);
-      const originalMinutes = (startH ?? 0) * 60 + (startM ?? 0);
-
-      // Calculate new start time in minutes
-      let newMinutes = originalMinutes + minutesDelta;
-
-      // Snap to nearest interval
-      newMinutes = Math.round(newMinutes / snapMinutes) * snapMinutes;
-
-      // Clamp to timeline bounds
-      const minMinutes = startHour * 60;
-      const maxMinutes = endHour * 60;
-      newMinutes = Math.max(minMinutes, Math.min(maxMinutes - 30, newMinutes)); // Leave room for at least 30min
-
-      // Convert back to time string
-      const newHours = Math.floor(newMinutes / 60);
-      const newMins = newMinutes % 60;
-      const newStartTime = `${newHours.toString().padStart(2, "0")}:${newMins.toString().padStart(2, "0")}`;
-
-      // Calculate new end time (preserve duration)
-      const durationMinutes = dragStartRef.current?.durationMinutes ?? 60;
-      const endMinutes = newMinutes + durationMinutes;
-      const endHours = Math.floor(endMinutes / 60);
-      const endMins = endMinutes % 60;
-      const newEndTime = `${endHours.toString().padStart(2, "0")}:${endMins.toString().padStart(2, "0")}`;
-
-      return { newStartTime, newEndTime };
+  const getGuideName = useCallback(
+    (guideId: string): string => {
+      const timeline = findGuideTimeline(guideId);
+      return timeline ? `${timeline.guide.firstName} ${timeline.guide.lastName}` : "Guide";
     },
-    [timelineConfig, timelineContainerRef]
+    [findGuideTimeline]
   );
 
-  // Check if time has meaningfully changed (beyond snap threshold)
-  const hasTimeChanged = useCallback(
-    (originalTime: string, newTime: string): boolean => {
-      if (!timelineConfig) return false;
-      const snapMinutes = timelineConfig.snapMinutes ?? 15;
-
-      const [origH, origM] = originalTime.split(":").map(Number);
-      const [newH, newM] = newTime.split(":").map(Number);
-
-      const origMinutes = (origH ?? 0) * 60 + (origM ?? 0);
-      const newMinutes = (newH ?? 0) * 60 + (newM ?? 0);
-
-      // Consider changed if difference is at least one snap interval
-      return Math.abs(newMinutes - origMinutes) >= snapMinutes;
+  const getBookingLabel = useCallback(
+    (activeData: ActiveDragData): string => {
+      if (isHopperBookingDrag(activeData)) {
+        return activeData.booking.customerName || "Booking";
+      }
+      // For segments, we don't have easy access to customer name
+      // Use a generic label
+      return "Booking";
     },
-    [timelineConfig]
+    []
   );
+
+  const getTimelineWidth = useCallback((): number => {
+    if (!timelineContainerRef?.current || !timelineConfig) return 0;
+    const guideColumnWidth = timelineConfig.guideColumnWidth ?? DEFAULT_TIMELINE_CONFIG.guideColumnWidth;
+    return Math.max(1, timelineContainerRef.current.offsetWidth - guideColumnWidth);
+  }, [timelineContainerRef, timelineConfig]);
+
+  // ==========================================================================
+  // DRAG HANDLERS
+  // ==========================================================================
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as ActiveDragData | undefined;
-
     if (!data) return;
 
-    if (data.type === "segment") {
-      setDragState({
-        activeId: event.active.id as string,
-        data,
-      });
+    if (isSegmentDrag(data)) {
+      setDragState({ activeId: event.active.id as string, data });
 
-      // Capture initial position and segment times for time-shift detection
+      // Capture initial position for time-shift calculations
       const rect = event.active.rect.current.initial;
       dragStartRef.current = {
         clientX: rect?.left ?? 0,
@@ -205,7 +172,7 @@ export function DndProvider({
         durationMinutes: data.durationMinutes,
       };
 
-      // Start ghost preview for segment drag
+      // Start ghost preview
       const guideTimeline = findGuideTimeline(data.guideId);
       startDrag({
         type: "segment",
@@ -213,23 +180,76 @@ export function DndProvider({
         fromGuideName: guideTimeline
           ? `${guideTimeline.guide.firstName} ${guideTimeline.guide.lastName}`
           : undefined,
+        guestCount: data.guestCount,
+        durationMinutes: data.durationMinutes,
+        originalStartTime: data.startTime,
       });
-    } else if (data.type === "hopper-booking") {
-      setDragState({
-        activeId: event.active.id as string,
-        data,
-      });
+    } else if (isHopperBookingDrag(data)) {
+      setDragState({ activeId: event.active.id as string, data });
 
-      // Start ghost preview for hopper booking drag
       startDrag({
         type: "hopper-booking",
         bookingId: data.booking.id,
         customerName: data.booking.customerName,
         guestCount: data.booking.guestCount,
         pickupZone: data.booking.pickupZone ?? undefined,
+        durationMinutes: data.booking.tourDurationMinutes ?? 60,
       });
     }
   }, [findGuideTimeline, startDrag]);
+
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    if (!timelineConfig || !timelineContainerRef?.current || !dragState) return;
+
+    const { startHour, endHour, snapMinutes = 15, guideColumnWidth = 200 } = timelineConfig;
+
+    // Get current position
+    const activeRect = event.active.rect.current.translated;
+    if (!activeRect) return;
+
+    const clientX = activeRect.left + activeRect.width / 2;
+    const containerRect = timelineContainerRef.current.getBoundingClientRect();
+
+    // Calculate position as percentage
+    const timelineStart = containerRect.left + guideColumnWidth;
+    const timelineWidth = containerRect.width - guideColumnWidth;
+    const relativeX = clientX - timelineStart;
+    const percent = Math.max(0, Math.min(1, relativeX / timelineWidth));
+
+    // Calculate time from position
+    const totalMinutes = (endHour - startHour) * 60;
+    const currentMinutes = startHour * 60 + percent * totalMinutes;
+    const snappedMinutes = Math.round(currentMinutes / snapMinutes) * snapMinutes;
+    const clampedMinutes = Math.max(startHour * 60, Math.min(endHour * 60, snappedMinutes));
+
+    // Convert to time string
+    const hours = Math.floor(clampedMinutes / 60);
+    const mins = clampedMinutes % 60;
+    const time = `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
+
+    // Get duration for width calculation
+    let durationMinutes = 60;
+    if (isSegmentDrag(dragState.data)) {
+      durationMinutes = dragState.data.durationMinutes ?? 60;
+    } else if (isHopperBookingDrag(dragState.data)) {
+      durationMinutes = dragState.data.booking.tourDurationMinutes ?? 60;
+    }
+
+    const widthPercent = durationToWidthPercent(durationMinutes, startHour, endHour);
+    const positionPercent = timeToPercent(time, startHour, endHour);
+
+    // Update state
+    setDragState((prev) =>
+      prev ? { ...prev, targetTime: time, targetDisplayTime: formatTimeDisplay(time) } : null
+    );
+
+    setTargetTime({
+      time,
+      displayTime: formatTimeDisplay(time),
+      percent: positionPercent,
+      widthPercent,
+    });
+  }, [timelineConfig, timelineContainerRef, dragState, setTargetTime]);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const { over, active } = event;
@@ -241,73 +261,221 @@ export function DndProvider({
 
     const overData = over.data.current as DroppableGuideRowData | { type: "hopper" } | undefined;
 
-    // Handle hovering over the hopper (for unassigning)
+    // Hovering over hopper - no preview needed
     if (overData?.type === "hopper") {
       clearDragTarget();
       return;
     }
 
-    // Handle hovering over a guide row
-    if (overData?.type === "guide-row") {
+    // Hovering over guide row
+    if (isGuideRowDrop(overData as DroppableGuideRowData)) {
+      const guideRowData = overData as DroppableGuideRowData;
       const activeData = active.data.current as ActiveDragData;
-      const guideTimeline = findGuideTimeline(overData.guideId);
 
-      // Don't show preview if dragging to same guide
-      if (activeData.type === "segment" && activeData.guideId === overData.guideId) {
+      // Don't show preview when dragging to same guide
+      if (isSegmentDrag(activeData) && activeData.guideId === guideRowData.guideId) {
         clearDragTarget();
         return;
       }
 
-      // Calculate guest count being moved
+      // Calculate impact
+      const guideTimeline = findGuideTimeline(guideRowData.guideId);
       let guestCount = 0;
       let bookingZoneId: string | undefined;
 
-      if (activeData.type === "hopper-booking") {
+      if (isHopperBookingDrag(activeData)) {
         guestCount = activeData.booking.guestCount;
         bookingZoneId = activeData.booking.pickupZone?.id;
       }
 
-      // Calculate impact
       const currentGuests = guideTimeline?.totalGuests ?? 0;
-      const vehicleCapacity = overData.vehicleCapacity;
+      const vehicleCapacity = guideRowData.vehicleCapacity;
       const newTotal = currentGuests + guestCount;
       const exceedsCapacity = newTotal > vehicleCapacity;
       const capacityUtilization = Math.round((newTotal / vehicleCapacity) * 100);
 
-      // Estimate drive time impact
-      const existingPickups = Math.floor(currentGuests / 2); // Rough estimate
+      const existingPickups = Math.floor(currentGuests / 2);
       const driveTimeChange = estimateDriveTimeImpact(bookingZoneId, undefined, existingPickups);
       const efficiency = calculateEfficiency(driveTimeChange);
 
       setDragTarget(
         {
-          guideId: overData.guideId,
-          guideName: overData.guideName,
+          guideId: guideRowData.guideId,
+          guideName: guideRowData.guideName,
           vehicleCapacity,
           currentGuestCount: currentGuests,
         },
-        {
-          driveTimeChange,
-          efficiency,
-          exceedsCapacity,
-          capacityUtilization,
-        }
+        { driveTimeChange, efficiency, exceedsCapacity, capacityUtilization }
       );
     }
   }, [dragState, findGuideTimeline, setDragTarget, clearDragTarget]);
 
+  // ==========================================================================
+  // DROP HANDLERS (defined before handleDragEnd to avoid hoisting issues)
+  // ==========================================================================
+
+  const handleHopperDrop = useCallback((activeData: ActiveDragData) => {
+    if (isSegmentDrag(activeData)) {
+      // Only pickup/tour segments can be unassigned
+      if (activeData.segmentType !== "pickup" && activeData.segmentType !== "tour") {
+        toast.info("Cannot unassign drive or idle segments");
+        return;
+      }
+
+      const bookingIds = activeData.bookingIds;
+      if (!bookingIds?.length) {
+        toast.error("Cannot unassign - no booking IDs found");
+        return;
+      }
+
+      const guideName = getGuideName(activeData.guideId);
+      const bookingLabel = getBookingLabel(activeData);
+
+      if (liveAssignment) {
+        const unassignAll = async () => {
+          for (const bookingId of bookingIds) {
+            try {
+              await liveAssignment.unassignBooking(bookingId, activeData.guideId, guideName, bookingLabel);
+            } catch (error) {
+              console.error(`Failed to unassign booking ${bookingId}:`, error);
+            }
+          }
+        };
+        unassignAll();
+      }
+    } else if (isHopperBookingDrag(activeData)) {
+      toast.info("Booking is already unassigned");
+    }
+  }, [getGuideName, getBookingLabel, liveAssignment]);
+
+  const handleGuideRowDrop = useCallback((
+    activeData: ActiveDragData,
+    overData: DroppableGuideRowData,
+    deltaX: number,
+    dragStartData: DragStartCapture | null
+  ) => {
+    if (isSegmentDrag(activeData)) {
+      const sourceGuideId = activeData.guideId;
+      const targetGuideId = overData.guideId;
+      const isSameGuide = sourceGuideId === targetGuideId;
+
+      // Same guide - check for time shift
+      if (isSameGuide) {
+        handleTimeShift(activeData, deltaX, dragStartData);
+        return;
+      }
+
+      // Different guide - reassign
+      handleReassign(activeData, sourceGuideId, targetGuideId, overData.guideName);
+    } else if (isHopperBookingDrag(activeData)) {
+      // New assignment from hopper
+      if (liveAssignment) {
+        const bookingLabel = activeData.booking.customerName || "Booking";
+        liveAssignment.assignBooking(
+          activeData.booking.id,
+          overData.guideId,
+          overData.guideName,
+          bookingLabel
+        );
+      }
+    }
+  }, [liveAssignment, timelineConfig, timelineContainerRef, addPendingChange]);
+
+  const handleTimeShift = useCallback((
+    activeData: DraggableSegmentData,
+    deltaX: number,
+    dragStartData: DragStartCapture | null
+  ) => {
+    if (!timelineConfig || !activeData.startTime) {
+      toast.info("No change made", { description: "Drag to a different guide or time" });
+      return;
+    }
+
+    const containerWidth = getTimelineWidth();
+    const segmentDuration = dragStartData?.durationMinutes ?? activeData.durationMinutes ?? 60;
+
+    const result = calculateTimeShift(
+      deltaX,
+      activeData.startTime,
+      segmentDuration,
+      containerWidth,
+      timelineConfig
+    );
+
+    if (result && hasTimeChanged(activeData.startTime, result.newStartTime, timelineConfig.snapMinutes)) {
+      addPendingChange({
+        type: "time-shift",
+        segmentId: activeData.segmentId,
+        guideId: activeData.guideId,
+        bookingIds: activeData.bookingIds,
+        originalStartTime: activeData.startTime,
+        newStartTime: result.newStartTime,
+        originalEndTime: activeData.endTime ?? "",
+        newEndTime: result.newEndTime,
+        durationMinutes: segmentDuration,
+      } as Omit<PendingTimeShiftChange, "id" | "timestamp">);
+
+      toast.success(`Moved to ${formatTimeDisplay(result.newStartTime)}`, {
+        description: "This change is pending - click Apply to save",
+      });
+      return;
+    }
+
+    toast.info("No change made", { description: "Drag to a different guide or time" });
+  }, [timelineConfig, getTimelineWidth, addPendingChange]);
+
+  const handleReassign = useCallback((
+    activeData: DraggableSegmentData,
+    sourceGuideId: string,
+    targetGuideId: string,
+    targetGuideName: string
+  ) => {
+    const bookingIds = activeData.bookingIds;
+    if (!bookingIds?.length) {
+      toast.error("Cannot reassign - no booking IDs found");
+      return;
+    }
+
+    const sourceGuideName = getGuideName(sourceGuideId);
+    const bookingLabel = getBookingLabel(activeData);
+
+    if (liveAssignment) {
+      const reassignAll = async () => {
+        for (const bookingId of bookingIds) {
+          try {
+            await liveAssignment.reassignBooking(
+              bookingId,
+              sourceGuideId,
+              sourceGuideName,
+              targetGuideId,
+              targetGuideName,
+              bookingLabel
+            );
+          } catch (error) {
+            console.error(`Failed to reassign booking ${bookingId}:`, error);
+          }
+        }
+      };
+      reassignAll();
+    }
+  }, [liveAssignment, getGuideName, getBookingLabel]);
+
+  // ==========================================================================
+  // MAIN DRAG END HANDLER (defined after drop handlers to avoid hoisting issues)
+  // ==========================================================================
+
   const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over, delta } = event;
+    const { active, over } = event;
 
-    // Capture time shift data before clearing
-    const timeShiftData = dragStartRef.current;
+    // Capture ref data before clearing
+    const dragStartData = dragStartRef.current;
 
-    // Clear all drag state
+    // Clear all state
     setDragState(null);
     dragStartRef.current = null;
     endDrag();
 
-    // Validate we have valid drop data
+    // Validate drop - ensure we have valid active and over data
     if (!over || !active.data.current || !over.data.current) {
       return;
     }
@@ -315,104 +483,17 @@ export function DndProvider({
     const activeData = active.data.current as ActiveDragData;
     const overData = over.data.current as DroppableGuideRowData | { type: "hopper" };
 
-    // Handle dropping on hopper (unassign)
-    if (overData.type === "hopper") {
-      // TODO: Implement unassign logic
+    // Handle drop on hopper (unassign)
+    if (isHopperDrop(overData)) {
+      handleHopperDrop(activeData);
       return;
     }
 
-    // Handle dropping on guide row
-    if (overData.type === "guide-row") {
-      if (activeData.type === "segment") {
-        // Segment reassignment or time shift
-        const sourceGuideId = activeData.guideId;
-        const targetGuideId = overData.guideId;
-        const isSameGuide = sourceGuideId === targetGuideId;
-
-        // Check for time shift (horizontal drag) when we have timeline config
-        if (timeShiftData?.segmentStartTime && timelineConfig) {
-          const newTimes = calculateTimeFromDelta(delta.x, timeShiftData.segmentStartTime);
-
-          if (newTimes && hasTimeChanged(timeShiftData.segmentStartTime, newTimes.newStartTime)) {
-            // Time shift detected!
-            addPendingChange({
-              type: "time-shift",
-              segmentId: activeData.segmentId,
-              guideId: isSameGuide ? sourceGuideId : targetGuideId,
-              bookingIds: activeData.bookingIds,
-              originalStartTime: timeShiftData.segmentStartTime,
-              newStartTime: newTimes.newStartTime,
-              originalEndTime: timeShiftData.segmentEndTime ?? "",
-              newEndTime: newTimes.newEndTime,
-              durationMinutes: timeShiftData.durationMinutes ?? 60,
-            } as Omit<PendingTimeShiftChange, "id" | "timestamp">);
-
-            // If also changing guide, add a reassignment too
-            if (!isSameGuide) {
-              addPendingChange({
-                type: "reassign",
-                tourRunId: activeData.tourRunId,
-                segmentId: activeData.segmentId,
-                fromGuideId: sourceGuideId,
-                toGuideId: targetGuideId,
-                bookingIds: activeData.bookingIds,
-              } as Omit<PendingReassignChange, "id" | "timestamp">);
-
-              toast.success(`Time & guide changed`, {
-                description: `Moved to ${newTimes.newStartTime} and ${overData.guideName.split(" ")[0]}`,
-              });
-            } else {
-              toast.success(`Time changed`, {
-                description: `Moved to ${newTimes.newStartTime}`,
-              });
-            }
-            return;
-          }
-        }
-
-        // No time shift - check for guide reassignment
-        if (isSameGuide) {
-          // Dropped on same guide with no time change
-          toast.info("No change made", {
-            description: "Drag horizontally to change time, or to a different guide to reassign",
-          });
-          return;
-        }
-
-        addPendingChange({
-          type: "reassign",
-          tourRunId: activeData.tourRunId,
-          segmentId: activeData.segmentId,
-          fromGuideId: sourceGuideId,
-          toGuideId: targetGuideId,
-          bookingIds: activeData.bookingIds,
-        } as Omit<PendingReassignChange, "id" | "timestamp">);
-
-        toast.success(`Reassignment queued`, {
-          description: `Will move to ${overData.guideName.split(" ")[0]} when saved`,
-        });
-      } else if (activeData.type === "hopper-booking") {
-        // New booking assignment from hopper - add as pending change
-        const { booking } = activeData;
-        addPendingChange({
-          type: "assign",
-          bookingId: booking.id,
-          toGuideId: overData.guideId,
-          toGuideName: overData.guideName,
-          timelineIndex: overData.timelineIndex,
-          bookingData: {
-            customerName: booking.customerName,
-            guestCount: booking.guestCount,
-            tourName: booking.tourName,
-            tourTime: booking.tourTime,
-            pickupZone: booking.pickupZone,
-          },
-        } as Omit<PendingAssignChange, "id" | "timestamp">);
-        // Also call the callback for toast notification
-        onBookingAssign?.(booking.id, overData.guideId);
-      }
+    // Handle drop on guide row
+    if (isGuideRowDrop(overData)) {
+      handleGuideRowDrop(activeData, overData, event.delta?.x ?? 0, dragStartData);
     }
-  }, [addPendingChange, endDrag, onBookingAssign, timelineConfig, calculateTimeFromDelta, hasTimeChanged]);
+  }, [endDrag, handleHopperDrop, handleGuideRowDrop, liveAssignment]);
 
   const handleDragCancel = useCallback(() => {
     setDragState(null);
@@ -420,27 +501,43 @@ export function DndProvider({
     endDrag();
   }, [endDrag]);
 
-  // When not in adjust mode, just render children without DnD context
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
+  // When not in adjust mode, render children without DnD context
   if (!isAdjustMode) {
-    return <>{children}</>;
+    return <div className={className}>{children}</div>;
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={pointerWithin}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-    >
-      {children}
+    <div className={className}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        {children}
 
-      {/* Drag Overlay - follows cursor while dragging */}
-      <DragOverlay dropAnimation={null}>
-        {dragState && <DragOverlayContent data={dragState.data} />}
-      </DragOverlay>
-    </DndContext>
+        <DragOverlay
+          dropAnimation={{
+            duration: 200,
+            easing: "cubic-bezier(0.2, 0, 0, 1)",
+          }}
+        >
+          {dragState && (
+            <DragOverlayContent
+              data={dragState.data}
+              targetTime={dragState.targetDisplayTime}
+            />
+          )}
+        </DragOverlay>
+      </DndContext>
+    </div>
   );
 }
 
@@ -452,19 +549,14 @@ DndProvider.displayName = "DndProvider";
 
 interface DragOverlayContentProps {
   data: ActiveDragData;
+  targetTime?: string;
 }
 
-/**
- * Visual representation shown during drag
- */
-function DragOverlayContent({ data }: DragOverlayContentProps) {
-  if (data.type === "segment") {
+function DragOverlayContent({ data, targetTime }: DragOverlayContentProps) {
+  if (isSegmentDrag(data)) {
     const segmentLabel =
-      data.segmentType === "pickup"
-        ? "Pickup"
-        : data.segmentType === "tour"
-          ? "Tour"
-          : "Segment";
+      data.segmentType === "pickup" ? "Pickup" :
+      data.segmentType === "tour" ? "Tour" : "Segment";
 
     return (
       <div
@@ -484,12 +576,18 @@ function DragOverlayContent({ data }: DragOverlayContentProps) {
           )}
         />
         <span>Moving {segmentLabel}</span>
+        {targetTime && (
+          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-mono">
+            <Clock className="h-3 w-3" />
+            {targetTime}
+          </span>
+        )}
         <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
       </div>
     );
   }
 
-  if (data.type === "hopper-booking") {
+  if (isHopperBookingDrag(data)) {
     const { booking } = data;
     const zoneColor = booking.pickupZone?.color || "#6B7280";
 
@@ -504,7 +602,6 @@ function DragOverlayContent({ data }: DragOverlayContentProps) {
           "min-w-[200px]"
         )}
       >
-        {/* Zone color indicator */}
         <div
           className="w-1.5 h-8 rounded-full shrink-0"
           style={{ backgroundColor: zoneColor }}
@@ -526,6 +623,13 @@ function DragOverlayContent({ data }: DragOverlayContentProps) {
             </div>
           )}
         </div>
+
+        {targetTime && (
+          <span className="flex items-center gap-1 px-2 py-1 rounded bg-primary/10 text-primary text-xs font-mono shrink-0">
+            <Clock className="h-3 w-3" />
+            {targetTime}
+          </span>
+        )}
 
         <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
       </div>

@@ -146,6 +146,7 @@ export interface TourSegment extends BaseSegment {
   tour: TourInfo;
   totalGuests: number;
   scheduleId?: string;
+  bookingIds?: string[]; // All booking IDs in this tour run (for drag-to-unassign)
 }
 
 /**
@@ -286,8 +287,11 @@ export function generateHourMarkers(
   for (let hour = startHour; hour <= endHour; hour++) {
     const time = `${hour.toString().padStart(2, "0")}:00`;
     const percent = timeToPercent(time, startHour, endHour);
-    const displayHour = hour % 12 || 12;
-    const period = hour >= 12 ? "PM" : "AM";
+
+    // Handle midnight (hour 24 or 0) and noon (hour 12) correctly
+    const normalizedHour = hour % 24; // Handle hour 24 as 0
+    const displayHour = normalizedHour % 12 || 12;
+    const period = normalizedHour >= 12 && normalizedHour < 24 ? "PM" : "AM";
 
     markers.push({
       hour,
@@ -318,20 +322,31 @@ export function getGuideInitials(guide: GuideInfo | Pick<GuideInfo, "firstName" 
 // =============================================================================
 
 /**
- * Default zone colors based on feature doc spec
- * These map common zone name patterns to colors
+ * Default zone colors - DISTINCT categorical palette
+ * Designed for instant visual differentiation at a glance
+ * Each color is perceptually unique (hue, saturation, brightness vary)
  */
 export const DEFAULT_ZONE_COLORS: Record<string, string> = {
-  marina: "#0EA5E9", // Teal - coastal/water
-  downtown: "#F97316", // Orange - urban/energy
-  palm: "#22C55E", // Green - palm tree
-  jbr: "#8B5CF6", // Purple - luxury
-  business: "#3B82F6", // Blue - corporate
-  airport: "#64748B", // Slate - transit
-  beach: "#06B6D4", // Cyan - coastal
-  creek: "#14B8A6", // Teal - waterway
-  old: "#D97706", // Amber - historic
-  jumeirah: "#A855F7", // Purple - premium
+  // Primary zones - bold, saturated, instantly recognizable
+  jbr: "#8B5CF6", // Violet - premium beach area
+  marina: "#0EA5E9", // Sky blue - waterfront
+  downtown: "#F97316", // Orange - urban core
+  palm: "#10B981", // Emerald - island greenery
+  business: "#3B82F6", // Blue - corporate district
+
+  // Secondary zones - distinct from primaries
+  airport: "#64748B", // Slate - transit hub
+  beach: "#06B6D4", // Cyan - coastal (distinct from marina blue)
+  creek: "#14B8A6", // Teal - historic waterway
+  old: "#EAB308", // Yellow - heritage district
+  jumeirah: "#EC4899", // Pink - luxury residential
+
+  // Fallback patterns
+  deira: "#F59E0B", // Amber - traditional area
+  bur: "#84CC16", // Lime - commercial
+  karama: "#A855F7", // Purple - mixed use
+  satwa: "#F43F5E", // Rose - residential
+  tecom: "#6366F1", // Indigo - business
 };
 
 /**

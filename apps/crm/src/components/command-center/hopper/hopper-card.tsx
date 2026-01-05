@@ -5,9 +5,14 @@ import { cn } from "@/lib/utils";
 import { useDraggable, type DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { CSS } from "@dnd-kit/utilities";
-import { Baby, Star, Cake, Accessibility, Clock, Users, MapPin } from "lucide-react";
+import { Baby, Star, Cake, Accessibility, Clock, Users, MapPin, Sparkles, GripVertical } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // =============================================================================
 // TYPES
@@ -32,6 +37,8 @@ export interface HopperBooking {
   tourName: string;
   tourTime: string;
   tourRunKey: string;
+  /** Tour duration in minutes (for timeline display) */
+  tourDurationMinutes?: number;
   // Special indicators
   isVIP?: boolean;
   isFirstTimer?: boolean;
@@ -56,14 +63,20 @@ interface HopperCardProps {
 // =============================================================================
 
 /**
- * Default zone colors based on feature doc spec
+ * Default zone colors - DISTINCT categorical palette
+ * Matches types.ts palette for consistency
  */
 const DEFAULT_ZONE_COLORS: Record<string, string> = {
-  marina: "#0EA5E9", // Teal - coastal/water
-  downtown: "#F97316", // Orange - urban/energy
-  palm: "#22C55E", // Green - palm tree
-  jbr: "#8B5CF6", // Purple - luxury
-  business: "#3B82F6", // Blue - corporate
+  jbr: "#8B5CF6", // Violet - premium beach area
+  marina: "#0EA5E9", // Sky blue - waterfront
+  downtown: "#F97316", // Orange - urban core
+  palm: "#10B981", // Emerald - island greenery
+  business: "#3B82F6", // Blue - corporate district
+  airport: "#64748B", // Slate - transit hub
+  beach: "#06B6D4", // Cyan - coastal
+  creek: "#14B8A6", // Teal - historic waterway
+  old: "#EAB308", // Yellow - heritage district
+  jumeirah: "#EC4899", // Pink - luxury residential
 };
 
 /**
@@ -146,14 +159,14 @@ function CompactHopperCard({
         }
       }}
       className={cn(
-        "group relative flex items-center gap-1.5 rounded border bg-card px-1.5 py-1 transition-all duration-150",
+        "group relative flex items-center gap-1.5 rounded border bg-card px-1.5 py-1 transition-all duration-150 ease-out",
         // Pending assignment styling - greyed out, non-draggable
         isPendingAssignment
           ? "opacity-50 cursor-not-allowed pointer-events-none border-emerald-500/50 bg-emerald-500/5"
-          : "cursor-grab active:cursor-grabbing hover:shadow-sm hover:border-primary/30",
+          : "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm",
         "focus:outline-none focus:ring-1 focus:ring-primary",
         isSelected && "ring-1 ring-primary border-primary",
-        isDndDragging && "shadow-md opacity-90",
+        isDndDragging && "shadow-lg opacity-90 scale-[1.02]",
         "touch-manipulation select-none"
       )}
     >
@@ -273,126 +286,153 @@ function FullHopperCard({
         }
       }}
       className={cn(
-        "group relative rounded-md border bg-card p-2 transition-all duration-150",
+        "group relative rounded-lg border bg-card p-3 transition-all duration-150 ease-out",
         // Pending assignment styling - greyed out, non-draggable
         isPendingAssignment
           ? "opacity-50 cursor-not-allowed pointer-events-none border-emerald-500/50 bg-emerald-500/5"
-          : "cursor-grab active:cursor-grabbing hover:shadow-sm hover:border-primary/30",
+          : "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm",
         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
         isSelected && "ring-2 ring-primary border-primary",
-        isDndDragging && "shadow-md opacity-90",
+        isDndDragging && "shadow-lg opacity-90 scale-[1.02]",
         "touch-manipulation select-none"
       )}
     >
-      {/* Zone color indicator bar */}
-      <div
-        className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full"
-        style={{ backgroundColor: zoneColor }}
-        aria-hidden="true"
-      />
-
-      <div className="pl-2">
-        {/* Header: Customer name + pax count */}
-        <div className="flex items-start justify-between gap-1.5 mb-1">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Avatar className="h-6 w-6 shrink-0">
-              <AvatarFallback className="text-[10px] font-medium bg-muted">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-foreground truncate leading-tight">
-                {booking.customerName}
-              </p>
-              <p className="text-[10px] text-muted-foreground leading-tight">
-                {booking.referenceNumber}
-              </p>
-            </div>
-          </div>
-
-          {/* Guest count badge */}
-          <Badge variant="secondary" className="shrink-0 text-[10px] h-5 px-1.5">
-            <Users className="h-2.5 w-2.5 mr-0.5" />
-            {booking.guestCount}
-          </Badge>
-
-          {/* Pending assignment indicator */}
-          {isPendingAssignment && (
-            <Badge variant="outline" className="shrink-0 text-[9px] h-4 px-1 border-emerald-500 text-emerald-600 bg-emerald-500/10">
-              Assigned
-            </Badge>
-          )}
-        </div>
-
-        {/* Tour info */}
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1">
-          <Clock className="h-2.5 w-2.5" />
-          <span className="font-mono">{booking.tourTime}</span>
-          <span className="text-muted-foreground/50">·</span>
-          <span className="truncate">{booking.tourName}</span>
-        </div>
-
-        {/* Zone badge */}
-        {booking.pickupZone && (
-          <div className="flex items-center gap-1">
-            <Badge
-              variant="outline"
-              className="text-[9px] font-medium h-4 px-1"
-              style={{
-                borderColor: zoneColor,
-                color: zoneColor,
-                backgroundColor: `${zoneColor}10`,
-              }}
-            >
-              <MapPin className="h-2 w-2 mr-0.5" />
-              {booking.pickupZone.name}
-            </Badge>
-
-            {booking.pickupTime && (
-              <span className="text-[9px] text-muted-foreground font-mono">
-                {booking.pickupTime}
-              </span>
-            )}
+      {/* ===== PRIMARY ROW: Grip + Avatar + Customer Name + Guest Count ===== */}
+      <div className="flex items-center gap-2">
+        {/* Drag Handle - visible affordance for dragging */}
+        {!isPendingAssignment && (
+          <div className="flex-shrink-0 -ml-1 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors cursor-grab active:cursor-grabbing">
+            <GripVertical className="h-4 w-4" aria-hidden="true" />
           </div>
         )}
 
-        {/* Special indicators */}
+        {/* Avatar with zone color ring */}
+        <Avatar
+          className="h-8 w-8 shrink-0 ring-2 ring-offset-1 ring-offset-card"
+          style={{ "--tw-ring-color": zoneColor } as React.CSSProperties}
+        >
+          <AvatarFallback className="text-xs font-semibold bg-muted text-foreground">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+
+        {/* Customer name + reference (reference demoted) */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate leading-tight">
+            {booking.customerName}
+          </p>
+          <p className="text-[9px] text-muted-foreground/50 font-mono tracking-wider opacity-70 group-hover:opacity-100 transition-opacity">
+            {booking.referenceNumber}
+          </p>
+        </div>
+
+        {/* Guest count badge - prominent on right */}
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          <div className="flex items-center gap-1 bg-primary/10 text-primary rounded-md px-2 py-1">
+            <Users className="h-3.5 w-3.5" />
+            <span className="text-sm font-bold tabular-nums">{booking.guestCount}</span>
+          </div>
+          {isPendingAssignment && (
+            <span className="text-[9px] font-medium text-emerald-600 dark:text-emerald-400">
+              Assigned
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ===== SECONDARY ROW: Time + Tour Name ===== */}
+      <div className="flex items-center gap-1.5 mt-2.5 text-xs text-muted-foreground">
+        <Clock className="h-3 w-3 shrink-0" />
+        <span className="font-mono font-medium text-foreground/80">{booking.tourTime}</span>
+        <span className="text-muted-foreground/40">|</span>
+        <span className="truncate">{booking.tourName}</span>
+      </div>
+
+      {/* ===== TERTIARY ROW: Zone + Indicators ===== */}
+      <div className="flex items-center gap-1.5 mt-2">
+        {/* Zone pill - compact, color-coded */}
+        {booking.pickupZone && (
+          <span
+            className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+            style={{
+              backgroundColor: `${zoneColor}15`,
+              color: zoneColor,
+            }}
+          >
+            <MapPin className="h-2.5 w-2.5" />
+            {booking.pickupZone.name}
+          </span>
+        )}
+
+        {/* Pickup time if different from tour time */}
+        {booking.pickupTime && booking.pickupTime !== booking.tourTime && (
+          <span className="text-[10px] text-muted-foreground/70 font-mono">
+            @ {booking.pickupTime}
+          </span>
+        )}
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Special indicators - inline, no border separator */}
         {hasSpecialIndicators && (
-          <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-border/50">
-            {booking.isVIP && (
-              <span
-                className="inline-flex items-center justify-center h-4 w-4 rounded bg-amber-500/10 text-amber-500"
-                title="VIP"
-              >
-                <Star className="h-2.5 w-2.5" />
-              </span>
-            )}
+          <div className="flex items-center gap-1">
             {(booking.childCount > 0 || booking.infantCount > 0) && (
-              <span
-                className="inline-flex items-center justify-center h-4 w-4 rounded bg-blue-500/10 text-blue-500"
-                title="Has children"
-              >
-                <Baby className="h-2.5 w-2.5" />
-              </span>
-            )}
-            {booking.specialOccasion && (
-              <span
-                className="inline-flex items-center justify-center h-4 w-4 rounded bg-pink-500/10 text-pink-500"
-                title={booking.specialOccasion}
-              >
-                <Cake className="h-2.5 w-2.5" />
-              </span>
-            )}
-            {booking.accessibilityNeeds && (
-              <span
-                className="inline-flex items-center justify-center h-4 w-4 rounded bg-purple-500/10 text-purple-500"
-                title={booking.accessibilityNeeds}
-              >
-                <Accessibility className="h-2.5 w-2.5" />
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-500/10 text-blue-500">
+                    <Baby className="h-3 w-3" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  {booking.childCount > 0 && `${booking.childCount} ${pluralize(booking.childCount, "child", "children")}`}
+                  {booking.childCount > 0 && booking.infantCount > 0 && ", "}
+                  {booking.infantCount > 0 && `${booking.infantCount} ${pluralize(booking.infantCount, "infant")}`}
+                </TooltipContent>
+              </Tooltip>
             )}
             {booking.isFirstTimer && (
-              <span className="text-[9px] text-blue-500 font-medium">1st</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center gap-0.5 h-5 px-1.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                    <Sparkles className="h-3 w-3" />
+                    <span className="text-[10px] font-semibold">NEW</span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  First time guest
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {booking.isVIP && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-amber-500/10 text-amber-500">
+                    <Star className="h-3 w-3" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">VIP Guest</TooltipContent>
+              </Tooltip>
+            )}
+            {booking.specialOccasion && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-pink-500/10 text-pink-500">
+                    <Cake className="h-3 w-3" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">{booking.specialOccasion}</TooltipContent>
+              </Tooltip>
+            )}
+            {booking.accessibilityNeeds && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-purple-500/10 text-purple-500">
+                    <Accessibility className="h-3 w-3" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">{booking.accessibilityNeeds}</TooltipContent>
+              </Tooltip>
             )}
           </div>
         )}

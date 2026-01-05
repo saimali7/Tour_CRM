@@ -35,6 +35,21 @@ import {
 // TYPES
 // =============================================================================
 
+/** Segment time data for overlap checking */
+interface SegmentTime {
+  id: string;
+  startTime: string;
+  endTime: string;
+  type: "tour" | "pickup";
+}
+
+/** Guide timeline for overlap validation */
+interface GuideTimelineForValidation {
+  guideId: string;
+  guideName: string;
+  segments: SegmentTime[];
+}
+
 interface PendingChangesPanelProps {
   /** Callback when apply is clicked */
   onApply: () => void;
@@ -42,8 +57,52 @@ interface PendingChangesPanelProps {
   isApplying?: boolean;
   /** Guide capacity info for impact calculation */
   guideCapacities?: Map<string, { current: number; capacity: number; name: string }>;
+  /** Guide timelines for overlap validation */
+  guideTimelines?: GuideTimelineForValidation[];
   /** Additional CSS classes */
   className?: string;
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+/** Convert HH:MM time to minutes since midnight */
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+/** Check if two time ranges overlap */
+function timesOverlap(
+  start1: string,
+  end1: string,
+  start2: string,
+  end2: string
+): boolean {
+  const s1 = timeToMinutes(start1);
+  const e1 = timeToMinutes(end1);
+  const s2 = timeToMinutes(start2);
+  const e2 = timeToMinutes(end2);
+  // Overlap if one starts before the other ends AND ends after the other starts
+  return s1 < e2 && e1 > s2;
+}
+
+/** Add minutes to HH:MM time string */
+function addMinutesToTime(time: string, minutes: number): string {
+  const totalMinutes = timeToMinutes(time) + minutes;
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+}
+
+interface OverlapError {
+  guideId: string;
+  guideName: string;
+  segment1: string;
+  segment2: string;
+  time1: string;
+  time2: string;
 }
 
 // =============================================================================
@@ -54,6 +113,7 @@ export function PendingChangesPanel({
   onApply,
   isApplying = false,
   guideCapacities,
+  guideTimelines,
   className,
 }: PendingChangesPanelProps) {
   const {
@@ -114,6 +174,92 @@ export function PendingChangesPanel({
     return { hasWarning, hasError, details };
   }, [summary.impactByGuide, guideCapacities]);
 
+  // Check for tour overlaps
+  const overlapStatus = useMemo(() => {
+    if (!guideTimelines) return { hasOverlap: false, errors: [] as OverlapError[] };
+
+    const errors: OverlapError[] = [];
+
+    // Build a map of guide -> segments (including pending changes)
+    const guideSegmentsMap = new Map<string, Array<{ id: string; startTime: string; endTime: string; label: string }>>();
+
+    // Initialize with existing timeline segments
+    for (const timeline of guideTimelines) {
+      const segments = timeline.segments
+        .filter((s) => s.type === "tour" || s.type === "pickup")
+        .map((s) => ({
+          id: s.id,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          label: s.type === "tour" ? "Tour" : "Pickup",
+        }));
+      guideSegmentsMap.set(timeline.guideId, segments);
+    }
+
+    // Apply pending time shifts
+    for (const change of pendingChanges) {
+      if (change.type === "time-shift") {
+        const segments = guideSegmentsMap.get(change.guideId);
+        if (segments) {
+          const segmentIdx = segments.findIndex((s) => s.id === change.segmentId);
+          const existingSegment = segments[segmentIdx];
+          if (segmentIdx !== -1 && existingSegment) {
+            segments[segmentIdx] = {
+              id: existingSegment.id,
+              label: existingSegment.label,
+              startTime: change.newStartTime,
+              endTime: change.newEndTime,
+            };
+          }
+        }
+      }
+    }
+
+    // Add pending assignments
+    for (const change of pendingChanges) {
+      if (change.type === "assign") {
+        const segments = guideSegmentsMap.get(change.toGuideId) || [];
+        const tourDuration = change.bookingData.tourDurationMinutes || 120;
+        segments.push({
+          id: `pending_${change.bookingId}`,
+          startTime: change.bookingData.tourTime,
+          endTime: addMinutesToTime(change.bookingData.tourTime, tourDuration),
+          label: change.bookingData.customerName,
+        });
+        guideSegmentsMap.set(change.toGuideId, segments);
+      }
+    }
+
+    // Check each guide for overlaps
+    for (const timeline of guideTimelines) {
+      const segments = guideSegmentsMap.get(timeline.guideId) || [];
+
+      // Compare each pair of segments
+      for (let i = 0; i < segments.length; i++) {
+        for (let j = i + 1; j < segments.length; j++) {
+          const seg1 = segments[i];
+          const seg2 = segments[j];
+
+          // TypeScript safety: ensure both segments exist
+          if (!seg1 || !seg2) continue;
+
+          if (timesOverlap(seg1.startTime, seg1.endTime, seg2.startTime, seg2.endTime)) {
+            errors.push({
+              guideId: timeline.guideId,
+              guideName: timeline.guideName,
+              segment1: seg1.label,
+              segment2: seg2.label,
+              time1: `${seg1.startTime}-${seg1.endTime}`,
+              time2: `${seg2.startTime}-${seg2.endTime}`,
+            });
+          }
+        }
+      }
+    }
+
+    return { hasOverlap: errors.length > 0, errors };
+  }, [guideTimelines, pendingChanges]);
+
   if (!hasPendingChanges) {
     return null;
   }
@@ -137,6 +283,14 @@ export function PendingChangesPanel({
                 <AlertTriangle className="h-4 w-4 text-destructive" />
               </TooltipTrigger>
               <TooltipContent>Capacity exceeded for some guides</TooltipContent>
+            </Tooltip>
+          )}
+          {overlapStatus.hasOverlap && (
+            <Tooltip>
+              <TooltipTrigger>
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+              </TooltipTrigger>
+              <TooltipContent>Tours overlap - cannot save</TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -338,7 +492,7 @@ export function PendingChangesPanel({
           className="w-full h-8"
           size="sm"
           onClick={onApply}
-          disabled={isApplying || capacityStatus.hasError}
+          disabled={isApplying || capacityStatus.hasError || overlapStatus.hasOverlap}
         >
           {isApplying ? (
             <>
@@ -352,7 +506,12 @@ export function PendingChangesPanel({
             </>
           )}
         </Button>
-        {capacityStatus.hasError && (
+        {overlapStatus.hasOverlap && (
+          <p className="text-[10px] text-destructive mt-1 text-center">
+            Cannot apply: tours overlap for {overlapStatus.errors[0]?.guideName}
+          </p>
+        )}
+        {!overlapStatus.hasOverlap && capacityStatus.hasError && (
           <p className="text-[10px] text-destructive mt-1 text-center">
             Cannot apply: some guides would exceed capacity
           </p>

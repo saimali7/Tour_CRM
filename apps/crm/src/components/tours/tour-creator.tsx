@@ -96,7 +96,7 @@ const DEFAULT_FORM_STATE: TourFormState = {
   name: "",
   category: "",
   basePrice: "",
-  durationMinutes: 120,
+  durationMinutes: 360,
   maxParticipants: 15,
   minParticipants: 1,
   shortDescription: "",
@@ -127,44 +127,45 @@ const DEFAULT_FORM_STATE: TourFormState = {
 };
 
 // Smart defaults based on category
+// Default duration is 6 hours (360 min), categories can override
 const CATEGORY_DEFAULTS: Record<string, Partial<TourFormState>> = {
   "Walking Tours": {
-    durationMinutes: 120,
+    durationMinutes: 180,
     maxParticipants: 15,
     includes: ["Professional guide", "Bottled water"],
     requirements: ["Comfortable walking shoes", "Weather-appropriate clothing"],
   },
   "Food & Wine": {
-    durationMinutes: 180,
+    durationMinutes: 240,
     maxParticipants: 12,
     includes: ["Food tastings", "Local guide", "All food samples"],
     excludes: ["Alcoholic beverages", "Transportation"],
     requirements: ["Please advise of dietary restrictions"],
   },
   "Adventure": {
-    durationMinutes: 240,
+    durationMinutes: 360,
     maxParticipants: 10,
     includes: ["Safety equipment", "Professional instructor", "Insurance"],
     requirements: ["Good physical condition", "Signed waiver"],
   },
   "Cultural": {
-    durationMinutes: 150,
+    durationMinutes: 240,
     maxParticipants: 20,
     includes: ["Expert guide", "Entrance fees", "Headsets for large groups"],
   },
   "Historical": {
-    durationMinutes: 120,
+    durationMinutes: 180,
     maxParticipants: 20,
     includes: ["Historian guide", "Historical maps/materials"],
   },
   "Nature": {
-    durationMinutes: 180,
+    durationMinutes: 300,
     maxParticipants: 12,
     includes: ["Nature guide", "Binoculars (upon request)"],
     requirements: ["Hiking boots recommended", "Bring sunscreen"],
   },
   "City Tours": {
-    durationMinutes: 180,
+    durationMinutes: 360,
     maxParticipants: 15,
     includes: ["Local guide", "City map"],
   },
@@ -174,24 +175,24 @@ const CATEGORY_DEFAULTS: Record<string, Partial<TourFormState>> = {
     includes: ["Transportation", "Professional guide", "Lunch"],
   },
   "Water Activities": {
-    durationMinutes: 180,
+    durationMinutes: 240,
     maxParticipants: 8,
     includes: ["Equipment rental", "Safety briefing", "Instructor"],
     requirements: ["Swimming ability required", "Towel and sunscreen"],
   },
   "Photography": {
-    durationMinutes: 180,
+    durationMinutes: 240,
     maxParticipants: 8,
     includes: ["Professional photographer guide", "Photo tips and tricks"],
     requirements: ["Bring your own camera"],
   },
   "Private Tours": {
-    durationMinutes: 180,
+    durationMinutes: 360,
     maxParticipants: 6,
     includes: ["Private guide", "Customized itinerary", "Flexible schedule"],
   },
   "Group Tours": {
-    durationMinutes: 180,
+    durationMinutes: 360,
     maxParticipants: 25,
     includes: ["Group guide", "Audio headsets"],
   },
@@ -235,7 +236,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
         category,
         ...defaults,
         // Don't override if already set
-        durationMinutes: prev.durationMinutes !== 120 ? prev.durationMinutes : (defaults.durationMinutes ?? 120),
+        durationMinutes: prev.durationMinutes !== 360 ? prev.durationMinutes : (defaults.durationMinutes ?? 360),
         maxParticipants: prev.maxParticipants !== 15 ? prev.maxParticipants : (defaults.maxParticipants ?? 15),
         includes: prev.includes.length > 0 ? prev.includes : (defaults.includes ?? []),
         excludes: prev.excludes.length > 0 ? prev.excludes : (defaults.excludes ?? []),

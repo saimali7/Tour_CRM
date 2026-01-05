@@ -70,12 +70,28 @@ export interface PendingAssignChange {
     guestCount: number;
     tourName: string;
     tourTime: string; // Format: "HH:mm"
+    tourDurationMinutes?: number; // Tour duration for accurate timeline display
     pickupZone?: { id: string; name: string; color?: string } | null;
   };
   timestamp: number;
 }
 
-export type PendingChange = PendingReassignChange | PendingAssignChange | PendingTimeShiftChange;
+/**
+ * Represents a pending unassignment (removing a booking from a guide)
+ */
+export interface PendingUnassignChange {
+  id: string;
+  type: "unassign";
+  segmentId: string;
+  fromGuideId: string;
+  fromGuideName: string;
+  bookingIds?: string[];
+  /** Guest count for display */
+  guestCount?: number;
+  timestamp: number;
+}
+
+export type PendingChange = PendingReassignChange | PendingAssignChange | PendingTimeShiftChange | PendingUnassignChange;
 
 interface AdjustModeContextType {
   /** Whether adjust mode is currently active */
@@ -142,6 +158,13 @@ export interface PendingChangesSummary {
     toGuideName?: string;
     bookingCount: number;
   }>;
+  unassignments: Array<{
+    id: string;
+    segmentId: string;
+    fromGuideId: string;
+    fromGuideName: string;
+    guestCount: number;
+  }>;
   timeShifts: Array<{
     id: string;
     segmentId: string;
@@ -180,6 +203,15 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
 
   // Track if we're in an undo/redo operation to avoid pushing to stack
   const isUndoRedoOperation = useRef(false);
+
+  // Ref to hold current pendingChanges for undo/redo without stale closures
+  // This prevents recreating undo/redo callbacks on every pendingChanges update
+  const pendingChangesRef = useRef<PendingChange[]>(pendingChanges);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    pendingChangesRef.current = pendingChanges;
+  }, [pendingChanges]);
 
   // Push current state to undo stack before making changes
   const pushToUndoStack = useCallback((currentState: PendingChange[]) => {
@@ -274,15 +306,50 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
           );
 
           if (existingIndex !== -1) {
-            // Update existing time-shift to new time
+            // Update existing time-shift - preserve ORIGINAL times from first shift
+            const existingChange = prev[existingIndex] as PendingTimeShiftChange;
             const newChange: PendingChange = {
               ...change,
+              // Keep the original times from the first time-shift
+              originalStartTime: existingChange.originalStartTime,
+              originalEndTime: existingChange.originalEndTime,
               id: `change-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
               timestamp: Date.now(),
             } as PendingChange;
             const updated = [...prev];
             updated[existingIndex] = newChange;
             return updated;
+          }
+        }
+
+        // For unassign: Check if segment is already being unassigned
+        if (change.type === "unassign") {
+          const unassignChange = change as Omit<PendingUnassignChange, "id" | "timestamp">;
+          const existingIndex = prev.findIndex(
+            (c) => c.type === "unassign" &&
+                   (c as PendingUnassignChange).segmentId === unassignChange.segmentId
+          );
+
+          if (existingIndex !== -1) {
+            // Already unassigning this segment - no change needed
+            toast.info("Already queued for unassignment");
+            return prev;
+          }
+
+          // Also check if there's a pending reassignment for this segment - remove it
+          const reassignIndex = prev.findIndex(
+            (c) => (c.type === "reassign" || c.type === "swap") &&
+                   (c as PendingReassignChange).segmentId === unassignChange.segmentId
+          );
+          if (reassignIndex !== -1) {
+            // Remove the reassignment and add unassign instead
+            const newChange: PendingChange = {
+              ...change,
+              id: `change-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+              timestamp: Date.now(),
+            } as PendingChange;
+            const updated = prev.filter((_, idx) => idx !== reassignIndex);
+            return [...updated, newChange];
           }
         }
 
@@ -323,6 +390,7 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
   }, [pushToUndoStack]);
 
   // Undo: restore previous state
+  // Uses pendingChangesRef to avoid stale closures and prevent callback recreation
   const undo = useCallback(() => {
     if (undoStack.length === 0) {
       toast.info("Nothing to undo");
@@ -336,8 +404,8 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
       const previousState = newUndo.pop();
 
       if (previousState !== undefined) {
-        // Push current state to redo stack
-        setRedoStack((prevRedo) => [...prevRedo, pendingChanges]);
+        // Push current state to redo stack (use ref to get current value)
+        setRedoStack((prevRedo) => [...prevRedo, pendingChangesRef.current]);
         // Restore previous state
         setPendingChanges(previousState);
         toast.info("Change undone", { duration: 1500 });
@@ -350,9 +418,10 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
     setTimeout(() => {
       isUndoRedoOperation.current = false;
     }, 0);
-  }, [undoStack.length, pendingChanges]);
+  }, [undoStack.length]); // Removed pendingChanges - using ref instead
 
   // Redo: restore next state
+  // Uses pendingChangesRef to avoid stale closures and prevent callback recreation
   const redo = useCallback(() => {
     if (redoStack.length === 0) {
       toast.info("Nothing to redo");
@@ -366,8 +435,8 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
       const nextState = newRedo.pop();
 
       if (nextState !== undefined) {
-        // Push current state to undo stack
-        setUndoStack((prevUndo) => [...prevUndo, pendingChanges]);
+        // Push current state to undo stack (use ref to get current value)
+        setUndoStack((prevUndo) => [...prevUndo, pendingChangesRef.current]);
         // Restore next state
         setPendingChanges(nextState);
         toast.info("Change redone", { duration: 1500 });
@@ -380,7 +449,7 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
     setTimeout(() => {
       isUndoRedoOperation.current = false;
     }, 0);
-  }, [redoStack.length, pendingChanges]);
+  }, [redoStack.length]); // Removed pendingChanges - using ref instead
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -454,6 +523,7 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
   const getPendingChangesSummary = useCallback((): PendingChangesSummary => {
     const assignments: PendingChangesSummary["assignments"] = [];
     const reassignments: PendingChangesSummary["reassignments"] = [];
+    const unassignments: PendingChangesSummary["unassignments"] = [];
     const timeShifts: PendingChangesSummary["timeShifts"] = [];
     const impactByGuide = new Map<string, { guestDelta: number; guideName: string }>();
 
@@ -486,6 +556,20 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
           toGuideName: reassign.toGuideName,
           bookingCount: reassign.bookingIds?.length || 1,
         });
+      } else if (change.type === "unassign") {
+        const unassign = change as PendingUnassignChange;
+        unassignments.push({
+          id: unassign.id,
+          segmentId: unassign.segmentId,
+          fromGuideId: unassign.fromGuideId,
+          fromGuideName: unassign.fromGuideName,
+          guestCount: unassign.guestCount ?? 0,
+        });
+
+        // Track negative impact on guide (losing guests)
+        const impact = impactByGuide.get(unassign.fromGuideId) || { guestDelta: 0, guideName: unassign.fromGuideName };
+        impact.guestDelta -= unassign.guestCount ?? 0;
+        impactByGuide.set(unassign.fromGuideId, impact);
       } else if (change.type === "time-shift") {
         const timeShift = change as PendingTimeShiftChange;
         timeShifts.push({
@@ -502,6 +586,7 @@ export function AdjustModeProvider({ children }: AdjustModeProviderProps) {
       totalChanges: pendingChanges.length,
       assignments,
       reassignments,
+      unassignments,
       timeShifts,
       impactByGuide,
     };

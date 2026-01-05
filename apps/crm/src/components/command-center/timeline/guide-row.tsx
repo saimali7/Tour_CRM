@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Car, Users, Clock } from "lucide-react";
+import { Car, Users } from "lucide-react";
 import { SegmentLane } from "./segment-lane";
 import type { GuideTimeline, TimelineSegment, GuideInfo } from "./types";
 import { getGuideFullName, formatDuration } from "./types";
@@ -109,8 +109,8 @@ export function GuideRow({
   return (
     <div
       className={cn(
-        "group relative flex min-h-[60px] items-stretch transition-colors duration-150",
-        "hover:bg-muted/30",
+        "group relative flex min-h-[60px] items-stretch transition-all duration-150 ease-out",
+        "hover:bg-muted/40",
         className
       )}
       role="row"
@@ -128,8 +128,8 @@ export function GuideRow({
       {/* Guide Info Column */}
       <div
         className={cn(
-          "flex flex-shrink-0 cursor-pointer items-center gap-2 border-r bg-card px-2 py-1.5 transition-colors",
-          "hover:bg-muted/50",
+          "flex flex-shrink-0 items-center gap-2 border-r bg-card px-2 py-1.5 transition-all duration-150 ease-out",
+          onGuideClick && "cursor-pointer hover:bg-muted/50 active:bg-muted/70",
           onGuideClick && "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         )}
         style={{ width: `${guideColumnWidth}px` }}
@@ -159,66 +159,60 @@ export function GuideRow({
             {fullName}
           </span>
 
-          {/* Metadata Row */}
-          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            {/* Vehicle Capacity */}
+          {/* Metadata Row - simplified with visual grouping */}
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            {/* Capacity: guests / vehicle seats */}
             <TooltipProvider delayDuration={300}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="inline-flex items-center gap-0.5">
-                    <Car className="h-2.5 w-2.5" aria-hidden="true" />
-                    <span className="font-mono tabular-nums">{guide.vehicleCapacity}</span>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  Vehicle capacity: {guide.vehicleCapacity} seats
-                  {guide.vehicleDescription && (
-                    <span className="block text-muted-foreground">{guide.vehicleDescription}</span>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <span className="text-muted-foreground/40">|</span>
-
-            {/* Guests Today */}
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex items-center gap-0.5">
+                  <span className={cn(
+                    "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md",
+                    "bg-muted/50 hover:bg-muted transition-colors"
+                  )}>
                     <Users className="h-2.5 w-2.5" aria-hidden="true" />
-                    <span className="font-mono tabular-nums">{timeline.totalGuests}</span>
+                    <span className="font-mono font-medium tabular-nums">
+                      {timeline.totalGuests}/{guide.vehicleCapacity}
+                    </span>
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
-                  {timeline.totalGuests} {timeline.totalGuests === 1 ? "guest" : "guests"} today
+                  <span className="font-semibold">{timeline.totalGuests}</span> guests assigned
+                  <br />
+                  <span className="text-muted-foreground">
+                    Vehicle capacity: {guide.vehicleCapacity} seats
+                    {guide.vehicleDescription && ` (${guide.vehicleDescription})`}
+                  </span>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
-            <span className="text-muted-foreground/40">|</span>
-
-            {/* Drive Time */}
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex items-center gap-0.5">
-                    <Clock className="h-2.5 w-2.5" aria-hidden="true" />
-                    <span className="font-mono tabular-nums">{formatDuration(timeline.totalDriveMinutes)}</span>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  {formatDuration(timeline.totalDriveMinutes)} drive time
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* Drive Time - only show if > 0 */}
+            {timeline.totalDriveMinutes > 0 && (
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center gap-0.5 text-muted-foreground/70">
+                      <Car className="h-2.5 w-2.5" aria-hidden="true" />
+                      <span className="font-mono tabular-nums">{formatDuration(timeline.totalDriveMinutes)}</span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    {formatDuration(timeline.totalDriveMinutes)} total drive time
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
 
-          {/* Utilization Bar */}
-          <div className="flex items-center gap-1">
-            <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+          {/* Utilization Bar - larger and more readable */}
+          <div className="flex items-center gap-1.5">
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted/50">
               <div
-                className={cn("h-full rounded-full transition-all duration-300", utilizationColor)}
+                className={cn(
+                  "h-full rounded-full transition-all duration-300",
+                  "bg-gradient-to-r",
+                  utilizationColor
+                )}
                 style={{ width: `${Math.min(100, timeline.utilization)}%` }}
                 role="progressbar"
                 aria-valuenow={timeline.utilization}
@@ -227,16 +221,22 @@ export function GuideRow({
                 aria-label="Utilization"
               />
             </div>
-            <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+            <span className={cn(
+              "text-[10px] font-semibold tabular-nums min-w-[28px] text-right",
+              timeline.utilization >= 80 ? "text-emerald-500" :
+              timeline.utilization >= 50 ? "text-blue-500" :
+              timeline.utilization >= 25 ? "text-amber-500" :
+              "text-muted-foreground"
+            )}>
               {Math.round(timeline.utilization)}%
             </span>
           </div>
         </div>
       </div>
 
-      {/* Timeline Area */}
+      {/* Timeline Area - no padding to ensure alignment with header grid lines */}
       <div
-        className="relative flex flex-1 items-center px-1"
+        className="relative flex flex-1 items-center"
         role="gridcell"
         aria-label={`${fullName}'s timeline`}
       >
@@ -261,19 +261,19 @@ GuideRow.displayName = "GuideRow";
 // =============================================================================
 
 /**
- * Get the color class for the utilization bar
+ * Get the color class for the utilization bar with gradient support
  */
 function getUtilizationColor(utilization: number): string {
   if (utilization >= 80) {
-    return "bg-emerald-500";
+    return "from-emerald-400 to-emerald-500";
   }
   if (utilization >= 50) {
-    return "bg-blue-500";
+    return "from-blue-400 to-blue-500";
   }
   if (utilization >= 25) {
-    return "bg-amber-500";
+    return "from-amber-400 to-amber-500";
   }
-  return "bg-muted-foreground/50";
+  return "from-muted-foreground/40 to-muted-foreground/50";
 }
 
 /**

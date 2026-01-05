@@ -68,10 +68,13 @@ export default function CommandCenterPage() {
     { enabled: true }
   );
 
+  // Height calculation accounts for:
+  // - Mobile: header (4rem) + padding (2rem) + mobile nav (4rem) = 10rem offset
+  // - Desktop: padding only (3rem) = 3rem offset
   return (
-    <div className="space-y-4">
-      {/* Page Header */}
-      <header className="flex items-center justify-between gap-4">
+    <div className="flex flex-col h-[calc(100vh-10rem)] md:h-[calc(100vh-3rem)]">
+      {/* Page Header - fixed height, doesn't scroll */}
+      <header className="flex-none flex items-center justify-between gap-4 pb-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
             Tour Command Center
@@ -82,14 +85,16 @@ export default function CommandCenterPage() {
         </div>
       </header>
 
-      {/* Main Command Center Component */}
-      <CommandCenter
-        date={selectedDate}
-        onDateChange={handleDateChange}
-        onPreviousDay={handlePreviousDay}
-        onNextDay={handleNextDay}
-        onToday={handleToday}
-      />
+      {/* Main Command Center Component - fills remaining space */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <CommandCenter
+          date={selectedDate}
+          onDateChange={handleDateChange}
+          onPreviousDay={handlePreviousDay}
+          onNextDay={handleNextDay}
+          onToday={handleToday}
+        />
+      </div>
     </div>
   );
 }

@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Sparkles, DollarSign, Clock, Users, AlertCircle, Check } from "lucide-react";
+import { Sparkles, DollarSign, Users, AlertCircle, Check } from "lucide-react";
+import { DurationInput } from "@/components/ui/duration-input";
 import type { TourFormState } from "../tour-creator";
 import {
   ValidatedFormField,
@@ -389,35 +390,13 @@ export function EssentialsTab({
           <label htmlFor="duration" className="block text-sm font-medium text-foreground">
             Duration <span className="text-destructive">*</span>
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <select
-              id="duration"
-              value={formState.durationMinutes}
-              onChange={(e) => updateForm({ durationMinutes: parseInt(e.target.value) })}
-              className={cn(
-                "w-full pl-11 pr-4 py-3 text-lg font-medium border rounded-xl transition-all appearance-none",
-                "bg-background text-foreground",
-                "focus:ring-2 focus:ring-primary/20 focus:border-primary",
-                "border-emerald-500 focus-visible:ring-emerald-500/30"
-              )}
-            >
-              <option value={30}>30 min</option>
-              <option value={45}>45 min</option>
-              <option value={60}>1 hour</option>
-              <option value={90}>1.5 hours</option>
-              <option value={120}>2 hours</option>
-              <option value={150}>2.5 hours</option>
-              <option value={180}>3 hours</option>
-              <option value={240}>4 hours</option>
-              <option value={300}>5 hours</option>
-              <option value={360}>6 hours</option>
-              <option value={480}>8 hours</option>
-              <option value={600}>10 hours</option>
-            </select>
-          </div>
+          <DurationInput
+            id="duration"
+            value={formState.durationMinutes}
+            onChange={(minutes) => updateForm({ durationMinutes: minutes })}
+            min={15}
+            max={1440}
+          />
           <div className="min-h-[20px]">
             <p className="text-sm text-emerald-600 flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 flex-shrink-0" />

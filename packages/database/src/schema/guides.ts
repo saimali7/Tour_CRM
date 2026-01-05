@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, index, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, jsonb, index, integer, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
@@ -61,6 +61,8 @@ export const guides = pgTable("guides", {
   userIdx: index("guides_user_idx").on(table.userId),
   statusIdx: index("guides_status_idx").on(table.status),
   orgStatusIdx: index("guides_org_status_idx").on(table.organizationId, table.status),
+  // Prevent duplicate guides with same email in same organization
+  uniqueOrgEmail: unique("guides_org_email_unique").on(table.organizationId, table.email),
 }));
 
 // Relations
