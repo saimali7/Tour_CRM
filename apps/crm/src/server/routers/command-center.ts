@@ -444,22 +444,35 @@ export const commandCenterRouter = createRouter({
         });
       }
 
-      // Calculate new guest counts after all changes
+      // Fetch booking details to get actual guest counts
+      const bookingIds = input.changes.map(c => c.bookingId);
+      const bookingGuestCounts = new Map<string, number>();
+
+      for (const bookingId of bookingIds) {
+        try {
+          const booking = await services.booking.getById(bookingId);
+          bookingGuestCounts.set(bookingId, booking.totalParticipants);
+        } catch {
+          // If booking not found, use 1 as fallback
+          bookingGuestCounts.set(bookingId, 1);
+        }
+      }
+
+      // Calculate new guest counts after all changes using actual booking data
       const guestChanges = new Map<string, number>(); // guideId -> delta
 
       for (const change of input.changes) {
-        // Get booking guest count (from timeline data or fetch)
-        // For now we'll validate capacity after assignment
-        // This is a simplified check - full implementation would need booking details
+        const guestCount = bookingGuestCounts.get(change.bookingId) ?? 1;
+
         if (change.fromGuideId) {
           guestChanges.set(
             change.fromGuideId,
-            (guestChanges.get(change.fromGuideId) || 0) - 1 // Placeholder - actual guest count needed
+            (guestChanges.get(change.fromGuideId) || 0) - guestCount
           );
         }
         guestChanges.set(
           change.toGuideId,
-          (guestChanges.get(change.toGuideId) || 0) + 1 // Placeholder
+          (guestChanges.get(change.toGuideId) || 0) + guestCount
         );
       }
 

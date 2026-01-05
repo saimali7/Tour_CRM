@@ -5,16 +5,34 @@ import { cn } from "@/lib/utils";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useAdjustMode, type PendingTimeShiftChange } from "../adjust-mode/adjust-mode-context";
-import { GripVertical, Clock } from "lucide-react";
+import { useLiveAssignmentContextSafe } from "../live-assignment-context";
+import { Clock, X, Loader2, Eye, UserMinus, ArrowRightLeft, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { TimelineSegment, GuideInfo } from "./types";
-import { timeToPercent, segmentWidthPercent, formatTimeDisplay, formatDuration, confidenceColors, getZoneColorFromName } from "./types";
-import { Users, MapPin, Calendar, Car, Cake, Star } from "lucide-react";
+import { timeToPercent, segmentWidthPercent, formatTimeDisplay } from "./types";
+// Import segment content components from extracted module
+import {
+  TourContent,
+  TourTooltip,
+  PickupContent,
+  PickupTooltip,
+  DriveContent,
+  DriveTooltip,
+  IdleContent,
+  IdleTooltip,
+} from "./segment-content";
 
 // =============================================================================
 // TYPES
@@ -33,6 +51,12 @@ interface SegmentLaneProps {
   selectedSegmentId?: string | null;
   /** Click handler for segments */
   onSegmentClick?: (segment: TimelineSegment) => void;
+  /** Context menu: View segment details */
+  onViewDetails?: (segment: TimelineSegment) => void;
+  /** Context menu: Reassign to different guide */
+  onReassign?: (segment: TimelineSegment) => void;
+  /** Context menu: View booking */
+  onViewBooking?: (bookingId: string) => void;
   /** Whether adjust mode is active */
   isAdjustMode?: boolean;
   /** Additional CSS classes */
@@ -46,6 +70,9 @@ interface SegmentItemProps {
   endHour: number;
   isSelected: boolean;
   onClick?: () => void;
+  onViewDetails?: (segment: TimelineSegment) => void;
+  onReassign?: (segment: TimelineSegment) => void;
+  onViewBooking?: (bookingId: string) => void;
   isAdjustMode: boolean;
 }
 
@@ -60,6 +87,9 @@ export function SegmentLane({
   endHour,
   selectedSegmentId,
   onSegmentClick,
+  onViewDetails,
+  onReassign,
+  onViewBooking,
   isAdjustMode = false,
   className,
 }: SegmentLaneProps) {
@@ -72,6 +102,41 @@ export function SegmentLane({
       return (startH ?? 0) < endHour && (endH ?? 0) > startHour;
     });
   }, [segments, startHour, endHour]);
+
+  // Empty state - guide has no assignments
+  if (validSegments.length === 0) {
+    return (
+      <div
+        className={cn(
+          "relative h-10 w-full",
+          "flex items-center justify-center",
+          className
+        )}
+        role="listbox"
+        aria-label="Timeline segments - no assignments"
+      >
+        {/* Subtle dashed border pattern to indicate intentional emptiness */}
+        <div
+          className={cn(
+            "absolute inset-x-0 inset-y-1",
+            "rounded border border-dashed border-muted-foreground/20",
+            "bg-muted/30"
+          )}
+          aria-hidden="true"
+        />
+        {/* Centered availability message */}
+        <span
+          className={cn(
+            "relative z-10",
+            "text-xs italic text-muted-foreground/60",
+            "select-none"
+          )}
+        >
+          Available all day
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -88,6 +153,9 @@ export function SegmentLane({
           endHour={endHour}
           isSelected={selectedSegmentId === segment.id}
           onClick={() => onSegmentClick?.(segment)}
+          onViewDetails={onViewDetails}
+          onReassign={onReassign}
+          onViewBooking={onViewBooking}
           isAdjustMode={isAdjustMode}
         />
       ))}
@@ -106,9 +174,53 @@ function SegmentItem({
   endHour,
   isSelected,
   onClick,
+  onViewDetails,
+  onReassign,
+  onViewBooking,
   isAdjustMode,
 }: SegmentItemProps) {
-  const { addPendingChange, getTimeShiftForSegment } = useAdjustMode();
+  const { getTimeShiftForSegment } = useAdjustMode();
+  const liveAssignment = useLiveAssignmentContextSafe();
+
+  // Get booking ID for this segment (first booking for unassign button)
+  const bookingId = React.useMemo(() => {
+    if (segment.type === "pickup" && segment.booking?.id) {
+      return segment.booking.id;
+    }
+    if (segment.type === "tour" && segment.bookingIds?.[0]) {
+      return segment.bookingIds[0];
+    }
+    return null;
+  }, [segment]);
+
+  // Check if this segment is currently being modified
+  const isPending = bookingId ? liveAssignment?.isBookingPending(bookingId) : false;
+
+  // Get booking label for toast messages (customer name or reference number)
+  const bookingLabel = React.useMemo(() => {
+    if (segment.type === "pickup" && segment.booking) {
+      const customer = segment.booking.customer;
+      if (customer?.firstName) {
+        return `${customer.firstName} ${customer.lastName}`.trim();
+      }
+      return segment.booking.referenceNumber || "Booking";
+    }
+    if (segment.type === "tour") {
+      return segment.tour?.name || "Tour booking";
+    }
+    return "Booking";
+  }, [segment]);
+
+  // Handler to unassign this segment - now uses live assignment
+  const handleUnassign = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (!bookingId || !liveAssignment) return;
+
+    const guideName = `${guide.firstName} ${guide.lastName}`.trim();
+    liveAssignment.unassignBooking(bookingId, guide.id, guideName, bookingLabel);
+  }, [bookingId, guide, liveAssignment, bookingLabel]);
 
   // Check for pending time shift
   const pendingTimeShift = isAdjustMode ? getTimeShiftForSegment(segment.id) : null;
@@ -134,6 +246,9 @@ function SegmentItem({
     if (segment.type === "pickup" && segment.booking?.id) {
       return [segment.booking.id];
     }
+    if (segment.type === "tour" && segment.bookingIds?.length) {
+      return segment.bookingIds;
+    }
     return undefined;
   }, [segment]);
 
@@ -141,6 +256,17 @@ function SegmentItem({
   const tourRunId = segment.type === "tour" && "scheduleId" in segment
     ? segment.scheduleId || segment.id
     : segment.id;
+
+  // Get guest count for capacity validation during drag
+  const guestCount = React.useMemo(() => {
+    if (segment.type === "pickup") {
+      return segment.guestCount ?? 0;
+    }
+    if (segment.type === "tour") {
+      return segment.totalGuests ?? 0;
+    }
+    return 0;
+  }, [segment]);
 
   // Draggable setup - always call hook but disable based on conditions
   const {
@@ -158,10 +284,13 @@ function SegmentItem({
       tourRunId,
       segmentType: segment.type,
       bookingIds,
-      // Include times for time-shift tracking
-      startTime: segment.startTime,
-      endTime: segment.endTime,
+      // Include CURRENT display times for time-shift tracking
+      // (accounts for any pending time shifts)
+      startTime: displayStartTime,
+      endTime: displayEndTime,
       durationMinutes: segment.durationMinutes,
+      // Include guest count for capacity validation
+      guestCount,
     },
     disabled: !isAdjustMode || !canDrag,
   });
@@ -181,25 +310,39 @@ function SegmentItem({
     ...dragStyle,
   };
 
-  return (
+  // Show context menu only for interactive segments (tour/pickup)
+  const showContextMenu = segment.type === "tour" || segment.type === "pickup";
+
+  // Z-index layering: idle/drive (1) < tour/pickup (10) < dragging (50)
+  const segmentZIndex = segment.type === "idle" || segment.type === "drive" ? "z-[1]" : "z-10";
+
+  const segmentElement = (
     <div
       ref={setNodeRef}
+      {...(isAdjustMode && canDrag ? { ...attributes, ...listeners } : {})}
       className={cn(
-        "absolute top-0 h-full",
+        "absolute top-0 h-full group",
+        // Z-index layering based on segment type
+        segmentZIndex,
+        // Container query support for responsive segments
+        "@container",
         isDragging && "opacity-50 z-50",
-        isAdjustMode && canDrag && "group/draggable",
+        isAdjustMode && canDrag && "cursor-grab active:cursor-grabbing",
+        // Adjust mode glow animation for draggable segments
+        isAdjustMode && canDrag && !isDragging && !hasTimeShift && "animate-adjust-glow",
         // Time shift styling - dashed border and subtle animation
         hasTimeShift && [
-          "ring-2 ring-primary/50 ring-offset-1",
+          "ring-2 ring-primary/50",
           "animate-pulse",
         ]
       )}
       style={positionStyle}
       role="option"
       aria-selected={isSelected}
+      aria-label={isAdjustMode && canDrag ? "Drag to reassign or drop on hopper to unassign" : undefined}
     >
       {/* Time Shift Indicator Badge */}
-      {hasTimeShift && (
+      {hasTimeShift && pendingTimeShift && (
         <Badge
           variant="secondary"
           className={cn(
@@ -211,31 +354,8 @@ function SegmentItem({
           )}
         >
           <Clock className="h-2.5 w-2.5" />
-          {pendingTimeShift?.newStartTime}
+          {formatTimeDisplay(pendingTimeShift.newStartTime)}
         </Badge>
-      )}
-
-      {/* Drag Handle - Only visible in adjust mode for draggable segments */}
-      {isAdjustMode && canDrag && (
-        <div
-          {...attributes}
-          {...listeners}
-          className={cn(
-            "absolute -left-1 top-1/2 -translate-y-1/2 z-10",
-            "flex items-center justify-center",
-            "w-4 h-6 rounded-sm",
-            "bg-background border shadow-sm",
-            // Only capture pointer events when visible (on hover or dragging)
-            "pointer-events-none group-hover/draggable:pointer-events-auto",
-            "opacity-0 group-hover/draggable:opacity-100",
-            "transition-opacity duration-150",
-            "cursor-grab active:cursor-grabbing",
-            isDragging && "opacity-100 pointer-events-auto"
-          )}
-          aria-label="Drag to reassign"
-        >
-          <GripVertical className="h-3 w-3 text-muted-foreground" />
-        </div>
       )}
 
       {/* Segment Content */}
@@ -245,9 +365,98 @@ function SegmentItem({
         onClick={onClick}
         isDragging={isDragging}
         hasTimeShift={hasTimeShift}
+        displayStartTime={displayStartTime}
+        displayEndTime={displayEndTime}
       />
+
+      {/* Unassign Button - appears on hover in adjust mode */}
+      {isAdjustMode && canDrag && !isDragging && bookingId && (
+        <button
+          type="button"
+          onClick={handleUnassign}
+          disabled={isPending}
+          className={cn(
+            "absolute -top-1.5 -right-1.5 z-20",
+            "flex items-center justify-center",
+            "w-5 h-5 rounded-full",
+            "bg-destructive text-destructive-foreground",
+            "shadow-md border-2 border-background",
+            "opacity-0 hover:opacity-100 group-hover:opacity-100",
+            "hover:scale-110 active:scale-95",
+            "transition-all duration-150",
+            "focus:outline-none focus:ring-2 focus:ring-destructive",
+            isPending && "opacity-100 cursor-wait"
+          )}
+          aria-label="Remove from guide"
+        >
+          {isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <X className="h-3 w-3" />
+          )}
+        </button>
+      )}
+
+      {/* Loading overlay when pending */}
+      {isPending && (
+        <div className="absolute inset-0 bg-background/50 rounded-sm flex items-center justify-center z-10">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+        </div>
+      )}
     </div>
   );
+
+  // Wrap in context menu for tour/pickup segments
+  if (showContextMenu) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          {segmentElement}
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-48">
+          <ContextMenuItem
+            onClick={() => onViewDetails?.(segment)}
+            className="gap-2"
+          >
+            <Eye className="h-4 w-4" />
+            View Details
+          </ContextMenuItem>
+          {isAdjustMode && (
+            <ContextMenuItem
+              onClick={() => onReassign?.(segment)}
+              className="gap-2"
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              Reassign Guide
+            </ContextMenuItem>
+          )}
+          {isAdjustMode && bookingId && (
+            <ContextMenuItem
+              onClick={handleUnassign}
+              className="gap-2 text-destructive focus:text-destructive"
+            >
+              <UserMinus className="h-4 w-4" />
+              Unassign
+            </ContextMenuItem>
+          )}
+          {bookingId && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                onClick={() => onViewBooking?.(bookingId)}
+                className="gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                View Booking
+              </ContextMenuItem>
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  }
+
+  return segmentElement;
 }
 
 // =============================================================================
@@ -260,15 +469,23 @@ interface SegmentContentProps {
   onClick?: () => void;
   isDragging: boolean;
   hasTimeShift?: boolean;
+  /** Display start time (may differ from segment.startTime if time-shifted) */
+  displayStartTime?: string;
+  /** Display end time (may differ from segment.endTime if time-shifted) */
+  displayEndTime?: string;
 }
 
-function SegmentContent({ segment, isSelected, onClick, isDragging, hasTimeShift }: SegmentContentProps) {
+function SegmentContent({ segment, isSelected, onClick, isDragging, hasTimeShift, displayStartTime, displayEndTime }: SegmentContentProps) {
+  // Use display times if provided (for time-shifted segments), otherwise use segment times
+  const effectiveStartTime = displayStartTime ?? segment.startTime;
+  const effectiveEndTime = displayEndTime ?? segment.endTime;
+
   const content = React.useMemo(() => {
     switch (segment.type) {
       case "tour":
-        return <TourContent segment={segment} />;
+        return <TourContent segment={segment} displayStartTime={effectiveStartTime} displayEndTime={effectiveEndTime} />;
       case "pickup":
-        return <PickupContent segment={segment} />;
+        return <PickupContent segment={segment} displayStartTime={effectiveStartTime} />;
       case "drive":
         return <DriveContent segment={segment} />;
       case "idle":
@@ -276,14 +493,14 @@ function SegmentContent({ segment, isSelected, onClick, isDragging, hasTimeShift
       default:
         return null;
     }
-  }, [segment]);
+  }, [segment, effectiveStartTime, effectiveEndTime]);
 
   const tooltipContent = React.useMemo(() => {
     switch (segment.type) {
       case "tour":
-        return <TourTooltip segment={segment} />;
+        return <TourTooltip segment={segment} displayStartTime={effectiveStartTime} displayEndTime={effectiveEndTime} />;
       case "pickup":
-        return <PickupTooltip segment={segment} />;
+        return <PickupTooltip segment={segment} displayStartTime={effectiveStartTime} />;
       case "drive":
         return <DriveTooltip segment={segment} />;
       case "idle":
@@ -291,7 +508,7 @@ function SegmentContent({ segment, isSelected, onClick, isDragging, hasTimeShift
       default:
         return null;
     }
-  }, [segment]);
+  }, [segment, effectiveStartTime, effectiveEndTime]);
 
   // Don't show tooltip while dragging
   if (isDragging) {
@@ -299,7 +516,7 @@ function SegmentContent({ segment, isSelected, onClick, isDragging, hasTimeShift
       <div
         className={cn(
           "h-full w-full rounded-sm transition-all duration-150",
-          isSelected && "ring-2 ring-ring ring-offset-1",
+          isSelected && "ring-2 ring-ring",
           hasTimeShift && "border-2 border-dashed border-primary/70"
         )}
         onClick={onClick}
@@ -314,10 +531,15 @@ function SegmentContent({ segment, isSelected, onClick, isDragging, hasTimeShift
       <TooltipTrigger asChild>
         <div
           className={cn(
-            "h-full w-full rounded-sm transition-all duration-150",
+            "h-full w-full rounded-sm transition-all duration-150 ease-out",
             onClick && "cursor-pointer",
-            onClick && "hover:scale-[1.02] active:scale-[0.98]",
-            isSelected && "ring-2 ring-ring ring-offset-1",
+            // Enhanced hover states with glow effect
+            onClick && [
+              "hover:scale-[1.03] hover:shadow-lg hover:z-10",
+              "hover:ring-2 hover:ring-white/20",
+              "active:scale-[0.98] active:shadow-sm"
+            ],
+            isSelected && "ring-2 ring-ring shadow-lg",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             hasTimeShift && "border-2 border-dashed border-primary/70"
           )}
@@ -338,236 +560,6 @@ function SegmentContent({ segment, isSelected, onClick, isDragging, hasTimeShift
         {tooltipContent}
       </TooltipContent>
     </Tooltip>
-  );
-}
-
-// =============================================================================
-// TOUR CONTENT
-// =============================================================================
-
-function TourContent({ segment }: { segment: Extract<TimelineSegment, { type: "tour" }> }) {
-  const colors = confidenceColors[segment.confidence];
-  const startTime = formatTimeDisplay(segment.startTime);
-  const endTime = formatTimeDisplay(segment.endTime);
-
-  return (
-    <div
-      className={cn(
-        "h-full w-full rounded-sm",
-        colors.bg,
-        "text-white shadow-md",
-        "bg-gradient-to-b from-white/10 to-transparent"
-      )}
-    >
-      <div className="flex h-full flex-col justify-center overflow-hidden px-2 py-1">
-        <div className="flex items-center gap-1.5">
-          <Calendar className="h-3 w-3 shrink-0 opacity-80" />
-          <span className="truncate text-xs font-semibold">{segment.tour.name}</span>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] opacity-80">
-          <span className="tabular-nums">{startTime}</span>
-          <span className="flex items-center gap-0.5">
-            <Users className="h-2.5 w-2.5" />
-            <span className="tabular-nums">{segment.totalGuests}</span>
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TourTooltip({ segment }: { segment: Extract<TimelineSegment, { type: "tour" }> }) {
-  const colors = confidenceColors[segment.confidence];
-  return (
-    <div className="divide-y divide-border">
-      <div className={cn("px-3 py-2", colors.bg, "text-white")}>
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-semibold">{segment.tour.name}</span>
-          <span className="rounded bg-white/20 px-1.5 py-0.5 text-xs font-bold tabular-nums">
-            {segment.totalGuests} guests
-          </span>
-        </div>
-      </div>
-      <div className="p-3 space-y-2">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="font-medium">{formatTimeDisplay(segment.startTime)} - {formatTimeDisplay(segment.endTime)}</span>
-          <span className="text-muted-foreground">({formatDuration(segment.durationMinutes)})</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// PICKUP CONTENT
-// =============================================================================
-
-function PickupContent({ segment }: { segment: Extract<TimelineSegment, { type: "pickup" }> }) {
-  const zoneColor = segment.pickupZoneColor || getZoneColorFromName(segment.pickupZoneName);
-  const useZoneColor = !!zoneColor && zoneColor !== "#6B7280";
-  const colors = confidenceColors[segment.confidence];
-
-  return (
-    <div
-      className={cn(
-        "h-full w-full rounded-sm shadow-sm",
-        !useZoneColor && colors.bg,
-        !useZoneColor && "text-white"
-      )}
-      style={useZoneColor ? { backgroundColor: zoneColor, color: "#FFFFFF" } : undefined}
-    >
-      <div className="flex h-full items-center justify-between gap-1 overflow-hidden px-1.5">
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-          <MapPin className="h-3 w-3 shrink-0 opacity-80" />
-          <span className="truncate text-[10px] font-medium">
-            {segment.pickupZoneName || segment.pickupLocation}
-          </span>
-        </div>
-        <div className="shrink-0 rounded-full px-1.5 py-0.5 bg-white/20 text-[10px] font-bold tabular-nums">
-          {segment.guestCount}
-        </div>
-        {(segment.hasSpecialOccasion || segment.isFirstTimer) && (
-          <div className="flex items-center gap-0.5">
-            {segment.hasSpecialOccasion && <Cake className="h-2.5 w-2.5 opacity-80" />}
-            {segment.isFirstTimer && <Star className="h-2.5 w-2.5 opacity-80" />}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PickupTooltip({ segment }: { segment: Extract<TimelineSegment, { type: "pickup" }> }) {
-  const zoneColor = segment.pickupZoneColor || getZoneColorFromName(segment.pickupZoneName);
-  const useZoneColor = !!zoneColor && zoneColor !== "#6B7280";
-  const colors = confidenceColors[segment.confidence];
-  const customerName = segment.booking.customer
-    ? `${segment.booking.customer.firstName} ${segment.booking.customer.lastName}`
-    : "Guest";
-
-  return (
-    <div className="divide-y divide-border">
-      <div
-        className={cn("px-3 py-2", !useZoneColor && colors.bg, !useZoneColor && "text-white")}
-        style={useZoneColor ? { backgroundColor: zoneColor, color: "#FFFFFF" } : undefined}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-semibold">{customerName}</span>
-          <span className="rounded bg-white/20 px-1.5 py-0.5 text-xs font-bold tabular-nums">
-            {segment.guestCount} guests
-          </span>
-        </div>
-        <div className="mt-0.5 text-xs opacity-90">#{segment.booking.referenceNumber}</div>
-      </div>
-      <div className="p-3 space-y-2">
-        <div className="flex items-start gap-2">
-          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <div className="text-sm font-medium">{segment.pickupLocation}</div>
-            {segment.pickupZoneName && segment.pickupZoneName !== segment.pickupLocation && (
-              <div className="text-xs text-muted-foreground">{segment.pickupZoneName}</div>
-            )}
-          </div>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          Pickup: {formatTimeDisplay(segment.startTime)}
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <Users className="h-3.5 w-3.5 text-muted-foreground" />
-          <span>
-            {segment.booking.adultCount} {segment.booking.adultCount === 1 ? "Adult" : "Adults"}
-            {segment.booking.childCount && segment.booking.childCount > 0 && (
-              <>, {segment.booking.childCount} {segment.booking.childCount === 1 ? "Child" : "Children"}</>
-            )}
-          </span>
-        </div>
-        {segment.booking.specialOccasion && (
-          <div className="flex items-center gap-2 text-xs">
-            <Cake className="h-3.5 w-3.5 text-amber-500" />
-            <span className="text-amber-600">{segment.booking.specialOccasion}</span>
-          </div>
-        )}
-        {segment.isFirstTimer && (
-          <div className="flex items-center gap-2 text-xs">
-            <Star className="h-3.5 w-3.5 text-yellow-500" />
-            <span className="text-yellow-600">First time with us</span>
-          </div>
-        )}
-      </div>
-      <div className="px-3 py-1.5 text-center text-xs text-muted-foreground">
-        Click for full details
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// DRIVE CONTENT
-// =============================================================================
-
-function DriveContent({ segment }: { segment: Extract<TimelineSegment, { type: "drive" }> }) {
-  return (
-    <div className="flex h-full items-center">
-      <div className="h-3 w-full rounded-full bg-muted-foreground/30">
-        {segment.durationMinutes >= 10 && (
-          <div className="flex h-full items-center justify-center">
-            <span className="flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground/80 whitespace-nowrap">
-              <Car className="h-2.5 w-2.5" />
-              <span className="tabular-nums">{formatDuration(segment.durationMinutes)}</span>
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DriveTooltip({ segment }: { segment: Extract<TimelineSegment, { type: "drive" }> }) {
-  return (
-    <div className="p-3 space-y-1.5">
-      <div className="flex items-center gap-2">
-        <Car className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="font-medium">Drive Time</span>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums">
-          {formatDuration(segment.durationMinutes)}
-        </span>
-      </div>
-      <div className="text-xs text-muted-foreground">
-        {formatTimeDisplay(segment.startTime)} - {formatTimeDisplay(segment.endTime)}
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// IDLE CONTENT
-// =============================================================================
-
-function IdleContent({ segment }: { segment: Extract<TimelineSegment, { type: "idle" }> }) {
-  return (
-    <div className="h-full w-full rounded-sm bg-muted/40 border border-dashed border-muted-foreground/20 opacity-60">
-      {segment.durationMinutes > 30 && (
-        <div className="flex h-full items-center justify-center">
-          <span className="text-[10px] text-muted-foreground/40 select-none">...</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function IdleTooltip({ segment }: { segment: Extract<TimelineSegment, { type: "idle" }> }) {
-  return (
-    <div className="p-3 space-y-1">
-      <div className="flex items-center gap-2">
-        <span className="font-medium">Available</span>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-          {formatDuration(segment.durationMinutes)}
-        </span>
-      </div>
-      <div className="text-xs text-muted-foreground">
-        {formatTimeDisplay(segment.startTime)} - {formatTimeDisplay(segment.endTime)}
-      </div>
-    </div>
   );
 }
 

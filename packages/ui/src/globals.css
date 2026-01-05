@@ -1847,3 +1847,194 @@ body.modal-open {
     transition: none;
   }
 }
+
+/* =============================================================================
+   ADJUST MODE ANIMATIONS
+   Visual feedback for Command Center adjust/edit mode
+   =============================================================================*/
+
+/* Subtle glow animation for draggable segments in adjust mode */
+@keyframes adjust-mode-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px hsl(var(--primary) / 0.2);
+  }
+}
+
+.animate-adjust-glow {
+  animation: adjust-mode-glow 2s ease-in-out infinite;
+}
+
+/* Dark mode: slightly brighter glow */
+.dark .animate-adjust-glow {
+  animation-name: adjust-mode-glow-dark;
+}
+
+@keyframes adjust-mode-glow-dark {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+  50% {
+    box-shadow: 0 0 10px 3px hsl(var(--primary) / 0.25);
+  }
+}
+
+/* Keyboard hint fade-in animation */
+@keyframes hint-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hint-fade-in {
+  animation: hint-fade-in 200ms ease-out forwards;
+}
+
+/* Reduce animations for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .animate-adjust-glow {
+    animation: none;
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
+  }
+
+  .animate-hint-fade-in {
+    animation: none;
+  }
+}
+
+/* =============================================================================
+   CONTAINER QUERIES FOR TIMELINE SEGMENTS
+   Responsive segment content based on available width
+   =============================================================================*/
+
+/* Enable container queries on segment items */
+.segment-container {
+  container-type: inline-size;
+  container-name: segment;
+}
+
+/* Extra compact view - icon only (<60px) */
+@container segment (max-width: 60px) {
+  .segment-label,
+  .segment-time,
+  .segment-guests {
+    display: none !important;
+  }
+
+  .segment-icon {
+    margin: 0 auto;
+  }
+}
+
+/* Compact view - icon + guests only (60-100px) */
+@container segment (min-width: 60px) and (max-width: 100px) {
+  .segment-label,
+  .segment-time {
+    display: none !important;
+  }
+
+  .segment-icon {
+    flex-shrink: 0;
+  }
+
+  .segment-guests {
+    font-size: 9px;
+  }
+}
+
+/* Medium view - hide time (100-150px) */
+@container segment (min-width: 100px) and (max-width: 150px) {
+  .segment-time {
+    display: none !important;
+  }
+
+  .segment-label {
+    max-width: 50px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Standard view - truncate long labels (150-200px) */
+@container segment (min-width: 150px) and (max-width: 200px) {
+  .segment-label {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Full view - show everything (>200px) */
+@container segment (min-width: 200px) {
+  .segment-label {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* =============================================================================
+   RESIZABLE PANEL ENHANCEMENTS
+   Better visual feedback for resizable panels
+   =============================================================================*/
+
+/* Resizable handle glow on hover/drag */
+[data-slot="resizable-handle"]:hover,
+[data-slot="resizable-handle"]:active {
+  background-color: hsl(var(--primary) / 0.2);
+}
+
+[data-slot="resizable-handle"]:active {
+  background-color: hsl(var(--primary) / 0.3);
+}
+
+/* Dark mode handle styling */
+.dark [data-slot="resizable-handle"]:hover {
+  background-color: hsl(var(--primary) / 0.25);
+}
+
+.dark [data-slot="resizable-handle"]:active {
+  background-color: hsl(var(--primary) / 0.35);
+}
+
+/* Handle grip icon visibility */
+[data-slot="resizable-handle"] > div {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+[data-slot="resizable-handle"]:hover > div,
+[data-slot="resizable-handle"]:active > div {
+  opacity: 1;
+}
+
+/* =============================================================================
+   ZOOM CONTROL TOGGLE GROUP STYLES
+   Enhanced styling for timeline zoom controls
+   =============================================================================*/
+
+/* Toggle group button active state - more prominent */
+[data-slot="toggle-group-item"][data-state="on"] {
+  background-color: hsl(var(--primary) / 0.15);
+  color: hsl(var(--primary));
+  font-weight: 500;
+}
+
+.dark [data-slot="toggle-group-item"][data-state="on"] {
+  background-color: hsl(var(--primary) / 0.2);
+}
+
+/* Toggle group hover state */
+[data-slot="toggle-group-item"]:hover:not([data-state="on"]) {
+  background-color: hsl(var(--muted));
+}

@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { TimelineHeader } from "./timeline-header";
 import { GuideRow } from "./guide-row";
 import { DroppableGuideRow } from "../adjust-mode";
-import { getGuideFullName, timeToPercent } from "./types";
+import { getGuideFullName, timeToPercent, generateHourMarkers } from "./types";
 import type { GuideTimeline, TimelineSegment, GuideInfo } from "./types";
 
 // =============================================================================
@@ -97,7 +97,7 @@ export interface TimelineContainerProps {
 export function TimelineContainer({
   timelines: timelinesProp,
   guideTimelines,
-  startHour = 6,
+  startHour = 7,
   endHour = 20,
   onSegmentClick,
   onGuideClick,
@@ -133,22 +133,41 @@ export function TimelineContainer({
   // Calculate the number of hours to display
   const totalHours = endHour - startHour;
 
-  // Empty state
+  // Empty state - visually distinct with helpful guidance
   if (timelines.length === 0) {
     return (
       <div
         className={cn(
-          "flex items-center justify-center rounded-lg border border-dashed bg-muted/30 p-12",
+          "flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-gradient-to-b from-muted/20 to-muted/5 p-12 min-h-[300px]",
           className
         )}
       >
-        <div className="text-center">
-          <p className="text-sm font-medium text-muted-foreground">
-            No guide schedules to display
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Assign guides to tours to see their timelines here
-          </p>
+        <div className="text-center space-y-3">
+          {/* Icon */}
+          <div className="mx-auto w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center">
+            <svg
+              className="w-6 h-6 text-muted-foreground/60"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"
+              />
+            </svg>
+          </div>
+          {/* Text */}
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              No schedules yet
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground max-w-[200px]">
+              Guides with tour assignments will appear here on the timeline
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -161,24 +180,24 @@ export function TimelineContainer({
         aria-label="Guide dispatch timeline"
         aria-readonly={isLocked}
         className={cn(
-          "relative overflow-hidden rounded-lg border bg-card",
+          "relative flex flex-col rounded-lg border bg-card h-full transition-all duration-200",
           isLocked && "opacity-90 pointer-events-auto",
+          // Subtle adjust mode indicator - just a slightly brighter border
+          isAdjustMode && "border-border",
           className
         )}
         aria-disabled={isLocked}
       >
-        {/* Scrollable container */}
+        {/* Removed: Adjust mode overlay tint was too prominent */}
+        {/* Scrollable container - both horizontal and vertical */}
         <div
           ref={scrollContainerRef}
-          className="overflow-x-auto"
-          style={{
-            // Minimum width to ensure timeline is readable
-            minWidth: "100%",
-          }}
+          className="flex-1 min-h-0 overflow-auto"
         >
           {/* Inner container with minimum width based on hours */}
           <div
             ref={timelineContentRef}
+            className="flex flex-col min-h-full"
             style={{
               // Each hour takes at least 80px, plus guide column
               minWidth: `${guideColumnWidth + totalHours * 80}px`,
@@ -199,31 +218,76 @@ export function TimelineContainer({
               />
             </div>
 
-            {/* Guide rows */}
-            <div className="relative">
-              {/* Vertical grid lines */}
+            {/* Guide rows - flex-1 ensures it fills remaining space for full-height gridlines */}
+            <div className="relative flex-1">
+              {/* Grid lines - vertical (hours) and horizontal (rows) */}
               {showGridLines && (
                 <div
                   className="pointer-events-none absolute inset-0 z-0"
-                  style={{ marginLeft: `${guideColumnWidth}px` }}
                   aria-hidden="true"
                 >
-                  <div className="relative h-full w-full">
-                    {Array.from({ length: totalHours + 1 }).map((_, index) => {
-                      const percent = (index / totalHours) * 100;
-                      return (
-                        <div
-                          key={index}
-                          className={cn(
-                            "absolute top-0 h-full w-px",
-                            index === 0 || index === totalHours
-                              ? "bg-border"
-                              : "bg-border/50"
-                          )}
-                          style={{ left: `${percent}%` }}
-                        />
-                      );
-                    })}
+                  {/* Horizontal row lines - span full width */}
+                  <div className="absolute inset-0">
+                    {Array.from({ length: Math.max(8, timelines.length + 1) }).map((_, index) => (
+                      <div
+                        key={`row-${index}`}
+                        className="absolute left-0 right-0 h-px bg-border/40"
+                        style={{ top: `${(index + 1) * 60}px` }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Vertical hour lines - only in timeline area */}
+                  <div
+                    className="absolute inset-0"
+                    style={{ marginLeft: `${guideColumnWidth}px` }}
+                  >
+                    <div className="relative h-full w-full">
+                      {/* Hour lines - use same calculation as header for exact alignment */}
+                      {generateHourMarkers(startHour, endHour).map((marker, index, arr) => {
+                        const isFirst = index === 0;
+                        const isLast = index === arr.length - 1;
+                        return (
+                          <div
+                            key={marker.hour}
+                            className={cn(
+                              "absolute top-0 h-full w-px",
+                              isFirst || isLast
+                                ? "bg-border"
+                                : "bg-border/70"
+                            )}
+                            style={{ left: `${marker.percent}%` }}
+                          />
+                        );
+                      })}
+
+                      {/* 15-minute interval lines (visible in adjust mode) - subtle */}
+                      {isAdjustMode &&
+                        Array.from({ length: totalHours * 4 }).map((_, index) => {
+                          // Skip hour marks (0, 4, 8, etc.)
+                          if (index % 4 === 0) return null;
+
+                          // Calculate time for this quarter-hour mark
+                          const minutesFromStart = index * 15;
+                          const hour = startHour + Math.floor(minutesFromStart / 60);
+                          const minute = minutesFromStart % 60;
+                          const timeString = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+                          const percent = timeToPercent(timeString, startHour, endHour);
+
+                          const isHalfHour = index % 2 === 0;
+
+                          // Only show half-hour marks, skip 15/45 minute marks for cleaner UI
+                          if (!isHalfHour) return null;
+
+                          return (
+                            <div
+                              key={`quarter-${index}`}
+                              className="absolute top-0 h-full w-px bg-border/50"
+                              style={{ left: `${percent}%` }}
+                            />
+                          );
+                        })}
+                    </div>
                   </div>
                 </div>
               )}
@@ -246,6 +310,7 @@ export function TimelineContainer({
                     vehicleCapacity={timeline.guide.vehicleCapacity}
                     currentGuests={timeline.totalGuests}
                     timelineIndex={index}
+                    guideColumnWidth={guideColumnWidth}
                   >
                     <GuideRow
                       guide={timeline.guide}
@@ -269,15 +334,25 @@ export function TimelineContainer({
           </div>
         </div>
 
-        {/* Left edge shadow when scrolled */}
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-y-0 left-0 z-30 w-4 bg-gradient-to-r from-card to-transparent opacity-0 transition-opacity duration-150",
-            isScrolled && "opacity-100"
-          )}
-          style={{ left: `${guideColumnWidth}px` }}
-          aria-hidden="true"
-        />
+{/* Removed: Left edge gradient shadow was causing glass-like visual artifact */}
+
+        {/* Adjust mode keyboard hint */}
+        {isAdjustMode && (
+          <div
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 animate-hint-fade-in"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/90 backdrop-blur-sm border border-border/50 shadow-sm">
+              <kbd className="inline-flex items-center justify-center h-5 px-1.5 text-[10px] font-medium text-muted-foreground bg-background rounded border border-border">
+                Esc
+              </kbd>
+              <span className="text-xs text-muted-foreground">
+                to exit edit mode
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );

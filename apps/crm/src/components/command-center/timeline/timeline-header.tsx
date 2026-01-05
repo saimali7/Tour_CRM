@@ -119,20 +119,30 @@ export function TimelineHeader({
             );
           })}
 
-          {/* Half-hour markers (smaller) */}
-          {Array.from({ length: totalHours }).map((_, index) => {
-            const halfHourPercent = ((index + 0.5) / totalHours) * 100;
+          {/* Quarter-hour markers (15-min intervals) */}
+          {Array.from({ length: totalHours * 4 }).map((_, index) => {
+            // Skip hour marks (0, 4, 8, etc.) - they're handled above
+            if (index % 4 === 0) return null;
+
+            const quarterPercent = (index / (totalHours * 4)) * 100;
+            const isHalfHour = index % 2 === 0; // 30-min marks are at index 2, 6, 10, etc.
 
             return (
               <div
-                key={`half-${index}`}
+                key={`quarter-${index}`}
                 className="absolute bottom-0 -translate-x-1/2 transform"
-                style={{ left: `${halfHourPercent}%` }}
+                style={{ left: `${quarterPercent}%` }}
                 aria-hidden="true"
               >
-                {/* Small tick mark for half hour */}
+                {/* Tick mark - taller for 30-min, shorter for 15/45-min */}
                 {showGridLines && (
-                  <div className="h-1 w-px bg-border/50" />
+                  <div
+                    className={
+                      isHalfHour
+                        ? "h-1.5 w-px bg-border/60"
+                        : "h-1 w-px bg-border/30"
+                    }
+                  />
                 )}
               </div>
             );

@@ -21,7 +21,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import type { DispatchWarning, DispatchSuggestion } from "./command-center";
+import type { DispatchWarning, DispatchSuggestion } from "./types";
 
 // =============================================================================
 // TYPES
@@ -50,25 +50,25 @@ interface WarningsPanelProps {
 const warningTypeConfig = {
   capacity: {
     icon: Users,
-    iconBg: "bg-amber-500/10",
+    dotColor: "bg-amber-500",
     iconColor: "text-amber-500",
     label: "Capacity",
   },
   no_guide: {
     icon: UserX,
-    iconBg: "bg-red-500/10",
+    dotColor: "bg-red-500",
     iconColor: "text-red-500",
     label: "No Guide",
   },
   conflict: {
     icon: AlertCircle,
-    iconBg: "bg-orange-500/10",
+    dotColor: "bg-orange-500",
     iconColor: "text-orange-500",
     label: "Conflict",
   },
   late_pickup: {
     icon: Clock,
-    iconBg: "bg-yellow-500/10",
+    dotColor: "bg-yellow-500",
     iconColor: "text-yellow-500",
     label: "Late",
   },
@@ -102,7 +102,6 @@ function CompactWarning({
   onToggle,
 }: CompactWarningProps) {
   const config = warningTypeConfig[warning.type];
-  const WarningIcon = config.icon;
 
   // Generate quick-assign suggestions if we have available guides and no existing suggestions
   const suggestions = useMemo(() => {
@@ -136,71 +135,50 @@ function CompactWarning({
   return (
     <div
       className={cn(
-        "group rounded-md border transition-all duration-150",
-        isExpanded
-          ? "bg-muted/30 border-amber-500/30"
-          : "bg-transparent border-transparent hover:bg-muted/20 hover:border-border"
+        "group rounded-md transition-all duration-150",
+        isExpanded ? "bg-muted/50" : "hover:bg-muted/30"
       )}
     >
       {/* Compact header row */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-2 px-2.5 py-2 text-left"
+        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left"
       >
-        {/* Expand/collapse icon */}
-        <span className="text-muted-foreground">
-          {isExpanded ? (
-            <ChevronDown className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
-          )}
-        </span>
-
-        {/* Warning type icon */}
-        <div className={cn("flex-shrink-0 p-1 rounded", config.iconBg)}>
-          <WarningIcon className={cn("h-3 w-3", config.iconColor)} />
-        </div>
+        {/* Warning type indicator - colored dot */}
+        <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", config.dotColor)} />
 
         {/* Message - truncated */}
         <span className="flex-1 text-xs text-foreground truncate">
           {warning.message}
         </span>
 
-        {/* Guest count if available */}
+        {/* Guest count - subtle */}
         {warning.guestCount && (
-          <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
-            {warning.guestCount} {pluralize(warning.guestCount, "pax", "pax")}
-          </Badge>
+          <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+            {warning.guestCount}p
+          </span>
         )}
 
-        {/* Quick action indicator */}
-        {hasSuggestions && !isExpanded && (
-          <Badge
-            variant="outline"
-            className="text-[10px] h-5 px-1.5 shrink-0 border-primary/30 text-primary"
-          >
-            <Zap className="h-2.5 w-2.5 mr-0.5" />
-            {suggestions.length}
-          </Badge>
-        )}
+        {/* Expand indicator */}
+        <ChevronRight className={cn(
+          "h-3 w-3 text-muted-foreground/50 transition-transform shrink-0",
+          isExpanded && "rotate-90"
+        )} />
       </button>
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-2.5 pb-2.5 pt-0">
+        <div className="px-2.5 pb-2.5 pt-0 ml-4">
           {/* Guest info if available */}
           {warning.guestName && (
-            <p className="text-[11px] text-muted-foreground mb-2 pl-6">
+            <p className="text-[11px] text-muted-foreground mb-2">
               {warning.guestName}
             </p>
           )}
 
           {/* Quick-assign suggestions */}
           {hasSuggestions ? (
-            <div className="flex flex-wrap items-center gap-1.5 pl-6">
-              <span className="text-[10px] text-muted-foreground mr-1">
-                Quick assign:
-              </span>
+            <div className="flex flex-wrap items-center gap-1.5">
               {suggestions.map((suggestion) => (
                 <Button
                   key={suggestion.id}
@@ -210,21 +188,16 @@ function CompactWarning({
                     e.stopPropagation();
                     onResolve(suggestion.id);
                   }}
-                  className="h-6 px-2 text-[11px] gap-1 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                  className="h-6 px-2 text-[10px] gap-1 hover:bg-primary hover:text-primary-foreground hover:border-primary"
                 >
-                  <UserPlus className="h-3 w-3" />
+                  <UserPlus className="h-2.5 w-2.5" />
                   {suggestion.label}
-                  {suggestion.impact && (
-                    <span className="text-muted-foreground ml-0.5">
-                      {suggestion.impact}
-                    </span>
-                  )}
                 </Button>
               ))}
             </div>
           ) : (
-            <p className="text-[11px] text-muted-foreground pl-6 italic">
-              No quick actions. Drag from hopper to assign.
+            <p className="text-[10px] text-muted-foreground/70">
+              Drag from hopper to assign
             </p>
           )}
         </div>
@@ -354,74 +327,68 @@ export function WarningsPanel({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      {/* Collapsible Header - Always visible */}
+      {/* Collapsible Header - Clean minimal design */}
       <CollapsibleTrigger asChild>
         <button
           className={cn(
-            "w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-colors",
-            "bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20",
-            !isOpen && "rounded-lg",
-            isOpen && "rounded-t-lg rounded-b-none border-b-0"
+            "w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-all",
+            "bg-card border border-border hover:bg-muted/50",
+            isOpen && "rounded-b-none border-b-transparent"
           )}
         >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-            <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
-              {warnings.length} {pluralize(warnings.length, "issue")} to resolve
+          <div className="flex items-center gap-3">
+            {/* Status dot */}
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
             </span>
 
-            {/* Type badges in collapsed state */}
+            {/* Count and label */}
+            <span className="text-sm">
+              <span className="font-semibold tabular-nums">{warnings.length}</span>
+              <span className="text-muted-foreground ml-1.5">{pluralize(warnings.length, "issue")} to resolve</span>
+            </span>
+
+            {/* Type breakdown - inline, subtle */}
             {!isOpen && (
-              <div className="hidden sm:flex items-center gap-1.5 ml-2">
-                {Object.entries(warningsByType).map(([type, count]) => {
-                  const typeConfig =
-                    warningTypeConfig[type as keyof typeof warningTypeConfig];
+              <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="text-border">|</span>
+                {Object.entries(warningsByType).map(([type, count], idx) => {
+                  const typeConfig = warningTypeConfig[type as keyof typeof warningTypeConfig];
                   if (!typeConfig) return null;
                   return (
-                    <Badge
-                      key={type}
-                      variant="outline"
-                      className={cn("text-[10px] h-5 px-1.5", typeConfig.iconColor)}
-                      style={{ borderColor: "currentColor" }}
-                    >
-                      {typeConfig.label} ({count})
-                    </Badge>
+                    <span key={type} className="flex items-center gap-1">
+                      {idx > 0 && <span className="text-border mr-2">·</span>}
+                      <span className={typeConfig.iconColor}>{typeConfig.label}</span>
+                      <span className="tabular-nums">({count})</span>
+                    </span>
                   );
                 })}
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Total guests affected */}
+          <div className="flex items-center gap-3">
+            {/* Total guests - only show if significant */}
             {totalGuestsAffected > 0 && (
-              <Badge variant="secondary" className="text-[10px] h-5">
-                <Users className="h-3 w-3 mr-1" />
-                {totalGuestsAffected} {pluralize(totalGuestsAffected, "guest")}
-              </Badge>
+              <span className="text-xs text-muted-foreground">
+                <Users className="h-3 w-3 inline mr-1" />
+                {totalGuestsAffected}
+              </span>
             )}
 
-            {/* Expand/collapse icon */}
-            <span className="text-amber-500">
-              {isOpen ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </span>
+            {/* Chevron */}
+            <ChevronDown className={cn(
+              "h-4 w-4 text-muted-foreground transition-transform",
+              isOpen && "rotate-180"
+            )} />
           </div>
         </button>
       </CollapsibleTrigger>
 
       {/* Collapsible Content */}
       <CollapsibleContent>
-        <div
-          className={cn(
-            "border border-t-0 border-amber-500/20 rounded-b-lg",
-            "bg-amber-500/5 px-2 py-2 space-y-1",
-            "max-h-[200px] overflow-y-auto"
-          )}
-        >
+        <div className="border border-t-0 border-border rounded-b-lg bg-card px-2 py-2 space-y-1 max-h-[200px] overflow-y-auto">
           {warnings.map((warning) => (
             <CompactWarning
               key={warning.id}

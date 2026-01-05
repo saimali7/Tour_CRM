@@ -14,6 +14,11 @@ import { LiveAnnouncerProvider, useLiveAnnouncer } from "./live-announcer";
 import { DispatchConfirmDialog } from "./dispatch-confirm-dialog";
 import { CapacityOverrideDialog } from "./capacity-override-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 import { AlertCircle, Calendar } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -25,360 +30,25 @@ import {
   GhostPreviewProvider,
   PendingChangesPanel,
   useAdjustMode,
-  type PendingChange,
-  type PendingAssignChange,
 } from "./adjust-mode";
+import { LiveAssignmentProvider } from "./live-assignment-context";
+import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
+import { useIsLargeDesktop, useIsDesktop } from "@/hooks/use-media-query";
 
-// =============================================================================
-// TYPES
-// =============================================================================
+// Import types and transformers from extracted modules
+import type {
+  DispatchStatus,
+  DispatchWarning,
+  DispatchSuggestion,
+  DispatchData,
+  CommandCenterProps,
+} from "./types";
+export type { DispatchStatus, DispatchWarning, DispatchSuggestion, DispatchData };
 
-export type DispatchStatus = "pending" | "optimized" | "needs_review" | "ready" | "dispatched";
-
-export interface DispatchWarning {
-  id: string;
-  type: "capacity" | "no_guide" | "conflict" | "late_pickup";
-  message: string;
-  bookingId?: string;
-  guestName?: string;
-  guestCount?: number;
-  suggestions: DispatchSuggestion[];
-}
-
-export interface DispatchSuggestion {
-  id: string;
-  label: string;
-  description?: string;
-  impact?: string; // e.g., "+18m drive"
-  guideId?: string;
-}
-
-export interface DispatchData {
-  status: DispatchStatus;
-  totalGuests: number;
-  totalGuides: number;
-  totalDriveMinutes: number;
-  efficiencyScore: number;
-  dispatchedAt?: Date;
-  warnings: DispatchWarning[];
-  guideTimelines: GuideTimeline[];
-}
-
-interface CommandCenterProps {
-  date: Date;
-  onDateChange: (date: Date) => void;
-  onPreviousDay: () => void;
-  onNextDay: () => void;
-  onToday: () => void;
-}
-
-// =============================================================================
-// DATA TRANSFORMATION HELPERS
-// =============================================================================
-
-/**
- * Map service warning type to component warning type
- */
-function mapWarningType(type: string): DispatchWarning["type"] {
-  switch (type) {
-    case "insufficient_guides":
-    case "capacity_exceeded":
-      return "capacity";
-    case "no_qualified_guide":
-    case "no_available_guide":
-      return "no_guide";
-    case "conflict":
-      return "conflict";
-    default:
-      return "capacity";
-  }
-}
-
-/**
- * Map service status to component dispatch status
- */
-function mapDispatchStatus(status: string, unresolvedWarnings: number): DispatchStatus {
-  if (status === "dispatched") return "dispatched";
-  if (status === "ready") return "ready";
-  if (status === "optimized" && unresolvedWarnings > 0) return "needs_review";
-  if (status === "optimized") return "optimized";
-  return "pending";
-}
-
-/**
- * Transform service timeline segment to component segment format
- */
-function transformTimelineSegment(
-  segment: {
-    type: string;
-    startTime: string;
-    endTime: string;
-    durationMinutes: number;
-    booking?: {
-      id: string;
-      referenceNumber: string;
-      customerName: string;
-      customerEmail: string | null;
-      totalParticipants: number;
-      adultCount: number;
-      childCount: number;
-      specialOccasion: string | null;
-      isFirstTime: boolean;
-    };
-    pickupLocation?: string;
-    pickupZoneName?: string;
-    pickupZoneColor?: string;
-    guestCount?: number;
-    tour?: { id: string; name: string; slug: string };
-    tourRunKey?: string;
-    confidence: string;
-  },
-  index: number
-): TimelineSegment {
-  // Generate stable segment ID based on type and content
-  // This ensures IDs are consistent across re-renders
-  let segmentId: string;
-  if (segment.type === "pickup" && segment.booking?.id) {
-    segmentId = `pickup_${segment.booking.id}`;
-  } else if (segment.type === "tour" && segment.tourRunKey) {
-    segmentId = `tour_${segment.tourRunKey}`;
-  } else if (segment.type === "tour" && segment.tour?.id) {
-    segmentId = `tour_${segment.tour.id}_${segment.startTime}`;
-  } else {
-    // Fallback for idle/drive segments - use type + time for uniqueness
-    segmentId = `${segment.type}_${segment.startTime}_${index}`;
-  }
-
-  const baseSegment = {
-    id: segmentId,
-    startTime: segment.startTime,
-    endTime: segment.endTime,
-    durationMinutes: segment.durationMinutes,
-    confidence: (segment.confidence || "optimal") as "optimal" | "good" | "review" | "problem",
-  };
-
-  switch (segment.type) {
-    case "idle":
-      return { ...baseSegment, type: "idle" };
-    case "drive":
-      return { ...baseSegment, type: "drive" };
-    case "pickup":
-      return {
-        ...baseSegment,
-        type: "pickup",
-        pickupLocation: segment.pickupLocation || "Unknown Location",
-        pickupZoneName: segment.pickupZoneName,
-        pickupZoneColor: segment.pickupZoneColor,
-        guestCount: segment.guestCount || 0,
-        booking: segment.booking
-          ? {
-              id: segment.booking.id,
-              referenceNumber: segment.booking.referenceNumber,
-              totalParticipants: segment.booking.totalParticipants,
-              adultCount: segment.booking.adultCount,
-              childCount: segment.booking.childCount,
-              specialOccasion: segment.booking.specialOccasion,
-              customer: {
-                id: segment.booking.id,
-                firstName: segment.booking.customerName?.split(" ")[0] ?? "",
-                lastName: segment.booking.customerName?.split(" ").slice(1).join(" ") ?? "",
-                email: segment.booking.customerEmail,
-              },
-            }
-          : {
-              id: "unknown",
-              referenceNumber: "N/A",
-              totalParticipants: segment.guestCount || 0,
-              adultCount: segment.guestCount || 0,
-            },
-        isFirstTimer: segment.booking?.isFirstTime,
-        hasSpecialOccasion: !!segment.booking?.specialOccasion,
-      };
-    case "tour":
-      return {
-        ...baseSegment,
-        type: "tour",
-        tour: segment.tour
-          ? {
-              id: segment.tour.id,
-              name: segment.tour.name,
-              durationMinutes: segment.durationMinutes,
-            }
-          : {
-              id: "unknown",
-              name: "Tour",
-              durationMinutes: segment.durationMinutes,
-            },
-        totalGuests: segment.guestCount || 0,
-        scheduleId: segment.tourRunKey, // For tracking which tour run this belongs to
-      };
-    default:
-      return { ...baseSegment, type: "idle" };
-  }
-}
-
-/**
- * Transform service guide timeline to component format
- */
-function transformGuideTimeline(
-  timeline: {
-    guide: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string | null;
-      phone: string | null;
-      avatarUrl: string | null;
-    };
-    vehicleCapacity: number;
-    segments: Array<{
-      type: string;
-      startTime: string;
-      endTime: string;
-      durationMinutes: number;
-      booking?: {
-        id: string;
-        referenceNumber: string;
-        customerName: string;
-        customerEmail: string | null;
-        totalParticipants: number;
-        adultCount: number;
-        childCount: number;
-        specialOccasion: string | null;
-        isFirstTime: boolean;
-      };
-      pickupLocation?: string;
-      guestCount?: number;
-      tour?: { id: string; name: string; slug: string };
-      tourRunKey?: string;
-      confidence: string;
-    }>;
-    totalDriveMinutes: number;
-    totalGuests: number;
-    utilization: number;
-  }
-): GuideTimeline {
-  return {
-    guide: {
-      id: timeline.guide.id,
-      firstName: timeline.guide.firstName,
-      lastName: timeline.guide.lastName,
-      email: timeline.guide.email || "",
-      phone: timeline.guide.phone,
-      avatarUrl: timeline.guide.avatarUrl,
-      vehicleCapacity: timeline.vehicleCapacity,
-      status: "active",
-    },
-    segments: timeline.segments.map((seg, idx) => transformTimelineSegment(seg, idx)),
-    totalDriveMinutes: timeline.totalDriveMinutes,
-    totalGuests: timeline.totalGuests,
-    utilization: timeline.utilization,
-  };
-}
-
-/**
- * Apply pending assign changes to guide timelines
- * This creates tour segments for bookings that have been dragged from hopper
- */
-function applyPendingAssignments(
-  timelines: GuideTimeline[],
-  pendingChanges: PendingChange[]
-): GuideTimeline[] {
-  // Filter to only assign type changes
-  const assignChanges = pendingChanges.filter(
-    (c): c is PendingAssignChange => c.type === "assign"
-  );
-
-  if (assignChanges.length === 0) return timelines;
-
-  // Group assign changes by timeline index (not just guide ID)
-  const changesByTimelineIndex = new Map<number, PendingAssignChange[]>();
-  for (const change of assignChanges) {
-    const existing = changesByTimelineIndex.get(change.timelineIndex) || [];
-    existing.push(change);
-    changesByTimelineIndex.set(change.timelineIndex, existing);
-  }
-
-  // Apply changes to each timeline by index
-  return timelines.map((timeline, index) => {
-    const timelineChanges = changesByTimelineIndex.get(index);
-    if (!timelineChanges || timelineChanges.length === 0) return timeline;
-
-    // Create new segments for assigned bookings
-    const newSegments: TimelineSegment[] = timelineChanges.map((change, idx) => {
-      const { bookingData } = change;
-      // Parse tour time to calculate end time (assume 2 hour tour)
-      const [hours, minutes] = bookingData.tourTime.split(":").map(Number);
-      const endHours = (hours ?? 0) + 2;
-      const endTime = `${endHours.toString().padStart(2, "0")}:${(minutes ?? 0).toString().padStart(2, "0")}`;
-
-      return {
-        id: `pending_${change.bookingId}_${idx}`,
-        type: "tour" as const,
-        startTime: bookingData.tourTime,
-        endTime,
-        durationMinutes: 120,
-        confidence: "good" as const,
-        tour: {
-          id: `tour_${change.bookingId}`,
-          name: bookingData.tourName,
-          durationMinutes: 120,
-        },
-        totalGuests: bookingData.guestCount,
-        scheduleId: change.bookingId,
-      };
-    });
-
-    // Merge new segments with existing, sorted by start time
-    const allSegments = [...timeline.segments, ...newSegments].sort((a, b) => {
-      const aTime = a.startTime.split(":").map(Number);
-      const bTime = b.startTime.split(":").map(Number);
-      return ((aTime[0] ?? 0) * 60 + (aTime[1] ?? 0)) - ((bTime[0] ?? 0) * 60 + (bTime[1] ?? 0));
-    });
-
-    // Calculate updated totals
-    const addedGuests = timelineChanges.reduce((sum, c) => sum + c.bookingData.guestCount, 0);
-
-    return {
-      ...timeline,
-      segments: allSegments,
-      totalGuests: timeline.totalGuests + addedGuests,
-    };
-  });
-}
-
-/**
- * Transform service warnings to component warnings format
- */
-function transformWarnings(
-  warnings: Array<{
-    id: string;
-    type: string;
-    message: string;
-    bookingId?: string;
-    tourRunKey?: string;
-    resolutions: Array<{
-      id: string;
-      label: string;
-      action: string;
-      guideId?: string;
-      impactMinutes?: number;
-    }>;
-  }>
-): DispatchWarning[] {
-  return warnings.map((warning) => ({
-    id: warning.id,
-    type: mapWarningType(warning.type),
-    message: warning.message,
-    bookingId: warning.bookingId,
-    suggestions: warning.resolutions.map((resolution) => ({
-      id: resolution.id,
-      label: resolution.label,
-      impact: resolution.impactMinutes ? `+${resolution.impactMinutes}m` : undefined,
-      guideId: resolution.guideId,
-    })),
-  }));
-}
+import {
+  transformGuideTimeline,
+  mapDispatchStatus,
+} from "./data-transformers";
 
 /**
  * Main command center component with adjust mode support
@@ -390,9 +60,12 @@ function CommandCenterContent({
   onNextDay,
   onToday,
 }: CommandCenterProps) {
-  const { isAdjustMode, pendingChanges, pendingChangesCount, hasPendingChanges, exitAdjustMode, enterAdjustMode } = useAdjustMode();
+  const { isAdjustMode, exitAdjustMode, enterAdjustMode } = useAdjustMode();
   const { announce } = useLiveAnnouncer();
-  const [isApplyingChanges, setIsApplyingChanges] = useState(false);
+
+  // Responsive breakpoints for conditional rendering (prevents react-resizable-panels sizing issues)
+  const isLargeDesktop = useIsLargeDesktop(); // >= 1280px (xl)
+  const isDesktop = useIsDesktop(); // >= 1024px (lg)
 
   // Panel state for guest and guide details
   const [selectedGuest, setSelectedGuest] = useState<GuestCardBooking | null>(null);
@@ -404,16 +77,43 @@ function CommandCenterContent({
   // Dispatch confirmation dialog state
   const [showDispatchConfirm, setShowDispatchConfirm] = useState(false);
 
+  // Keyboard shortcuts modal state
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+
   // Ref for timeline container (used for time calculations in drag/drop)
   const timelineContainerRef = useRef<HTMLDivElement>(null);
 
+  // Zoom level state: "compact" (4h), "normal" (8h), "expanded" (full day)
+  const [zoomLevel, setZoomLevel] = useState<"compact" | "normal" | "expanded">("normal");
+
+  // Calculate timeline hours based on zoom level
+  const { startHour, endHour } = useMemo(() => {
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    switch (zoomLevel) {
+      case "compact":
+        // 4-hour window centered around current time or morning
+        const compactStart = Math.max(6, Math.min(currentHour - 1, 18));
+        return { startHour: compactStart, endHour: compactStart + 6 };
+      case "normal":
+        // 10-hour business day view
+        return { startHour: 7, endHour: 20 };
+      case "expanded":
+        // Full day view
+        return { startHour: 6, endHour: 24 };
+      default:
+        return { startHour: 7, endHour: 20 };
+    }
+  }, [zoomLevel]);
+
   // Timeline configuration for time-shift calculations
   const timelineConfig = useMemo(() => ({
-    startHour: 6,
-    endHour: 20,
+    startHour,
+    endHour,
     snapMinutes: 15,
     guideColumnWidth: 200, // Must match the guideColumnWidth prop in TimelineContainer
-  }), []);
+  }), [startHour, endHour]);
 
   // Get tRPC utils for query invalidation
   const utils = trpc.useUtils();
@@ -550,128 +250,6 @@ function CommandCenterContent({
     },
     [date, resolveWarningMutation]
   );
-
-  // Apply reassignments mutation
-  const applyReassignmentsMutation = trpc.commandCenter.applyReassignments.useMutation({
-    onSuccess: (result) => {
-      utils.commandCenter.getDispatch.invalidate({ date });
-
-      if (result.failed > 0) {
-        toast.warning(`Applied ${result.applied} reassignment${result.applied !== 1 ? "s" : ""}, ${result.failed} failed`, {
-          description: "Some changes could not be applied.",
-        });
-      } else {
-        toast.success(`Applied ${result.applied} guide reassignment${result.applied !== 1 ? "s" : ""}`, {
-          description: "Changes have been saved successfully.",
-        });
-      }
-    },
-    onError: (error) => {
-      toast.error("Failed to apply changes", {
-        description: error.message,
-      });
-    },
-  });
-
-  // Handle applying adjust mode changes
-  const handleApplyAdjustChanges = useCallback(async () => {
-    if (pendingChanges.length === 0) return;
-
-    setIsApplyingChanges(true);
-
-    try {
-      // Transform pending changes to the mutation format
-      // Each change may have multiple booking IDs or a single segment
-      const changes = pendingChanges.flatMap((change) => {
-        // Handle new booking assignments from hopper
-        if (change.type === "assign") {
-          return [{
-            bookingId: change.bookingId,
-            fromGuideId: null, // No previous guide for hopper assignments
-            toGuideId: change.toGuideId,
-          }];
-        }
-
-        // Handle time-shift changes (for now just log them - backend support needed)
-        if (change.type === "time-shift") {
-          // TODO: Implement time-shift mutations when backend is ready
-          console.log("Time shift pending:", {
-            segmentId: change.segmentId,
-            originalStartTime: change.originalStartTime,
-            newStartTime: change.newStartTime,
-          });
-          // For now, skip time-shift changes (visual feedback is the main feature)
-          return [];
-        }
-
-        // Handle reassign/swap changes
-        if (change.type === "reassign" || change.type === "swap") {
-          if (change.bookingIds && change.bookingIds.length > 0) {
-            // Has explicit booking IDs - use them
-            return change.bookingIds.map((bookingId) => ({
-              bookingId,
-              fromGuideId: change.fromGuideId || null,
-              toGuideId: change.toGuideId,
-            }));
-          }
-
-          // For segments without explicit booking IDs (like tour segments),
-          // extract booking ID from segment ID format: "pickup_{bookingId}" or "tour_{tourRunKey}"
-          const segmentId = change.segmentId;
-          if (segmentId.startsWith("pickup_")) {
-            // Extract booking ID from pickup segment
-            const bookingId = segmentId.replace("pickup_", "");
-            return [{
-              bookingId,
-              fromGuideId: change.fromGuideId || null,
-              toGuideId: change.toGuideId,
-            }];
-          }
-
-          // For tour segments, we use the tourRunId which should be the schedule/run key
-          // The backend will need to look up all bookings for this tour run
-          if (segmentId.startsWith("tour_")) {
-            // Tour reassignment - use tourRunId (which is the tourRunKey)
-            return [{
-              bookingId: change.tourRunId, // Backend handles tour run reassignment
-              fromGuideId: change.fromGuideId || null,
-              toGuideId: change.toGuideId,
-              isTourRun: true, // Flag for backend to handle differently
-            }];
-          }
-
-          // Skip segments without proper IDs (shouldn't happen with fixed ID generation)
-          console.warn("Skipping segment without proper ID:", segmentId);
-          return [];
-        }
-
-        // Unknown change type - skip
-        return [];
-      });
-
-      // Filter out empty changes
-      const validChanges = changes.filter((c) => c.bookingId);
-
-      if (validChanges.length === 0) {
-        toast.warning("No valid changes to apply");
-        setIsApplyingChanges(false);
-        return;
-      }
-
-      await applyReassignmentsMutation.mutateAsync({
-        date,
-        changes: validChanges,
-      });
-
-      // Exit adjust mode and refresh data
-      exitAdjustMode(true);
-      refetch();
-    } catch (error) {
-      // Error handling is done in mutation onError
-    } finally {
-      setIsApplyingChanges(false);
-    }
-  }, [pendingChanges, date, applyReassignmentsMutation, exitAdjustMode, refetch]);
 
   // Handle segment click to open guest details panel
   const handleSegmentClick = useCallback((segment: TimelineSegment, guide: GuideInfo) => {
@@ -826,6 +404,7 @@ function CommandCenterContent({
             tourName: run.tour?.name || "Tour",
             tourTime: run.time,
             tourRunKey: run.key,
+            tourDurationMinutes: run.tour?.durationMinutes,
             isVIP: false, // Could enhance with customer data
             isFirstTimer: booking.isFirstTime,
             specialOccasion: booking.specialOccasion,
@@ -839,27 +418,16 @@ function CommandCenterContent({
     return unassigned;
   }, [dispatchResponse]);
 
-  // Apply pending assign changes to timelines (for visual preview in adjust mode)
-  const timelinesWithPendingChanges = useMemo(() => {
-    if (!data?.guideTimelines) return [];
-    return applyPendingAssignments(data.guideTimelines, pendingChanges);
-  }, [data?.guideTimelines, pendingChanges]);
-
-  // Filter out bookings that have been assigned via pending changes
-  const filteredHopperBookings = useMemo(() => {
-    const assignedBookingIds = new Set(
-      pendingChanges
-        .filter((c): c is PendingAssignChange => c.type === "assign")
-        .map((c) => c.bookingId)
-    );
-    return hopperBookings.filter((b) => !assignedBookingIds.has(b.id));
-  }, [hopperBookings, pendingChanges]);
+  // Guide timelines from the API (live mode - changes reflect immediately)
+  const guideTimelines = useMemo(() => {
+    return data?.guideTimelines ?? [];
+  }, [data?.guideTimelines]);
 
   // Get route stops for the selected guide (for map panel)
   const selectedGuideRouteStops = useMemo<RouteStop[]>(() => {
-    if (!selectedTimelineGuideId || timelinesWithPendingChanges.length === 0) return [];
+    if (!selectedTimelineGuideId || guideTimelines.length === 0) return [];
 
-    const timeline = timelinesWithPendingChanges.find(
+    const timeline = guideTimelines.find(
       (t) => t.guide.id === selectedTimelineGuideId
     );
     if (!timeline) return [];
@@ -887,13 +455,13 @@ function CommandCenterContent({
     }
 
     return stops;
-  }, [selectedTimelineGuideId, timelinesWithPendingChanges]);
+  }, [selectedTimelineGuideId, guideTimelines]);
 
   // Get the selected guide's name and total drive minutes
   const selectedGuideInfo = useMemo(() => {
-    if (!selectedTimelineGuideId || timelinesWithPendingChanges.length === 0) return null;
+    if (!selectedTimelineGuideId || guideTimelines.length === 0) return null;
 
-    const timeline = timelinesWithPendingChanges.find(
+    const timeline = guideTimelines.find(
       (t) => t.guide.id === selectedTimelineGuideId
     );
     if (!timeline) return null;
@@ -902,7 +470,7 @@ function CommandCenterContent({
       name: `${timeline.guide.firstName} ${timeline.guide.lastName}`.trim(),
       totalDriveMinutes: timeline.totalDriveMinutes,
     };
-  }, [selectedTimelineGuideId, timelinesWithPendingChanges]);
+  }, [selectedTimelineGuideId, guideTimelines]);
 
   // Format date for display - simpler format for CommandStrip
   const formattedDate = useMemo(() => {
@@ -973,19 +541,6 @@ function CommandCenterContent({
       .reduce((sum, run) => sum + run.totalGuests, 0);
   }, [dispatchResponse]);
 
-  // Compute guide capacities for PendingChangesPanel capacity validation
-  const guideCapacities = useMemo(() => {
-    const capacityMap = new Map<string, { current: number; capacity: number; name: string }>();
-    for (const timeline of timelinesWithPendingChanges) {
-      capacityMap.set(timeline.guide.id, {
-        current: timeline.totalGuests,
-        capacity: timeline.guide.vehicleCapacity,
-        name: `${timeline.guide.firstName} ${timeline.guide.lastName}`.trim(),
-      });
-    }
-    return capacityMap;
-  }, [timelinesWithPendingChanges]);
-
   // Handler to select a guide when clicking their row (for map panel)
   // IMPORTANT: This hook must be defined before any early returns to maintain hooks order
   const handleTimelineGuideClick = useCallback((guide: GuideInfo) => {
@@ -1028,29 +583,33 @@ function CommandCenterContent({
           event.preventDefault();
           onToday();
           break;
+        case "e":
+        case "E":
+          if (!isAdjustMode) {
+            event.preventDefault();
+            enterAdjustMode();
+          }
+          break;
+        case "?":
+          event.preventDefault();
+          setShowShortcutsModal(true);
+          break;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAdjustMode, exitAdjustMode, onPreviousDay, onNextDay, onToday]);
+  }, [isAdjustMode, exitAdjustMode, enterAdjustMode, onPreviousDay, onNextDay, onToday]);
 
   // Loading state
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {/* Date Navigation Skeleton */}
-        <div className="flex items-center justify-center gap-4">
-          <Skeleton className="h-8 w-8 rounded-md" />
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-8 w-8 rounded-md" />
-        </div>
+      <div className="flex flex-col h-full min-h-0 gap-2">
+        {/* Command Strip Skeleton */}
+        <Skeleton className="flex-none h-14 w-full rounded-lg" />
 
-        {/* Status Banner Skeleton */}
-        <Skeleton className="h-16 w-full rounded-lg" />
-
-        {/* Timeline Skeleton */}
-        <Skeleton className="h-96 w-full rounded-lg" />
+        {/* Timeline Skeleton - fills remaining space */}
+        <Skeleton className="flex-1 min-h-0 w-full rounded-lg" />
       </div>
     );
   }
@@ -1058,12 +617,14 @@ function CommandCenterContent({
   // Error state
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
-        <div className="flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 text-destructive" />
-          <div>
-            <p className="text-sm font-medium text-destructive">Failed to load dispatch data</p>
-            <p className="text-xs text-destructive/70 mt-0.5">{error.message}</p>
+      <div className="flex flex-col h-full min-h-0 gap-2">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            <div>
+              <p className="text-sm font-medium text-destructive">Failed to load dispatch data</p>
+              <p className="text-xs text-destructive/70 mt-0.5">{error.message}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1073,7 +634,7 @@ function CommandCenterContent({
   // Empty state - no bookings for this day
   if (!data || data.totalGuests === 0) {
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col h-full min-h-0 gap-2">
         <CommandStrip
           date={date}
           formattedDate={formattedDate}
@@ -1087,20 +648,21 @@ function CommandCenterContent({
           unassignedCount={0}
           warningsCount={0}
           isAdjustMode={false}
-          pendingChangesCount={0}
           onEnterAdjustMode={enterAdjustMode}
           onExitAdjustMode={() => exitAdjustMode(false)}
-          onApplyChanges={handleApplyAdjustChanges}
           onOptimize={handleOptimize}
           onDispatch={handleDispatch}
         />
 
-        <div className="rounded-lg border border-border bg-card p-8 text-center">
-          <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <h3 className="text-base font-medium text-foreground mb-1.5">No Tours Scheduled</h3>
-          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            No confirmed bookings for this date. Tours appear here once booked.
-          </p>
+        {/* Empty state card - fills remaining space */}
+        <div className="flex-1 min-h-0 flex items-center justify-center rounded-lg border border-border bg-card">
+          <div className="text-center p-8">
+            <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+            <h3 className="text-base font-medium text-foreground mb-1.5">No Tours Scheduled</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              No confirmed bookings for this date. Tours appear here once booked.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -1110,13 +672,12 @@ function CommandCenterContent({
   const hasUnassigned = hopperBookings.length > 0;
   const isDispatched = data.status === "dispatched";
 
-  // Show three-panel layout when:
-  // 1. In adjust mode (always), OR
-  // 2. There are unassigned bookings (even in normal mode)
-  const showThreePanelLayout = isAdjustMode || hasUnassigned;
+  // Show three-panel layout ONLY in adjust mode
+  // Normal mode focuses on the timeline - hopper appears via the unassigned count button
+  const showThreePanelLayout = isAdjustMode;
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col h-full min-h-0 gap-2">
       {/* Command Strip - Unified header with date nav, status, and actions */}
       <CommandStrip
         date={date}
@@ -1132,13 +693,12 @@ function CommandCenterContent({
         warningsCount={data.warnings.length}
         dispatchedAt={data.dispatchedAt}
         isAdjustMode={isAdjustMode}
-        pendingChangesCount={pendingChangesCount}
+        zoomLevel={zoomLevel}
+        onZoomChange={setZoomLevel}
         onEnterAdjustMode={enterAdjustMode}
         onExitAdjustMode={() => exitAdjustMode(false)}
-        onApplyChanges={handleApplyAdjustChanges}
         onOptimize={handleOptimize}
         onDispatch={handleDispatch}
-        isApplying={isApplyingChanges}
       />
 
       {/* Warnings Panel - collapsed by default, only in normal mode */}
@@ -1150,96 +710,199 @@ function CommandCenterContent({
         />
       )}
 
-      {/* Main Content Area */}
-      <DndProvider
-        guideTimelines={timelinesWithPendingChanges.map((t) => ({
-          guide: t.guide,
-          totalGuests: t.totalGuests,
-          vehicleCapacity: t.guide.vehicleCapacity,
-        }))}
-        timelineConfig={timelineConfig}
-        timelineContainerRef={timelineContainerRef}
-        onBookingAssign={(bookingId, guideId) => {
-          // Toast notification - pending change is added by DndProvider
-          const guide = timelinesWithPendingChanges.find((t) => t.guide.id === guideId);
-          const guideName = guide ? `${guide.guide.firstName} ${guide.guide.lastName}` : "guide";
-          toast.success(`Assigned booking to ${guideName}`);
-        }}
-      >
+      {/* Main Content Area - Takes remaining height */}
+      <LiveAssignmentProvider date={date} onSuccess={() => refetch()}>
+        <DndProvider
+          className="flex-1 min-h-0"
+          guideTimelines={guideTimelines.map((t) => ({
+            guide: t.guide,
+            totalGuests: t.totalGuests,
+            vehicleCapacity: t.guide.vehicleCapacity,
+          }))}
+          timelineConfig={timelineConfig}
+          timelineContainerRef={timelineContainerRef}
+        >
         {showThreePanelLayout ? (
           /* ============================================================
-           * THREE-PANEL LAYOUT
-           * Shown when: adjust mode OR there are unassigned bookings
+           * THREE-PANEL LAYOUT with Resizable Panels
+           * Shown when: adjust mode is active
            * Hopper (left) | Timeline (center) | Map (right)
-           * Responsive: xl=3-panel, lg=2-panel, md/sm=timeline only
+           * Desktop: 3-panel resizable, Tablet: 2-panel, Mobile: timeline only
+           *
+           * IMPORTANT: We use conditional rendering (not CSS hiding) to ensure
+           * only one ResizablePanelGroup is mounted at a time. This prevents
+           * react-resizable-panels from miscalculating panel sizes.
            * ============================================================ */
-          <div className={cn(
-            "rounded-lg border border-border overflow-hidden",
-            "h-[calc(100vh-180px)] min-h-[480px]",
-            // Responsive grid - tighter panels
-            "grid grid-cols-1",
-            "lg:grid-cols-[260px_1fr]",
-            "xl:grid-cols-[260px_1fr_260px]"
-          )}>
-            {/* Left Panel: Hopper - Unassigned Bookings (hidden on mobile) */}
-            <div className="hidden lg:block">
-              <HopperPanel
-                bookings={filteredHopperBookings}
-                onBookingClick={(booking) => {
-                  toast.info(`Selected: ${booking.customerName}`);
-                }}
-                isLoading={isLoading}
-              />
-            </div>
+          <div className="h-full rounded-lg border border-border overflow-hidden">
+            {/* Desktop: 3-panel grid layout (xl and above)
+                Using CSS Grid instead of react-resizable-panels due to sizing bugs */}
+            {isLargeDesktop && (
+              <div className="h-full grid grid-cols-[280px_1fr_280px]">
+                {/* Left Panel: Hopper - Unassigned Bookings */}
+                <div className="flex flex-col min-h-0 overflow-hidden border-r border-border">
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <HopperPanel
+                      bookings={hopperBookings}
+                      onBookingClick={(booking) => {
+                        toast.info(`Selected: ${booking.customerName}`);
+                      }}
+                      isLoading={isLoading}
+                      className="h-full"
+                    />
+                  </div>
+                  {/* Pending Changes Panel */}
+                  {isAdjustMode && (
+                    <PendingChangesPanel
+                      onApply={() => {
+                        toast.info("Apply pending changes");
+                      }}
+                      isApplying={false}
+                      guideTimelines={guideTimelines.map((t) => ({
+                        guideId: t.guide.id,
+                        guideName: `${t.guide.firstName} ${t.guide.lastName}`.trim(),
+                        segments: t.segments
+                          .filter((s) => s.type === "tour" || s.type === "pickup")
+                          .map((s) => ({
+                            id: s.id,
+                            startTime: s.startTime,
+                            endTime: s.endTime,
+                            type: s.type as "tour" | "pickup",
+                          })),
+                      }))}
+                      className="flex-none border-t border-border"
+                    />
+                  )}
+                </div>
 
-            {/* Center Panel: Guide Dispatch Timeline */}
-            <div className="overflow-hidden bg-card border-x border-border">
-              <TimelineContainer
-                timelines={timelinesWithPendingChanges}
-                startHour={6}
-                endHour={20}
-                onSegmentClick={handleSegmentClick}
-                onGuideClick={handleTimelineGuideClick}
-                className={cn(
-                  "h-full",
-                  isDispatched && "opacity-75 pointer-events-none"
-                )}
-                isAdjustMode={isAdjustMode}
-                timelineContentRef={timelineContainerRef}
-              />
-            </div>
+                {/* Center Panel: Guide Dispatch Timeline */}
+                <div className="bg-card overflow-hidden">
+                  <TimelineContainer
+                    timelines={guideTimelines}
+                    startHour={startHour}
+                    endHour={endHour}
+                    onSegmentClick={handleSegmentClick}
+                    onGuideClick={handleTimelineGuideClick}
+                    className={cn(
+                      "h-full min-h-0",
+                      isDispatched && "opacity-75 pointer-events-none"
+                    )}
+                    isAdjustMode={isAdjustMode}
+                    timelineContentRef={timelineContainerRef}
+                  />
+                </div>
 
-            {/* Right Panel: Route Context & Zone Distribution */}
-            <div className="hidden xl:block">
-              <MapPanel
-                selectedGuideId={selectedTimelineGuideId}
-                selectedGuideName={selectedGuideInfo?.name}
-                routeStops={selectedGuideRouteStops}
-                totalDriveMinutes={selectedGuideInfo?.totalDriveMinutes}
-                zoneDistribution={zoneDistribution}
-                tourRunSummary={tourRunSummary}
-                totalGuests={data.totalGuests}
-                assignedGuests={assignedGuests}
-              />
-            </div>
+                {/* Right Panel: Route Context & Zone Distribution */}
+                <div className="overflow-hidden border-l border-border">
+                  <MapPanel
+                    selectedGuideId={selectedTimelineGuideId}
+                    selectedGuideName={selectedGuideInfo?.name}
+                    routeStops={selectedGuideRouteStops}
+                    totalDriveMinutes={selectedGuideInfo?.totalDriveMinutes}
+                    zoneDistribution={zoneDistribution}
+                    tourRunSummary={tourRunSummary}
+                    totalGuests={data.totalGuests}
+                    assignedGuests={assignedGuests}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Tablet: 2-panel grid layout - lg to xl (1024px - 1279px) */}
+            {isDesktop && !isLargeDesktop && (
+              <div className="h-full grid grid-cols-[280px_1fr]">
+                <div className="flex flex-col overflow-hidden border-r border-border">
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <HopperPanel
+                      bookings={hopperBookings}
+                      onBookingClick={(booking) => {
+                        toast.info(`Selected: ${booking.customerName}`);
+                      }}
+                      isLoading={isLoading}
+                      className="h-full"
+                    />
+                  </div>
+                  {isAdjustMode && (
+                    <PendingChangesPanel
+                      onApply={() => toast.info("Apply pending changes")}
+                      isApplying={false}
+                      guideTimelines={guideTimelines.map((t) => ({
+                        guideId: t.guide.id,
+                        guideName: `${t.guide.firstName} ${t.guide.lastName}`.trim(),
+                        segments: t.segments
+                          .filter((s) => s.type === "tour" || s.type === "pickup")
+                          .map((s) => ({
+                            id: s.id,
+                            startTime: s.startTime,
+                            endTime: s.endTime,
+                            type: s.type as "tour" | "pickup",
+                          })),
+                      }))}
+                      className="flex-none border-t border-border"
+                    />
+                  )}
+                </div>
+
+                <div className="bg-card overflow-hidden">
+                  <TimelineContainer
+                    timelines={guideTimelines}
+                    startHour={startHour}
+                    endHour={endHour}
+                    onSegmentClick={handleSegmentClick}
+                    onGuideClick={handleTimelineGuideClick}
+                    className={cn(
+                      "h-full min-h-0",
+                      isDispatched && "opacity-75 pointer-events-none"
+                    )}
+                    isAdjustMode={isAdjustMode}
+                    timelineContentRef={timelineContainerRef}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Mobile: Timeline only (below lg) */}
+            {!isDesktop && (
+              <div className="h-full bg-card">
+                <TimelineContainer
+                  timelines={guideTimelines}
+                  startHour={startHour}
+                  endHour={endHour}
+                  onSegmentClick={handleSegmentClick}
+                  onGuideClick={handleTimelineGuideClick}
+                  className={cn(
+                    "h-full",
+                    isDispatched && "opacity-75 pointer-events-none"
+                  )}
+                  isAdjustMode={isAdjustMode}
+                  timelineContentRef={timelineContainerRef}
+                />
+              </div>
+            )}
           </div>
         ) : (
           /* ============================================================
-           * STANDARD LAYOUT (All Assigned)
-           * Full-width timeline - no hopper needed
+           * STANDARD LAYOUT (Normal viewing mode)
+           * Timeline takes center stage - clean and focused
+           * Enter edit mode to see hopper and context panels
            * ============================================================ */
-          <TimelineContainer
-            timelines={timelinesWithPendingChanges}
-            startHour={6}
-            endHour={20}
-            onSegmentClick={handleSegmentClick}
-            onGuideClick={handleGuideClick}
-            className={isDispatched ? "opacity-75 pointer-events-none" : undefined}
-            isAdjustMode={isAdjustMode}
-            timelineContentRef={timelineContainerRef}
-          />
+          <div className="h-full rounded-lg border border-border bg-card overflow-hidden">
+            <TimelineContainer
+              timelines={guideTimelines}
+              startHour={startHour}
+              endHour={endHour}
+              onSegmentClick={handleSegmentClick}
+              onGuideClick={handleTimelineGuideClick}
+              className={cn(
+                "h-full",
+                isDispatched && "opacity-75 pointer-events-none"
+              )}
+              isAdjustMode={isAdjustMode}
+              timelineContentRef={timelineContainerRef}
+            />
+          </div>
         )}
-      </DndProvider>
+        </DndProvider>
+      </LiveAssignmentProvider>
 
       {/* Guest Details Panel */}
       <GuestCard
@@ -1265,25 +928,14 @@ function CommandCenterContent({
 
       {/* Mobile Hopper Sheet - FAB and bottom sheet for mobile booking assignment */}
       <MobileHopperSheet
-        bookings={filteredHopperBookings}
-        guideTimelines={timelinesWithPendingChanges}
+        bookings={hopperBookings}
+        guideTimelines={guideTimelines}
         onAssign={(bookingId, guideId, guideName) => {
           toast.success(`Assigned booking to ${guideName}`);
           announce(`Booking assigned to ${guideName}`);
         }}
         isLoading={isLoading}
       />
-
-      {/* Pending Changes Panel - Floating panel in adjust mode */}
-      {isAdjustMode && hasPendingChanges && (
-        <div className="fixed bottom-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)] shadow-lg">
-          <PendingChangesPanel
-            onApply={handleApplyAdjustChanges}
-            isApplying={isApplyingChanges}
-            guideCapacities={guideCapacities}
-          />
-        </div>
-      )}
 
       {/* Dispatch Confirmation Dialog */}
       <DispatchConfirmDialog
@@ -1292,14 +944,14 @@ function CommandCenterContent({
         onConfirm={handleConfirmDispatch}
         isLoading={dispatchMutation.isPending}
         date={date}
-        guideCount={timelinesWithPendingChanges.length}
+        guideCount={guideTimelines.length}
         totalGuests={data?.totalGuests ?? 0}
         efficiencyScore={data?.efficiencyScore ?? 0}
         warningsCount={data?.warnings?.length ?? 0}
       />
 
-      {/* Keyboard Shortcut Hints */}
-      <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground/70 py-1">
+      {/* Keyboard Shortcut Hints - fixed at bottom, doesn't affect scroll */}
+      <div className="flex-none flex items-center justify-center gap-3 text-xs text-muted-foreground/70 py-1">
         <span className="flex items-center gap-1">
           <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">←</kbd>
           <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">→</kbd>
@@ -1312,10 +964,28 @@ function CommandCenterContent({
         {isAdjustMode && (
           <span className="flex items-center gap-1">
             <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">Esc</kbd>
-            <span className="ml-0.5">cancel</span>
+            <span className="ml-0.5">exit</span>
           </span>
         )}
+        <button
+          onClick={() => setShowShortcutsModal(true)}
+          className={cn(
+            "flex items-center gap-1 px-1.5 py-0.5 rounded",
+            "hover:bg-muted/70 hover:text-foreground transition-colors",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          )}
+          aria-label="Show keyboard shortcuts"
+        >
+          <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">?</kbd>
+          <span className="ml-0.5">shortcuts</span>
+        </button>
       </div>
+
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal
+        open={showShortcutsModal}
+        onOpenChange={setShowShortcutsModal}
+      />
     </div>
   );
 }

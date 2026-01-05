@@ -37,7 +37,7 @@ export function DashboardShell({ children, mobileHeader }: DashboardShellProps) 
       {/* Page content */}
       <main
         id="main-content"
-        className="flex-1 overflow-auto p-4 md:p-6 mobile-content-padding"
+        className="flex-1 flex flex-col min-h-0 overflow-auto p-4 md:p-6 mobile-content-padding"
         tabIndex={-1}
       >
         {children}

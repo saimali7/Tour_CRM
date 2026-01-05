@@ -6,7 +6,7 @@
  * Usage:
  * 1. Wrap your command center with AdjustModeProvider, GhostPreviewProvider, and DndProvider
  * 2. Use AdjustModeToggle to enter/exit adjust mode
- * 3. Wrap segments with DraggableSegment
+ * 3. Segments in segment-lane.tsx use useDraggable directly (inline DnD)
  * 4. Wrap guide rows with DroppableGuideRow
  * 5. Use useGhostPreview in MapPanel to show drag feedback
  *
@@ -16,10 +16,8 @@
  *   <GhostPreviewProvider>
  *     <DndProvider onBookingAssign={handleAssign}>
  *       <AdjustModeToggle onApplyChanges={handleApply} />
- *       <DroppableGuideRow guideId={guide.id}>
- *         <DraggableSegment id={segment.id} guideId={guide.id}>
- *           <SegmentContent />
- *         </DraggableSegment>
+ *       <DroppableGuideRow guideId={guide.id} guideName={guideName} ...>
+ *         <SegmentLane segments={segments} guide={guide} ... />
  *       </DroppableGuideRow>
  *       <MapPanel />
  *     </DndProvider>
@@ -28,7 +26,10 @@
  * ```
  */
 
-// Context and hook
+// =============================================================================
+// CONTEXT & STATE
+// =============================================================================
+
 export {
   AdjustModeProvider,
   useAdjustMode,
@@ -36,13 +37,10 @@ export {
   type PendingAssignChange,
   type PendingReassignChange,
   type PendingTimeShiftChange,
+  type PendingUnassignChange,
   type PendingChangesSummary,
 } from "./adjust-mode-context";
 
-// Pending changes panel
-export { PendingChangesPanel } from "./pending-changes-panel";
-
-// Ghost preview context for map panel feedback
 export {
   GhostPreviewProvider,
   useGhostPreview,
@@ -52,18 +50,36 @@ export {
   type EfficiencyRating,
 } from "./ghost-preview-context";
 
-// Toggle button
+// =============================================================================
+// COMPONENTS
+// =============================================================================
+
 export { AdjustModeToggle } from "./adjust-mode-toggle";
-
-// Drag and drop components
-export {
-  DraggableSegment,
-  type DraggableSegmentData,
-} from "./draggable-segment";
-
-export {
-  DroppableGuideRow,
-  type DroppableGuideRowData,
-} from "./droppable-guide-row";
-
+export { PendingChangesPanel } from "./pending-changes-panel";
+export { DroppableGuideRow } from "./droppable-guide-row";
 export { DndProvider } from "./dnd-provider";
+
+// =============================================================================
+// DND TYPES (centralized)
+// =============================================================================
+
+export {
+  // Drag data types
+  type DraggableSegmentData,
+  type HopperBookingDragData,
+  type ActiveDragData,
+  // Drop target types
+  type DroppableGuideRowData,
+  type DroppableHopperData,
+  type DroppableData,
+  // State types
+  type DragState,
+  type DragStartCapture,
+  type DndTimelineConfig,
+  // Type guards
+  isSegmentDrag,
+  isHopperBookingDrag,
+  isGuideRowDrop,
+  isHopperDrop,
+  canSegmentBeDragged,
+} from "./types";

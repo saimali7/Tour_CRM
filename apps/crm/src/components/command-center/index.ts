@@ -51,9 +51,32 @@
 
 export { CommandCenter } from "./command-center";
 export { CommandCenterErrorBoundary } from "./command-center-error-boundary";
-export { DispatchHeader } from "./dispatch-header";
-export { StatusBanner } from "./status-banner";
+export { CommandStrip } from "./command-strip";
 export { WarningsPanel } from "./warnings-panel";
+
+// =============================================================================
+// TYPES (exported from dedicated types module)
+// =============================================================================
+
+export type {
+  DispatchStatus,
+  DispatchWarning,
+  DispatchSuggestion,
+  DispatchData,
+  CommandCenterProps,
+} from "./types";
+
+// =============================================================================
+// DATA TRANSFORMERS (for external use if needed)
+// =============================================================================
+
+export {
+  transformGuideTimeline,
+  transformTimelineSegment,
+  transformWarnings,
+  mapDispatchStatus,
+  mapWarningType,
+} from "./data-transformers";
 
 // =============================================================================
 // DETAIL PANELS
@@ -67,15 +90,26 @@ export { GuideCard, type GuideCardProps, type GuideCardData, type GuideAssignmen
 // =============================================================================
 
 export {
+  // Components
   AdjustModeProvider,
   AdjustModeToggle,
-  DraggableSegment,
   DroppableGuideRow,
   DndProvider,
+  PendingChangesPanel,
+  // Ghost preview
+  GhostPreviewProvider,
+  useGhostPreview,
+  // Context hooks
   useAdjustMode,
+  // Types
   type PendingChange,
   type DraggableSegmentData,
+  type HopperBookingDragData,
   type DroppableGuideRowData,
+  type ActiveDragData,
+  // Type guards
+  isSegmentDrag,
+  isHopperBookingDrag,
 } from "./adjust-mode";
 
 // =============================================================================

@@ -1,32 +1,44 @@
 "use client";
 
-import { format } from "date-fns";
-import { isToday, isTomorrow } from "date-fns";
-import type { ReactNode } from "react";
+import { format, isToday, isTomorrow } from "date-fns";
 import {
   CheckCircle2,
-  AlertTriangle,
+  AlertCircle,
   Send,
   ChevronLeft,
   ChevronRight,
   Users,
-  Car,
-  Gauge,
   Lock,
   Sparkles,
-  Undo2,
-  Save,
+  Pencil,
+  Check,
+  ChevronDown,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import type { DispatchStatus } from "./command-center";
+import type { DispatchStatus } from "./types";
+
+// =============================================================================
+// ZOOM TYPES
+// =============================================================================
+
+export type ZoomLevel = "compact" | "normal" | "expanded";
 
 // =============================================================================
 // TYPES
@@ -59,20 +71,18 @@ interface CommandStripProps {
   dispatchedAt?: Date;
   /** Whether adjust mode is active */
   isAdjustMode: boolean;
-  /** Number of pending changes in adjust mode */
-  pendingChangesCount: number;
+  /** Current zoom level */
+  zoomLevel?: ZoomLevel;
+  /** Change zoom level */
+  onZoomChange?: (level: ZoomLevel) => void;
   /** Enter adjust mode */
   onEnterAdjustMode: () => void;
   /** Exit adjust mode */
   onExitAdjustMode: () => void;
-  /** Apply adjust mode changes */
-  onApplyChanges: () => void;
   /** Optimize assignments */
   onOptimize: () => void;
   /** Send dispatch */
   onDispatch: () => void;
-  /** Whether changes are being applied */
-  isApplying?: boolean;
 }
 
 // =============================================================================
@@ -101,13 +111,12 @@ export function CommandStrip({
   warningsCount,
   dispatchedAt,
   isAdjustMode,
-  pendingChangesCount,
+  zoomLevel = "normal",
+  onZoomChange,
   onEnterAdjustMode,
   onExitAdjustMode,
-  onApplyChanges,
   onOptimize,
   onDispatch,
-  isApplying = false,
 }: CommandStripProps) {
   const isDateToday = isToday(date);
   const isDateTomorrow = isTomorrow(date);
@@ -127,28 +136,32 @@ export function CommandStrip({
 
   const healthConfig = {
     critical: {
-      bg: "bg-red-500/10 border-red-500/30",
-      text: "text-red-600 dark:text-red-400",
-      icon: AlertTriangle,
-      label: `${unassignedCount} ${pluralize(unassignedCount, "booking")} unassigned`,
+      bg: "bg-card border-border",
+      accent: "bg-red-500",
+      text: "text-foreground",
+      icon: AlertCircle,
+      iconColor: "text-red-500",
     },
     warning: {
-      bg: "bg-amber-500/10 border-amber-500/30",
-      text: "text-amber-600 dark:text-amber-400",
-      icon: AlertTriangle,
-      label: `${warningsCount} ${pluralize(warningsCount, "issue")} to review`,
+      bg: "bg-card border-border",
+      accent: "bg-amber-500",
+      text: "text-foreground",
+      icon: AlertCircle,
+      iconColor: "text-amber-500",
     },
     ready: {
-      bg: "bg-emerald-500/10 border-emerald-500/30",
-      text: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-card border-border",
+      accent: "bg-emerald-500",
+      text: "text-foreground",
       icon: CheckCircle2,
-      label: "Ready to dispatch",
+      iconColor: "text-emerald-500",
     },
     dispatched: {
-      bg: "bg-muted border-border",
+      bg: "bg-card border-border",
+      accent: "bg-muted-foreground/50",
       text: "text-muted-foreground",
       icon: Lock,
-      label: `Sent at ${dispatchedAt ? format(dispatchedAt, "HH:mm") : "--:--"}`,
+      iconColor: "text-muted-foreground",
     },
   };
 
@@ -157,18 +170,24 @@ export function CommandStrip({
 
   return (
     <div className={cn(
-      "rounded-md border transition-all duration-200",
+      "relative rounded-lg border overflow-hidden transition-all duration-200",
       config.bg,
-      // Adjust mode indicator - prominent border
+      // Adjust mode indicator
       isAdjustMode && "ring-2 ring-primary/50 border-primary/50"
     )}>
-      <div className="flex items-center justify-between gap-3 px-3 py-1.5">
-        {/* Left: Date Navigation */}
-        <div className="flex items-center gap-1">
+      {/* Left accent bar - status indicator */}
+      <div className={cn(
+        "absolute left-0 top-0 bottom-0 w-1 transition-colors",
+        config.accent
+      )} />
+
+      <div className="flex items-center justify-between gap-4 pl-4 pr-3 py-2">
+        {/* Left: Date Navigation - compact */}
+        <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 min-w-[36px]"
+            className="h-8 w-8"
             onClick={onPreviousDay}
             aria-label="Previous day"
           >
@@ -179,12 +198,10 @@ export function CommandStrip({
             onClick={onToday}
             disabled={isDateToday}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-semibold transition-colors min-h-[36px]",
+              "px-3 py-1.5 rounded-md text-sm font-semibold transition-colors",
               isDateToday
                 ? "bg-primary/10 text-primary cursor-default"
-                : isDateTomorrow
-                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20"
-                  : "hover:bg-muted"
+                : "hover:bg-muted"
             )}
           >
             {formattedDate}
@@ -193,7 +210,7 @@ export function CommandStrip({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 min-w-[36px]"
+            className="h-8 w-8"
             onClick={onNextDay}
             aria-label="Next day"
           >
@@ -201,164 +218,215 @@ export function CommandStrip({
           </Button>
         </div>
 
-        {/* Center: Health Status + Stats */}
-        <div className="flex items-center gap-3">
-          {/* Health Status Badge */}
-          <div className={cn("flex items-center gap-1", config.text)}>
-            <HealthIcon className={cn("h-3.5 w-3.5", healthState === "critical" && "animate-pulse")} />
-            <span className="text-xs font-medium">{config.label}</span>
+        {/* Center: Status + Stats - clean and minimal */}
+        <div className="flex items-center gap-4">
+          {/* Status indicator */}
+          <div className="flex items-center gap-2">
+            <HealthIcon className={cn("h-4 w-4", config.iconColor)} />
+            <span className={cn("text-sm", config.text)}>
+              {healthState === "critical" ? (
+                <span>
+                  <span className="font-semibold tabular-nums">{unassignedCount}</span>
+                  <span className="text-muted-foreground ml-1">unassigned</span>
+                </span>
+              ) : healthState === "warning" ? (
+                <span>
+                  <span className="font-semibold tabular-nums">{warningsCount}</span>
+                  <span className="text-muted-foreground ml-1">{pluralize(warningsCount, "issue")}</span>
+                </span>
+              ) : healthState === "ready" ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ready</span>
+              ) : (
+                <span>Sent {dispatchedAt ? format(dispatchedAt, "HH:mm") : "--:--"}</span>
+              )}
+            </span>
           </div>
 
-          {/* Divider */}
-          <div className="h-3 w-px bg-border" />
+          {/* Separator */}
+          <div className="h-4 w-px bg-border" />
 
-          {/* Stats - Compact */}
-          <TooltipProvider delayDuration={200}>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-0.5">
-                    <Users className="h-3 w-3" />
-                    <span className="font-medium text-foreground tabular-nums">{totalGuests}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{totalGuests} {pluralize(totalGuests, "guest")}</TooltipContent>
-              </Tooltip>
+          {/* Guest count - expandable */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 text-sm",
+                  "hover:text-foreground transition-colors",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded"
+                )}
+              >
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="tabular-nums font-medium">{totalGuests}</span>
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="bottom"
+              align="center"
+              className="w-44 p-3"
+            >
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Guests</span>
+                  <span className="font-medium tabular-nums">{totalGuests}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Guides</span>
+                  <span className="font-medium tabular-nums">{totalGuides}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Efficiency</span>
+                  <span className={cn(
+                    "font-medium tabular-nums",
+                    efficiencyScore >= 90 ? "text-emerald-500" :
+                    efficiencyScore >= 70 ? "text-amber-500" :
+                    "text-red-500"
+                  )}>
+                    {efficiencyScore}%
+                  </span>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-0.5">
-                    <Car className="h-3 w-3" />
-                    <span className="font-medium text-foreground tabular-nums">{totalGuides}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{totalGuides} {pluralize(totalGuides, "guide")}</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-0.5">
-                    <Gauge className="h-3 w-3" />
-                    <span className={cn(
-                      "font-medium tabular-nums",
-                      efficiencyScore >= 90 ? "text-emerald-600 dark:text-emerald-400" :
-                      efficiencyScore >= 70 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
-                    )}>{efficiencyScore}%</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>Efficiency</TooltipContent>
-              </Tooltip>
-            </div>
-          </TooltipProvider>
-        </div>
-
-        {/* Right: Primary Action */}
-        <div className="flex items-center gap-2">
-          {isAdjustMode ? (
-            /* Adjust Mode Controls */
+          {/* Zoom controls - hidden on mobile */}
+          {onZoomChange && (
             <>
-              {/* Adjust Mode Badge with keyboard hints */}
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="text-xs border-primary/50 text-primary bg-primary/5 animate-pulse"
+              <Separator orientation="vertical" className="h-4 hidden sm:block" />
+              <TooltipProvider delayDuration={300}>
+                <ToggleGroup
+                  type="single"
+                  value={zoomLevel}
+                  onValueChange={(value) => value && onZoomChange(value as ZoomLevel)}
+                  className="hidden sm:flex gap-0.5"
                 >
-                  Editing
-                </Badge>
-                <TooltipProvider delayDuration={0}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="hidden md:flex items-center gap-1 text-[10px] text-muted-foreground">
-                        <kbd className="px-1 py-0.5 rounded bg-muted font-mono text-[10px] border border-border/50">⌘Z</kbd>
-                        <span>undo</span>
-                      </span>
+                      <ToggleGroupItem
+                        value="compact"
+                        aria-label="Compact view (6 hours)"
+                        className={cn(
+                          "h-7 w-7 p-0 data-[state=on]:bg-primary/10 data-[state=on]:text-primary",
+                          "hover:bg-muted transition-colors"
+                        )}
+                      >
+                        <ZoomIn className="h-3.5 w-3.5" />
+                      </ToggleGroupItem>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" className="text-xs">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] border">⌘Z</kbd>
-                          <span>Undo change</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <kbd className="px-1.5 py-0.5 rounded bg-muted text-[10px] border">⇧⌘Z</kbd>
-                          <span>Redo change</span>
-                        </div>
-                      </div>
+                      Compact (6h)
                     </TooltipContent>
                   </Tooltip>
-                </TooltipProvider>
-              </div>
 
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem
+                        value="normal"
+                        aria-label="Normal view (13 hours)"
+                        className={cn(
+                          "h-7 w-7 p-0 data-[state=on]:bg-primary/10 data-[state=on]:text-primary",
+                          "hover:bg-muted transition-colors"
+                        )}
+                      >
+                        <ZoomOut className="h-3.5 w-3.5" />
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Normal (13h)
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem
+                        value="expanded"
+                        aria-label="Full day view (18 hours)"
+                        className={cn(
+                          "h-7 w-7 p-0 data-[state=on]:bg-primary/10 data-[state=on]:text-primary",
+                          "hover:bg-muted transition-colors"
+                        )}
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Expanded (18h)
+                    </TooltipContent>
+                  </Tooltip>
+                </ToggleGroup>
+              </TooltipProvider>
+            </>
+          )}
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2">
+          {isAdjustMode ? (
+            /* Live Edit Mode */
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-primary/10">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+                </span>
+                <span className="text-xs font-medium text-primary">Editing</span>
+              </div>
+              <Button
+                size="sm"
+                onClick={onExitAdjustMode}
+                className="h-8 gap-1.5 text-xs"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Done
+              </Button>
+            </div>
+          ) : isDispatched ? (
+            <Button variant="outline" size="sm" className="h-8 text-xs">
+              View Manifests
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onExitAdjustMode}
+                onClick={onEnterAdjustMode}
                 className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
-                <Undo2 className="h-3.5 w-3.5" />
-                Cancel
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
               </Button>
-              <Button
-                size="sm"
-                onClick={onApplyChanges}
-                disabled={pendingChangesCount === 0 || isApplying}
-                className="h-8 gap-1.5 text-xs bg-primary relative"
-              >
-                <Save className="h-3.5 w-3.5" />
-                {isApplying ? "Saving..." : "Save Changes"}
-                {pendingChangesCount > 0 && !isApplying && (
-                  <Badge
-                    variant="secondary"
-                    className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-[10px] font-bold bg-amber-500 text-white border-2 border-background"
-                  >
-                    {pendingChangesCount}
-                  </Badge>
-                )}
-              </Button>
-            </>
-          ) : isDispatched ? (
-            /* Dispatched State */
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">View Manifests</Button>
-          ) : hasUnassigned ? (
-            /* Need to Assign */
-            <>
-              <Button variant="outline" size="sm" onClick={onEnterAdjustMode} className="h-8 gap-1.5 text-xs">
-                Manual
-              </Button>
-              <Button size="sm" onClick={onOptimize} className="h-8 gap-1.5 text-xs bg-primary">
-                <Sparkles className="h-3.5 w-3.5" />
-                Auto-Assign
-              </Button>
-            </>
-          ) : hasWarnings ? (
-            /* Has Warnings */
-            <>
-              <Button variant="outline" size="sm" onClick={onEnterAdjustMode} className="h-8 text-xs">Adjust</Button>
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span tabIndex={0}>
-                      <Button size="sm" disabled className="h-8 gap-1.5 text-xs pointer-events-none">
-                        <Send className="h-3.5 w-3.5" />
-                        Dispatch
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p className="text-xs">Resolve {warningsCount} {pluralize(warningsCount, "issue")} first</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </>
-          ) : (
-            /* Ready to Dispatch */
-            <>
-              <Button variant="outline" size="sm" onClick={onEnterAdjustMode} className="h-8 text-xs">Adjust</Button>
-              <Button size="sm" onClick={onDispatch} className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700">
-                <Send className="h-3.5 w-3.5" />
-                Dispatch
-              </Button>
-            </>
+              {hasUnassigned ? (
+                <Button size="sm" onClick={onOptimize} className="h-8 gap-1.5 text-xs">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Auto-Assign
+                </Button>
+              ) : hasWarnings ? (
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button size="sm" disabled className="h-8 gap-1.5 text-xs">
+                          <Send className="h-3.5 w-3.5" />
+                          Dispatch
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Resolve issues first
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={onDispatch}
+                  className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Dispatch
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </div>

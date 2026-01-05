@@ -32,6 +32,10 @@ export interface GhostPreviewData {
     /** For segment drags, the current guide */
     fromGuideId?: string;
     fromGuideName?: string;
+    /** Duration of the booking/segment in minutes */
+    durationMinutes?: number;
+    /** Original start time (for segments) */
+    originalStartTime?: string;
   } | null;
 
   /** Target guide being hovered over */
@@ -40,6 +44,18 @@ export interface GhostPreviewData {
     guideName: string;
     vehicleCapacity: number;
     currentGuestCount: number;
+  } | null;
+
+  /** Target time position for the drop (snapped to 15-min intervals) */
+  targetTime: {
+    /** The snapped time string (e.g., "10:15") */
+    time: string;
+    /** The formatted display time (e.g., "10:15 AM") */
+    displayTime: string;
+    /** Position as percentage of timeline width */
+    percent: number;
+    /** Width as percentage (based on duration) */
+    widthPercent: number;
   } | null;
 
   /** Calculated impact of the proposed assignment */
@@ -72,6 +88,9 @@ interface GhostPreviewContextType {
   /** Update target when hovering over a guide */
   setDragTarget: (target: GhostPreviewData["target"], impact?: GhostPreviewData["impact"], recommendation?: GhostPreviewData["recommendation"]) => void;
 
+  /** Update target time position during drag (called on mouse move) */
+  setTargetTime: (targetTime: GhostPreviewData["targetTime"]) => void;
+
   /** Clear target when leaving a guide */
   clearDragTarget: () => void;
 
@@ -87,6 +106,7 @@ const initialGhostPreview: GhostPreviewData = {
   isActive: false,
   source: null,
   target: null,
+  targetTime: null,
   impact: null,
   recommendation: null,
 };
@@ -113,6 +133,7 @@ export function GhostPreviewProvider({ children }: GhostPreviewProviderProps) {
       isActive: true,
       source,
       target: null,
+      targetTime: null,
       impact: null,
       recommendation: null,
     });
@@ -131,10 +152,18 @@ export function GhostPreviewProvider({ children }: GhostPreviewProviderProps) {
     }));
   }, []);
 
+  const setTargetTime = useCallback((targetTime: GhostPreviewData["targetTime"]) => {
+    setGhostPreview((prev) => ({
+      ...prev,
+      targetTime,
+    }));
+  }, []);
+
   const clearDragTarget = useCallback(() => {
     setGhostPreview((prev) => ({
       ...prev,
       target: null,
+      targetTime: null,
       impact: null,
       recommendation: null,
     }));
@@ -150,6 +179,7 @@ export function GhostPreviewProvider({ children }: GhostPreviewProviderProps) {
         ghostPreview,
         startDrag,
         setDragTarget,
+        setTargetTime,
         clearDragTarget,
         endDrag,
       }}

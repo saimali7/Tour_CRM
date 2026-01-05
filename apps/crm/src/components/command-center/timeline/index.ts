@@ -22,7 +22,7 @@
  *   return (
  *     <TimelineContainer
  *       timelines={timelines}
- *       startHour={6}
+ *       startHour={7}
  *       endHour={20}
  *       onSegmentClick={(segment, guide) => {
  *         console.log("Clicked", segment, "for guide", guide);
@@ -50,6 +50,19 @@ export { IdleSegment } from "./idle-segment";
 export { DriveSegment } from "./drive-segment";
 export { PickupSegment, GuestDots } from "./pickup-segment";
 export { TourSegment } from "./tour-segment";
+export { SegmentLane } from "./segment-lane";
+
+// Segment content components (extracted for maintainability)
+export {
+  TourContent,
+  TourTooltip,
+  PickupContent,
+  PickupTooltip,
+  DriveContent,
+  DriveTooltip,
+  IdleContent,
+  IdleTooltip,
+} from "./segment-content";
 
 // =============================================================================
 // TYPES

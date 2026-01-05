@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { Loader2, X, Plus } from "lucide-react";
 import { SingleImageUploader, ImageUploader } from "@/components/uploads/image-uploader";
+import { DurationInput } from "@/components/ui/duration-input";
 import { toast } from "sonner";
 
 export interface TourFormData {
@@ -76,7 +77,7 @@ export function TourForm({
     slug: "",
     description: "",
     shortDescription: "",
-    durationMinutes: 60,
+    durationMinutes: 360,
     minParticipants: 1,
     maxParticipants: 10,
     guestsPerGuide: 6,
@@ -460,20 +461,18 @@ export function TourForm({
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
-              Duration (minutes) *
+              Duration *
             </label>
-            <input
-              type="number"
-              required
-              min="15"
+            <DurationInput
               value={formData.durationMinutes}
-              onChange={(e) =>
+              onChange={(minutes) =>
                 setFormData((prev) => ({
                   ...prev,
-                  durationMinutes: parseInt(e.target.value) || 60,
+                  durationMinutes: minutes,
                 }))
               }
-              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              min={15}
+              max={1440}
             />
           </div>
 

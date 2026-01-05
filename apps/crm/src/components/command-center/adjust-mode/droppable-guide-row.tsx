@@ -4,37 +4,21 @@ import { useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { useAdjustMode } from "./adjust-mode-context";
+import { useGhostPreview } from "./ghost-preview-context";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowRight, AlertTriangle, CheckCircle2, Clock, Users } from "lucide-react";
 import type { ReactNode } from "react";
-import type { DraggableSegmentData } from "./draggable-segment";
-import type { HopperBooking } from "../hopper/hopper-card";
 
-// =============================================================================
-// TYPES
-// =============================================================================
+// Import centralized types
+import {
+  type ActiveDragData,
+  type DroppableGuideRowData,
+  isSegmentDrag,
+  isHopperBookingDrag,
+} from "./types";
 
-/**
- * Data from hopper booking drag
- */
-interface HopperBookingDragData {
-  type: "hopper-booking";
-  booking: HopperBooking;
-}
-
-type ActiveDragData = DraggableSegmentData | HopperBookingDragData;
-
-/**
- * Data attached to droppable guide rows for drop handling
- */
-export interface DroppableGuideRowData {
-  type: "guide-row";
-  guideId: string;
-  guideName: string;
-  vehicleCapacity: number;
-  /** Index of this row in the timelines array */
-  timelineIndex: number;
-}
+// Re-export for backward compatibility
+export type { DroppableGuideRowData } from "./types";
 
 interface DroppableGuideRowProps {
   /** Unique ID for this row (to avoid collision when same guide appears multiple times) */
@@ -51,6 +35,8 @@ interface DroppableGuideRowProps {
   timelineIndex: number;
   /** Content to render inside the droppable area */
   children: ReactNode;
+  /** Width of the guide info column in pixels (for positioning ghost preview) */
+  guideColumnWidth?: number;
   /** Additional CSS classes */
   className?: string;
 }
@@ -76,9 +62,11 @@ export function DroppableGuideRow({
   currentGuests = 0,
   timelineIndex,
   children,
+  guideColumnWidth = 200,
   className,
 }: DroppableGuideRowProps) {
   const { isAdjustMode } = useAdjustMode();
+  const { ghostPreview } = useGhostPreview();
 
   const { setNodeRef, isOver, active } = useDroppable({
     id: `guide-row-${rowId}`,
@@ -95,15 +83,24 @@ export function DroppableGuideRow({
   // Extract data from active draggable
   const activeData = active?.data?.current as ActiveDragData | undefined;
 
-  // Determine if this is a valid drop target based on drag type
-  const isHopperBookingDrag = activeData?.type === "hopper-booking";
-  const isSegmentDrag = activeData?.type === "segment";
-  const sourceGuideId = isSegmentDrag ? activeData.guideId : undefined;
-
+  // Determine drop validity based on drag type
   // For hopper bookings: always valid (no source guide)
   // For segments: only valid if from a different guide
-  const isDifferentGuide = isSegmentDrag ? sourceGuideId !== guideId : false;
-  const isValidDropTarget = isHopperBookingDrag || isDifferentGuide;
+  const { isHopperDrag, isSegmentDragType, sourceGuideId } = useMemo(() => {
+    if (!activeData) {
+      return { isHopperDrag: false, isSegmentDragType: false, sourceGuideId: undefined };
+    }
+    if (isHopperBookingDrag(activeData)) {
+      return { isHopperDrag: true, isSegmentDragType: false, sourceGuideId: undefined };
+    }
+    if (isSegmentDrag(activeData)) {
+      return { isHopperDrag: false, isSegmentDragType: true, sourceGuideId: activeData.guideId };
+    }
+    return { isHopperDrag: false, isSegmentDragType: false, sourceGuideId: undefined };
+  }, [activeData]);
+
+  const isDifferentGuide = isSegmentDragType && sourceGuideId !== guideId;
+  const isValidDropTarget = isHopperDrag || isDifferentGuide;
 
   // Calculate capacity status when hovering with a booking
   const capacityStatus = useMemo((): {
@@ -114,14 +111,13 @@ export function DroppableGuideRow({
   } | null => {
     if (!isOver || !activeData) return null;
 
-    // Get guest count from the dragged item
+    // Get guest count from the dragged item (using type guards for type narrowing)
     let guestCount = 0;
-    if (activeData.type === "hopper-booking") {
+    if (isHopperBookingDrag(activeData)) {
       guestCount = activeData.booking.guestCount;
-    } else if (activeData.type === "segment") {
-      // For segment drags, we could add guest count to DraggableSegmentData
-      // For now, estimate based on typical booking size
-      guestCount = 0; // Segments don't carry guest count currently
+    } else if (isSegmentDrag(activeData)) {
+      // Use guestCount from segment data (available for pickup and tour segments)
+      guestCount = activeData.guestCount ?? 0;
     }
 
     const newTotal = currentGuests + guestCount;
@@ -251,6 +247,28 @@ export function DroppableGuideRow({
         </div>
       )}
 
+      {/* Ghost Preview Segment - shows where the booking will land */}
+      {showDropIndicator && ghostPreview.targetTime && (
+        <div
+          className="absolute pointer-events-none z-15"
+          style={{
+            left: `calc(${guideColumnWidth}px + ${ghostPreview.targetTime.percent}%)`,
+            width: `${ghostPreview.targetTime.widthPercent}%`,
+            top: "50%",
+            transform: "translateY(-50%)",
+          }}
+          aria-hidden="true"
+        >
+          <GhostSegment
+            displayTime={ghostPreview.targetTime.displayTime}
+            customerName={ghostPreview.source?.customerName}
+            guestCount={ghostPreview.source?.guestCount}
+            zoneColor={ghostPreview.source?.pickupZone?.color}
+            isSegment={ghostPreview.source?.type === "segment"}
+          />
+        </div>
+      )}
+
       {/* Row Content */}
       {children}
     </div>
@@ -258,3 +276,86 @@ export function DroppableGuideRow({
 }
 
 DroppableGuideRow.displayName = "DroppableGuideRow";
+
+// =============================================================================
+// GHOST SEGMENT COMPONENT
+// =============================================================================
+
+interface GhostSegmentProps {
+  displayTime: string;
+  customerName?: string;
+  guestCount?: number;
+  zoneColor?: string;
+  isSegment?: boolean;
+}
+
+/**
+ * Translucent preview segment showing where the booking will land
+ */
+function GhostSegment({
+  displayTime,
+  customerName,
+  guestCount,
+  zoneColor = "#6B7280",
+  isSegment = false,
+}: GhostSegmentProps) {
+  return (
+    <div
+      className={cn(
+        "relative h-10 rounded-md",
+        "border-2 border-dashed",
+        "flex items-center justify-between px-2",
+        "transition-all duration-150",
+        "animate-pulse"
+      )}
+      style={{
+        backgroundColor: `${zoneColor}15`,
+        borderColor: `${zoneColor}60`,
+      }}
+    >
+      {/* Time badge - positioned at top left */}
+      <div
+        className={cn(
+          "absolute -top-5 left-0",
+          "flex items-center gap-1",
+          "px-1.5 py-0.5 rounded",
+          "text-[10px] font-mono font-medium",
+          "bg-card border shadow-sm"
+        )}
+        style={{ color: zoneColor }}
+      >
+        <Clock className="h-3 w-3" />
+        {displayTime}
+      </div>
+
+      {/* Left side - zone indicator and name */}
+      <div className="flex items-center gap-2 min-w-0">
+        <div
+          className="w-1 h-6 rounded-full shrink-0"
+          style={{ backgroundColor: zoneColor }}
+        />
+        {customerName && (
+          <span
+            className="text-xs font-medium truncate opacity-70"
+            style={{ color: zoneColor }}
+          >
+            {isSegment ? "Moving..." : customerName.split(" ")[0]}
+          </span>
+        )}
+      </div>
+
+      {/* Right side - guest count */}
+      {guestCount !== undefined && guestCount > 0 && (
+        <div
+          className="flex items-center gap-1 shrink-0 opacity-70"
+          style={{ color: zoneColor }}
+        >
+          <Users className="h-3 w-3" />
+          <span className="text-xs font-medium">{guestCount}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+GhostSegment.displayName = "GhostSegment";

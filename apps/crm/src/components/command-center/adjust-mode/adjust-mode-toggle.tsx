@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,6 +35,9 @@ interface AdjustModeToggleProps {
  *
  * When inactive: Shows a simple "Adjust" button
  * When active: Shows status badge, change count, and action buttons
+ *
+ * Keyboard shortcuts:
+ * - Escape: Exit adjust mode (cancels pending changes)
  */
 export function AdjustModeToggle({
   onApplyChanges,
@@ -49,6 +53,22 @@ export function AdjustModeToggle({
     hasPendingChanges,
     pendingChangesCount,
   } = useAdjustMode();
+
+  // Handle Escape key to exit adjust mode
+  React.useEffect(() => {
+    if (!isAdjustMode) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isApplying) {
+        e.preventDefault();
+        clearPendingChanges();
+        toggleAdjustMode();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isAdjustMode, isApplying, clearPendingChanges, toggleAdjustMode]);
 
   // Inactive state - show simple toggle button
   if (!isAdjustMode) {
@@ -77,12 +97,20 @@ export function AdjustModeToggle({
   // Active state - show status and actions
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      {/* Adjust Mode Badge */}
+      {/* Adjust Mode Badge - prominent visual indicator */}
       <Badge
         variant="secondary"
-        className="bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400"
+        className={cn(
+          "bg-primary/10 text-primary border-primary/30",
+          "dark:bg-primary/20 dark:text-primary dark:border-primary/40",
+          "animate-pulse-subtle font-medium"
+        )}
       >
-        Adjust Mode
+        <span className="relative flex h-2 w-2 mr-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+        </span>
+        Edit Mode
       </Badge>
 
       {/* Pending Changes Count */}
