@@ -86,37 +86,10 @@ export { GuestCard, type GuestCardProps, type GuestCardBooking } from "./guest-c
 export { GuideCard, type GuideCardProps, type GuideCardData, type GuideAssignment } from "./guide-card";
 
 // =============================================================================
-// ADJUST MODE (drag-and-drop guide reassignment)
-// =============================================================================
-
-export {
-  // Components
-  AdjustModeProvider,
-  AdjustModeToggle,
-  DroppableGuideRow,
-  DndProvider,
-  PendingChangesPanel,
-  // Ghost preview
-  GhostPreviewProvider,
-  useGhostPreview,
-  // Context hooks
-  useAdjustMode,
-  // Types
-  type PendingChange,
-  type DraggableSegmentData,
-  type HopperBookingDragData,
-  type DroppableGuideRowData,
-  type ActiveDragData,
-  // Type guards
-  isSegmentDrag,
-  isHopperBookingDrag,
-} from "./adjust-mode";
-
-// =============================================================================
 // HOPPER (unassigned bookings)
 // =============================================================================
 
-export { HopperPanel, HopperCard, type HopperBooking } from "./hopper";
+export { HopperCard, type HopperBooking, MobileHopperSheet } from "./hopper";
 
 // =============================================================================
 // MAP PANEL (route context)
@@ -126,41 +99,62 @@ export {
   MapPanel,
   type RouteStop,
   type GhostPreviewData,
+  type ZoneDistribution,
+  type TourRunSummary,
 } from "./map-panel";
 
 // =============================================================================
-// TIMELINE (re-export from timeline submodule)
+// SIMPLE TIMELINE (new booking-centric timeline)
 // =============================================================================
 
 export {
-  // Components
-  TimelineContainer,
-  TimelineHeader,
-  GuideRow,
-  Segment,
-  SegmentWrapper,
-  IdleSegment,
-  DriveSegment,
-  PickupSegment,
-  TourSegment,
-  GuestDots,
-
-  // Types
-  type TimelineContainerProps,
-  type ConfidenceLevel,
-  type SegmentType,
-  type BaseSegment,
-  type IdleSegmentType,
-  type DriveSegmentType,
-  type PickupSegmentType,
-  type TourSegmentType,
-  type TimelineSegment,
-  type BookingWithCustomer,
-  type TourInfo,
+  SimpleTimelineContainer,
+  BookingBlock,
+  BookingBlockGroup,
+  BookingLane,
+  SimpleGuideRow,
+  DroppableAddGuideRow,
+  SimpleHopper,
+  EditModeProvider,
+  EditModeToggle,
+  useEditMode,
+  useEditModeOptional,
+  TimelineGrid,
+  TimelineGridLines,
+  CurrentTimeIndicator,
+  transformDispatchData,
+  getGuideCapacityInfo,
+  wouldExceedCapacity,
+  findBookingGuide,
+  type BookingData,
+  type TransformedData,
+  type GuideWithBookings,
   type GuideInfo,
-  type GuideTimeline,
+} from "./simple-timeline";
 
-  // Utilities
+// =============================================================================
+// TIMELINE TYPES (re-export common types)
+// =============================================================================
+
+export type {
+  ConfidenceLevel,
+  SegmentType,
+  BaseSegment,
+  IdleSegmentType,
+  DriveSegmentType,
+  PickupSegmentType,
+  TourSegmentType,
+  TimelineSegment,
+  BookingWithCustomer,
+  TourInfo,
+  GuideTimeline,
+} from "./timeline";
+
+// =============================================================================
+// TIMELINE UTILITIES
+// =============================================================================
+
+export {
   confidenceColors,
   timeToPercent,
   segmentWidthPercent,
@@ -169,4 +163,6 @@ export {
   generateHourMarkers,
   getGuideFullName,
   getGuideInitials,
+  AddGuideRow,
+  type AvailableGuide,
 } from "./timeline";

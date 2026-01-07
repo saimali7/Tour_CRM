@@ -74,6 +74,8 @@ export interface BaseSegment {
   endTime: string; // HH:MM format, e.g., "09:30"
   durationMinutes: number;
   confidence: ConfidenceLevel;
+  /** Whether this segment represents a pending (unsaved) change in adjust mode */
+  isPending?: boolean;
 }
 
 /**

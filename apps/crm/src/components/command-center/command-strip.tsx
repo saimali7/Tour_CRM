@@ -1,6 +1,6 @@
 "use client";
 
-import { format, isToday, isTomorrow } from "date-fns";
+import { format, isToday, isPast, startOfDay } from "date-fns";
 import {
   CheckCircle2,
   AlertCircle,
@@ -10,12 +10,7 @@ import {
   Users,
   Lock,
   Sparkles,
-  Pencil,
-  Check,
   ChevronDown,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,16 +24,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { DispatchStatus } from "./types";
-
-// =============================================================================
-// ZOOM TYPES
-// =============================================================================
-
-export type ZoomLevel = "compact" | "normal" | "expanded";
 
 // =============================================================================
 // TYPES
@@ -69,16 +56,6 @@ interface CommandStripProps {
   warningsCount: number;
   /** When dispatch was sent */
   dispatchedAt?: Date;
-  /** Whether adjust mode is active */
-  isAdjustMode: boolean;
-  /** Current zoom level */
-  zoomLevel?: ZoomLevel;
-  /** Change zoom level */
-  onZoomChange?: (level: ZoomLevel) => void;
-  /** Enter adjust mode */
-  onEnterAdjustMode: () => void;
-  /** Exit adjust mode */
-  onExitAdjustMode: () => void;
   /** Optimize assignments */
   onOptimize: () => void;
   /** Send dispatch */
@@ -110,16 +87,12 @@ export function CommandStrip({
   unassignedCount,
   warningsCount,
   dispatchedAt,
-  isAdjustMode,
-  zoomLevel = "normal",
-  onZoomChange,
-  onEnterAdjustMode,
-  onExitAdjustMode,
   onOptimize,
   onDispatch,
 }: CommandStripProps) {
   const isDateToday = isToday(date);
-  const isDateTomorrow = isTomorrow(date);
+  // Check if date is in the past (before today)
+  const isPastDate = isPast(startOfDay(date)) && !isDateToday;
   const isDispatched = status === "dispatched";
   const hasUnassigned = unassignedCount > 0;
   const hasWarnings = warningsCount > 0;
@@ -171,9 +144,7 @@ export function CommandStrip({
   return (
     <div className={cn(
       "relative rounded-lg border overflow-hidden transition-all duration-200",
-      config.bg,
-      // Adjust mode indicator
-      isAdjustMode && "ring-2 ring-primary/50 border-primary/50"
+      config.bg
     )}>
       {/* Left accent bar - status indicator */}
       <div className={cn(
@@ -288,97 +259,15 @@ export function CommandStrip({
               </div>
             </PopoverContent>
           </Popover>
-
-          {/* Zoom controls - hidden on mobile */}
-          {onZoomChange && (
-            <>
-              <Separator orientation="vertical" className="h-4 hidden sm:block" />
-              <TooltipProvider delayDuration={300}>
-                <ToggleGroup
-                  type="single"
-                  value={zoomLevel}
-                  onValueChange={(value) => value && onZoomChange(value as ZoomLevel)}
-                  className="hidden sm:flex gap-0.5"
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem
-                        value="compact"
-                        aria-label="Compact view (6 hours)"
-                        className={cn(
-                          "h-7 w-7 p-0 data-[state=on]:bg-primary/10 data-[state=on]:text-primary",
-                          "hover:bg-muted transition-colors"
-                        )}
-                      >
-                        <ZoomIn className="h-3.5 w-3.5" />
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      Compact (6h)
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem
-                        value="normal"
-                        aria-label="Normal view (13 hours)"
-                        className={cn(
-                          "h-7 w-7 p-0 data-[state=on]:bg-primary/10 data-[state=on]:text-primary",
-                          "hover:bg-muted transition-colors"
-                        )}
-                      >
-                        <ZoomOut className="h-3.5 w-3.5" />
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      Normal (13h)
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem
-                        value="expanded"
-                        aria-label="Full day view (18 hours)"
-                        className={cn(
-                          "h-7 w-7 p-0 data-[state=on]:bg-primary/10 data-[state=on]:text-primary",
-                          "hover:bg-muted transition-colors"
-                        )}
-                      >
-                        <Maximize2 className="h-3.5 w-3.5" />
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      Expanded (18h)
-                    </TooltipContent>
-                  </Tooltip>
-                </ToggleGroup>
-              </TooltipProvider>
-            </>
-          )}
         </div>
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {isAdjustMode ? (
-            /* Live Edit Mode */
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-primary/10">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
-                </span>
-                <span className="text-xs font-medium text-primary">Editing</span>
-              </div>
-              <Button
-                size="sm"
-                onClick={onExitAdjustMode}
-                className="h-8 gap-1.5 text-xs"
-              >
-                <Check className="h-3.5 w-3.5" />
-                Done
-              </Button>
+          {isPastDate ? (
+            /* Past date - read-only mode */
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-muted/50 text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">View Only</span>
             </div>
           ) : isDispatched ? (
             <Button variant="outline" size="sm" className="h-8 text-xs">
@@ -386,15 +275,6 @@ export function CommandStrip({
             </Button>
           ) : (
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onEnterAdjustMode}
-                className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit
-              </Button>
               {hasUnassigned ? (
                 <Button size="sm" onClick={onOptimize} className="h-8 gap-1.5 text-xs">
                   <Sparkles className="h-3.5 w-3.5" />

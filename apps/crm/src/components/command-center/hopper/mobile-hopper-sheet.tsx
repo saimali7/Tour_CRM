@@ -27,7 +27,6 @@ import {
   Car,
 } from "lucide-react";
 import { type HopperBooking } from "./hopper-card";
-import { useAdjustMode } from "../adjust-mode";
 import type { GuideInfo, GuideTimeline } from "../timeline/types";
 
 // =============================================================================
@@ -259,8 +258,6 @@ export function MobileHopperSheet({
   const [selectedBooking, setSelectedBooking] = useState<HopperBooking | null>(null);
   const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);
 
-  const { enterAdjustMode, isAdjustMode, addPendingChange } = useAdjustMode();
-
   // Derived state
   const unassignedCount = bookings.length;
   const hasUnassigned = unassignedCount > 0;
@@ -295,7 +292,7 @@ export function MobileHopperSheet({
     setSelectedGuideId(guideId);
   }, []);
 
-  // Handle confirm assignment
+  // Handle confirm assignment - calls the onAssign callback
   const handleConfirmAssignment = useCallback(() => {
     if (!selectedBooking || !selectedGuideId) return;
 
@@ -304,28 +301,7 @@ export function MobileHopperSheet({
 
     const guideName = `${selectedGuide.guide.firstName} ${selectedGuide.guide.lastName}`;
 
-    // Enter adjust mode if not already in it
-    if (!isAdjustMode) {
-      enterAdjustMode();
-    }
-
-    // Add the pending change (cast to the specific assign type)
-    addPendingChange({
-      type: "assign" as const,
-      bookingId: selectedBooking.id,
-      toGuideId: selectedGuideId,
-      toGuideName: guideName,
-      timelineIndex: selectedGuide.timelineIndex,
-      bookingData: {
-        customerName: selectedBooking.customerName,
-        guestCount: selectedBooking.guestCount,
-        tourName: selectedBooking.tourName,
-        tourTime: selectedBooking.tourTime,
-        pickupZone: selectedBooking.pickupZone,
-      },
-    } as Omit<import("../adjust-mode").PendingAssignChange, "id" | "timestamp">);
-
-    // Callback for external handling
+    // Callback for external handling (parent component handles the actual assignment)
     onAssign?.(selectedBooking.id, selectedGuideId, guideName, selectedGuide.timelineIndex);
 
     // Reset state and close if this was the last booking
@@ -340,9 +316,6 @@ export function MobileHopperSheet({
     selectedBooking,
     selectedGuideId,
     guideOptions,
-    isAdjustMode,
-    enterAdjustMode,
-    addPendingChange,
     onAssign,
     bookings.length,
   ]);

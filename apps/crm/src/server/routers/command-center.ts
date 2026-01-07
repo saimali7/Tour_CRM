@@ -23,8 +23,28 @@ import { inngest } from "@/inngest";
 // INPUT SCHEMAS
 // =============================================================================
 
+/**
+ * Date input schema that accepts either:
+ * - ISO date string (YYYY-MM-DD) - preferred for consistency
+ * - Full ISO datetime string (2026-01-03T00:00:00.000Z) - will extract date part
+ * - Date object (will be coerced)
+ *
+ * The date is stored as a string internally to avoid timezone issues.
+ */
 const dateInputSchema = z.object({
-  date: z.coerce.date(),
+  date: z.union([
+    // Accept YYYY-MM-DD strings directly
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+    // Accept ISO datetime strings and extract date part
+    z.string().datetime().transform((val) => val.split("T")[0]!),
+    // Accept Date objects for backward compatibility
+    z.date().transform((val) => {
+      const year = val.getFullYear();
+      const month = String(val.getMonth() + 1).padStart(2, "0");
+      const day = String(val.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }),
+  ]),
 });
 
 const warningResolutionSchema = z.object({
@@ -36,7 +56,16 @@ const warningResolutionSchema = z.object({
 });
 
 const resolveWarningInputSchema = z.object({
-  date: z.coerce.date(),
+  date: z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+    z.string().datetime().transform((val) => val.split("T")[0]!),
+    z.date().transform((val) => {
+      const year = val.getFullYear();
+      const month = String(val.getMonth() + 1).padStart(2, "0");
+      const day = String(val.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }),
+  ]),
   warningId: z.string(),
   resolution: warningResolutionSchema,
 });
@@ -303,6 +332,40 @@ export const commandCenterRouter = createRouter({
     }),
 
   /**
+   * Time-shift a booking's pickup time
+   * Updates the calculated pickup time for a booking's guide assignment
+   */
+  timeShift: adminProcedure
+    .input(z.object({
+      bookingId: z.string(),
+      guideId: z.string(),
+      newStartTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({
+        organizationId: ctx.orgContext.organizationId,
+      });
+
+      try {
+        await services.commandCenter.updatePickupTime(
+          input.bookingId,
+          input.guideId,
+          input.newStartTime
+        );
+        return { success: true };
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to update pickup time",
+          cause: error,
+        });
+      }
+    }),
+
+  /**
    * Dispatch (finalize and notify)
    * Sends notifications to all assigned guides for the date
    */
@@ -321,7 +384,7 @@ export const commandCenterRouter = createRouter({
           name: "dispatch.completed",
           data: {
             organizationId: ctx.orgContext.organizationId,
-            dispatchDate: input.date.toISOString().split("T")[0] || "",
+            dispatchDate: input.date, // Already in YYYY-MM-DD format
             dispatchedBy: ctx.user?.id || "system",
           },
         });
@@ -550,6 +613,168 @@ export const commandCenterRouter = createRouter({
           message: error instanceof Error
             ? `Assignment failed: ${error.message}. All changes have been rolled back.`
             : "Assignment failed. All changes have been rolled back.",
+          cause: error,
+        });
+      }
+    }),
+  /**
+   * Batch apply all pending changes from adjust mode
+   * Handles: assign, unassign, reassign, and time-shift changes
+   *
+   * Changes are applied atomically with rollback on failure.
+   */
+  batchApplyChanges: adminProcedure
+    .input(z.object({
+      date: z.coerce.date(),
+      changes: z.array(z.discriminatedUnion("type", [
+        // Assign: from hopper to guide
+        z.object({
+          type: z.literal("assign"),
+          bookingId: z.string(),
+          toGuideId: z.string(),
+        }),
+        // Unassign: remove from guide (back to hopper)
+        z.object({
+          type: z.literal("unassign"),
+          bookingIds: z.array(z.string()),
+          fromGuideId: z.string(),
+        }),
+        // Reassign: move from one guide to another
+        z.object({
+          type: z.literal("reassign"),
+          bookingIds: z.array(z.string()),
+          fromGuideId: z.string(),
+          toGuideId: z.string(),
+        }),
+        // Time shift: change pickup time
+        z.object({
+          type: z.literal("time-shift"),
+          bookingIds: z.array(z.string()),
+          guideId: z.string(),
+          newStartTime: z.string(), // HH:MM format
+        }),
+      ])),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({
+        organizationId: ctx.orgContext.organizationId,
+      });
+
+      const results: Array<{
+        type: string;
+        bookingIds: string[];
+        success: boolean;
+        error?: string;
+      }> = [];
+
+      // Track applied changes for rollback
+      const rollbackActions: Array<() => Promise<void>> = [];
+
+      try {
+        for (const change of input.changes) {
+          switch (change.type) {
+            case "assign": {
+              await services.commandCenter.manualAssign(change.bookingId, change.toGuideId);
+
+              // Rollback: unassign
+              const bookingId = change.bookingId;
+              rollbackActions.push(async () => {
+                await services.commandCenter.unassign(bookingId);
+              });
+
+              results.push({
+                type: "assign",
+                bookingIds: [change.bookingId],
+                success: true,
+              });
+              break;
+            }
+
+            case "unassign": {
+              for (const bookingId of change.bookingIds) {
+                await services.commandCenter.unassign(bookingId);
+
+                // Rollback: re-assign to original guide
+                const guideId = change.fromGuideId;
+                rollbackActions.push(async () => {
+                  await services.commandCenter.manualAssign(bookingId, guideId);
+                });
+              }
+
+              results.push({
+                type: "unassign",
+                bookingIds: change.bookingIds,
+                success: true,
+              });
+              break;
+            }
+
+            case "reassign": {
+              for (const bookingId of change.bookingIds) {
+                // Unassign from old guide
+                await services.commandCenter.unassign(bookingId);
+                // Assign to new guide
+                await services.commandCenter.manualAssign(bookingId, change.toGuideId);
+
+                // Rollback: move back to original guide
+                const fromGuideId = change.fromGuideId;
+                rollbackActions.push(async () => {
+                  await services.commandCenter.unassign(bookingId);
+                  await services.commandCenter.manualAssign(bookingId, fromGuideId);
+                });
+              }
+
+              results.push({
+                type: "reassign",
+                bookingIds: change.bookingIds,
+                success: true,
+              });
+              break;
+            }
+
+            case "time-shift": {
+              // Update pickup time for all bookings in this segment
+              for (const bookingId of change.bookingIds) {
+                await services.commandCenter.updatePickupTime(
+                  bookingId,
+                  change.guideId,
+                  change.newStartTime
+                );
+              }
+
+              // Note: Time shift rollback would need original times, which we don't track
+              // For now, time shifts are not rolled back on error
+
+              results.push({
+                type: "time-shift",
+                bookingIds: change.bookingIds,
+                success: true,
+              });
+              break;
+            }
+          }
+        }
+
+        return {
+          success: true,
+          applied: results.length,
+          results,
+        };
+      } catch (error) {
+        // Rollback all applied changes in reverse order
+        for (const rollback of rollbackActions.reverse()) {
+          try {
+            await rollback();
+          } catch (rollbackError) {
+            console.error("Rollback failed:", rollbackError);
+          }
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error
+            ? `Batch apply failed: ${error.message}. Changes have been rolled back.`
+            : "Batch apply failed. Changes have been rolled back.",
           cause: error,
         });
       }

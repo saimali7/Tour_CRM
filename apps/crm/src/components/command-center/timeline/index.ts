@@ -1,68 +1,8 @@
 /**
  * Tour Command Center - Timeline Components
  *
- * A complete timeline visualization system for the guide dispatch interface.
- * Displays guide schedules as horizontal "segmented tapes" showing:
- * - Idle time (available periods)
- * - Drive time (travel between locations)
- * - Pickups (customer pickup points)
- * - Tours (the main activity)
- *
- * @example
- * ```tsx
- * import {
- *   TimelineContainer,
- *   type GuideTimeline,
- *   type TimelineSegment,
- * } from "@/components/command-center/timeline";
- *
- * function CommandCenter() {
- *   const timelines: GuideTimeline[] = [...];
- *
- *   return (
- *     <TimelineContainer
- *       timelines={timelines}
- *       startHour={7}
- *       endHour={20}
- *       onSegmentClick={(segment, guide) => {
- *         console.log("Clicked", segment, "for guide", guide);
- *       }}
- *     />
- *   );
- * }
- * ```
+ * Timeline utilities and types for the guide dispatch interface.
  */
-
-// =============================================================================
-// MAIN COMPONENTS
-// =============================================================================
-
-export { TimelineContainer, type TimelineContainerProps } from "./timeline-container";
-export { TimelineHeader } from "./timeline-header";
-export { GuideRow } from "./guide-row";
-
-// =============================================================================
-// SEGMENT COMPONENTS
-// =============================================================================
-
-export { Segment, SegmentWrapper } from "./segment";
-export { IdleSegment } from "./idle-segment";
-export { DriveSegment } from "./drive-segment";
-export { PickupSegment, GuestDots } from "./pickup-segment";
-export { TourSegment } from "./tour-segment";
-export { SegmentLane } from "./segment-lane";
-
-// Segment content components (extracted for maintainability)
-export {
-  TourContent,
-  TourTooltip,
-  PickupContent,
-  PickupTooltip,
-  DriveContent,
-  DriveTooltip,
-  IdleContent,
-  IdleTooltip,
-} from "./segment-content";
 
 // =============================================================================
 // TYPES
@@ -72,7 +12,7 @@ export type {
   // Confidence
   ConfidenceLevel,
 
-  // Segment types
+  // Segment types (for compatibility)
   SegmentType,
   BaseSegment,
   IdleSegment as IdleSegmentType,
@@ -98,7 +38,7 @@ export {
   // Color utilities
   confidenceColors,
 
-  // Time utilities
+  // Time utilities (from types.ts)
   timeToPercent,
   segmentWidthPercent,
   formatDuration,
@@ -109,3 +49,12 @@ export {
   getGuideFullName,
   getGuideInitials,
 } from "./types";
+
+// New timeline utilities
+export * from "./timeline-utils";
+
+// =============================================================================
+// COMPONENTS (kept for potential reuse)
+// =============================================================================
+
+export { AddGuideRow, type AvailableGuide } from "./add-guide-row";

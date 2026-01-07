@@ -72,17 +72,53 @@ export function parseTourRunKey(key: string): {
 }
 
 /**
- * Format a Date object to YYYY-MM-DD string for use in tour run keys.
+ * Format a Date object or date string to YYYY-MM-DD string for use in tour run keys.
  *
- * @param date - The Date object to format
+ * IMPORTANT: This function extracts the LOCAL date from a Date object.
+ * For consistent behavior across timezones:
+ * - Prefer passing ISO date strings (YYYY-MM-DD) directly
+ * - When passing Date objects, the LOCAL date will be used
+ *
+ * @param date - The Date object or ISO date string to format
  * @returns The date string in YYYY-MM-DD format
  */
-export function formatDateForKey(date: Date): string {
-  // Use UTC date components for consistency
-  // The date is typically sent as local midnight which becomes previous day in UTC
-  // We add 12 hours to ensure we're in the middle of the intended day
-  const adjusted = new Date(date.getTime() + 12 * 60 * 60 * 1000);
-  return adjusted.toISOString().split("T")[0]!;
+export function formatDateForKey(date: Date | string): string {
+  // If already a string in YYYY-MM-DD format, return as-is
+  if (typeof date === "string") {
+    // Validate format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
+    }
+    // Try to parse ISO string and extract date part
+    if (date.includes("T")) {
+      return date.split("T")[0]!;
+    }
+    // Return as-is if it looks like a date string
+    return date;
+  }
+
+  // For Date objects, use LOCAL date components (not UTC)
+  // This ensures the date displayed to the user matches the date stored
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Get the day of week (0-6, Sunday-Saturday) from a date.
+ *
+ * @param date - The Date object or ISO date string (YYYY-MM-DD)
+ * @returns The day of week (0 = Sunday, 6 = Saturday)
+ */
+export function getDayOfWeek(date: Date | string): number {
+  if (typeof date === "string") {
+    // Parse YYYY-MM-DD string - create date at noon UTC to avoid timezone issues
+    const [year, month, day] = date.split("-").map(Number);
+    const d = new Date(Date.UTC(year!, month! - 1, day!, 12, 0, 0));
+    return d.getUTCDay();
+  }
+  return date.getDay();
 }
 
 /**

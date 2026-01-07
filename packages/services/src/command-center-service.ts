@@ -40,7 +40,7 @@ import { GuideAvailabilityService } from "./guide-availability-service";
 import { TourGuideQualificationService } from "./tour-guide-qualification-service";
 import { TourRunService, type TourRun as BaseTourRun } from "./tour-run-service";
 import { createServiceLogger } from "./lib/logger";
-import { createTourRunKey, parseTourRunKey, formatDateForKey } from "./lib/tour-run-utils";
+import { createTourRunKey, parseTourRunKey, formatDateForKey, getDayOfWeek } from "./lib/tour-run-utils";
 import { requireEntity } from "./lib/validation-helpers";
 import {
   validateBookingWithRelationsArray,
@@ -79,7 +79,8 @@ interface GuideAssignmentWithRelations extends GuideAssignment {
 export type DispatchStatusType = "pending" | "optimized" | "ready" | "dispatched";
 
 export interface DispatchStatus {
-  date: Date;
+  /** Date in YYYY-MM-DD format */
+  date: string;
   status: DispatchStatusType;
   optimizedAt: Date | null;
   dispatchedAt: Date | null;
@@ -97,7 +98,8 @@ export interface TourRun {
   key: string; // "tourId|2026-01-02|09:00"
   tourId: string;
   tour: Pick<Tour, "id" | "name" | "slug" | "durationMinutes" | "meetingPoint" | "meetingPointDetails" | "guestsPerGuide">;
-  date: Date;
+  /** Date in YYYY-MM-DD format */
+  date: string;
   time: string;
   bookings: BookingWithCustomer[];
   totalGuests: number;
@@ -135,6 +137,8 @@ export interface BookingWithCustomer {
   pickupTime: string | null;
   specialOccasion: string | null;
   isFirstTime: boolean;
+  // Experience mode for shared vs private bookings
+  experienceMode: "join" | "book" | "charter" | null;
 }
 
 export interface GuideAssignmentInfo {
@@ -320,7 +324,7 @@ export class CommandCenterService extends BaseService {
   /**
    * Get or create dispatch status for a date
    */
-  async getDispatchStatus(date: Date): Promise<DispatchStatus> {
+  async getDispatchStatus(date: Date | string): Promise<DispatchStatus> {
     const dateKey = this.formatDateKey(date);
     const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId) || new Map();
 
@@ -360,7 +364,7 @@ export class CommandCenterService extends BaseService {
     }
 
     const dispatchStatus: DispatchStatus = {
-      date,
+      date: dateKey,
       status,
       optimizedAt: status !== "pending" ? new Date() : null,
       dispatchedAt: null,
@@ -381,7 +385,7 @@ export class CommandCenterService extends BaseService {
   /**
    * Update dispatch status (internal helper)
    */
-  private updateDispatchStatus(date: Date, updates: Partial<DispatchStatus>): void {
+  private updateDispatchStatus(date: Date | string, updates: Partial<DispatchStatus>): void {
     const dateKey = this.formatDateKey(date);
     const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId) || new Map();
     const existing = orgCache.get(dateKey);
@@ -400,7 +404,7 @@ export class CommandCenterService extends BaseService {
    * Get all tour runs for a date with their bookings and assignments
    * A "tour run" = tourId + date + time grouping
    */
-  async getTourRuns(date: Date): Promise<TourRun[]> {
+  async getTourRuns(date: Date | string): Promise<TourRun[]> {
     const dateStr = this.formatDateKey(date);
 
     // Get all bookings for this date with the new booking model
@@ -499,6 +503,7 @@ export class CommandCenterService extends BaseService {
           pickupTime: booking.pickupTime ?? null,
           specialOccasion: booking.specialOccasion ?? null,
           isFirstTime,
+          experienceMode: (booking.pricingSnapshot as { experienceMode?: "join" | "book" | "charter" } | null)?.experienceMode ?? null,
         });
       }
 
@@ -573,7 +578,7 @@ export class CommandCenterService extends BaseService {
           meetingPointDetails: tour.meetingPointDetails,
           guestsPerGuide: tour.guestsPerGuide,
         },
-        date,
+        date: dateStr,
         time: time!,
         bookings: bookingsWithCustomer,
         totalGuests,
@@ -598,7 +603,7 @@ export class CommandCenterService extends BaseService {
    * Get available guides for a date (checking availability patterns + overrides)
    * Optimized to parallelize per-guide queries and batch where possible
    */
-  async getAvailableGuides(date: Date): Promise<AvailableGuide[]> {
+  async getAvailableGuides(date: Date | string): Promise<AvailableGuide[]> {
     // Get all active guides
     const allGuides = await this.db.query.guides.findMany({
       where: and(
@@ -670,11 +675,11 @@ export class CommandCenterService extends BaseService {
    */
   private async batchCheckGuideAvailability(
     guideIds: string[],
-    date: Date
+    date: Date | string
   ): Promise<Map<string, { isAvailable: boolean; startTime: string | null; endTime: string | null }>> {
     const result = new Map<string, { isAvailable: boolean; startTime: string | null; endTime: string | null }>();
     const dateStr = this.formatDateKey(date);
-    const dayOfWeek = date.getDay();
+    const dayOfWeek = getDayOfWeek(date);
 
     try {
       // Fetch overrides and weekly availability in parallel
@@ -813,7 +818,7 @@ export class CommandCenterService extends BaseService {
    */
   private async batchGetGuideAssignmentsForDate(
     guideIds: string[],
-    date: Date
+    date: Date | string
   ): Promise<Map<string, CurrentAssignment[]>> {
     const result = new Map<string, CurrentAssignment[]>();
     const dateStr = this.formatDateKey(date);
@@ -898,7 +903,7 @@ export class CommandCenterService extends BaseService {
    * Get guide timelines for visualization
    * Returns guide rows with their segments (drive, pickup, tour)
    */
-  async getGuideTimelines(date: Date): Promise<GuideTimeline[]> {
+  async getGuideTimelines(date: Date | string): Promise<GuideTimeline[]> {
     const availableGuides = await this.getAvailableGuides(date);
     const tourRuns = await this.getTourRuns(date);
 
@@ -1019,7 +1024,7 @@ export class CommandCenterService extends BaseService {
    * Run optimization algorithm for a date
    * Assigns guides to tour runs optimally
    */
-  async optimize(date: Date): Promise<OptimizationResult> {
+  async optimize(date: Date | string): Promise<OptimizationResult> {
     const tourRuns = await this.getTourRuns(date);
     const availableGuides = await this.getAvailableGuides(date);
 
@@ -1554,7 +1559,7 @@ export class CommandCenterService extends BaseService {
   /**
    * Invalidate the dispatch status cache for a specific date
    */
-  private invalidateDispatchCache(date: Date): void {
+  private invalidateDispatchCache(date: Date | string): void {
     const dateKey = this.formatDateKey(date);
     const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId);
     if (orgCache) {
@@ -1643,6 +1648,78 @@ export class CommandCenterService extends BaseService {
     }
   }
 
+  /**
+   * Update the calculated pickup time for a booking's guide assignment
+   * Used for time-shift operations in adjust mode
+   *
+   * NOTE: This method is resilient - it will update the booking's pickup time
+   * even if no guide assignment exists. The assignment update is optional.
+   */
+  async updatePickupTime(
+    bookingId: string,
+    guideId: string,
+    newPickupTime: string
+  ): Promise<void> {
+    // Update both pickupTime and bookingTime on the booking
+    // bookingTime determines the tour slot/visual position on timeline
+    // pickupTime is the calculated time the guide picks up the guest
+    const [updatedBooking] = await this.db
+      .update(bookings)
+      .set({
+        bookingTime: newPickupTime, // Update tour slot time (visual position)
+        pickupTime: newPickupTime,  // Update pickup time
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(bookings.id, bookingId),
+          eq(bookings.organizationId, this.organizationId)
+        )
+      )
+      .returning();
+
+    if (!updatedBooking) {
+      throw new NotFoundError("Booking", bookingId);
+    }
+
+    // Try to update the guide assignment if one exists
+    const assignments = await this.guideAssignmentService.getAssignmentsForBooking(bookingId);
+    const assignment = assignments.find(
+      (a) => a.guideId === guideId && a.status === "confirmed"
+    );
+
+    if (assignment) {
+      // Update the calculated pickup time on the assignment
+      await this.db
+        .update(guideAssignments)
+        .set({
+          calculatedPickupTime: newPickupTime,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(guideAssignments.id, assignment.id),
+            eq(guideAssignments.organizationId, this.organizationId)
+          )
+        );
+    } else {
+      // Log but don't throw - booking was updated successfully
+      this.logger.warn(
+        { bookingId, guideId },
+        "No confirmed guide assignment found for time-shift, booking updated anyway"
+      );
+    }
+
+    // Invalidate dispatch status cache
+    if (updatedBooking.bookingDate) {
+      const dateKey = this.formatDateKey(updatedBooking.bookingDate);
+      const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId);
+      if (orgCache) {
+        orgCache.delete(dateKey);
+      }
+    }
+  }
+
   // ===========================================================================
   // DISPATCH
   // ===========================================================================
@@ -1650,7 +1727,7 @@ export class CommandCenterService extends BaseService {
   /**
    * Dispatch: finalize and send notifications to all guides
    */
-  async dispatch(date: Date): Promise<DispatchResult> {
+  async dispatch(date: Date | string): Promise<DispatchResult> {
     const dateStr = this.formatDateKey(date);
     this.logger.info({ date: dateStr }, "Starting dispatch process");
 
@@ -1798,6 +1875,7 @@ export class CommandCenterService extends BaseService {
         pickupTime: booking.pickupTime ?? null,
         specialOccasion: null,
         isFirstTime,
+        experienceMode: (booking.pricingSnapshot as { experienceMode?: "join" | "book" | "charter" } | null)?.experienceMode ?? null,
       },
       participants: booking.participants.map((p) => ({
         id: p.id,
@@ -1830,7 +1908,7 @@ export class CommandCenterService extends BaseService {
    * Format date as YYYY-MM-DD
    * Uses shared formatDateForKey from tour-run-utils.ts
    */
-  private formatDateKey(date: Date): string {
+  private formatDateKey(date: Date | string): string {
     return formatDateForKey(date);
   }
 

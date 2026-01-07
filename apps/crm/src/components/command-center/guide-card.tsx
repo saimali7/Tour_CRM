@@ -20,14 +20,55 @@ import {
   Languages,
   Calendar,
   ExternalLink,
+  ChevronDown,
+  ChevronRight,
+  Cake,
+  Star,
+  Accessibility,
+  Baby,
+  Navigation,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "./timeline/types";
+import { useState } from "react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
+/**
+ * Booking info for display under a tour assignment
+ */
+export interface AssignmentBooking {
+  id: string;
+  referenceNumber: string;
+  customerName: string;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  guestCount: number;
+  adultCount: number;
+  childCount?: number | null;
+  infantCount?: number | null;
+  pickupLocation?: string | null;
+  pickupTime?: string | null;
+  pickupZoneName?: string | null;
+  pickupZoneColor?: string | null;
+  // Flags
+  isFirstTime?: boolean;
+  specialOccasion?: string | null;
+  accessibilityNeeds?: string | null;
+  dietaryRequirements?: string | null;
+  specialRequests?: string | null;
+}
+
+/**
+ * A tour assignment with its bookings
+ */
 export interface GuideAssignment {
   tourRunId: string;
   tourName: string;
@@ -35,6 +76,8 @@ export interface GuideAssignment {
   endTime: string;
   guestCount: number;
   pickupCount: number;
+  /** Bookings assigned to this guide for this tour run */
+  bookings: AssignmentBooking[];
 }
 
 export interface GuideCardData {
@@ -272,35 +315,15 @@ export function GuideCard({
             </div>
           </section>
 
-          {/* Today's Schedule */}
+          {/* Today's Schedule - PRIMARY SECTION */}
           {guide.assignments.length > 0 && (
             <section className="space-y-3">
               <h4 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                 Today&apos;s Schedule
               </h4>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {guide.assignments.map((assignment) => (
-                  <div
-                    key={assignment.tourRunId}
-                    className="rounded-lg border bg-card p-3 transition-colors hover:bg-muted/30"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-medium">{assignment.tourName}</span>
-                      <Badge variant="outline" className="flex-shrink-0 font-mono text-xs">
-                        {assignment.startTime} - {assignment.endTime}
-                      </Badge>
-                    </div>
-                    <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" aria-hidden="true" />
-                        {assignment.guestCount} guest{assignment.guestCount !== 1 ? "s" : ""}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" aria-hidden="true" />
-                        {assignment.pickupCount} pickup{assignment.pickupCount !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                  </div>
+                  <TourAssignmentCard key={assignment.tourRunId} assignment={assignment} />
                 ))}
               </div>
             </section>
@@ -366,3 +389,203 @@ export function GuideCard({
 }
 
 GuideCard.displayName = "GuideCard";
+
+// =============================================================================
+// TOUR ASSIGNMENT CARD
+// =============================================================================
+
+/**
+ * Displays a single tour assignment with its bookings
+ */
+function TourAssignmentCard({ assignment }: { assignment: GuideAssignment }) {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasBookings = assignment.bookings && assignment.bookings.length > 0;
+
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden">
+      {/* Tour Header */}
+      <div
+        className={cn(
+          "flex items-center justify-between gap-2 p-3",
+          "bg-gradient-to-r from-primary/5 to-transparent"
+        )}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex-shrink-0 h-2 w-2 rounded-full bg-primary" />
+          <span className="font-medium text-sm truncate">{assignment.tourName}</span>
+        </div>
+        <Badge variant="outline" className="flex-shrink-0 font-mono text-xs">
+          {assignment.startTime} - {assignment.endTime}
+        </Badge>
+      </div>
+
+      {/* Booking Summary Bar */}
+      <div className="px-3 py-2 border-t border-border/50 bg-muted/20">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Users className="h-3 w-3" aria-hidden="true" />
+              {assignment.guestCount} guest{assignment.guestCount !== 1 ? "s" : ""}
+            </span>
+            <span className="flex items-center gap-1">
+              <Navigation className="h-3 w-3" aria-hidden="true" />
+              {assignment.bookings?.length || 0} pickup{(assignment.bookings?.length || 0) !== 1 ? "s" : ""}
+            </span>
+          </div>
+          {hasBookings && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={isExpanded ? "Collapse bookings" : "Expand bookings"}
+            >
+              <span className="text-[10px] uppercase tracking-wide">
+                {isExpanded ? "Hide" : "Show"}
+              </span>
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Bookings List */}
+      {hasBookings && isExpanded && (
+        <div className="divide-y divide-border/50">
+          {assignment.bookings.map((booking) => (
+            <BookingRow key={booking.id} booking={booking} />
+          ))}
+        </div>
+      )}
+
+      {/* No Bookings State */}
+      {!hasBookings && (
+        <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+          No booking details available
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// BOOKING ROW
+// =============================================================================
+
+/**
+ * Displays a single booking within a tour assignment
+ */
+function BookingRow({ booking }: { booking: AssignmentBooking }) {
+  const hasFlags = booking.isFirstTime ||
+                   booking.specialOccasion ||
+                   booking.accessibilityNeeds ||
+                   (booking.childCount && booking.childCount > 0) ||
+                   (booking.infantCount && booking.infantCount > 0);
+
+  return (
+    <div className="p-3 hover:bg-muted/30 transition-colors">
+      {/* Customer & Guests */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm truncate">
+              {booking.customerName}
+            </span>
+            <span className="flex-shrink-0 text-[10px] text-muted-foreground font-mono">
+              {booking.referenceNumber}
+            </span>
+          </div>
+
+          {/* Guest breakdown */}
+          <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+            <span>{booking.guestCount} guest{booking.guestCount !== 1 ? "s" : ""}</span>
+            {booking.childCount && booking.childCount > 0 && (
+              <span className="text-amber-600">
+                ({booking.childCount} child{booking.childCount !== 1 ? "ren" : ""})
+              </span>
+            )}
+            {booking.infantCount && booking.infantCount > 0 && (
+              <span className="text-amber-600">
+                ({booking.infantCount} infant{booking.infantCount !== 1 ? "s" : ""})
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Quick contact */}
+        {booking.customerPhone && (
+          <a
+            href={`tel:${booking.customerPhone}`}
+            className="flex-shrink-0 p-1 rounded hover:bg-muted transition-colors"
+            aria-label={`Call ${booking.customerName}`}
+          >
+            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+          </a>
+        )}
+      </div>
+
+      {/* Pickup Info */}
+      {booking.pickupLocation && (
+        <div className="mt-2 flex items-start gap-2">
+          <MapPin className="h-3 w-3 mt-0.5 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              {booking.pickupZoneColor && (
+                <span
+                  className="h-2 w-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: booking.pickupZoneColor }}
+                />
+              )}
+              <span className="text-xs truncate">{booking.pickupLocation}</span>
+            </div>
+            {booking.pickupTime && (
+              <span className="text-[10px] text-muted-foreground font-mono">
+                {booking.pickupTime}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Special Flags */}
+      {hasFlags && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {booking.isFirstTime && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-blue-50 text-blue-700 border-blue-200">
+              <Star className="h-2.5 w-2.5" aria-hidden="true" />
+              First time
+            </Badge>
+          )}
+          {booking.specialOccasion && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-pink-50 text-pink-700 border-pink-200">
+              <Cake className="h-2.5 w-2.5" aria-hidden="true" />
+              {booking.specialOccasion}
+            </Badge>
+          )}
+          {booking.accessibilityNeeds && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-purple-50 text-purple-700 border-purple-200">
+              <Accessibility className="h-2.5 w-2.5" aria-hidden="true" />
+              Accessibility
+            </Badge>
+          )}
+          {((booking.childCount && booking.childCount > 0) || (booking.infantCount && booking.infantCount > 0)) && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-amber-50 text-amber-700 border-amber-200">
+              <Baby className="h-2.5 w-2.5" aria-hidden="true" />
+              Family
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {/* Special Requests (if any) */}
+      {booking.specialRequests && (
+        <div className="mt-2 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
+          <span className="font-medium">Notes: </span>
+          {booking.specialRequests}
+        </div>
+      )}
+    </div>
+  );
+}
