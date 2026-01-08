@@ -2,7 +2,6 @@ import { pgTable, text, timestamp, integer, index, unique } from "drizzle-orm/pg
 import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
-import { schedules } from "./schedules";
 import { guideAssignments } from "./guide-operations";
 import { bookings } from "./bookings";
 import { pickupAddresses } from "./pickup-addresses";
@@ -33,10 +32,8 @@ export const pickupAssignments = pgTable("pickup_assignments", {
     .references(() => organizations.id, { onDelete: "cascade" }),
 
   // Relationships
-  /** The schedule (tour instance) this pickup is for */
-  scheduleId: text("schedule_id")
-    .notNull()
-    .references(() => schedules.id, { onDelete: "cascade" }),
+  /** The schedule (tour instance) this pickup is for - DEPRECATED: Use tourId/bookingDate from booking instead */
+  scheduleId: text("schedule_id"),
 
   /** The guide assignment handling this pickup */
   guideAssignmentId: text("guide_assignment_id")
@@ -94,10 +91,7 @@ export const pickupAssignmentsRelations = relations(pickupAssignments, ({ one })
     fields: [pickupAssignments.organizationId],
     references: [organizations.id],
   }),
-  schedule: one(schedules, {
-    fields: [pickupAssignments.scheduleId],
-    references: [schedules.id],
-  }),
+  // schedule relation removed - schedules table deprecated
   guideAssignment: one(guideAssignments, {
     fields: [pickupAssignments.guideAssignmentId],
     references: [guideAssignments.id],

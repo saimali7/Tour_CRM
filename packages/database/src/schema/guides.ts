@@ -53,8 +53,7 @@ export const guides = pgTable("guides", {
   // Notes (internal)
   notes: text("notes"),
 
-  // Vehicle info for pickup operations
-  vehicleCapacity: integer("vehicle_capacity"),
+  // Additional vehicle info for pickup operations
   vehicleType: text("vehicle_type"), // e.g., "sedan", "van", "bus"
   preferredZones: jsonb("preferred_zones").$type<string[]>().default([]),
 
