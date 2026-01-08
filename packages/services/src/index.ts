@@ -45,12 +45,10 @@ import { TourAvailabilityService } from "./tour-availability-service";
 import { TourRunService } from "./tour-run-service";
 // Product catalog
 import { ProductService } from "./product-service";
-// Tour Command Center: Daily operations and auto-assignment
-import { DailyOperationsService } from "./daily-operations-service";
-import { AutoAssignmentService } from "./auto-assignment-service";
 // Tour Command Center: Pickup operations
 import { PickupAddressService } from "./pickup-address-service";
-import { PickupAssignmentService } from "./pickup-assignment-service";
+// NOTE: DailyOperationsService, AutoAssignmentService, PickupAssignmentService
+// temporarily disabled - depend on deprecated schedules table
 
 export interface Services {
   tour: TourService;
@@ -98,12 +96,8 @@ export interface Services {
   tourRun: TourRunService;
   // Product catalog
   product: ProductService;
-  // Tour Command Center: Daily operations and auto-assignment
-  dailyOperations: DailyOperationsService;
-  autoAssignment: AutoAssignmentService;
   // Tour Command Center: Pickup operations
   pickupAddress: PickupAddressService;
-  pickupAssignment: PickupAssignmentService;
 }
 
 /**
@@ -163,12 +157,8 @@ export function createServices(ctx: ServiceContext): Services {
     tourRun: new TourRunService(ctx),
     // Product catalog
     product: new ProductService(ctx),
-    // Tour Command Center: Daily operations and auto-assignment
-    dailyOperations: new DailyOperationsService(ctx),
-    autoAssignment: new AutoAssignmentService(ctx),
     // Tour Command Center: Pickup operations
     pickupAddress: new PickupAddressService(ctx),
-    pickupAssignment: new PickupAssignmentService(ctx),
   };
 }
 
@@ -269,36 +259,8 @@ export type {
   UpdatePickupAddressInput,
   GetPickupAddressesOptions,
 } from "./pickup-address-service";
-export { PickupAssignmentService } from "./pickup-assignment-service";
-export type {
-  AssignBookingInput,
-  GhostPreviewInput,
-  GhostPreview,
-  PickupAssignmentWithRelations,
-} from "./pickup-assignment-service";
-// Tour Command Center: Daily operations and auto-assignment
-export { DailyOperationsService } from "./daily-operations-service";
-export { AutoAssignmentService } from "./auto-assignment-service";
-export type {
-  TourAssignmentStatus,
-  TourSummary,
-  DayStats,
-  DayOverview,
-  GroupedTours,
-  BookingWithCustomer,
-  GuideAssignmentWithPickups,
-  AvailableGuide,
-  UnassignedBooking,
-  TourAssignmentData,
-  AssignmentStatus,
-} from "./daily-operations-service";
-export type {
-  AssignmentFlagType,
-  AssignmentFlag,
-  AutoAssignResult,
-  DayAssignResult,
-  AssignmentSuggestion,
-} from "./auto-assignment-service";
+// NOTE: PickupAssignmentService, DailyOperationsService, AutoAssignmentService
+// temporarily disabled - depend on deprecated schedules table
 export type {
   CreateBookingOptionInput,
   UpdateBookingOptionInput,

@@ -204,7 +204,9 @@
       "Bash(git -C /Users/saim/Desktop/Tour_CRM checkout:*)",
       "Bash(git -C /Users/saim/Desktop/Tour_CRM rebase --continue)",
       "Bash(git -C /Users/saim/Desktop/Tour_CRM diff --name-only --diff-filter=U)",
-      "Bash(git -C /Users/saim/Desktop/Tour_CRM diff --check)"
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM diff --check)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM rebase --abort)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM branch:*)"
     ]
   }
 }

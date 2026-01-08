@@ -47,7 +47,6 @@ import { tourRunRouter } from "./tour-run";
 // Products Platform
 import { productRouter } from "./product";
 // Tour Command Center
-import { operationsRouter } from "./operations";
 import { pickupAddressRouter } from "./pickup-address";
 
 export const appRouter = createRouter({
@@ -100,7 +99,6 @@ export const appRouter = createRouter({
   // Products Platform
   product: productRouter,
   // Tour Command Center
-  operations: operationsRouter,
   pickupAddress: pickupAddressRouter,
 });
 
