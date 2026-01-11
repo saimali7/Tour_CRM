@@ -1,5 +1,18 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Validate environment variables at startup (production only)
+    if (process.env.NODE_ENV === "production") {
+      const { validateServerEnv, logEnvValidation } = await import("@tour/config");
+      const result = validateServerEnv();
+      logEnvValidation(result, "[startup] ");
+
+      if (!result.success) {
+        console.error("[startup] ❌ Environment validation failed - server may not function correctly");
+        // Don't throw in production - let the app start and fail on specific operations
+        // This allows health checks to show partial status
+      }
+    }
+
     await import("./sentry.server.config");
   }
 

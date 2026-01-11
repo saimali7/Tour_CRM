@@ -106,7 +106,7 @@ export async function validateMagicLinkToken(
   cookieStore.set(COOKIE_NAME, sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict", // Strict for security - guide portal doesn't need cross-site access
     maxAge: TOKEN_EXPIRY_DAYS * 24 * 60 * 60, // 7 days in seconds
     path: "/",
   });
