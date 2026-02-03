@@ -25,6 +25,7 @@ export function MobileHeader({ organization, slug }: MobileHeaderProps) {
           size="icon"
           onClick={() => setIsOpen(true)}
           className="text-muted-foreground"
+          aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
         </Button>
@@ -65,6 +66,7 @@ export function MobileHeader({ organization, slug }: MobileHeaderProps) {
                 size="icon"
                 onClick={() => setIsOpen(false)}
                 className="text-muted-foreground"
+                aria-label="Close menu"
               >
                 <X className="h-5 w-5" />
               </Button>

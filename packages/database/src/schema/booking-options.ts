@@ -3,8 +3,6 @@ import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { tours } from "./tours";
-import { bookings } from "./bookings";
-import { customers } from "./customers";
 
 // ============================================================
 // PRICING MODEL TYPES
@@ -148,88 +146,6 @@ export const bookingOptions = pgTable("booking_options", {
   tourStatusIdx: index("booking_options_tour_status_idx").on(table.tourId, table.status),
 }));
 
-// ============================================================
-// SCHEDULE OPTION AVAILABILITY (DEPRECATED)
-// This table was used for schedule-based availability tracking
-// Now using availability-based booking (tourId + bookingDate + bookingTime)
-// Kept for migration purposes - will be removed in future cleanup
-// ============================================================
-
-export const scheduleOptionAvailability = pgTable("schedule_option_availability", {
-  id: text("id").primaryKey().$defaultFn(createId),
-
-  // References - scheduleId kept for migration, no FK constraint
-  scheduleId: text("schedule_id").notNull(),
-  bookingOptionId: text("booking_option_id")
-    .notNull()
-    .references(() => bookingOptions.id, { onDelete: "cascade" }),
-
-  // Shared capacity tracking
-  totalSeats: integer("total_seats"),
-  bookedSeats: integer("booked_seats").default(0),
-
-  // Unit capacity tracking
-  totalUnits: integer("total_units"),
-  bookedUnits: integer("booked_units").default(0),
-
-  // Timestamps
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  // Each option can only appear once per schedule
-  scheduleOptionUnique: unique().on(table.scheduleId, table.bookingOptionId),
-  // Indexes
-  scheduleIdx: index("schedule_option_avail_schedule_idx").on(table.scheduleId),
-  optionIdx: index("schedule_option_avail_option_idx").on(table.bookingOptionId),
-}));
-
-// ============================================================
-// WAITLIST ENTRIES
-// Customers waiting for availability
-// ============================================================
-
-export type WaitlistStatus = "waiting" | "notified" | "converted" | "expired";
-
-export const waitlistEntries = pgTable("waitlist_entries", {
-  id: text("id").primaryKey().$defaultFn(createId),
-
-  // Organization (tenant isolation)
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-
-  // What they're waiting for - scheduleId kept for migration, no FK constraint
-  scheduleId: text("schedule_id").notNull(),
-  bookingOptionId: text("booking_option_id")
-    .references(() => bookingOptions.id, { onDelete: "set null" }),
-
-  // Contact info
-  customerId: text("customer_id")
-    .references(() => customers.id, { onDelete: "set null" }),
-  email: text("email").notNull(),
-  phone: text("phone"),
-
-  // Guest request
-  adults: integer("adults").notNull(),
-  children: integer("children").default(0),
-  infants: integer("infants").default(0),
-
-  // Status
-  status: text("status").$type<WaitlistStatus>().default("waiting"),
-  notifiedAt: timestamp("notified_at", { withTimezone: true }),
-  expiresAt: timestamp("expires_at", { withTimezone: true }),
-  convertedBookingId: text("converted_booking_id")
-    .references(() => bookings.id, { onDelete: "set null" }),
-
-  // Timestamps
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  orgIdx: index("waitlist_org_idx").on(table.organizationId),
-  scheduleIdx: index("waitlist_schedule_idx").on(table.scheduleId),
-  statusIdx: index("waitlist_status_idx").on(table.status),
-  scheduleStatusIdx: index("waitlist_schedule_status_idx").on(table.scheduleId, table.status),
-  emailIdx: index("waitlist_email_idx").on(table.email),
-}));
 
 // ============================================================
 // BOOKING OPTION SNAPSHOT (for bookings)
@@ -248,7 +164,7 @@ export interface BookingOptionSnapshot {
 // RELATIONS
 // ============================================================
 
-export const bookingOptionsRelations = relations(bookingOptions, ({ one, many }) => ({
+export const bookingOptionsRelations = relations(bookingOptions, ({ one }) => ({
   organization: one(organizations, {
     fields: [bookingOptions.organizationId],
     references: [organizations.id],
@@ -256,36 +172,6 @@ export const bookingOptionsRelations = relations(bookingOptions, ({ one, many })
   tour: one(tours, {
     fields: [bookingOptions.tourId],
     references: [tours.id],
-  }),
-  scheduleAvailability: many(scheduleOptionAvailability),
-  waitlistEntries: many(waitlistEntries),
-}));
-
-export const scheduleOptionAvailabilityRelations = relations(scheduleOptionAvailability, ({ one }) => ({
-  // Note: schedule relation removed - schedules table no longer exists
-  bookingOption: one(bookingOptions, {
-    fields: [scheduleOptionAvailability.bookingOptionId],
-    references: [bookingOptions.id],
-  }),
-}));
-
-export const waitlistEntriesRelations = relations(waitlistEntries, ({ one }) => ({
-  organization: one(organizations, {
-    fields: [waitlistEntries.organizationId],
-    references: [organizations.id],
-  }),
-  // Note: schedule relation removed - schedules table no longer exists
-  bookingOption: one(bookingOptions, {
-    fields: [waitlistEntries.bookingOptionId],
-    references: [bookingOptions.id],
-  }),
-  customer: one(customers, {
-    fields: [waitlistEntries.customerId],
-    references: [customers.id],
-  }),
-  convertedBooking: one(bookings, {
-    fields: [waitlistEntries.convertedBookingId],
-    references: [bookings.id],
   }),
 }));
 
@@ -295,9 +181,3 @@ export const waitlistEntriesRelations = relations(waitlistEntries, ({ one }) => 
 
 export type BookingOption = typeof bookingOptions.$inferSelect;
 export type NewBookingOption = typeof bookingOptions.$inferInsert;
-
-export type ScheduleOptionAvailability = typeof scheduleOptionAvailability.$inferSelect;
-export type NewScheduleOptionAvailability = typeof scheduleOptionAvailability.$inferInsert;
-
-export type WaitlistEntry = typeof waitlistEntries.$inferSelect;
-export type NewWaitlistEntry = typeof waitlistEntries.$inferInsert;

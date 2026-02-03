@@ -6,7 +6,7 @@
  */
 
 import { eq } from "drizzle-orm";
-import { db as database } from "@tour/database";
+import { db as database, zoneTravelTimes } from "@tour/database";
 import type { TravelMatrix, ZoneTravelTime } from "./types";
 import { createServiceLogger } from "../lib/logger";
 
@@ -44,18 +44,17 @@ export async function buildTravelMatrix(
   const matrix: TravelMatrix = new Map();
 
   try {
-    // Query zone_travel_times table if it exists
-    // For now, we'll use a placeholder since the table may not exist yet
-    // In production, this would query:
-    //
-    // const travelTimes = await database.query.zoneTravelTimes.findMany({
-    //   where: eq(zoneTravelTimes.organizationId, organizationId),
-    // });
+    const travelTimes = await database.query.zoneTravelTimes.findMany({
+      where: eq(zoneTravelTimes.organizationId, organizationId),
+    });
 
-    // Initialize empty matrix - will be populated from database
-    // This allows the algorithm to work even before travel times are configured
-
-    return matrix;
+    return buildTravelMatrixFromEntries(
+      travelTimes.map((row) => ({
+        fromZoneId: row.fromZoneId,
+        toZoneId: row.toZoneId,
+        estimatedMinutes: row.estimatedMinutes,
+      }))
+    );
   } catch (error) {
     // Log error but return empty matrix - algorithm will use defaults
     logger.error({ err: error, organizationId }, "Failed to build travel matrix");

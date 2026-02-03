@@ -12,14 +12,14 @@
 | tRPC Router | ✅ Complete | `apps/crm/src/server/routers/booking-options.ts` |
 | Pricing Calculator | ✅ Complete | `packages/services/src/pricing-calculator-service.ts` |
 | Options Management UI | ✅ Complete | `apps/crm/src/components/tours/tour-booking-options-tab.tsx` |
-| Availability Service | ⚠️ Partial | Has legacy fallback, designed for options |
-| Database Tables | ❌ Missing | `booking_options`, `schedule_option_availability` not pushed |
+| Availability Service | ✅ Complete | Uses configured booking options only |
+| Database Tables | ⚠️ Partial | `booking_options` not pushed |
 
 ### Critical Gaps
 1. **Tour Creation**: No prompt to set up pricing tiers after creating tour
 2. **Tour Edit**: Booking options tab buried/not prominent
 3. **Schedule Creation**: No visible link to available options
-4. **Booking Flow**: Uses legacy fallback instead of configured options
+4. **Booking Flow**: Needs clearer option details in booking review
 5. **Booking Display**: Doesn't show selected option details
 6. **Reports**: No option-based analytics
 
@@ -33,8 +33,6 @@
 | ID | Task | Effort |
 |----|------|--------|
 | DB-1 | Push `booking_options` table to database | S |
-| DB-2 | Push `schedule_option_availability` table | S |
-| DB-3 | Push `waitlist_entries` table | S |
 | DB-4 | Add migration for existing tours → create default "Standard" option | M |
 
 **Acceptance Criteria:**
@@ -278,7 +276,6 @@ Create Tour → Basic Info → Images → [NEW] Pricing Setup → Policies → P
 | SC-2 | Allow per-schedule option overrides (enable/disable) | M |
 | SC-3 | Display option availability on calendar | S |
 | SC-4 | Show option breakdown in schedule details | S |
-| SC-5 | Auto-initialize `schedule_option_availability` on create | S |
 
 **Schedule Creation:**
 ```
@@ -345,9 +342,9 @@ Create Tour → Basic Info → Images → [NEW] Pricing Setup → Policies → P
 ## Implementation Phases
 
 ### Phase A: Foundation (Week 1)
-- [ ] DB-1, DB-2, DB-3: Push all booking option tables
+- [ ] DB-1: Push booking options table
 - [ ] DB-4: Migration to create default options for existing tours
-- [ ] BF-1: Remove legacy fallback (use real options)
+- [x] BF-1: Remove legacy fallback (use real options)
 - [ ] BF-7, BF-8: Populate bookingOptionId and pricing snapshot
 
 ### Phase B: Tour Setup (Week 2)
@@ -410,24 +407,24 @@ WHERE NOT EXISTS (
 ```
 
 ### Backward Compatibility
-- `bookingOptionId` remains nullable for legacy bookings
+- `bookingOptionId` remains nullable for historical bookings
 - Legacy bookings display using `pricingSnapshot` or calculated from `total`
-- API continues to work without options (auto-creates default)
+- New bookings require configured options (no automatic fallback)
 
 ### Performance Considerations
 - Index `booking_options(tour_id, status)` for fast lookups
 - Cache calculated prices in Redis for high-traffic tours
-- Batch `schedule_option_availability` updates
+- Batch availability checks per tour/date
 
 ---
 
 ## Open Questions
 
-1. **Waitlist**: Should waitlist be per-option or per-schedule?
+1. **Waitlist**: If reintroduced, should it be per-option or per-tour-run?
 2. **Seasonal Pricing**: How do seasons interact with options?
 3. **Promo Codes**: Apply to specific options only?
 4. **Add-ons**: Bundled with options or separate selection?
 
 ---
 
-*Last Updated: December 22, 2024*
+*Last Updated: February 3, 2026*

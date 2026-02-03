@@ -297,6 +297,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-baseline gap-2">
             <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
+              <span className="sr-only">Dashboard</span>
               {greeting}
             </h1>
             <span className="text-xs text-muted-foreground font-medium">

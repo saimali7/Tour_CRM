@@ -115,9 +115,10 @@ export const bookings = pgTable("bookings", {
   // =========================================================================
   // GUIDE ASSIGNMENT (Direct booking → guide relationship)
   // =========================================================================
-  // Direct guide assignment for dispatch (replaces guide_assignments table for simple cases)
+  // Legacy direct guide assignment (deprecated for Command Center dispatch).
+  // Use guide_assignments + pickup_assignments as the canonical dispatch source of truth.
   assignedGuideId: text("assigned_guide_id").references(() => guides.id, { onDelete: "set null" }),
-  assignedAt: timestamp("assigned_at", { withTimezone: true }), // When the guide was assigned
+  assignedAt: timestamp("assigned_at", { withTimezone: true }), // When the legacy guide assignment was set
   isFirstTime: boolean("is_first_time").default(false), // First time customer with this org
 
   // Internal notes

@@ -178,18 +178,4 @@ export const bookingOptionsRouter = createRouter({
       await services.bookingOption.reorder(input.tourId, input.orderedIds);
       return { success: true };
     }),
-
-  /**
-   * Initialize availability for a schedule
-   * Called when creating a schedule
-   */
-  initializeScheduleAvailability: adminProcedure
-    .input(z.object({ scheduleId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
-      await services.bookingOption.initializeScheduleAvailability(input.scheduleId);
-      return { success: true };
-    }),
 });

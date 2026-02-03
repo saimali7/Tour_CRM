@@ -227,7 +227,7 @@ export default function ToursPage() {
 
       {/* Tour Cards Grid */}
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="tours-grid">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="rounded-lg border border-border bg-card p-4 animate-pulse">
               <div className="flex items-center gap-2 mb-2">
@@ -248,7 +248,7 @@ export default function ToursPage() {
       ) : (
         <>
           {/* Tour Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="tours-grid">
             {data?.data.map((product) => (
               <ProductCard
                 key={product.id}

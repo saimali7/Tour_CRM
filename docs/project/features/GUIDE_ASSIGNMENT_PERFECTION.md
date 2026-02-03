@@ -277,25 +277,14 @@ function scoreGuideForBooking(guide, booking, existingAssignments) {
 
 ## Data Model Improvements
 
-### 9. Per-Booking Guide Assignment
+### 9. Per-Booking Guide Assignment (Canonical via `guide_assignments`)
 
-**Current:** Tour run → guides (all bookings in run go to all guides)
-**Needed:** Booking → guide (explicit 1:1 mapping)
+**Current:** `guide_assignments` is the source of truth (1:1 booking → guide) for dispatch.
+**Note:** `bookings.assignedGuideId` exists for legacy/simple flows, but is **deprecated for Command Center dispatch**.
 
-**Schema Change:**
-```typescript
-// In bookings schema
-export const bookings = pgTable("bookings", {
-  // ... existing fields
-  assignedGuideId: uuid("assigned_guide_id").references(() => guides.id),
-  assignedAt: timestamp("assigned_at"),
-});
-```
-
-**Migration:**
-- Add column (nullable initially)
-- Backfill from guide_assignments table
-- Update service to use direct relationship
+**Guideline:**
+- Use `guide_assignments` + `pickup_assignments` for all dispatch/timeline operations.
+- Avoid reading `bookings.assignedGuideId` in Command Center logic.
 
 ### 10. Drive Time Estimation Table
 

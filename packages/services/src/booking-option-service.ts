@@ -343,33 +343,6 @@ export class BookingOptionService extends BaseService {
     }
   }
 
-  /**
-   * @deprecated Schedules table has been removed. Use tour availability instead.
-   * This method is kept for backwards compatibility but no longer functions.
-   */
-  async initializeScheduleAvailability(_scheduleId: string): Promise<void> {
-    // Schedules table removed - availability is now managed via tour availability
-    return;
-  }
-
-  /**
-   * @deprecated Schedules table has been removed. Use tour availability instead.
-   * Returns null - availability is now managed via tour availability model.
-   */
-  async getScheduleOptionAvailability(
-    _scheduleId: string,
-    _optionId: string
-  ): Promise<{
-    totalSeats: number | null;
-    bookedSeats: number;
-    totalUnits: number | null;
-    bookedUnits: number;
-    available: number;
-  } | null> {
-    // Schedules table removed - return null
-    return null;
-  }
-
   // ============================================================
   // VALIDATION HELPERS
   // ============================================================

@@ -9,9 +9,8 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  CheckCircle2,
   UserPlus,
-  X,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -123,6 +122,7 @@ function CompactWarning({
           description: `${guide.currentGuests}/${guide.vehicleCapacity} seats`,
           guideId: guide.id,
           impact: undefined,
+          action: "assign_guide",
         })
       );
     }
@@ -196,9 +196,23 @@ function CompactWarning({
               ))}
             </div>
           ) : (
-            <p className="text-[10px] text-muted-foreground/70">
-              Drag from hopper to assign
-            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onResolve("res_acknowledge");
+                }}
+                className="h-6 px-2 text-[10px] gap-1 hover:bg-emerald-500 hover:text-white hover:border-emerald-500"
+              >
+                <CheckCircle2 className="h-2.5 w-2.5" />
+                Mark Reviewed
+              </Button>
+              <span className="text-[10px] text-muted-foreground/70">
+                No quick fix
+              </span>
+            </div>
           )}
         </div>
       )}

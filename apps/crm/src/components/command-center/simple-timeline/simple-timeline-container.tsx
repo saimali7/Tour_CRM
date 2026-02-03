@@ -38,6 +38,8 @@ interface SimpleTimelineContainerProps {
   tourRuns: any[]
   /** Guide timelines from API */
   guideTimelines: any[]
+  /** Read-only mode (e.g. dispatched day) */
+  isReadOnly?: boolean
   /** Loading state */
   isLoading?: boolean
   /** Error state */
@@ -58,6 +60,7 @@ export function SimpleTimelineContainer({
   date,
   tourRuns,
   guideTimelines,
+  isReadOnly = false,
   isLoading = false,
   error = null,
   onGuideClick,
@@ -66,6 +69,7 @@ export function SimpleTimelineContainer({
 }: SimpleTimelineContainerProps) {
   const dateString = format(date, "yyyy-MM-dd")
   const isPastDate = isPast(startOfDay(date)) && !isToday(date)
+  const isReadOnlyMode = isPastDate || isReadOnly
 
   // Transform data into booking-centric format
   const { guides, unassignedBookings } = useMemo(() => {
@@ -122,6 +126,7 @@ export function SimpleTimelineContainer({
       <SimpleTimelineContent
         date={date}
         isPastDate={isPastDate}
+        isReadOnly={isReadOnlyMode}
         guides={guides}
         unassignedBookings={unassignedBookings}
         onGuideClick={onGuideClick}
@@ -139,6 +144,7 @@ export function SimpleTimelineContainer({
 interface SimpleTimelineContentProps {
   date: Date
   isPastDate: boolean
+  isReadOnly: boolean
   guides: GuideWithBookings[]
   unassignedBookings: BookingData[]
   onGuideClick?: (guide: GuideInfo) => void
@@ -149,6 +155,7 @@ interface SimpleTimelineContentProps {
 function SimpleTimelineContent({
   date,
   isPastDate,
+  isReadOnly,
   guides,
   unassignedBookings,
   onGuideClick,
@@ -160,8 +167,8 @@ function SimpleTimelineContent({
 
   // Always enable edit mode on mount
   useEffect(() => {
-    setIsEditing(true)
-  }, [setIsEditing])
+    setIsEditing(!isReadOnly)
+  }, [setIsEditing, isReadOnly])
 
   // Current time for the indicator (updates every minute)
   const [currentTime, setCurrentTime] = useState<string>(() => {
@@ -218,7 +225,7 @@ function SimpleTimelineContent({
               </div>
             )}
           </div>
-          <EditModeToggle isPastDate={isPastDate} />
+          <EditModeToggle isPastDate={isPastDate} isReadOnly={isReadOnly} />
         </div>
 
         {/* Timeline grid with scrollable content */}

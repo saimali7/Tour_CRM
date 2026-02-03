@@ -291,9 +291,10 @@ export function EmptyState({
 
   return (
     <div
-      className={cn("space-y-6 animate-in fade-in duration-500", className)}
+      className={cn("space-y-6 animate-in fade-in duration-500 empty-state", className)}
       role="region"
       aria-label={title}
+      data-testid="empty-state"
     >
       {/* Suggestion cards */}
       {suggestions && suggestions.length > 0 && (

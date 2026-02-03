@@ -47,8 +47,7 @@ import { TourRunService } from "./tour-run-service";
 import { ProductService } from "./product-service";
 // Tour Command Center: Pickup operations
 import { PickupAddressService } from "./pickup-address-service";
-// NOTE: DailyOperationsService, AutoAssignmentService, PickupAssignmentService
-// temporarily disabled - depend on deprecated schedules table
+import { PickupAssignmentService } from "./pickup-assignment-service";
 
 export interface Services {
   tour: TourService;
@@ -98,6 +97,7 @@ export interface Services {
   product: ProductService;
   // Tour Command Center: Pickup operations
   pickupAddress: PickupAddressService;
+  pickupAssignment: PickupAssignmentService;
 }
 
 /**
@@ -159,6 +159,7 @@ export function createServices(ctx: ServiceContext): Services {
     product: new ProductService(ctx),
     // Tour Command Center: Pickup operations
     pickupAddress: new PickupAddressService(ctx),
+    pickupAssignment: new PickupAssignmentService(ctx),
   };
 }
 
@@ -254,13 +255,12 @@ export type {
 } from "./route-optimization-service";
 // Tour Command Center: Pickup operations
 export { PickupAddressService } from "./pickup-address-service";
+export { PickupAssignmentService } from "./pickup-assignment-service";
 export type {
   CreatePickupAddressInput,
   UpdatePickupAddressInput,
   GetPickupAddressesOptions,
 } from "./pickup-address-service";
-// NOTE: PickupAssignmentService, DailyOperationsService, AutoAssignmentService
-// temporarily disabled - depend on deprecated schedules table
 export type {
   CreateBookingOptionInput,
   UpdateBookingOptionInput,

@@ -21,6 +21,7 @@ import {
   customers,
   bookingParticipants,
   guideAssignments,
+  dispatchStatus,
   guides,
   guideAvailability,
   guideAvailabilityOverrides,
@@ -29,6 +30,7 @@ import {
   type Booking,
   type Guide,
   type GuideAssignment,
+  type DispatchStatus as DispatchStatusRow,
   type Customer,
   type BookingParticipant,
   type PickupZone,
@@ -38,10 +40,15 @@ import { NotFoundError, ValidationError, ConflictError } from "./types";
 import { GuideAssignmentService } from "./guide-assignment-service";
 import { GuideAvailabilityService } from "./guide-availability-service";
 import { TourGuideQualificationService } from "./tour-guide-qualification-service";
-import { TourRunService, type TourRun as BaseTourRun } from "./tour-run-service";
+import { PickupAssignmentService } from "./pickup-assignment-service";
 import { createServiceLogger } from "./lib/logger";
 import { createTourRunKey, parseTourRunKey, formatDateForKey, getDayOfWeek } from "./lib/tour-run-utils";
 import { requireEntity } from "./lib/validation-helpers";
+import {
+  optimizeDispatch,
+  buildTravelMatrix,
+  type OptimizationWarning,
+} from "./optimization";
 import {
   validateBookingWithRelationsArray,
   validateGuideAssignmentWithRelationsArray,
@@ -89,6 +96,7 @@ export interface DispatchStatus {
   totalDriveMinutes: number;
   efficiencyScore: number;
   unresolvedWarnings: number;
+  warnings: Warning[];
 }
 
 /**
@@ -227,7 +235,14 @@ export interface OptimizedAssignment {
 /**
  * Warning types and resolution
  */
-export type WarningType = "insufficient_guides" | "capacity_exceeded" | "no_qualified_guide" | "conflict" | "no_available_guide";
+export type WarningType =
+  | "insufficient_guides"
+  | "capacity_exceeded"
+  | "no_qualified_guide"
+  | "no_available_guide"
+  | "conflict"
+  | "schedule_conflict"
+  | "other";
 
 export interface Warning {
   id: string;
@@ -235,13 +250,16 @@ export interface Warning {
   tourRunKey?: string;
   bookingId?: string;
   message: string;
-  resolutions: WarningResolution[];
+  resolutions?: WarningResolution[];
+  resolved?: boolean;
+  resolvedAt?: string;
+  resolution?: string;
 }
 
 export interface WarningResolution {
   id: string;
   label: string; // "Assign to Ahmed (+18m)"
-  action: "assign_guide" | "add_external" | "cancel_tour" | "split_booking";
+  action: "assign_guide" | "add_external" | "cancel_tour" | "split_booking" | "acknowledge";
   guideId?: string;
   impactMinutes?: number;
   // Additional context for resolution execution
@@ -299,13 +317,10 @@ export interface GuestDetails {
  * Orchestrates daily dispatch operations for tour guides.
  */
 export class CommandCenterService extends BaseService {
-  // In-memory dispatch status cache (keyed by date string YYYY-MM-DD)
-  private static dispatchStatusCache = new Map<string, Map<string, DispatchStatus>>();
-
   private guideAssignmentService: GuideAssignmentService;
   private guideAvailabilityService: GuideAvailabilityService;
   private tourGuideQualificationService: TourGuideQualificationService;
-  private tourRunService: TourRunService;
+  private pickupAssignmentService: PickupAssignmentService;
   private logger: ReturnType<typeof createServiceLogger>;
 
   constructor(ctx: { organizationId: string; userId?: string }) {
@@ -313,7 +328,7 @@ export class CommandCenterService extends BaseService {
     this.guideAssignmentService = new GuideAssignmentService(ctx);
     this.guideAvailabilityService = new GuideAvailabilityService(ctx);
     this.tourGuideQualificationService = new TourGuideQualificationService(ctx);
-    this.tourRunService = new TourRunService(ctx);
+    this.pickupAssignmentService = new PickupAssignmentService(ctx);
     this.logger = createServiceLogger("command-center", ctx.organizationId);
   }
 
@@ -325,19 +340,104 @@ export class CommandCenterService extends BaseService {
    * Get or create dispatch status for a date
    */
   async getDispatchStatus(date: Date | string): Promise<DispatchStatus> {
-    const dateKey = this.formatDateKey(date);
-    const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId) || new Map();
+    return this.refreshDispatchStatus(date);
+  }
 
-    // Check cache first
-    const cached = orgCache.get(dateKey);
-    if (cached) {
-      return cached;
+  /**
+   * Refresh and persist dispatch status from current data
+   */
+  private async refreshDispatchStatus(date: Date | string): Promise<DispatchStatus> {
+    const tourRuns = await this.getTourRuns(date);
+    const summary = this.computeDispatchSummaryFromRuns(tourRuns);
+    const existing = await this.getDispatchStatusRecord(date);
+    const warningState = await this.reconcileWarnings(existing?.warnings ?? [], tourRuns);
+    const unresolvedWarnings = Math.max(summary.unresolvedWarnings, warningState.unresolvedCount);
+
+    // Preserve dispatched status once set
+    const status: DispatchStatusType = existing?.status === "dispatched"
+      ? "dispatched"
+      : tourRuns.length === 0
+        ? "pending"
+        : unresolvedWarnings > 0
+          ? "optimized"
+          : "ready";
+
+    const merged = {
+      totalGuests: summary.totalGuests,
+      totalGuides: summary.totalGuides,
+      totalDriveMinutes: summary.totalDriveMinutes,
+      efficiencyScore: this.normalizeEfficiencyScore(summary.efficiencyScore),
+      unresolvedWarnings,
+      status,
+      optimizedAt: existing?.optimizedAt ?? (status !== "pending" ? new Date() : null),
+      dispatchedAt: existing?.dispatchedAt ?? null,
+      dispatchedBy: existing?.dispatchedBy ?? null,
+      warnings: warningState.warnings,
+    } satisfies Partial<DispatchStatusRow>;
+
+    const row = await this.upsertDispatchStatus(date, merged, existing);
+    return this.mapDispatchStatusRow(row);
+  }
+
+  /**
+   * Apply explicit dispatch status updates (optimize/dispatch)
+   */
+  private async applyDispatchStatusUpdate(
+    date: Date | string,
+    updates: Partial<DispatchStatusRow>
+  ): Promise<DispatchStatus> {
+    const tourRuns = await this.getTourRuns(date);
+    const summary = this.computeDispatchSummaryFromRuns(tourRuns);
+    const existing = await this.getDispatchStatusRecord(date);
+    const incomingWarnings = (updates.warnings ?? existing?.warnings ?? []) as Warning[];
+    const warningState = updates.warnings
+      ? { warnings: incomingWarnings, unresolvedCount: this.countUnresolvedWarnings(incomingWarnings) }
+      : await this.reconcileWarnings(incomingWarnings, tourRuns);
+    const computedUnresolved = Math.max(summary.unresolvedWarnings, warningState.unresolvedCount);
+
+    const baseStatus: DispatchStatusType = existing?.status === "dispatched"
+      ? "dispatched"
+      : tourRuns.length === 0
+        ? "pending"
+        : computedUnresolved > 0
+          ? "optimized"
+          : "ready";
+
+    let status = (updates.status as DispatchStatusType | undefined) ?? baseStatus;
+    if (status !== "dispatched" && computedUnresolved > 0) {
+      status = "optimized";
     }
 
-    // Build fresh status from current data
-    const tourRuns = await this.getTourRuns(date);
-    const availableGuides = await this.getAvailableGuides(date);
+    const merged = {
+      totalGuests: updates.totalGuests ?? summary.totalGuests,
+      totalGuides: updates.totalGuides ?? summary.totalGuides,
+      totalDriveMinutes: updates.totalDriveMinutes ?? summary.totalDriveMinutes,
+      efficiencyScore: this.normalizeEfficiencyScore(
+        updates.efficiencyScore ?? summary.efficiencyScore
+      ),
+      unresolvedWarnings: Math.max(updates.unresolvedWarnings ?? 0, computedUnresolved),
+      warnings: warningState.warnings,
+      status,
+      optimizedAt: updates.optimizedAt ?? existing?.optimizedAt ?? (status !== "pending" ? new Date() : null),
+      dispatchedAt: updates.dispatchedAt ?? existing?.dispatchedAt ?? null,
+      dispatchedBy: updates.dispatchedBy ?? existing?.dispatchedBy ?? null,
+    } satisfies Partial<DispatchStatusRow>;
 
+    const row = await this.upsertDispatchStatus(date, merged, existing);
+    return this.mapDispatchStatusRow(row);
+  }
+
+  /**
+   * Compute dispatch summary from current tour runs
+   */
+  private computeDispatchSummaryFromRuns(tourRuns: TourRun[]): {
+    status: DispatchStatusType;
+    totalGuests: number;
+    totalGuides: number;
+    totalDriveMinutes: number;
+    efficiencyScore: number;
+    unresolvedWarnings: number;
+  } {
     let totalGuests = 0;
     let totalGuidesNeeded = 0;
     let totalGuidesAssigned = 0;
@@ -353,47 +453,215 @@ export class CommandCenterService extends BaseService {
       }
     }
 
-    // Determine status
     let status: DispatchStatusType = "pending";
     if (tourRuns.length === 0) {
       status = "pending";
     } else if (unresolvedWarnings > 0) {
-      status = "optimized"; // Has data but needs review
-    } else if (totalGuidesAssigned >= totalGuidesNeeded) {
+      status = "optimized";
+    } else {
       status = "ready";
     }
 
-    const dispatchStatus: DispatchStatus = {
-      date: dateKey,
+    const efficiencyScore = totalGuidesNeeded > 0
+      ? Math.round((totalGuidesAssigned / totalGuidesNeeded) * 100)
+      : 100;
+
+    return {
       status,
-      optimizedAt: status !== "pending" ? new Date() : null,
-      dispatchedAt: null,
       totalGuests,
       totalGuides: totalGuidesAssigned,
       totalDriveMinutes: 0,
-      efficiencyScore: totalGuidesNeeded > 0 ? Math.round((totalGuidesAssigned / totalGuidesNeeded) * 100) : 100,
+      efficiencyScore,
       unresolvedWarnings,
     };
-
-    // Cache it
-    orgCache.set(dateKey, dispatchStatus);
-    CommandCenterService.dispatchStatusCache.set(this.organizationId, orgCache);
-
-    return dispatchStatus;
   }
 
   /**
-   * Update dispatch status (internal helper)
+   * Compute dispatch summary from current tour runs (loads runs)
    */
-  private updateDispatchStatus(date: Date | string, updates: Partial<DispatchStatus>): void {
+  private async computeDispatchSummary(date: Date | string): Promise<{
+    status: DispatchStatusType;
+    totalGuests: number;
+    totalGuides: number;
+    totalDriveMinutes: number;
+    efficiencyScore: number;
+    unresolvedWarnings: number;
+  }> {
+    const tourRuns = await this.getTourRuns(date);
+    return this.computeDispatchSummaryFromRuns(tourRuns);
+  }
+
+  private normalizeEfficiencyScore(
+    value: number | string | null | undefined
+  ): string | null {
+    if (value === null || value === undefined) return null;
+    return typeof value === "number" ? value.toString() : value;
+  }
+
+  private countUnresolvedWarnings(warnings: Warning[]): number {
+    return warnings.filter((warning) => !warning.resolved).length;
+  }
+
+  private async reconcileWarnings(
+    warnings: Warning[],
+    tourRuns: TourRun[]
+  ): Promise<{ warnings: Warning[]; unresolvedCount: number }> {
+    if (warnings.length === 0) {
+      return { warnings, unresolvedCount: 0 };
+    }
+
+    const bookingIds = warnings
+      .map((warning) => warning.bookingId)
+      .filter((id): id is string => Boolean(id));
+
+    const assignedBookingIds = new Set<string>();
+
+    if (bookingIds.length > 0) {
+      const assignments = await this.db.query.guideAssignments.findMany({
+        columns: {
+          bookingId: true,
+        },
+        where: and(
+          eq(guideAssignments.organizationId, this.organizationId),
+          inArray(guideAssignments.bookingId, bookingIds),
+          eq(guideAssignments.status, "confirmed")
+        ),
+      });
+
+      for (const assignment of assignments) {
+        assignedBookingIds.add(assignment.bookingId);
+      }
+    }
+
+    const tourRunStatus = new Map(tourRuns.map((run) => [run.key, run.status]));
+    const nowIso = new Date().toISOString();
+    const autoResolveTypes = new Set<WarningType>([
+      "insufficient_guides",
+      "no_available_guide",
+      "no_qualified_guide",
+    ]);
+
+    const updatedWarnings = warnings.map((warning) => {
+      if (warning.resolved) return warning;
+
+      let shouldResolve = false;
+
+      if (warning.bookingId && assignedBookingIds.has(warning.bookingId)) {
+        if (autoResolveTypes.has(warning.type)) {
+          shouldResolve = true;
+        }
+      } else if (warning.tourRunKey) {
+        const status = tourRunStatus.get(warning.tourRunKey);
+        if (status === "assigned" && autoResolveTypes.has(warning.type)) {
+          shouldResolve = true;
+        }
+      }
+
+      if (!shouldResolve) {
+        return warning;
+      }
+
+      return {
+        ...warning,
+        resolved: true,
+        resolvedAt: warning.resolvedAt ?? nowIso,
+        resolution: warning.resolution ?? "auto",
+      };
+    });
+
+    return {
+      warnings: updatedWarnings,
+      unresolvedCount: this.countUnresolvedWarnings(updatedWarnings),
+    };
+  }
+
+  /**
+   * Get dispatch status record for date (DB)
+   */
+  private async getDispatchStatusRecord(date: Date | string): Promise<DispatchStatusRow | null> {
     const dateKey = this.formatDateKey(date);
-    const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId) || new Map();
-    const existing = orgCache.get(dateKey);
+    const record = await this.db.query.dispatchStatus.findFirst({
+      where: and(
+        eq(dispatchStatus.organizationId, this.organizationId),
+        sql`${dispatchStatus.dispatchDate}::text = ${dateKey}`
+      ),
+    });
+    return record ?? null;
+  }
+
+  /**
+   * Insert or update dispatch status row
+   */
+  private async upsertDispatchStatus(
+    date: Date | string,
+    updates: Partial<DispatchStatusRow>,
+    existing?: DispatchStatusRow | null
+  ): Promise<DispatchStatusRow> {
+    const dateKey = this.formatDateKey(date);
+    const dispatchDate = new Date(dateKey);
 
     if (existing) {
-      orgCache.set(dateKey, { ...existing, ...updates });
+      const [updated] = await this.db
+        .update(dispatchStatus)
+        .set({
+          ...updates,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(dispatchStatus.organizationId, this.organizationId),
+            sql`${dispatchStatus.dispatchDate}::text = ${dateKey}`
+          )
+        )
+        .returning();
+
+      return updated ?? existing;
     }
-    CommandCenterService.dispatchStatusCache.set(this.organizationId, orgCache);
+
+    const [created] = await this.db
+      .insert(dispatchStatus)
+      .values({
+        organizationId: this.organizationId,
+        dispatchDate,
+        status: "pending",
+        ...updates,
+      })
+      .returning();
+
+    if (!created) {
+      throw new ValidationError("Failed to create dispatch status");
+    }
+
+    return created;
+  }
+
+  /**
+   * Map DB row to API shape
+   */
+  private mapDispatchStatusRow(row: DispatchStatusRow): DispatchStatus {
+    return {
+      date: this.formatDateKey(row.dispatchDate),
+      status: row.status as DispatchStatusType,
+      optimizedAt: row.optimizedAt ?? null,
+      dispatchedAt: row.dispatchedAt ?? null,
+      totalGuests: row.totalGuests ?? 0,
+      totalGuides: row.totalGuides ?? 0,
+      totalDriveMinutes: row.totalDriveMinutes ?? 0,
+      efficiencyScore: row.efficiencyScore ? Number(row.efficiencyScore) : 0,
+      unresolvedWarnings: row.unresolvedWarnings ?? 0,
+      warnings: (row.warnings ?? []) as Warning[],
+    };
+  }
+
+  private async assertNotDispatched(
+    date: Date | string,
+    actionLabel: string
+  ): Promise<void> {
+    const existing = await this.getDispatchStatusRecord(date);
+    if (existing?.status === "dispatched") {
+      const dateKey = this.formatDateKey(date);
+      throw new ValidationError(`${actionLabel} blocked: ${dateKey} is already dispatched.`);
+    }
   }
 
   // ===========================================================================
@@ -904,10 +1172,34 @@ export class CommandCenterService extends BaseService {
    * Returns guide rows with their segments (drive, pickup, tour)
    */
   async getGuideTimelines(date: Date | string): Promise<GuideTimeline[]> {
-    const availableGuides = await this.getAvailableGuides(date);
-    const tourRuns = await this.getTourRuns(date);
+    // Ensure pickup assignments exist for the date
+    await this.pickupAssignmentService.syncForDate(date);
+
+    const [availableGuides, tourRuns, pickupAssignments] = await Promise.all([
+      this.getAvailableGuides(date),
+      this.getTourRuns(date),
+      this.pickupAssignmentService.getForDate(date),
+    ]);
+
+    const pickupsByGuide = new Map<string, typeof pickupAssignments>();
+    for (const pickup of pickupAssignments) {
+      if (!pickup.guideId) continue;
+      if (!pickupsByGuide.has(pickup.guideId)) {
+        pickupsByGuide.set(pickup.guideId, []);
+      }
+      pickupsByGuide.get(pickup.guideId)!.push(pickup);
+    }
+
+    // Fast lookup for bookings by ID
+    const bookingById = new Map<string, BookingWithCustomer>();
+    for (const run of tourRuns) {
+      for (const booking of run.bookings) {
+        bookingById.set(booking.id, booking);
+      }
+    }
 
     const timelines: GuideTimeline[] = [];
+    const pickupDurationMinutes = 5;
 
     for (const availableGuide of availableGuides) {
       const segments: TimelineSegment[] = [];
@@ -924,6 +1216,16 @@ export class CommandCenterService extends BaseService {
 
       // Build timeline segments
       let lastEndTime = availableGuide.availableFrom;
+      let lastSegmentWasWork = false;
+      const guidePickups = pickupsByGuide.get(availableGuide.guide.id) ?? [];
+
+      const pickupsByRun = new Map<string, typeof guidePickups>();
+      for (const pickup of guidePickups) {
+        if (!pickupsByRun.has(pickup.tourRunKey)) {
+          pickupsByRun.set(pickup.tourRunKey, []);
+        }
+        pickupsByRun.get(pickup.tourRunKey)!.push(pickup);
+      }
 
       for (const run of assignedRuns) {
         const guideAssignment = run.assignedGuides.find((g) => g.guideId === availableGuide.guide.id);
@@ -934,28 +1236,135 @@ export class CommandCenterService extends BaseService {
         const tourDuration = run.tour.durationMinutes;
         const tourEndTime = this.addMinutesToTime(tourStartTime, tourDuration);
 
-        // Get bookings assigned to this guide in this run
-        // All bookings in the run are handled by assigned guides (guests split across guides)
-        const guideBookings = run.bookings;
+        const runPickups = (pickupsByRun.get(run.key) ?? [])
+          .filter((pickup) => pickup.pickupTime)
+          .sort((a, b) => {
+            if (a.pickupOrder !== b.pickupOrder) {
+              return a.pickupOrder - b.pickupOrder;
+            }
+            return (a.pickupTime ?? "").localeCompare(b.pickupTime ?? "");
+          });
 
-        const guestsForGuide = Math.ceil(run.totalGuests / run.guidesAssigned);
-        totalGuests += guestsForGuide;
+        if (runPickups.length === 0) {
+          const guestsForGuide = Math.ceil(run.totalGuests / Math.max(run.guidesAssigned, 1));
+          totalGuests += guestsForGuide;
 
-        // Add idle segment if there's a gap
-        if (lastEndTime < tourStartTime) {
-          const idleDuration = this.timeDifferenceMinutes(lastEndTime, tourStartTime);
+          if (lastEndTime < tourStartTime) {
+            const idleDuration = this.timeDifferenceMinutes(lastEndTime, tourStartTime);
+            if (idleDuration > 0) {
+              segments.push({
+                type: "idle",
+                startTime: lastEndTime,
+                endTime: tourStartTime,
+                durationMinutes: idleDuration,
+                confidence: "optimal",
+              });
+              lastSegmentWasWork = false;
+            }
+          }
+
+          segments.push({
+            type: "tour",
+            startTime: tourStartTime,
+            endTime: tourEndTime,
+            durationMinutes: tourDuration,
+            tour: {
+              id: run.tour.id,
+              name: run.tour.name,
+              slug: run.tour.slug,
+            },
+            tourRunKey: run.key,
+            bookingIds: run.bookings.map((b) => b.id),
+            guestCount: guestsForGuide,
+            confidence: this.calculateConfidence(run, guideAssignment),
+          });
+
+          lastSegmentWasWork = true;
+          lastEndTime = tourEndTime;
+          continue;
+        }
+
+        const firstSegmentStart = runPickups[0]!.pickupTime!;
+
+        // Add idle before first segment
+        if (lastEndTime < firstSegmentStart) {
+          const idleDuration = this.timeDifferenceMinutes(lastEndTime, firstSegmentStart);
           if (idleDuration > 0) {
             segments.push({
               type: "idle",
               startTime: lastEndTime,
-              endTime: tourStartTime,
+              endTime: firstSegmentStart,
               durationMinutes: idleDuration,
               confidence: "optimal",
             });
+            lastSegmentWasWork = false;
+            lastEndTime = firstSegmentStart;
+          }
+        }
+
+        // Add pickup segments (and drive gaps between them)
+        for (const pickup of runPickups) {
+          const pickupTime = pickup.pickupTime!;
+          if (lastEndTime < pickupTime) {
+            const gap = this.timeDifferenceMinutes(lastEndTime, pickupTime);
+            if (gap > 0) {
+              segments.push({
+                type: lastSegmentWasWork ? "drive" : "idle",
+                startTime: lastEndTime,
+                endTime: pickupTime,
+                durationMinutes: gap,
+                confidence: "optimal",
+              });
+              if (lastSegmentWasWork) {
+                totalDriveMinutes += gap;
+              }
+            }
+          }
+
+          const pickupEnd = this.addMinutesToTime(pickupTime, pickupDurationMinutes);
+          const booking = bookingById.get(pickup.bookingId);
+          const guestCount = booking?.totalParticipants ?? pickup.passengerCount;
+
+          segments.push({
+            type: "pickup",
+            startTime: pickupTime,
+            endTime: pickupEnd,
+            durationMinutes: pickupDurationMinutes,
+            booking: booking ?? undefined,
+            pickupLocation: booking?.pickupLocation ?? "Pickup",
+            pickupZoneName: booking?.pickupZone?.name,
+            pickupZoneColor: booking?.pickupZone?.color,
+            guestCount,
+            confidence: this.calculateConfidence(run, guideAssignment),
+          });
+
+          totalGuests += guestCount;
+          lastSegmentWasWork = true;
+          lastEndTime = pickupEnd;
+        }
+
+        // Drive segment from last pickup to tour start (if needed)
+        if (lastEndTime < tourStartTime) {
+          const gap = this.timeDifferenceMinutes(lastEndTime, tourStartTime);
+          if (gap > 0) {
+            segments.push({
+              type: "drive",
+              startTime: lastEndTime,
+              endTime: tourStartTime,
+              durationMinutes: gap,
+              confidence: "optimal",
+            });
+            totalDriveMinutes += gap;
+            lastEndTime = tourStartTime;
           }
         }
 
         // Add tour segment
+        const guideBookings = runPickups
+          .map((pickup) => pickup.bookingId)
+          .map((id) => bookingById.get(id))
+          .filter(Boolean) as BookingWithCustomer[];
+
         segments.push({
           type: "tour",
           startTime: tourStartTime,
@@ -968,10 +1377,11 @@ export class CommandCenterService extends BaseService {
           },
           tourRunKey: run.key,
           bookingIds: guideBookings.map((b) => b.id),
-          guestCount: guestsForGuide,
+          guestCount: guideBookings.reduce((sum, b) => sum + (b.totalParticipants ?? 0), 0),
           confidence: this.calculateConfidence(run, guideAssignment),
         });
 
+        lastSegmentWasWork = true;
         lastEndTime = tourEndTime;
       }
 
@@ -1025,170 +1435,232 @@ export class CommandCenterService extends BaseService {
    * Assigns guides to tour runs optimally
    */
   async optimize(date: Date | string): Promise<OptimizationResult> {
-    const tourRuns = await this.getTourRuns(date);
-    const availableGuides = await this.getAvailableGuides(date);
+    await this.assertNotDispatched(date, "Optimization");
+    const dateKey = this.formatDateKey(date);
+    const baseDate = this.parseDateKey(dateKey);
 
-    const assignments: OptimizedAssignment[] = [];
-    const warnings: Warning[] = [];
-    let totalDriveMinutes = 0;
+    const [tourRuns, availableGuides, travelMatrix] = await Promise.all([
+      this.getTourRuns(date),
+      this.getAvailableGuides(date),
+      buildTravelMatrix(this.organizationId),
+    ]);
 
-    // Sort tour runs by time (earlier first) and then by guest count (larger harder to staff)
-    const sortedRuns = [...tourRuns].sort((a, b) => {
-      if (a.time !== b.time) return a.time.localeCompare(b.time);
-      return b.totalGuests - a.totalGuests;
+    const bookingIds = tourRuns.flatMap((run) => run.bookings.map((booking) => booking.id));
+    const existingAssignments = bookingIds.length > 0
+      ? await this.db.query.guideAssignments.findMany({
+          columns: {
+            bookingId: true,
+          },
+          where: and(
+            eq(guideAssignments.organizationId, this.organizationId),
+            inArray(guideAssignments.bookingId, bookingIds),
+            eq(guideAssignments.status, "confirmed")
+          ),
+        })
+      : [];
+
+    const assignedBookingIds = new Set(existingAssignments.map((assignment) => assignment.bookingId));
+
+    const tourRunInputs = tourRuns
+      .map((run) => {
+        const unassignedBookings = run.bookings.filter((booking) => !assignedBookingIds.has(booking.id));
+        if (unassignedBookings.length === 0) {
+          return null;
+        }
+
+        const totalGuests = unassignedBookings.reduce((sum, booking) => sum + booking.totalParticipants, 0);
+        const guestsPerGuide = run.tour.guestsPerGuide ?? 6;
+        const guidesNeeded = totalGuests > 0 ? Math.ceil(totalGuests / guestsPerGuide) : 0;
+
+        if (guidesNeeded === 0) {
+          return null;
+        }
+
+        const pickupZoneCounts = new Map<string, number>();
+        for (const booking of unassignedBookings) {
+          if (!booking.pickupZoneId) continue;
+          pickupZoneCounts.set(
+            booking.pickupZoneId,
+            (pickupZoneCounts.get(booking.pickupZoneId) ?? 0) + 1
+          );
+        }
+
+        let primaryPickupZone: string | undefined;
+        let maxCount = 0;
+        for (const [zoneId, count] of pickupZoneCounts) {
+          if (count > maxCount) {
+            maxCount = count;
+            primaryPickupZone = zoneId;
+          }
+        }
+
+        return {
+          tourId: run.tourId,
+          tourName: run.tour.name,
+          date: baseDate,
+          time: run.time,
+          durationMinutes: run.tour.durationMinutes,
+          guestsPerGuide,
+          totalGuests,
+          guidesNeeded,
+          primaryPickupZone,
+          bookings: unassignedBookings.map((booking) => ({
+            id: booking.id,
+            referenceNumber: booking.referenceNumber,
+            participantCount: booking.totalParticipants,
+            pickupZoneId: booking.pickupZoneId ?? undefined,
+            pickupLocation: booking.pickupLocation ?? undefined,
+            customerName: booking.customerName,
+            specialRequests: booking.specialRequests ?? undefined,
+            isPrivate: booking.experienceMode ? booking.experienceMode !== "join" : undefined,
+          })),
+        };
+      })
+      .filter((run): run is NonNullable<typeof run> => run !== null);
+
+    if (tourRunInputs.length === 0) {
+      await this.applyDispatchStatusUpdate(date, {
+        status: "ready",
+        optimizedAt: new Date(),
+        efficiencyScore: "100",
+        totalDriveMinutes: 0,
+        warnings: [],
+        unresolvedWarnings: 0,
+      });
+
+      return {
+        assignments: [],
+        warnings: [],
+        efficiency: 100,
+        totalDriveMinutes: 0,
+      };
+    }
+
+    const guideScheduleEntries = new Map<string, Array<{
+      id: string;
+      startsAt: Date;
+      endsAt: Date;
+      endZoneId?: string;
+    }>>();
+
+    const buildDateTime = (time: string) => {
+      const [hours, minutes] = time.split(":").map(Number);
+      const result = new Date(baseDate);
+      result.setHours(hours || 0, minutes || 0, 0, 0);
+      return result;
+    };
+
+    for (const run of tourRuns) {
+      const runStart = buildDateTime(run.time);
+      const runEnd = new Date(runStart.getTime() + (run.tour.durationMinutes || 60) * 60 * 1000);
+
+      for (const guide of run.assignedGuides) {
+        if (!guide.guideId) continue;
+        if (!guideScheduleEntries.has(guide.guideId)) {
+          guideScheduleEntries.set(guide.guideId, []);
+        }
+        guideScheduleEntries.get(guide.guideId)!.push({
+          id: run.key,
+          startsAt: runStart,
+          endsAt: runEnd,
+        });
+      }
+    }
+
+    const availableGuideInputs = availableGuides.map((guide) => ({
+      id: guide.guide.id,
+      name: `${guide.guide.firstName} ${guide.guide.lastName}`.trim(),
+      vehicleCapacity: guide.vehicleCapacity,
+      baseZoneId: guide.baseZone ?? undefined,
+      languages: guide.guide.languages ?? [],
+      qualifiedTourIds: guide.qualifiedTours,
+      primaryTourIds: [],
+      availableFrom: buildDateTime(guide.availableFrom),
+      availableTo: buildDateTime(guide.availableTo),
+      currentAssignments: guideScheduleEntries.get(guide.guide.id) ?? [],
+    }));
+
+    const optimizationResult = await optimizeDispatch({
+      date: baseDate,
+      tourRuns: tourRunInputs,
+      availableGuides: availableGuideInputs,
+      travelMatrix,
+      organizationId: this.organizationId,
     });
 
-    // Track guide assignments during optimization
-    const guideSchedules = new Map<string, {
-      assignedRuns: string[];
-      currentLocation: string | null;
-    }>();
+    const warnings = this.mapOptimizationWarnings(optimizationResult.warnings);
+    const assignments: OptimizedAssignment[] = [];
 
-    for (const guide of availableGuides) {
-      guideSchedules.set(guide.guide.id, {
-        assignedRuns: [],
-        currentLocation: guide.baseZone,
-      });
-    }
-
-    // Process each tour run
-    for (const run of sortedRuns) {
-      // Skip if already fully assigned
-      if (run.status === "assigned" || run.status === "overstaffed") {
+    for (const proposed of optimizationResult.assignments) {
+      if (assignedBookingIds.has(proposed.bookingId)) {
         continue;
       }
 
-      const guidesStillNeeded = run.guidesNeeded - run.guidesAssigned;
+      try {
+        const assignment = await this.guideAssignmentService.assignGuideToBooking(
+          proposed.bookingId,
+          proposed.guideId,
+          { autoConfirm: true }
+        );
 
-      if (guidesStillNeeded <= 0) {
-        continue;
-      }
-
-      // Find qualified, available guides for this run
-      const candidates = availableGuides.filter((g) => {
-        // Must be qualified for this tour
-        if (!g.qualifiedTours.includes(run.tourId)) {
-          return false;
-        }
-
-        // Must be available during the tour
-        const tourStartTime = run.time;
-        const tourEndTime = this.addMinutesToTime(tourStartTime, run.tour.durationMinutes);
-
-        if (tourStartTime < g.availableFrom || tourEndTime > g.availableTo) {
-          return false;
-        }
-
-        // Check for time conflicts with already assigned runs
-        const schedule = guideSchedules.get(g.guide.id);
-        if (!schedule) return true;
-
-        for (const assignedRunKey of schedule.assignedRuns) {
-          const assignedRun = sortedRuns.find((r) => r.key === assignedRunKey);
-          if (!assignedRun) continue;
-
-          const assignedStart = assignedRun.time;
-          const assignedEnd = this.addMinutesToTime(assignedStart, assignedRun.tour.durationMinutes);
-
-          // Check for overlap
-          if (!(tourEndTime <= assignedStart || tourStartTime >= assignedEnd)) {
-            return false;
-          }
-        }
-
-        return true;
-      });
-
-      if (candidates.length === 0) {
-        // No qualified guides available
-        warnings.push({
-          id: this.generateWarningId(),
-          type: candidates.length === 0 && availableGuides.some((g) => g.qualifiedTours.includes(run.tourId))
-            ? "no_available_guide"
-            : "no_qualified_guide",
-          tourRunKey: run.key,
-          message: `No ${candidates.length === 0 ? "available" : "qualified"} guide for ${run.tour.name} at ${run.time}`,
-          resolutions: this.generateResolutions(run, availableGuides),
-        });
-        continue;
-      }
-
-      // Score and rank candidates
-      const scoredCandidates = candidates.map((candidate) => ({
-        guide: candidate,
-        score: this.scoreGuideForRun(candidate, run, guideSchedules),
-      })).sort((a, b) => b.score - a.score);
-
-      // Assign top candidates
-      const toAssign = scoredCandidates.slice(0, guidesStillNeeded);
-
-      for (let i = 0; i < toAssign.length; i++) {
-        const { guide } = toAssign[i]!;
-
-        // Assign guide to all bookings in this run
-        for (const booking of run.bookings) {
-          // Check if already assigned
-          const existingAssignment = run.assignedGuides.find(
-            (a) => a.guideId === guide.guide.id
+        await this.db
+          .update(guideAssignments)
+          .set({
+            pickupOrder: proposed.pickupOrder,
+            calculatedPickupTime: proposed.calculatedPickupTime,
+            driveTimeMinutes: proposed.driveTimeMinutes,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(guideAssignments.id, assignment.id),
+              eq(guideAssignments.organizationId, this.organizationId)
+            )
           );
 
-          if (!existingAssignment) {
-            // Create assignment
-            try {
-              await this.guideAssignmentService.assignGuideToBooking(
-                booking.id,
-                guide.guide.id,
-                { autoConfirm: true }
-              );
-
-              assignments.push({
-                bookingId: booking.id,
-                guideId: guide.guide.id,
-                pickupOrder: i + 1,
-                calculatedPickupTime: run.time, // Simplified - no pickup time calculation yet
-                driveTimeMinutes: 0,
-              });
-            } catch (error) {
-              // Assignment might already exist, skip
-            }
-          }
-        }
-
-        // Update guide schedule
-        const schedule = guideSchedules.get(guide.guide.id);
-        if (schedule) {
-          schedule.assignedRuns.push(run.key);
-        }
-      }
-
-      // Check if we still need more guides
-      if (toAssign.length < guidesStillNeeded) {
-        warnings.push({
-          id: this.generateWarningId(),
-          type: "insufficient_guides",
-          tourRunKey: run.key,
-          message: `Need ${guidesStillNeeded} guides for ${run.tour.name} at ${run.time}, only ${toAssign.length} available`,
-          resolutions: this.generateResolutions(run, availableGuides),
+        assignments.push({
+          bookingId: proposed.bookingId,
+          guideId: proposed.guideId,
+          pickupOrder: proposed.pickupOrder,
+          calculatedPickupTime: proposed.calculatedPickupTime,
+          driveTimeMinutes: proposed.driveTimeMinutes,
         });
+      } catch {
+        // Assignment might already exist, skip
       }
     }
 
-    // Calculate efficiency
-    const totalGuestsNeeded = tourRuns.reduce((sum, r) => sum + r.totalGuests, 0);
-    const totalGuidesNeeded = tourRuns.reduce((sum, r) => sum + r.guidesNeeded, 0);
-    const totalGuidesAssigned = assignments.length > 0
-      ? new Set(assignments.map((a) => a.guideId)).size
-      : 0;
+    // Ensure pickup assignments (and guide assignment pickup fields) are synced
+    await this.pickupAssignmentService.syncForDate(date);
 
-    const efficiency = totalGuidesNeeded > 0
-      ? Math.round((totalGuidesAssigned / totalGuidesNeeded) * 100)
-      : 100;
+    if (assignments.length > 0) {
+      const pickupSummaries = await this.pickupAssignmentService.getForDate(date);
+      const pickupByBooking = new Map(pickupSummaries.map((pickup) => [pickup.bookingId, pickup]));
+
+      for (const assignment of assignments) {
+        const pickup = pickupByBooking.get(assignment.bookingId);
+        if (!pickup) continue;
+
+        assignment.pickupOrder = pickup.pickupOrder;
+        if (pickup.pickupTime) {
+          assignment.calculatedPickupTime = pickup.pickupTime;
+        }
+        if (pickup.driveTimeMinutes !== null) {
+          assignment.driveTimeMinutes = pickup.driveTimeMinutes;
+        }
+      }
+    }
+
+    const efficiency = optimizationResult.efficiency;
+    const totalDriveMinutes = optimizationResult.totalDriveMinutes;
 
     // Update dispatch status
-    this.updateDispatchStatus(date, {
+    await this.applyDispatchStatusUpdate(date, {
       status: warnings.length > 0 ? "optimized" : "ready",
       optimizedAt: new Date(),
-      efficiencyScore: efficiency,
+      efficiencyScore: efficiency.toString(),
+      totalDriveMinutes,
+      warnings,
       unresolvedWarnings: warnings.length,
     });
 
@@ -1200,9 +1672,141 @@ export class CommandCenterService extends BaseService {
     };
   }
 
+  private mapOptimizationWarnings(warnings: OptimizationWarning[]): Warning[] {
+    return warnings.map((warning) => ({
+      id: warning.id,
+      type: this.mapOptimizationWarningType(warning.type),
+      tourRunKey: warning.tourRunId,
+      bookingId: warning.bookingId,
+      message: warning.message,
+      resolutions: this.mapOptimizationResolutions(warning),
+      resolved: false,
+    }));
+  }
+
+  private mapOptimizationWarningType(type: OptimizationWarning["type"]): WarningType {
+    switch (type) {
+      case "insufficient_guides":
+        return "insufficient_guides";
+      case "no_qualified_guide":
+        return "no_qualified_guide";
+      case "vehicle_capacity_exceeded":
+        return "capacity_exceeded";
+      case "time_conflict":
+        return "conflict";
+      case "unassigned_booking":
+        return "no_available_guide";
+      case "long_drive_time":
+      case "suboptimal_assignment":
+      default:
+        return "conflict";
+    }
+  }
+
+  private mapOptimizationResolutions(warning: OptimizationWarning): WarningResolution[] {
+    if (!warning.suggestedResolutions || warning.suggestedResolutions.length === 0) {
+      return [];
+    }
+
+    const resolutions: WarningResolution[] = [];
+
+    for (const suggestion of warning.suggestedResolutions) {
+      if (suggestion.type === "assign_to_guide" && suggestion.guideId) {
+        resolutions.push({
+          id: suggestion.id,
+          label: suggestion.label,
+          action: "assign_guide",
+          guideId: suggestion.guideId,
+          impactMinutes: suggestion.additionalDriveMinutes,
+          tourRunKey: warning.tourRunId,
+          bookingId: warning.bookingId,
+        });
+        continue;
+      }
+
+      if (suggestion.type === "add_external_guide") {
+        resolutions.push({
+          id: suggestion.id,
+          label: suggestion.label,
+          action: "add_external",
+          tourRunKey: warning.tourRunId,
+          bookingId: warning.bookingId,
+        });
+      }
+    }
+
+    return resolutions;
+  }
+
   // ===========================================================================
   // WARNING RESOLUTION
   // ===========================================================================
+
+  private async resolveWarningDate(resolution: WarningResolution): Promise<string | null> {
+    if (resolution.bookingId) {
+      const booking = await this.db.query.bookings.findFirst({
+        columns: {
+          bookingDate: true,
+        },
+        where: and(
+          eq(bookings.id, resolution.bookingId),
+          eq(bookings.organizationId, this.organizationId)
+        ),
+      });
+
+      if (booking?.bookingDate) {
+        return this.formatDateKey(booking.bookingDate);
+      }
+    }
+
+    if (resolution.tourRunKey) {
+      const parsed = parseTourRunKey(resolution.tourRunKey);
+      if (parsed?.date) {
+        return parsed.date;
+      }
+    }
+
+    return null;
+  }
+
+  private async assertNotDispatchedForResolution(
+    resolution: WarningResolution
+  ): Promise<string | null> {
+    const dateKey = await this.resolveWarningDate(resolution);
+    if (dateKey) {
+      await this.assertNotDispatched(dateKey, "Warning resolution");
+    }
+    return dateKey;
+  }
+
+  private async markWarningResolved(
+    date: Date | string,
+    warningId: string,
+    resolution: WarningResolution
+  ): Promise<void> {
+    const existing = await this.getDispatchStatusRecord(date);
+    if (!existing?.warnings || existing.warnings.length === 0) {
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const warnings = (existing.warnings as Warning[]).map((warning) => {
+      if (warning.id !== warningId) return warning;
+      if (warning.resolved) return warning;
+
+      return {
+        ...warning,
+        resolved: true,
+        resolvedAt: warning.resolvedAt ?? nowIso,
+        resolution: warning.resolution ?? resolution.action,
+      };
+    });
+
+    await this.applyDispatchStatusUpdate(date, {
+      warnings,
+      unresolvedWarnings: this.countUnresolvedWarnings(warnings),
+    });
+  }
 
   /**
    * Resolve a warning by applying a resolution
@@ -1211,6 +1815,7 @@ export class CommandCenterService extends BaseService {
    * @param resolution - The resolution to apply, must include necessary context (bookingId, tourRunKey, etc.)
    */
   async resolveWarning(warningId: string, resolution: WarningResolution): Promise<void> {
+    const warningDate = await this.assertNotDispatchedForResolution(resolution);
     this.logger.info(`Resolving warning ${warningId} with action: ${resolution.action}`);
 
     switch (resolution.action) {
@@ -1230,8 +1835,16 @@ export class CommandCenterService extends BaseService {
         await this.resolveSplitBooking(warningId, resolution);
         break;
 
+      case "acknowledge":
+        this.logger.info(`Warning ${warningId} acknowledged without automated action.`);
+        break;
+
       default:
         throw new ValidationError(`Unknown resolution action: ${resolution.action}`);
+    }
+
+    if (warningDate) {
+      await this.markWarningResolved(warningDate, warningId, resolution);
     }
   }
 
@@ -1263,7 +1876,7 @@ export class CommandCenterService extends BaseService {
       });
 
       if (booking?.bookingDate) {
-        this.invalidateDispatchCache(booking.bookingDate);
+        await this.refreshDispatchStatus(booking.bookingDate);
       }
 
       this.logger.info(`Resolved warning ${warningId}: assigned guide ${resolution.guideId} to booking ${resolution.bookingId}`);
@@ -1309,9 +1922,9 @@ export class CommandCenterService extends BaseService {
         }
       }
 
-      // Invalidate cache for the date
+      // Refresh dispatch status for the date
       const date = new Date(dateStr);
-      this.invalidateDispatchCache(date);
+      await this.refreshDispatchStatus(date);
 
       this.logger.info(`Resolved warning ${warningId}: assigned guide ${resolution.guideId} to ${assignedCount} bookings in tour run ${resolution.tourRunKey}`);
       return;
@@ -1373,9 +1986,9 @@ export class CommandCenterService extends BaseService {
         }
       }
 
-      // Invalidate cache
+      // Refresh dispatch status
       const date = new Date(dateStr);
-      this.invalidateDispatchCache(date);
+      await this.refreshDispatchStatus(date);
 
       this.logger.info(`Resolved warning ${warningId}: added external guide "${resolution.externalGuideName}" to ${assignedCount} bookings`);
       return;
@@ -1460,9 +2073,9 @@ export class CommandCenterService extends BaseService {
       }
     }
 
-    // Invalidate cache
+    // Refresh dispatch status
     const date = new Date(dateStr);
-    this.invalidateDispatchCache(date);
+    await this.refreshDispatchStatus(date);
 
     this.logger.warn(
       `Resolved warning ${warningId}: CANCELLED tour run ${resolution.tourRunKey} ` +
@@ -1547,24 +2160,13 @@ export class CommandCenterService extends BaseService {
       }
     }
 
-    // Invalidate cache
+    // Refresh dispatch status
     if (booking.bookingDate) {
-      this.invalidateDispatchCache(booking.bookingDate);
+      await this.refreshDispatchStatus(booking.bookingDate);
     }
 
     // Note: Full split functionality (creating separate bookings) not yet implemented
     this.logger.warn(`Split booking for ${bookingId}: guide assignments updated, full split not implemented`);
-  }
-
-  /**
-   * Invalidate the dispatch status cache for a specific date
-   */
-  private invalidateDispatchCache(date: Date | string): void {
-    const dateKey = this.formatDateKey(date);
-    const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId);
-    if (orgCache) {
-      orgCache.delete(dateKey);
-    }
   }
 
   // ===========================================================================
@@ -1588,6 +2190,10 @@ export class CommandCenterService extends BaseService {
       bookingId
     );
 
+    if (booking.bookingDate) {
+      await this.assertNotDispatched(booking.bookingDate, "Manual assignment");
+    }
+
     // Verify guide exists and belongs to org (using shared validation helper)
     await requireEntity(
       () =>
@@ -1606,13 +2212,9 @@ export class CommandCenterService extends BaseService {
       autoConfirm: true,
     });
 
-    // Invalidate dispatch status cache for the booking date
+    // Refresh dispatch status for the booking date
     if (booking.bookingDate) {
-      const dateKey = this.formatDateKey(booking.bookingDate);
-      const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId);
-      if (orgCache) {
-        orgCache.delete(dateKey);
-      }
+      await this.refreshDispatchStatus(booking.bookingDate);
     }
   }
 
@@ -1631,6 +2233,10 @@ export class CommandCenterService extends BaseService {
       ),
     });
 
+    if (booking?.bookingDate) {
+      await this.assertNotDispatched(booking.bookingDate, "Unassign");
+    }
+
     // Cancel all confirmed assignments
     for (const assignment of assignments) {
       if (assignment.status === "confirmed") {
@@ -1638,13 +2244,9 @@ export class CommandCenterService extends BaseService {
       }
     }
 
-    // Invalidate dispatch status cache
+    // Refresh dispatch status
     if (booking?.bookingDate) {
-      const dateKey = this.formatDateKey(booking.bookingDate);
-      const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId);
-      if (orgCache) {
-        orgCache.delete(dateKey);
-      }
+      await this.refreshDispatchStatus(booking.bookingDate);
     }
   }
 
@@ -1660,6 +2262,24 @@ export class CommandCenterService extends BaseService {
     guideId: string,
     newPickupTime: string
   ): Promise<void> {
+    const booking = await this.db.query.bookings.findFirst({
+      columns: {
+        bookingDate: true,
+      },
+      where: and(
+        eq(bookings.id, bookingId),
+        eq(bookings.organizationId, this.organizationId)
+      ),
+    });
+
+    if (!booking) {
+      throw new NotFoundError("Booking", bookingId);
+    }
+
+    if (booking.bookingDate) {
+      await this.assertNotDispatched(booking.bookingDate, "Time shift");
+    }
+
     // Update both pickupTime and bookingTime on the booking
     // bookingTime determines the tour slot/visual position on timeline
     // pickupTime is the calculated time the guide picks up the guest
@@ -1710,13 +2330,9 @@ export class CommandCenterService extends BaseService {
       );
     }
 
-    // Invalidate dispatch status cache
+    // Refresh dispatch status
     if (updatedBooking.bookingDate) {
-      const dateKey = this.formatDateKey(updatedBooking.bookingDate);
-      const orgCache = CommandCenterService.dispatchStatusCache.get(this.organizationId);
-      if (orgCache) {
-        orgCache.delete(dateKey);
-      }
+      await this.refreshDispatchStatus(updatedBooking.bookingDate);
     }
   }
 
@@ -1763,9 +2379,10 @@ export class CommandCenterService extends BaseService {
     const dispatchedAt = new Date();
 
     // Update dispatch status
-    this.updateDispatchStatus(date, {
+    await this.applyDispatchStatusUpdate(date, {
       status: "dispatched",
       dispatchedAt,
+      dispatchedBy: this.userId ?? null,
     });
 
     this.logger.info(
@@ -1913,6 +2530,14 @@ export class CommandCenterService extends BaseService {
   }
 
   /**
+   * Parse YYYY-MM-DD into a local Date (midnight).
+   */
+  private parseDateKey(dateKey: string): Date {
+    const [year, month, day] = dateKey.split("-").map(Number);
+    return new Date(year || 0, (month || 1) - 1, day || 1);
+  }
+
+  /**
    * Check if a customer is booking for the first time
    */
   private async checkIfFirstTimeCustomer(customerId: string): Promise<boolean> {
@@ -1984,37 +2609,6 @@ export class CommandCenterService extends BaseService {
   }
 
   /**
-   * Score a guide for a tour run
-   */
-  private scoreGuideForRun(
-    guide: AvailableGuide,
-    run: TourRun,
-    schedules: Map<string, { assignedRuns: string[]; currentLocation: string | null }>
-  ): number {
-    let score = 0;
-
-    // Base score for being qualified
-    score += 50;
-
-    // Workload balancing - prefer guides with fewer assignments
-    const schedule = schedules.get(guide.guide.id);
-    if (schedule) {
-      score -= schedule.assignedRuns.length * 10;
-    }
-
-    // Capacity fit - prefer guides whose capacity matches the load
-    const guestsToAssign = Math.ceil(run.totalGuests / run.guidesNeeded);
-    const capacityDiff = guide.vehicleCapacity - guestsToAssign;
-    if (capacityDiff >= 0 && capacityDiff <= 2) {
-      score += 20; // Good fit
-    } else if (capacityDiff < 0) {
-      score -= 30; // Over capacity
-    }
-
-    return score;
-  }
-
-  /**
    * Calculate confidence level for a segment
    */
   private calculateConfidence(
@@ -2031,64 +2625,6 @@ export class CommandCenterService extends BaseService {
     if (guestsPerGuide > 8) return "review"; // Over typical capacity
 
     return "optimal";
-  }
-
-  /**
-   * Generate warning ID
-   */
-  private generateWarningId(): string {
-    return `warn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  /**
-   * Generate resolutions for a warning
-   */
-  private generateResolutions(
-    run: TourRun,
-    availableGuides: AvailableGuide[]
-  ): WarningResolution[] {
-    const resolutions: WarningResolution[] = [];
-
-    // Find alternative guides (not qualified but available)
-    const alternativeGuides = availableGuides.filter((g) => {
-      // Must not already be assigned to this run
-      if (run.assignedGuides.some((a) => a.guideId === g.guide.id)) {
-        return false;
-      }
-      // Must be available during the tour time
-      const tourStartTime = run.time;
-      const tourEndTime = this.addMinutesToTime(tourStartTime, run.tour.durationMinutes);
-      return tourStartTime >= g.availableFrom && tourEndTime <= g.availableTo;
-    });
-
-    for (const guide of alternativeGuides.slice(0, 3)) {
-      resolutions.push({
-        id: `res_assign_${guide.guide.id}`,
-        label: `Assign to ${guide.guide.firstName} ${guide.guide.lastName}`,
-        action: "assign_guide",
-        guideId: guide.guide.id,
-        tourRunKey: run.key, // Include tour run key for resolution
-        impactMinutes: 0,
-      });
-    }
-
-    // Add external guide option
-    resolutions.push({
-      id: "res_add_external",
-      label: "Add External Guide",
-      action: "add_external",
-      tourRunKey: run.key, // Include tour run key for resolution
-    });
-
-    // Add cancel tour option for severe staffing issues
-    resolutions.push({
-      id: "res_cancel_tour",
-      label: "Cancel Tour Run",
-      action: "cancel_tour",
-      tourRunKey: run.key,
-    });
-
-    return resolutions;
   }
 
   /**

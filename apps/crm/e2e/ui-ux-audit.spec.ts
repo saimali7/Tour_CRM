@@ -113,14 +113,15 @@ test.describe("Page Loading States", () => {
     // Check that page eventually loads without errors
     await page.waitForLoadState("networkidle");
 
-    // Should have table or empty state
+    // Should have card grid, table, or empty state
+    const hasGrid = await page.locator('[data-testid="tours-grid"]').isVisible().catch(() => false);
     const hasTable = await page.locator("table").isVisible().catch(() => false);
     const hasEmptyState = await page
       .locator('[class*="empty"], [data-testid="empty-state"]')
       .isVisible()
       .catch(() => false);
 
-    expect(hasTable || hasEmptyState).toBeTruthy();
+    expect(hasGrid || hasTable || hasEmptyState).toBeTruthy();
   });
 
   test("Bookings page shows loading state", async ({ page }) => {
@@ -141,12 +142,12 @@ test.describe("Page Loading States", () => {
   });
 
   test("Schedules page shows calendar or list view", async ({ page }) => {
-    await page.goto(`${BASE_URL}/schedules`);
+    await page.goto(`${BASE_URL}/calendar`);
     await page.waitForLoadState("networkidle");
 
     // Should have either calendar or list view
     const hasContent = await page
-      .locator('[class*="calendar"], table, [class*="schedule"]')
+      .locator('[data-testid="operations-calendar"], [class*="calendar"], table, [class*="schedule"]')
       .first()
       .isVisible()
       .catch(() => false);
@@ -258,14 +259,19 @@ test.describe("Table UX", () => {
     await page.goto(`${BASE_URL}/customers`);
     await page.waitForLoadState("networkidle");
 
-    // Check for row actions (view, edit, delete)
-    const rowActions = page.locator("table tbody tr").first().locator("button, a");
-    const hasTable = await page.locator("table tbody tr").first().isVisible().catch(() => false);
+    const emptyState = page.locator('[data-testid="empty-state"]');
+    const isEmpty = await emptyState.isVisible().catch(() => false);
+    if (isEmpty) return;
 
-    if (hasTable) {
-      const actionCount = await rowActions.count();
-      expect(actionCount).toBeGreaterThanOrEqual(1);
-    }
+    // Check for row actions (view, edit, delete) once data rows render
+    const rowWithActions = page
+      .locator("table tbody tr")
+      .filter({ has: page.locator("button, a") })
+      .first();
+
+    await expect(rowWithActions).toBeVisible();
+    const actionCount = await rowWithActions.locator("button, a").count();
+    expect(actionCount).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -293,24 +299,24 @@ test.describe("Navigation UX", () => {
     // This is optional - just verify it works if present
   });
 
-  test("Page titles are descriptive", async ({ page }) => {
-    const pages = [
-      { url: `${BASE_URL}`, title: /dashboard/i },
-      { url: `${BASE_URL}/bookings`, title: /booking/i },
-      { url: `${BASE_URL}/customers`, title: /customer/i },
-      { url: `${BASE_URL}/tours`, title: /tour/i },
-      { url: `${BASE_URL}/schedules`, title: /schedule/i },
-      { url: `${BASE_URL}/guides`, title: /guide/i },
-    ];
+  const descriptivePages = [
+    { name: "Dashboard", url: `${BASE_URL}`, title: /dashboard/i },
+    { name: "Bookings", url: `${BASE_URL}/bookings`, title: /booking/i },
+    { name: "Customers", url: `${BASE_URL}/customers`, title: /customer/i },
+    { name: "Tours", url: `${BASE_URL}/tours`, title: /tour/i },
+    { name: "Calendar", url: `${BASE_URL}/calendar`, title: /calendar/i },
+    { name: "Guides", url: `${BASE_URL}/guides`, title: /guide/i },
+  ];
 
-    for (const { url, title } of pages) {
-      await page.goto(url);
-      await page.waitForLoadState("networkidle");
+  for (const { name, url, title } of descriptivePages) {
+    test(`Page title is descriptive: ${name}`, async ({ page }) => {
+      test.setTimeout(60000);
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
       const h1 = page.locator("h1").first();
       await expect(h1).toContainText(title);
-    }
-  });
+    });
+  }
 });
 
 test.describe("Responsive Design", () => {

@@ -206,7 +206,7 @@ export function CommandStrip({
                   <span className="text-muted-foreground ml-1">{pluralize(warningsCount, "issue")}</span>
                 </span>
               ) : healthState === "ready" ? (
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ready</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ready to Dispatch</span>
               ) : (
                 <span>Sent {dispatchedAt ? format(dispatchedAt, "HH:mm") : "--:--"}</span>
               )}

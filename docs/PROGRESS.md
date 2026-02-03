@@ -1,6 +1,6 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** December 16, 2025
+**Last Updated:** February 3, 2026
 **Status:** Sequential Phase Development
 **Current Phase:** Phase 7 - Operations Excellence
 **Main Branch:** `main`
@@ -810,6 +810,38 @@ pnpm build ✅ (both CRM and Web apps)
 
 ## Changelog
 
+### February 3, 2026 - Command Center Shipping Plan Started
+
+Kickstarted production hardening for the Tour Command Center:
+
+**Execution Plan:**
+- Added `docs/project/features/COMMAND_CENTER_SHIP_PLAN.md` with milestones, DoD, QA checklist.
+
+**Dispatch Status Persistence (Milestone 1):**
+- Replaced in-memory dispatch status cache with DB-backed `dispatch_status`.
+- `CommandCenterService` now upserts status on optimize/dispatch/resolve flows.
+- Router now passes `userId` so `dispatchedBy` is recorded.
+
+Next up: Pickup assignments + real timeline segments (drive/pickup/tour).
+
+**Milestone 2 Complete (Pickup Assignments + Real Timeline):**
+- Optimization now syncs pickup assignments and returns persisted pickup order/time/drive minutes.
+- Pickup assignment sync updates guide assignments with pickup order, calculated pickup time, and drive minutes.
+
+**Milestone 1 Complete (Source of Truth):**
+- Documented `guide_assignments` as canonical for dispatch; `bookings.assignedGuideId` marked deprecated for Command Center.
+
+**Cleanup:**
+- Removed unused Command Center optimizer fields (`currentLocation`, `tourRunService`) and stale service index comments.
+- Removed schedule-based booking option endpoints and legacy availability fallbacks; booking flow now requires configured options.
+- Dropped legacy schedule availability + waitlist tables from schema and added migration to remove them.
+
+**Milestone 3 Complete (Optimization + Travel Matrix):**
+- Wired dispatch optimizer into Command Center and mapped warnings to UI.
+- Travel matrix now loads from `zone_travel_times`.
+
+---
+
 ### December 16, 2025 - Phase 7.2 Complete (60-Second Phone Booking)
 
 Completed the remaining 25% of Phase 7.2:
@@ -989,6 +1021,14 @@ Created comprehensive implementation plan for Phase 7 transformation:
 - Booking reschedule and refund
 - Calendar view with react-big-calendar
 - Activity logging system
+
+### February 3, 2026 - Command Center Milestone 4
+- Dispatch day lock enforced (server guard + read-only UI on dispatched days)
+- Dispatch warnings persisted and used for gating (cannot dispatch with unresolved warnings)
+- Warning actions improved with actionable suggestions and “Mark Reviewed” fallback
+- Added Ready-to-Dispatch and Dispatched banners in the Command Center header
+- Read-only timeline behavior aligned with dispatched state
+- `pnpm typecheck` passed
 
 ---
 

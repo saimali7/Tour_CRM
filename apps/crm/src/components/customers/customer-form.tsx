@@ -188,14 +188,14 @@ export function CustomerForm({ customer }: CustomerFormProps) {
       )}
 
       {/* Essential Info - Always visible */}
-      <div className="bg-card rounded-xl border border-border p-6 space-y-5">
+      <div className="bg-card rounded-xl border border-border p-4 sm:p-6 space-y-5">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Customer Details</h2>
           <p className="text-sm text-muted-foreground mt-1">Name and contact information</p>
         </div>
 
         {/* Name */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
               First Name *

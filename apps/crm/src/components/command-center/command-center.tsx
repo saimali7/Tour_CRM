@@ -12,7 +12,7 @@ import { type HopperBooking, MobileHopperSheet } from "./hopper";
 import { LiveAnnouncerProvider, useLiveAnnouncer } from "./live-announcer";
 import { DispatchConfirmDialog } from "./dispatch-confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Calendar } from "lucide-react";
+import { AlertCircle, Calendar, CheckCircle2, Lock } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import type { GuideTimeline, GuideInfo } from "./timeline/types";
@@ -31,6 +31,7 @@ export type { DispatchStatus, DispatchWarning, DispatchSuggestion, DispatchData 
 import {
   transformGuideTimeline,
   mapDispatchStatus,
+  transformWarnings,
 } from "./data-transformers";
 
 /**
@@ -157,31 +158,6 @@ function CommandCenterContent({
     setShowDispatchConfirm(false);
   }, [dateString, dispatchMutation]);
 
-  const handleResolveWarning = useCallback(
-    (warningId: string, suggestionId: string) => {
-      let type: "assign_guide" | "add_external" | "skip" | "cancel" = "skip";
-      let guideId: string | undefined;
-
-      if (suggestionId.startsWith("res_assign_")) {
-        type = "assign_guide";
-        guideId = suggestionId.replace("res_assign_", "");
-      } else if (suggestionId === "res_add_external") {
-        type = "add_external";
-      }
-
-      resolveWarningMutation.mutate({
-        date: dateString,
-        warningId,
-        resolution: {
-          id: suggestionId,
-          type,
-          guideId,
-        },
-      });
-    },
-    [dateString, resolveWarningMutation]
-  );
-
   // Handle guide click - opens the guide detail card
   const handleGuideClick = useCallback((guide: GuideInfo) => {
     if (!dispatchResponse) return;
@@ -292,36 +268,43 @@ function CommandCenterContent({
 
     const { status, tourRuns, timelines } = dispatchResponse;
 
-    // Generate warnings from tour runs that need attention
-    const warnings: DispatchWarning[] = [];
+    const serviceWarnings = status.warnings ?? [];
+    const fallbackWarnings: DispatchWarning[] = [];
 
-    if (tourRuns) {
+    if (serviceWarnings.length === 0 && tourRuns) {
       for (const run of tourRuns) {
         if (run.status === "unassigned") {
-          warnings.push({
+          fallbackWarnings.push({
             id: `warning_${run.key}_unassigned`,
             type: "no_guide",
             message: `${run.tour?.name || "Tour"} at ${run.time} has no guide assigned (${run.totalGuests} ${run.totalGuests === 1 ? "guest" : "guests"})`,
+            tourRunKey: run.key,
             suggestions: [],
           });
         } else if (run.status === "partial") {
-          warnings.push({
+          fallbackWarnings.push({
             id: `warning_${run.key}_partial`,
             type: "capacity",
             message: `${run.tour?.name || "Tour"} at ${run.time} needs ${run.guidesNeeded - run.guidesAssigned} more guide(s)`,
             guestCount: run.totalGuests,
+            tourRunKey: run.key,
             suggestions: [],
           });
         } else if (run.status === "overstaffed") {
-          warnings.push({
+          fallbackWarnings.push({
             id: `warning_${run.key}_overstaffed`,
             type: "conflict",
             message: `${run.tour?.name || "Tour"} at ${run.time} has too many guides assigned`,
+            tourRunKey: run.key,
             suggestions: [],
           });
         }
       }
     }
+
+    const warnings = serviceWarnings.length > 0
+      ? transformWarnings(serviceWarnings)
+      : fallbackWarnings;
 
     const guideTimelines = timelines.map(transformGuideTimeline);
     const displayStatus = mapDispatchStatus(status.status, status.unresolvedWarnings);
@@ -337,6 +320,58 @@ function CommandCenterContent({
       guideTimelines,
     };
   }, [dispatchResponse]);
+
+  const availableGuides = useMemo(() => {
+    if (!dispatchResponse?.timelines) return [];
+
+    return dispatchResponse.timelines.map((timeline) => ({
+      id: timeline.guide.id,
+      name: `${timeline.guide.firstName} ${timeline.guide.lastName}`.trim(),
+      vehicleCapacity: timeline.vehicleCapacity ?? 0,
+      currentGuests: timeline.totalGuests ?? 0,
+    }));
+  }, [dispatchResponse?.timelines]);
+
+  const handleResolveWarning = useCallback(
+    (warningId: string, suggestionId: string) => {
+      let type: "assign_guide" | "add_external" | "skip" | "cancel" = "skip";
+      let guideId: string | undefined;
+
+      const warning = data?.warnings.find((item) => item.id === warningId);
+      const suggestion = warning?.suggestions.find((item) => item.id === suggestionId);
+      const assignPrefixes = ["res_assign_", "assign_", "quick_assign_"];
+
+      for (const prefix of assignPrefixes) {
+        if (suggestionId.startsWith(prefix)) {
+          type = "assign_guide";
+          guideId = suggestionId.replace(prefix, "");
+          break;
+        }
+      }
+
+      if (!guideId && suggestion?.guideId) {
+        type = "assign_guide";
+        guideId = suggestion.guideId;
+      } else if (suggestion?.action === "add_external" || suggestionId === "res_add_external" || suggestionId === "add_external") {
+        type = "add_external";
+      } else if (suggestionId === "res_acknowledge" || suggestion?.action === "acknowledge") {
+        type = "skip";
+      }
+
+      resolveWarningMutation.mutate({
+        date: dateString,
+        warningId,
+        resolution: {
+          id: suggestionId,
+          type,
+          guideId,
+          bookingId: warning?.bookingId,
+          tourRunKey: warning?.tourRunKey,
+        },
+      });
+    },
+    [dateString, resolveWarningMutation, data?.warnings]
+  );
 
   // Extract unassigned bookings for mobile hopper
   const hopperBookings = useMemo<HopperBooking[]>(() => {
@@ -511,11 +546,37 @@ function CommandCenterContent({
         onDispatch={handleDispatch}
       />
 
+      {data.status === "ready" && (
+        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4" />
+          <div>
+            <span className="font-medium">Ready to dispatch.</span>{" "}
+            <span className="text-emerald-700/80 dark:text-emerald-300/80">
+              All assignments are clear and warnings are resolved.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {data.status === "dispatched" && (
+        <div className="rounded-lg border border-muted-foreground/20 bg-muted/40 px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+          <Lock className="h-4 w-4" />
+          <div>
+            <span className="font-medium text-foreground/90">Dispatched.</span>{" "}
+            {data.dispatchedAt
+              ? `Sent ${format(data.dispatchedAt, "MMM d, HH:mm")}.`
+              : "Dispatch sent."}{" "}
+            This day is locked for edits.
+          </div>
+        </div>
+      )}
+
       {/* Warnings Panel - collapsed by default */}
       {hasWarnings && (
         <WarningsPanel
           warnings={data.warnings}
           onResolve={handleResolveWarning}
+          availableGuides={availableGuides}
           defaultCollapsed={true}
         />
       )}
@@ -527,6 +588,7 @@ function CommandCenterContent({
           tourRuns={dispatchResponse?.tourRuns ?? []}
           guideTimelines={dispatchResponse?.timelines ?? []}
           isLoading={isLoading}
+          isReadOnly={isDispatched}
           onGuideClick={(guide) => {
             const guideInfo: GuideInfo = {
               id: guide.id,
@@ -542,7 +604,7 @@ function CommandCenterContent({
           }}
           className={cn(
             "h-full",
-            isDispatched && "opacity-75 pointer-events-none"
+            isDispatched && "opacity-75"
           )}
         />
       </div>
@@ -576,6 +638,7 @@ function CommandCenterContent({
           announce(`Booking assigned to ${guideName}`);
         }}
         isLoading={isLoading}
+        isReadOnly={isDispatched}
       />
 
       {/* Dispatch Confirmation Dialog */}

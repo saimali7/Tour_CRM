@@ -19,6 +19,9 @@ import { inngest } from "@/inngest";
  * - Dispatch notifications to guides
  */
 
+const getServices = (ctx: { orgContext: { organizationId: string }; user?: { id?: string } | null }) =>
+  createServices({ organizationId: ctx.orgContext.organizationId, userId: ctx.user?.id });
+
 // =============================================================================
 // INPUT SCHEMAS
 // =============================================================================
@@ -53,6 +56,8 @@ const warningResolutionSchema = z.object({
   guideId: z.string().optional(),
   externalGuideName: z.string().optional(),
   externalGuideContact: z.string().optional(),
+  bookingId: z.string().optional(),
+  tourRunKey: z.string().optional(),
 });
 
 const resolveWarningInputSchema = z.object({
@@ -95,9 +100,7 @@ export const commandCenterRouter = createRouter({
   getDispatch: adminProcedure
     .input(dateInputSchema)
     .query(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         const [status, tourRuns, timelines] = await Promise.all([
@@ -130,9 +133,7 @@ export const commandCenterRouter = createRouter({
   getTourRuns: adminProcedure
     .input(dateInputSchema)
     .query(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         return await services.commandCenter.getTourRuns(input.date);
@@ -155,9 +156,7 @@ export const commandCenterRouter = createRouter({
   getAvailableGuides: adminProcedure
     .input(dateInputSchema)
     .query(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         return await services.commandCenter.getAvailableGuides(input.date);
@@ -180,9 +179,7 @@ export const commandCenterRouter = createRouter({
   getGuideTimelines: adminProcedure
     .input(dateInputSchema)
     .query(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         return await services.commandCenter.getGuideTimelines(input.date);
@@ -205,9 +202,7 @@ export const commandCenterRouter = createRouter({
   optimize: adminProcedure
     .input(dateInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         return await services.commandCenter.optimize(input.date);
@@ -230,9 +225,7 @@ export const commandCenterRouter = createRouter({
   resolveWarning: adminProcedure
     .input(resolveWarningInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         // Map the input resolution to the service's expected format
@@ -241,6 +234,10 @@ export const commandCenterRouter = createRouter({
           label: "", // Not used by the service
           action: mapResolutionType(input.resolution.type),
           guideId: input.resolution.guideId,
+          externalGuideName: input.resolution.externalGuideName,
+          externalGuideContact: input.resolution.externalGuideContact,
+          bookingId: input.resolution.bookingId,
+          tourRunKey: input.resolution.tourRunKey,
         };
 
         await services.commandCenter.resolveWarning(
@@ -277,9 +274,7 @@ export const commandCenterRouter = createRouter({
   manualAssign: adminProcedure
     .input(manualAssignInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         await services.commandCenter.manualAssign(input.bookingId, input.guideId);
@@ -312,9 +307,7 @@ export const commandCenterRouter = createRouter({
   unassign: adminProcedure
     .input(unassignInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         await services.commandCenter.unassign(input.bookingId);
@@ -342,9 +335,7 @@ export const commandCenterRouter = createRouter({
       newStartTime: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
     }))
     .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         await services.commandCenter.updatePickupTime(
@@ -372,9 +363,7 @@ export const commandCenterRouter = createRouter({
   dispatch: adminProcedure
     .input(dateInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         const result = await services.commandCenter.dispatch(input.date);
@@ -418,9 +407,7 @@ export const commandCenterRouter = createRouter({
   getGuestDetails: protectedProcedure
     .input(guestDetailsInputSchema)
     .query(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       try {
         return await services.commandCenter.getGuestDetails(input.bookingId);
@@ -466,9 +453,7 @@ export const commandCenterRouter = createRouter({
       })),
     }))
     .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       // =========================================================================
       // PHASE 1: Pre-validation (fail fast before any changes)
@@ -656,9 +641,7 @@ export const commandCenterRouter = createRouter({
       ])),
     }))
     .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
+      const services = getServices(ctx);
 
       const results: Array<{
         type: string;
@@ -790,7 +773,7 @@ export const commandCenterRouter = createRouter({
  */
 function mapResolutionType(
   type: "assign_guide" | "add_external" | "skip" | "cancel"
-): "assign_guide" | "add_external" | "cancel_tour" | "split_booking" {
+): "assign_guide" | "add_external" | "cancel_tour" | "split_booking" | "acknowledge" {
   switch (type) {
     case "assign_guide":
       return "assign_guide";
@@ -799,9 +782,8 @@ function mapResolutionType(
     case "cancel":
       return "cancel_tour";
     case "skip":
-      // Skip is handled as a no-op on the service side
-      // For now, we map it to cancel_tour as a fallback
-      return "cancel_tour";
+      // Skip is handled as an acknowledgement on the service side
+      return "acknowledge";
     default:
       return "assign_guide";
   }

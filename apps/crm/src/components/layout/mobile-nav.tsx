@@ -99,6 +99,7 @@ export function MobileNav({ orgSlug }: MobileNavProps) {
       )}
       role="navigation"
       aria-label="Main navigation"
+      data-testid="mobile-menu"
     >
       <div className="flex items-center justify-around h-16 px-2 bg-card/95 backdrop-blur-md supports-[backdrop-filter]:bg-card/80">
         {navItems.map((item) => {

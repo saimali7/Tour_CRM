@@ -64,7 +64,8 @@ export interface ServiceWarning {
   message: string;
   bookingId?: string;
   tourRunKey?: string;
-  resolutions: Array<{
+  resolved?: boolean;
+  resolutions?: Array<{
     id: string;
     label: string;
     action: string;
@@ -99,18 +100,22 @@ export function mapWarningType(type: string): DispatchWarning["type"] {
  * Transform service warnings to component warnings format
  */
 export function transformWarnings(warnings: ServiceWarning[]): DispatchWarning[] {
-  return warnings.map((warning) => ({
-    id: warning.id,
-    type: mapWarningType(warning.type),
-    message: warning.message,
-    bookingId: warning.bookingId,
-    suggestions: warning.resolutions.map((resolution) => ({
-      id: resolution.id,
-      label: resolution.label,
-      impact: resolution.impactMinutes ? `+${resolution.impactMinutes}m` : undefined,
-      guideId: resolution.guideId,
-    })),
-  }));
+  return warnings
+    .filter((warning) => !warning.resolved)
+    .map((warning) => ({
+      id: warning.id,
+      type: mapWarningType(warning.type),
+      message: warning.message,
+      bookingId: warning.bookingId,
+      tourRunKey: warning.tourRunKey,
+      suggestions: (warning.resolutions || []).map((resolution) => ({
+        id: resolution.id,
+        label: resolution.label,
+        impact: resolution.impactMinutes ? `+${resolution.impactMinutes}m` : undefined,
+        guideId: resolution.guideId,
+        action: resolution.action as DispatchSuggestion["action"] | undefined,
+      })),
+    }));
 }
 
 // =============================================================================

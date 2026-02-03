@@ -24,6 +24,7 @@ import {
   Loader2,
   Check,
   AlertCircle,
+  AlertTriangle,
   X,
   Mail,
   Phone,
@@ -252,6 +253,7 @@ export function CustomerFirstBookingSheet({
     data: availabilityData,
     isLoading: availabilityLoading,
     isFetching: availabilityFetching,
+    error: availabilityError,
   } = trpc.availability.checkAvailability.useQuery(
     {
       tourId: selectedTourId,
@@ -387,8 +389,8 @@ export function CustomerFirstBookingSheet({
       }
     }
 
-    if (!customerId || !selectedTime) {
-      toast.error("Missing required information");
+    if (!customerId || !selectedTime || !selectedOptionId) {
+      toast.error("Select a booking option and time to continue");
       return;
     }
 
@@ -404,7 +406,7 @@ export function CustomerFirstBookingSheet({
         tourId: selectedTourId,
         bookingDate: getDateString(selectedDate),
         bookingTime: selectedTime,
-        bookingOptionId: selectedOptionId !== "legacy-default" ? selectedOptionId : undefined,
+        bookingOptionId: selectedOptionId,
         pricingSnapshot: selectedOption ? {
           optionId: selectedOption.id,
           optionName: selectedOption.name,
@@ -898,6 +900,14 @@ export function CustomerFirstBookingSheet({
                   <div className="flex flex-col items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
                     <p className="text-muted-foreground">Calculating your options...</p>
+                  </div>
+                ) : availabilityError ? (
+                  <div className="text-center py-12 bg-muted/50 rounded-lg border border-dashed border-border">
+                    <AlertTriangle className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="font-medium text-foreground mb-1">Options not configured</p>
+                    <p className="text-sm text-muted-foreground">
+                      {availabilityError.message || "Set up booking options for this tour to enable availability."}
+                    </p>
                   </div>
                 ) : availabilityData?.soldOut ? (
                   <div className="text-center py-12 bg-muted/50 rounded-lg border border-dashed border-border">

@@ -22,6 +22,7 @@ export interface DispatchSuggestion {
   description?: string;
   impact?: string; // e.g., "+18m drive"
   guideId?: string;
+  action?: "assign_guide" | "add_external" | "cancel_tour" | "split_booking" | "acknowledge";
 }
 
 export interface DispatchWarning {
@@ -29,6 +30,7 @@ export interface DispatchWarning {
   type: "capacity" | "no_guide" | "conflict" | "late_pickup";
   message: string;
   bookingId?: string;
+  tourRunKey?: string;
   guestName?: string;
   guestCount?: number;
   suggestions: DispatchSuggestion[];

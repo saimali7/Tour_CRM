@@ -172,17 +172,19 @@ export function DispatchConfirmDialog({
           <Button
             size="sm"
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isLoading || hasWarnings}
             className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700"
           >
-            {isLoading ? (
-              "Sending..."
-            ) : (
-              <>
-                <Send className="h-3.5 w-3.5" />
-                Send Dispatch
-              </>
-            )}
+            {isLoading
+              ? "Sending..."
+              : hasWarnings
+                ? "Resolve Issues"
+                : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    Send Dispatch
+                  </>
+                )}
           </Button>
         </DialogFooter>
       </DialogContent>

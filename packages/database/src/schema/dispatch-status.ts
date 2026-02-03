@@ -59,13 +59,29 @@ export const dispatchStatusRelations = relations(dispatchStatus, ({ one }) => ({
 // Types
 export type DispatchStatusType = "pending" | "optimized" | "needs_review" | "ready" | "dispatched";
 
+export interface DispatchWarningResolution {
+  id: string;
+  label: string;
+  action: "assign_guide" | "add_external" | "cancel_tour" | "split_booking" | "acknowledge";
+  guideId?: string;
+  impactMinutes?: number;
+}
+
 export interface DispatchWarning {
   id: string;
-  type: "insufficient_guides" | "capacity_exceeded" | "no_qualified_guide" | "schedule_conflict" | "other";
+  type:
+    | "insufficient_guides"
+    | "capacity_exceeded"
+    | "no_qualified_guide"
+    | "no_available_guide"
+    | "conflict"
+    | "schedule_conflict"
+    | "other";
   message: string;
   bookingId?: string;
-  tourRunId?: string;
+  tourRunKey?: string;
   guideId?: string;
+  resolutions?: DispatchWarningResolution[];
   resolved?: boolean;
   resolvedAt?: string;
   resolution?: string;

@@ -48,73 +48,6 @@ async function pushTables() {
   `);
   console.log("✓ booking_options indexes created");
 
-  // 3. Create schedule_option_availability table
-  console.log("Creating schedule_option_availability table...");
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS schedule_option_availability (
-      id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-      booking_option_id TEXT NOT NULL REFERENCES booking_options(id) ON DELETE CASCADE,
-      total_seats INTEGER,
-      booked_seats INTEGER NOT NULL DEFAULT 0,
-      total_units INTEGER,
-      booked_units INTEGER NOT NULL DEFAULT 0,
-      is_available BOOLEAN NOT NULL DEFAULT true,
-      override_pricing JSONB,
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      UNIQUE(schedule_id, booking_option_id)
-    )
-  `);
-  console.log("✓ schedule_option_availability table created");
-
-  // 4. Create indexes for schedule_option_availability
-  console.log("Creating indexes for schedule_option_availability...");
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS schedule_option_avail_schedule_idx ON schedule_option_availability(schedule_id)
-  `);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS schedule_option_avail_option_idx ON schedule_option_availability(booking_option_id)
-  `);
-  console.log("✓ schedule_option_availability indexes created");
-
-  // 5. Create waitlist_entries table
-  console.log("Creating waitlist_entries table...");
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS waitlist_entries (
-      id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-      schedule_id TEXT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
-      booking_option_id TEXT REFERENCES booking_options(id) ON DELETE SET NULL,
-      customer_id TEXT REFERENCES customers(id) ON DELETE CASCADE,
-      guest_email TEXT,
-      guest_name TEXT,
-      guest_phone TEXT,
-      party_size INTEGER NOT NULL DEFAULT 1,
-      status TEXT NOT NULL DEFAULT 'waiting',
-      notified_at TIMESTAMP WITH TIME ZONE,
-      expires_at TIMESTAMP WITH TIME ZONE,
-      notes TEXT,
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-    )
-  `);
-  console.log("✓ waitlist_entries table created");
-
-  // 6. Create indexes for waitlist_entries
-  console.log("Creating indexes for waitlist_entries...");
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS waitlist_schedule_idx ON waitlist_entries(schedule_id)
-  `);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS waitlist_customer_idx ON waitlist_entries(customer_id)
-  `);
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS waitlist_status_idx ON waitlist_entries(status)
-  `);
-  console.log("✓ waitlist_entries indexes created");
-
   console.log("\n✅ All tables created successfully!\n");
 }
 
@@ -209,84 +142,10 @@ async function createDefaultOptionsForExistingTours() {
   console.log(`\n✅ Created ${tours.length} default booking options\n`);
 }
 
-async function initializeScheduleAvailability() {
-  console.log("📅 Initializing schedule availability for existing schedules...\n");
-
-  // Get all schedules that don't have availability entries
-  const schedulesWithoutAvailability = await db.execute(sql`
-    SELECT s.id, s.organization_id, s.tour_id, s.max_participants
-    FROM schedules s
-    WHERE NOT EXISTS (
-      SELECT 1 FROM schedule_option_availability soa WHERE soa.schedule_id = s.id
-    )
-  `);
-
-  // Handle different result formats
-  const scheduleRows = Array.isArray(schedulesWithoutAvailability)
-    ? schedulesWithoutAvailability
-    : (schedulesWithoutAvailability as any).rows || [];
-
-  const schedules = scheduleRows as Array<{
-    id: string;
-    organization_id: string;
-    tour_id: string;
-    max_participants: number | null;
-  }>;
-
-  console.log(`Found ${schedules.length} schedules without availability tracking`);
-
-  let created = 0;
-  for (const schedule of schedules) {
-    // Get active booking options for this tour
-    const optionsResult = await db.execute(sql`
-      SELECT id, capacity_model
-      FROM booking_options
-      WHERE tour_id = ${schedule.tour_id}
-        AND status = 'active'
-    `);
-
-    const optionRows = Array.isArray(optionsResult)
-      ? optionsResult
-      : (optionsResult as any).rows || [];
-
-    const options = optionRows as Array<{
-      id: string;
-      capacity_model: { type: string; totalSeats?: number; totalUnits?: number };
-    }>;
-
-    for (const option of options) {
-      const availId = `avail_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-      const capacityModel = option.capacity_model;
-
-      await db.execute(sql`
-        INSERT INTO schedule_option_availability (
-          id, organization_id, schedule_id, booking_option_id,
-          total_seats, booked_seats, total_units, booked_units, is_available
-        ) VALUES (
-          ${availId},
-          ${schedule.organization_id},
-          ${schedule.id},
-          ${option.id},
-          ${capacityModel.type === "shared" ? capacityModel.totalSeats || schedule.max_participants || 30 : null},
-          0,
-          ${capacityModel.type === "unit" ? capacityModel.totalUnits || 1 : null},
-          0,
-          true
-        )
-        ON CONFLICT (schedule_id, booking_option_id) DO NOTHING
-      `);
-      created++;
-    }
-  }
-
-  console.log(`✅ Created ${created} schedule availability entries\n`);
-}
-
 async function main() {
   try {
     await pushTables();
     await createDefaultOptionsForExistingTours();
-    await initializeScheduleAvailability();
 
     console.log("🎉 Migration complete!");
     process.exit(0);

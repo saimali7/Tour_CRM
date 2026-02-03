@@ -42,6 +42,8 @@ interface MobileHopperSheetProps {
   onAssign?: (bookingId: string, guideId: string, guideName: string, timelineIndex: number) => void;
   /** Whether the sheet is loading */
   isLoading?: boolean;
+  /** Read-only mode (disables assignment UI) */
+  isReadOnly?: boolean;
 }
 
 interface GuideOptionProps {
@@ -253,7 +255,12 @@ export function MobileHopperSheet({
   guideTimelines,
   onAssign,
   isLoading = false,
+  isReadOnly = false,
 }: MobileHopperSheetProps) {
+  if (isReadOnly) {
+    return null;
+  }
+
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<HopperBooking | null>(null);
   const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);

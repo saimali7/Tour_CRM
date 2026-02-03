@@ -221,7 +221,7 @@ export function OperationsCalendar({
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
+      <div className="space-y-4" data-testid="operations-calendar">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

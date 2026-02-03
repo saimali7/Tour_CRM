@@ -206,7 +206,11 @@
       "Bash(git -C /Users/saim/Desktop/Tour_CRM diff --name-only --diff-filter=U)",
       "Bash(git -C /Users/saim/Desktop/Tour_CRM diff --check)",
       "Bash(git -C /Users/saim/Desktop/Tour_CRM rebase --abort)",
-      "Bash(git -C /Users/saim/Desktop/Tour_CRM branch:*)"
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM branch:*)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM merge dev -m \"Merge dev: Command Center Phase 3 + Remove schedules-dependent features\")",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM stash push:*)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -10)",
+      "Bash(git -C /Users/saim/Desktop/Tour_CRM merge dev -m \"Merge dev: Production security hardening\")"
     ]
   }
 }

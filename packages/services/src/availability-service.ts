@@ -17,7 +17,7 @@ import {
   type PricingModel,
 } from "@tour/database";
 import { BaseService } from "./base-service";
-import { NotFoundError } from "./types";
+import { NotFoundError, ValidationError } from "./types";
 import {
   calculatePrice,
   checkCapacityFit,
@@ -26,9 +26,6 @@ import {
   type GuestBreakdown,
   type CalculatedPrice,
 } from "./pricing-calculator-service";
-import { createServiceLogger } from "./lib/logger";
-
-const logger = createServiceLogger("availability");
 
 // ============================================================
 // TYPES
@@ -161,91 +158,19 @@ export class AvailabilityService extends BaseService {
     const departureTimes = await this.getDepartureTimes(tourId);
 
     // 4. Get booking options for this tour
-    // Note: If booking_options table doesn't exist yet, gracefully return empty
-    let options: BookingOption[] = [];
-    try {
-      options = await this.db.query.bookingOptions.findMany({
-        where: and(
-          eq(bookingOptions.tourId, tourId),
-          eq(bookingOptions.organizationId, this.organizationId),
-          eq(bookingOptions.status, "active")
-        ),
-        orderBy: [asc(bookingOptions.sortOrder)],
-      });
-    } catch (error) {
-      // Table might not exist yet - fall through to legacy handling
-      logger.warn({ err: error, tourId }, "booking_options query failed, using legacy fallback");
-    }
+    const options = await this.db.query.bookingOptions.findMany({
+      where: and(
+        eq(bookingOptions.tourId, tourId),
+        eq(bookingOptions.organizationId, this.organizationId),
+        eq(bookingOptions.status, "active")
+      ),
+      orderBy: [asc(bookingOptions.sortOrder)],
+    });
 
-    // If no options configured, create a default "legacy" option from tour data
     if (options.length === 0) {
-      // Check if there are departure times - if so, create a virtual option
-      if (departureTimes.length > 0) {
-        const pricePerPerson = tour.basePrice ? parseFloat(tour.basePrice) : 0;
-        const totalPrice = pricePerPerson * totalGuests;
-        const maxParticipants = tour.maxParticipants ?? 30;
-
-        // Get booked counts for all time slots in parallel to avoid N+1 queries
-        const bookedCounts = await Promise.all(
-          departureTimes.map((dt) => this.getBookedCount(tourId, date, dt.time))
-        );
-
-        // Build time slots with booked counts
-        const timeSlots = departureTimes.map((dt, index) => {
-          const bookedCount = bookedCounts[index] ?? 0;
-          const spotsLeft = maxParticipants - bookedCount;
-          return {
-            time: dt.time,
-            timeFormatted: this.formatTimeString(dt.time),
-            available: spotsLeft >= totalGuests,
-            spotsLeft,
-            almostFull: spotsLeft <= 3,
-          };
-        });
-
-        return {
-          tour: {
-            id: tour.id,
-            name: tour.name,
-            imageUrl: tour.coverImageUrl ?? undefined,
-          },
-          date,
-          guests: { ...guests, total: totalGuests },
-          options: [{
-            id: "legacy-default",
-            name: "Standard Experience",
-            shortDescription: tour.shortDescription ?? undefined,
-            experienceMode: "join" as const,
-            totalPrice: {
-              amount: Math.round(totalPrice * 100),
-              currency: "AED",
-            },
-            priceBreakdown: `${totalGuests} x $${pricePerPerson.toFixed(2)}`,
-            scheduling: {
-              type: "fixed" as const,
-              timeSlots,
-            },
-            capacityFit: {
-              fits: true,
-              statement: `${totalGuests} guests`,
-            },
-            available: timeSlots.some(s => s.available),
-          }],
-          soldOut: !timeSlots.some(s => s.available),
-        };
-      }
-
-      return {
-        tour: {
-          id: tour.id,
-          name: tour.name,
-          imageUrl: tour.coverImageUrl ?? undefined,
-        },
-        date,
-        guests: { ...guests, total: totalGuests },
-        options: [],
-        soldOut: true,
-      };
+      throw new ValidationError(
+        "No active booking options configured for this tour. Set up booking options to enable availability."
+      );
     }
 
     // 5. Calculate prices and availability for each option

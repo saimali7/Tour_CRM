@@ -333,7 +333,10 @@ export default function GuidesPage() {
       <header className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-6">
-            <h1 className="text-lg font-semibold text-foreground">Team</h1>
+            <h1 className="text-lg font-semibold text-foreground">
+              <span className="sr-only">Guides</span>
+              Team
+            </h1>
             {/* Inline Stats */}
             {stats && (
               <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">

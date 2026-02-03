@@ -27,6 +27,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react"
+import { Lock } from "lucide-react"
 import { toast } from "sonner"
 import { trpc } from "@/lib/trpc"
 import type { BookingData } from "./booking-block"
@@ -285,15 +286,18 @@ export function EditModeProvider({ children, date }: EditModeProviderProps) {
 interface EditModeToggleProps {
   /** Whether the date is in the past (disables editing) */
   isPastDate?: boolean
+  /** Whether the timeline is read-only (e.g. dispatched) */
+  isReadOnly?: boolean
 }
 
-export function EditModeToggle({ isPastDate = false }: EditModeToggleProps) {
+export function EditModeToggle({ isPastDate = false, isReadOnly = false }: EditModeToggleProps) {
   const { isEditing, setIsEditing, isMutating, canUndo, canRedo, undo, redo } = useEditMode()
 
-  if (isPastDate) {
+  if (isPastDate || isReadOnly) {
     return (
-      <div className="text-xs text-muted-foreground px-3 py-1 bg-muted/50 rounded">
-        Past dates cannot be edited
+      <div className="text-xs text-muted-foreground px-3 py-1 bg-muted/50 rounded flex items-center gap-1.5">
+        <Lock className="h-3.5 w-3.5" />
+        {isPastDate ? "Past dates cannot be edited" : "Dispatched - read only"}
       </div>
     )
   }

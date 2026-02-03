@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 import {
@@ -277,7 +278,7 @@ export const availabilityRouter = createRouter({
     }),
 
   // ===========================================================================
-  // LEGACY BOOKING OPTIONS / SCHEDULE-BASED METHODS
+  // BOOKING OPTIONS / AVAILABILITY (Customer-first booking flow)
   // ===========================================================================
 
   /**
@@ -292,28 +293,17 @@ export const availabilityRouter = createRouter({
       const services = createServices({
         organizationId: ctx.orgContext.organizationId,
       });
-      return services.availability.checkAvailability(input);
-    }),
 
-  /**
-   * Get schedule availability for a specific option
-   * Useful for checking real-time capacity
-   */
-  getScheduleOptionAvailability: protectedProcedure
-    .input(
-      z.object({
-        scheduleId: z.string(),
-        optionId: z.string(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
-      return services.bookingOption.getScheduleOptionAvailability(
-        input.scheduleId,
-        input.optionId
-      );
+      try {
+        return await services.availability.checkAvailability(input);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to check availability";
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message,
+          cause: error,
+        });
+      }
     }),
 
   /**
@@ -325,7 +315,6 @@ export const availabilityRouter = createRouter({
       z.object({
         tourId: z.string(),
         optionId: z.string(),
-        scheduleId: z.string().optional(),
         guests: guestBreakdownSchema,
       })
     )
@@ -417,67 +406,4 @@ export const availabilityRouter = createRouter({
       return calculatedAddOns;
     }),
 
-  /**
-   * Join waitlist for a sold-out schedule
-   */
-  joinWaitlist: protectedProcedure
-    .input(
-      z.object({
-        scheduleId: z.string(),
-        optionId: z.string().optional(),
-        email: z.string().email(),
-        phone: z.string().optional(),
-        guests: guestBreakdownSchema,
-        customerId: z.string().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({
-        organizationId: ctx.orgContext.organizationId,
-      });
-
-      // Import the waitlist table for direct insert
-      const { db } = await import("@tour/database");
-      const { waitlistEntries } = await import("@tour/database");
-
-      const [entry] = await db
-        .insert(waitlistEntries)
-        .values({
-          organizationId: ctx.orgContext.organizationId,
-          scheduleId: input.scheduleId,
-          bookingOptionId: input.optionId,
-          customerId: input.customerId,
-          email: input.email,
-          phone: input.phone,
-          adults: input.guests.adults,
-          children: input.guests.children,
-          infants: input.guests.infants,
-          status: "waiting",
-        })
-        .returning();
-
-      return entry;
-    }),
-
-  /**
-   * Get waitlist for a schedule (admin)
-   */
-  getWaitlist: protectedProcedure
-    .input(z.object({ scheduleId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const { db, waitlistEntries, customers } = await import("@tour/database");
-      const { eq, and, asc } = await import("drizzle-orm");
-
-      return db.query.waitlistEntries.findMany({
-        where: and(
-          eq(waitlistEntries.scheduleId, input.scheduleId),
-          eq(waitlistEntries.organizationId, ctx.orgContext.organizationId)
-        ),
-        orderBy: [asc(waitlistEntries.createdAt)],
-        with: {
-          customer: true,
-          bookingOption: true,
-        },
-      });
-    }),
 });
