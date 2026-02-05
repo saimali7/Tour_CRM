@@ -50,15 +50,9 @@ interface DispatchConfirmDialogProps {
 // =============================================================================
 
 function getEfficiencyColor(score: number): string {
-  if (score >= 80) return "text-emerald-500";
-  if (score >= 60) return "text-amber-500";
-  return "text-red-500";
-}
-
-function getEfficiencyLabel(score: number): string {
-  if (score >= 80) return "Excellent";
-  if (score >= 60) return "Good";
-  return "Needs attention";
+  if (score >= 80) return "text-success";
+  if (score >= 60) return "text-warning";
+  return "text-destructive";
 }
 
 // =============================================================================
@@ -89,7 +83,7 @@ export function DispatchConfirmDialog({
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Send className="h-4 w-4 text-emerald-500" />
+            <Send className="h-4 w-4 text-success" />
             Confirm Dispatch
           </DialogTitle>
           <DialogDescription className="text-xs">
@@ -146,13 +140,13 @@ export function DispatchConfirmDialog({
 
         {/* Warning banner */}
         {hasWarnings && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          <div className="flex items-start gap-2 rounded-md border border-warning/20 bg-warning/10 px-3 py-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              <p className="text-sm font-medium text-warning dark:text-warning">
                 {warningsCount} unresolved {warningsCount === 1 ? "issue" : "issues"}
               </p>
-              <p className="text-xs text-amber-600/80 dark:text-amber-400/80">
+              <p className="text-xs text-warning/80 dark:text-warning/80">
                 Consider resolving issues before dispatching.
               </p>
             </div>
@@ -173,7 +167,7 @@ export function DispatchConfirmDialog({
             size="sm"
             onClick={onConfirm}
             disabled={isLoading || hasWarnings}
-            className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+            className="h-8 gap-1.5 bg-success hover:bg-success"
           >
             {isLoading
               ? "Sending..."

@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import {
-  AlertTriangle,
   Users,
   UserX,
   Clock,
@@ -13,7 +12,6 @@ import {
   UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -49,26 +47,26 @@ interface WarningsPanelProps {
 const warningTypeConfig = {
   capacity: {
     icon: Users,
-    dotColor: "bg-amber-500",
-    iconColor: "text-amber-500",
+    dotColor: "bg-warning",
+    iconColor: "text-warning",
     label: "Capacity",
   },
   no_guide: {
     icon: UserX,
-    dotColor: "bg-red-500",
-    iconColor: "text-red-500",
+    dotColor: "bg-destructive",
+    iconColor: "text-destructive",
     label: "No Guide",
   },
   conflict: {
     icon: AlertCircle,
-    dotColor: "bg-orange-500",
-    iconColor: "text-orange-500",
+    dotColor: "bg-warning",
+    iconColor: "text-warning",
     label: "Conflict",
   },
   late_pickup: {
     icon: Clock,
-    dotColor: "bg-yellow-500",
-    iconColor: "text-yellow-500",
+    dotColor: "bg-warning",
+    iconColor: "text-warning",
     label: "Late",
   },
 };
@@ -204,7 +202,7 @@ function CompactWarning({
                   e.stopPropagation();
                   onResolve("res_acknowledge");
                 }}
-                className="h-6 px-2 text-[10px] gap-1 hover:bg-emerald-500 hover:text-white hover:border-emerald-500"
+                className="h-6 px-2 text-[10px] gap-1 hover:bg-success hover:text-white hover:border-success"
               >
                 <CheckCircle2 className="h-2.5 w-2.5" />
                 Mark Reviewed
@@ -238,9 +236,7 @@ function InlineWarnings({
   const [expandedWarnings, setExpandedWarnings] = useState<Set<string>>(
     new Set()
   );
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-
-  const visibleWarnings = warnings.filter((w) => !dismissed.has(w.id));
+  const visibleWarnings = warnings;
 
   if (visibleWarnings.length === 0) return null;
 
@@ -255,12 +251,6 @@ function InlineWarnings({
       return next;
     });
   };
-
-  // Calculate total guests affected
-  const totalGuestsAffected = warnings.reduce(
-    (sum, w) => sum + (w.guestCount || 0),
-    0
-  );
 
   return (
     <div className="space-y-1">
@@ -353,8 +343,8 @@ export function WarningsPanel({
           <div className="flex items-center gap-3">
             {/* Status dot */}
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-warning"></span>
             </span>
 
             {/* Count and label */}

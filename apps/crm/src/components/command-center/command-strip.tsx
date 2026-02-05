@@ -1,6 +1,8 @@
 "use client";
 
 import { format, isToday, isPast, startOfDay } from "date-fns";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   CheckCircle2,
   AlertCircle,
@@ -56,6 +58,14 @@ interface CommandStripProps {
   warningsCount: number;
   /** When dispatch was sent */
   dispatchedAt?: Date;
+  /** Tour runs for manifest access */
+  tourRuns?: Array<{
+    key: string;
+    date: string;
+    time: string;
+    totalGuests: number;
+    tour?: { id: string; name: string } | null;
+  }>;
   /** Optimize assignments */
   onOptimize: () => void;
   /** Send dispatch */
@@ -87,15 +97,21 @@ export function CommandStrip({
   unassignedCount,
   warningsCount,
   dispatchedAt,
+  tourRuns,
   onOptimize,
   onDispatch,
 }: CommandStripProps) {
+  const params = useParams();
+  const slugParam = params?.slug;
+  const slug = typeof slugParam === "string" ? slugParam : Array.isArray(slugParam) ? slugParam[0] : undefined;
+
   const isDateToday = isToday(date);
   // Check if date is in the past (before today)
   const isPastDate = isPast(startOfDay(date)) && !isDateToday;
   const isDispatched = status === "dispatched";
   const hasUnassigned = unassignedCount > 0;
   const hasWarnings = warningsCount > 0;
+  const manifestRuns = (tourRuns ?? []).filter((run) => run.tour?.id && run.time);
 
   // Determine the health state
   type HealthState = "critical" | "warning" | "ready" | "dispatched";
@@ -110,24 +126,24 @@ export function CommandStrip({
   const healthConfig = {
     critical: {
       bg: "bg-card border-border",
-      accent: "bg-red-500",
+      accent: "bg-destructive",
       text: "text-foreground",
       icon: AlertCircle,
-      iconColor: "text-red-500",
+      iconColor: "text-destructive",
     },
     warning: {
       bg: "bg-card border-border",
-      accent: "bg-amber-500",
+      accent: "bg-warning",
       text: "text-foreground",
       icon: AlertCircle,
-      iconColor: "text-amber-500",
+      iconColor: "text-warning",
     },
     ready: {
       bg: "bg-card border-border",
-      accent: "bg-emerald-500",
+      accent: "bg-success",
       text: "text-foreground",
       icon: CheckCircle2,
-      iconColor: "text-emerald-500",
+      iconColor: "text-success",
     },
     dispatched: {
       bg: "bg-card border-border",
@@ -206,7 +222,7 @@ export function CommandStrip({
                   <span className="text-muted-foreground ml-1">{pluralize(warningsCount, "issue")}</span>
                 </span>
               ) : healthState === "ready" ? (
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ready to Dispatch</span>
+                <span className="text-success dark:text-success font-medium">Ready to Dispatch</span>
               ) : (
                 <span>Sent {dispatchedAt ? format(dispatchedAt, "HH:mm") : "--:--"}</span>
               )}
@@ -228,6 +244,7 @@ export function CommandStrip({
               >
                 <Users className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="tabular-nums font-medium">{totalGuests}</span>
+                <span className="text-[11px] text-muted-foreground">guests</span>
                 <ChevronDown className="h-3 w-3 text-muted-foreground" />
               </button>
             </PopoverTrigger>
@@ -249,9 +266,9 @@ export function CommandStrip({
                   <span className="text-muted-foreground">Efficiency</span>
                   <span className={cn(
                     "font-medium tabular-nums",
-                    efficiencyScore >= 90 ? "text-emerald-500" :
-                    efficiencyScore >= 70 ? "text-amber-500" :
-                    "text-red-500"
+                    efficiencyScore >= 90 ? "text-success" :
+                    efficiencyScore >= 70 ? "text-warning" :
+                    "text-destructive"
                   )}>
                     {efficiencyScore}%
                   </span>
@@ -270,9 +287,58 @@ export function CommandStrip({
               <span className="text-xs font-medium">View Only</span>
             </div>
           ) : isDispatched ? (
-            <Button variant="outline" size="sm" className="h-8 text-xs">
-              View Manifests
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs">
+                  View Manifests
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-72 p-2">
+                <div className="px-2 py-1 text-[11px] text-muted-foreground">
+                  Open a tour run manifest
+                </div>
+                {manifestRuns.length === 0 || !slug ? (
+                  <div className="px-2 py-2 text-xs text-muted-foreground">
+                    No tour runs available.
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {manifestRuns.map((run) => {
+                      const href = {
+                        pathname: `/org/${slug}/tour-run`,
+                        query: {
+                          tourId: run.tour?.id ?? "",
+                          date: run.date,
+                          time: run.time,
+                        },
+                      }
+                      return (
+                        <Link
+                          key={run.key}
+                          href={href}
+                          className={cn(
+                            "flex items-center justify-between gap-3 rounded-md px-2 py-1.5",
+                            "hover:bg-muted/60 transition-colors"
+                          )}
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">
+                              {run.tour?.name ?? "Tour"}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground font-mono">
+                              {run.time}
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground tabular-nums">
+                            {run.totalGuests} guests
+                          </span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           ) : (
             <div className="flex items-center gap-2">
               {hasUnassigned ? (
@@ -300,7 +366,7 @@ export function CommandStrip({
                 <Button
                   size="sm"
                   onClick={onDispatch}
-                  className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+                  className="h-8 gap-1.5 text-xs bg-success hover:bg-success"
                 >
                   <Send className="h-3.5 w-3.5" />
                   Dispatch

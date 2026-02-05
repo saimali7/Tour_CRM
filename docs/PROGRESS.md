@@ -1,6 +1,6 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** February 3, 2026
+**Last Updated:** February 5, 2026
 **Status:** Sequential Phase Development
 **Current Phase:** Phase 7 - Operations Excellence
 **Main Branch:** `main`
@@ -67,6 +67,19 @@
 | **10+** | SaaS Platform & Public API | ⏳ FUTURE | 0% |
 
 **Legend:** ✅ Complete | 🔄 In Progress | ⏳ Pending
+
+---
+
+## Recent Updates (February 5, 2026)
+
+- Rebuilt `Tour Command Center` dispatch surface around a new canvas + view-model pipeline.
+- Added operation-based assignment workflow with server-backed undo/redo (`batchApplyChanges`).
+- Added drag and explicit non-drag assignment flows in hopper for accessibility and speed.
+- Added live current-time marker, drop capacity preview, and escape-to-cancel drag behavior.
+- Fixed command-center type issues (`Link` typing, guide capacity access, guest detail `total/currency` mapping).
+- Removed legacy/orphaned command-center modules to reduce dead code and maintenance overhead.
+- Rewrote command center spec as a production-ready interaction and release contract:
+  `docs/COMMAND_CENTER_SPEC.md`.
 
 ---
 

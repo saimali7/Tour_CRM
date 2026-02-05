@@ -1,149 +1,278 @@
 "use client";
 
 import { useMemo, useCallback, useState, useEffect } from "react";
-import { format, isToday, isTomorrow, isYesterday } from "date-fns";
+import { format, isToday, isTomorrow, isYesterday, isPast, startOfDay } from "date-fns";
+import { AlertCircle, Calendar, CheckCircle2, Lock } from "lucide-react";
+import { toast } from "sonner";
+import { trpc, type RouterInputs, type RouterOutputs } from "@/lib/trpc";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { CommandStrip } from "./command-strip";
 import { WarningsPanel } from "./warnings-panel";
-import { SimpleTimelineContainer } from "./simple-timeline";
+import { DispatchConfirmDialog } from "./dispatch-confirm-dialog";
+import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { GuestCard, type GuestCardBooking } from "./guest-card";
 import { GuideCard, type GuideCardData } from "./guide-card";
-import { type HopperBooking, MobileHopperSheet } from "./hopper";
+import { MobileHopperSheet } from "./hopper/mobile-hopper-sheet";
+import { DispatchCanvas } from "./dispatch-canvas";
 import { LiveAnnouncerProvider, useLiveAnnouncer } from "./live-announcer";
-import { DispatchConfirmDialog } from "./dispatch-confirm-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Calendar, CheckCircle2, Lock } from "lucide-react";
-import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
-import type { GuideTimeline, GuideInfo } from "./timeline/types";
-import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
+import type { DispatchData, CommandCenterProps, DispatchWarning, DispatchSuggestion } from "./types";
+import { buildCommandCenterViewModel, mapStatus, mapWarningType } from "./dispatch-model";
+import type { GuideTimeline } from "./timeline/types";
 
-// Import types and transformers from extracted modules
-import type {
-  DispatchStatus,
-  DispatchWarning,
-  DispatchSuggestion,
-  DispatchData,
-  CommandCenterProps,
-} from "./types";
-export type { DispatchStatus, DispatchWarning, DispatchSuggestion, DispatchData };
+type BatchChange = RouterInputs["commandCenter"]["batchApplyChanges"]["changes"][number];
+type DispatchResponse = RouterOutputs["commandCenter"]["getDispatch"];
 
-import {
-  transformGuideTimeline,
-  mapDispatchStatus,
-  transformWarnings,
-} from "./data-transformers";
+interface OperationRecord {
+  changes: BatchChange[];
+  undoChanges: BatchChange[];
+  description: string;
+}
 
-/**
- * Main command center component
- * Uses the simplified booking-centric timeline that's always in edit mode
- */
+function mapWarnings(response: DispatchResponse): DispatchWarning[] {
+  const serviceWarnings = response.status.warnings ?? [];
+  const unresolved = serviceWarnings.filter((warning) => !warning.resolved);
+
+  if (unresolved.length > 0) {
+    return unresolved.map((warning) => ({
+      id: warning.id,
+      type: mapWarningType(warning.type),
+      message: warning.message,
+      bookingId: warning.bookingId,
+      tourRunKey: warning.tourRunKey,
+      suggestions: (warning.resolutions ?? []).map((resolution) => ({
+        id: resolution.id,
+        label: resolution.label,
+        guideId: resolution.guideId,
+        impact: resolution.impactMinutes ? `+${resolution.impactMinutes}m` : undefined,
+        action: resolution.action as DispatchSuggestion["action"] | undefined,
+      })),
+    }));
+  }
+
+  // Fallback warnings when status warnings are empty but tour runs still need staffing.
+  const fallback: DispatchWarning[] = [];
+  for (const run of response.tourRuns) {
+    if (run.status === "unassigned") {
+      fallback.push({
+        id: `warning_${run.key}_unassigned`,
+        type: "no_guide",
+        message: `${run.tour?.name ?? "Tour"} at ${run.time} has no guide assigned`,
+        tourRunKey: run.key,
+        suggestions: [],
+      });
+    } else if (run.status === "partial") {
+      fallback.push({
+        id: `warning_${run.key}_partial`,
+        type: "capacity",
+        message: `${run.tour?.name ?? "Tour"} at ${run.time} needs ${run.guidesNeeded - run.guidesAssigned} more guide(s)`,
+        tourRunKey: run.key,
+        suggestions: [],
+      });
+    }
+  }
+
+  return fallback;
+}
+
+function mapGuideTimelinesForMobile(
+  timelines: DispatchResponse["timelines"]
+): GuideTimeline[] {
+  return timelines.map((timeline) => ({
+    guide: {
+      ...timeline.guide,
+      email: timeline.guide.email ?? "",
+      vehicleCapacity: timeline.vehicleCapacity,
+      status: "active",
+    },
+    segments: [],
+    totalDriveMinutes: timeline.totalDriveMinutes,
+    totalGuests: timeline.totalGuests,
+    utilization: timeline.utilization,
+  }));
+}
+
 function CommandCenterContent({
   date,
-  onDateChange,
+  onDateChange: _onDateChange,
   onPreviousDay,
   onNextDay,
   onToday,
 }: CommandCenterProps) {
   const { announce } = useLiveAnnouncer();
-
-  // Panel state for guest and guide details
-  const [selectedGuest, setSelectedGuest] = useState<GuestCardBooking | null>(null);
-  const [selectedGuide, setSelectedGuide] = useState<GuideCardData | null>(null);
-
-  // Dispatch confirmation dialog state
-  const [showDispatchConfirm, setShowDispatchConfirm] = useState(false);
-
-  // Keyboard shortcuts modal state
-  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
-
-  // Get tRPC utils for query invalidation
   const utils = trpc.useUtils();
 
-  // ==========================================================================
-  // QUERIES
-  // ==========================================================================
+  const [showDispatchConfirm, setShowDispatchConfirm] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [selectedGuest, setSelectedGuest] = useState<GuestCardBooking | null>(null);
+  const [selectedGuide, setSelectedGuide] = useState<GuideCardData | null>(null);
+  const [isEditing, setIsEditing] = useState(true);
+  const [undoStack, setUndoStack] = useState<OperationRecord[]>([]);
+  const [redoStack, setRedoStack] = useState<OperationRecord[]>([]);
 
-  // Convert date to YYYY-MM-DD string for API calls
   const dateString = format(date, "yyyy-MM-dd");
+  const isPastDate = isPast(startOfDay(date)) && !isToday(date);
 
-  // Fetch dispatch data for the selected date
   const {
     data: dispatchResponse,
     isLoading,
     error,
-    refetch,
   } = trpc.commandCenter.getDispatch.useQuery(
     { date: dateString },
     {
       refetchOnWindowFocus: true,
-      staleTime: 30 * 1000,
+      staleTime: 30_000,
     }
   );
 
-  // ==========================================================================
-  // MUTATIONS
-  // ==========================================================================
-
-  // Optimize mutation
   const optimizeMutation = trpc.commandCenter.optimize.useMutation({
     onSuccess: (result) => {
       utils.commandCenter.getDispatch.invalidate({ date: dateString });
-
-      const warningCount = result.warnings.length;
-      if (warningCount > 0) {
-        toast.warning(`Optimization complete with ${warningCount} ${warningCount === 1 ? "warning" : "warnings"}`, {
-          description: `Efficiency: ${result.efficiency}%`,
-        });
+      if (result.warnings.length > 0) {
+        toast.warning(`Optimization complete with ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}`);
       } else {
-        toast.success("Optimization complete", {
-          description: `Efficiency: ${result.efficiency}% - Ready to dispatch!`,
-        });
+        toast.success("Optimization complete");
       }
     },
-    onError: (error) => {
-      toast.error("Optimization failed", {
-        description: error.message,
-      });
+    onError: (mutationError) => {
+      toast.error("Optimization failed", { description: mutationError.message });
     },
   });
 
-  // Dispatch mutation
   const dispatchMutation = trpc.commandCenter.dispatch.useMutation({
     onSuccess: (result) => {
       utils.commandCenter.getDispatch.invalidate({ date: dateString });
-
-      toast.success("Dispatch sent successfully", {
-        description: `${result.guidesNotified.length} guides notified`,
-      });
-
-      announce(`Dispatch sent. ${result.guidesNotified.length} guides notified.`, "assertive");
+      toast.success("Dispatch sent", { description: `${result.guidesNotified.length} guides notified` });
+      announce(`Dispatch sent for ${dateString}. ${result.guidesNotified.length} guides notified.`, "assertive");
     },
-    onError: (error) => {
-      toast.error("Dispatch failed", {
-        description: error.message,
-      });
-
-      announce(`Dispatch failed: ${error.message}`, "assertive");
+    onError: (mutationError) => {
+      toast.error("Dispatch failed", { description: mutationError.message });
+      announce(`Dispatch failed: ${mutationError.message}`, "assertive");
     },
   });
 
-  // Resolve warning mutation
   const resolveWarningMutation = trpc.commandCenter.resolveWarning.useMutation({
     onSuccess: () => {
       utils.commandCenter.getDispatch.invalidate({ date: dateString });
       toast.success("Warning resolved");
     },
-    onError: (error) => {
-      toast.error("Failed to resolve warning", {
-        description: error.message,
-      });
+    onError: (mutationError) => {
+      toast.error("Failed to resolve warning", { description: mutationError.message });
     },
   });
 
-  // ==========================================================================
-  // HANDLERS
-  // ==========================================================================
+  const batchMutation = trpc.commandCenter.batchApplyChanges.useMutation({
+    onError: (mutationError) => {
+      toast.error("Assignment update failed", { description: mutationError.message });
+    },
+  });
+
+  const warnings = useMemo(() => {
+    if (!dispatchResponse) return [];
+    return mapWarnings(dispatchResponse);
+  }, [dispatchResponse]);
+
+  const viewModel = useMemo(() => {
+    if (!dispatchResponse) return null;
+    return buildCommandCenterViewModel(dispatchResponse);
+  }, [dispatchResponse]);
+
+  const dispatchData = useMemo<DispatchData | null>(() => {
+    if (!dispatchResponse) return null;
+
+    return {
+      status: mapStatus(dispatchResponse.status.status, dispatchResponse.status.unresolvedWarnings),
+      totalGuests: dispatchResponse.status.totalGuests,
+      totalGuides: dispatchResponse.status.totalGuides,
+      totalDriveMinutes: dispatchResponse.status.totalDriveMinutes,
+      efficiencyScore: dispatchResponse.status.efficiencyScore,
+      dispatchedAt: dispatchResponse.status.dispatchedAt ?? undefined,
+      warnings,
+      guideTimelines: [],
+    };
+  }, [dispatchResponse, warnings]);
+
+  const availableGuides = useMemo(() => {
+    if (!viewModel) return [];
+    return viewModel.rows.map((row) => ({
+      id: row.guide.id,
+      name: `${row.guide.firstName} ${row.guide.lastName}`.trim(),
+      vehicleCapacity: row.vehicleCapacity,
+      currentGuests: row.totalGuests,
+    }));
+  }, [viewModel]);
+
+  const unassignedCount = useMemo(
+    () => viewModel?.groups.reduce((sum, group) => sum + group.totalBookings, 0) ?? 0,
+    [viewModel]
+  );
+
+  const canUndo = undoStack.length > 0;
+  const canRedo = redoStack.length > 0;
+  const isMutating = batchMutation.isPending;
+  const isReadOnly = dispatchData?.status === "dispatched" || isPastDate;
+
+  useEffect(() => {
+    if (isReadOnly) {
+      setIsEditing(false);
+    }
+  }, [isReadOnly]);
+
+  const executeOperation = useCallback(
+    async (operation: OperationRecord, options?: { record?: boolean; toastPrefix?: string }) => {
+      const shouldRecord = options?.record ?? true;
+
+      const result = await batchMutation.mutateAsync({
+        date,
+        changes: operation.changes,
+      });
+
+      if (!result.success) {
+        throw new Error("Operation did not succeed");
+      }
+
+      await utils.commandCenter.getDispatch.invalidate({ date: dateString });
+      if (shouldRecord) {
+        setUndoStack((prev) => [...prev, operation]);
+        setRedoStack([]);
+      }
+
+      if (operation.description) {
+        toast.success(options?.toastPrefix ? `${options.toastPrefix}: ${operation.description}` : operation.description);
+        announce(operation.description);
+      }
+    },
+    [announce, batchMutation, date, dateString, utils.commandCenter.getDispatch]
+  );
+
+  const handleUndo = useCallback(async () => {
+    if (undoStack.length === 0 || isMutating) return;
+    const operation = undoStack[undoStack.length - 1]!;
+    const inverse: OperationRecord = {
+      changes: operation.undoChanges,
+      undoChanges: operation.changes,
+      description: `Undid: ${operation.description}`,
+    };
+
+    await executeOperation(inverse, { record: false, toastPrefix: "Undo" });
+    setUndoStack((prev) => prev.slice(0, -1));
+    setRedoStack((prev) => [...prev, operation]);
+  }, [executeOperation, isMutating, undoStack]);
+
+  const handleRedo = useCallback(async () => {
+    if (redoStack.length === 0 || isMutating) return;
+    const operation = redoStack[redoStack.length - 1]!;
+    await executeOperation(operation, { record: false, toastPrefix: "Redo" });
+    setRedoStack((prev) => prev.slice(0, -1));
+    setUndoStack((prev) => [...prev, operation]);
+  }, [executeOperation, isMutating, redoStack]);
+
+  const handleApplyOperation = useCallback(
+    async (operation: OperationRecord) => {
+      await executeOperation(operation);
+    },
+    [executeOperation]
+  );
 
   const handleOptimize = useCallback(() => {
     optimizeMutation.mutate({ date: dateString });
@@ -158,204 +287,26 @@ function CommandCenterContent({
     setShowDispatchConfirm(false);
   }, [dateString, dispatchMutation]);
 
-  // Handle guide click - opens the guide detail card
-  const handleGuideClick = useCallback((guide: GuideInfo) => {
-    if (!dispatchResponse) return;
-
-    const timelines = dispatchResponse.timelines.map(transformGuideTimeline);
-    const timeline = timelines.find(t => t.guide.id === guide.id);
-
-    if (!timeline) {
-      setSelectedGuide(null);
-      return;
-    }
-
-    // Build assignments from timeline segments
-    type AssignmentBooking = {
-      id: string;
-      referenceNumber: string;
-      customerName: string;
-      customerEmail?: string | null;
-      customerPhone?: string | null;
-      guestCount: number;
-      adultCount: number;
-      childCount?: number | null;
-      infantCount?: number | null;
-      pickupLocation?: string | null;
-      pickupTime?: string | null;
-      pickupZoneName?: string | null;
-      pickupZoneColor?: string | null;
-      isFirstTime?: boolean;
-      specialOccasion?: string | null;
-      accessibilityNeeds?: string | null;
-      dietaryRequirements?: string | null;
-      specialRequests?: string | null;
-    };
-
-    type GuideAssignment = {
-      tourRunId: string;
-      tourName: string;
-      startTime: string;
-      endTime: string;
-      guestCount: number;
-      pickupCount: number;
-      bookings: AssignmentBooking[];
-    };
-
-    const assignments: GuideAssignment[] = [];
-    let currentPickups: AssignmentBooking[] = [];
-
-    for (const segment of timeline.segments) {
-      if (segment.type === "pickup" && segment.booking) {
-        const booking = segment.booking;
-        const customer = booking.customer;
-        currentPickups.push({
-          id: booking.id,
-          referenceNumber: booking.referenceNumber,
-          customerName: customer
-            ? `${customer.firstName} ${customer.lastName}`.trim()
-            : "Guest",
-          customerEmail: customer?.email,
-          customerPhone: customer?.phone,
-          guestCount: booking.totalParticipants,
-          adultCount: booking.adultCount,
-          childCount: booking.childCount,
-          pickupLocation: segment.pickupLocation,
-          pickupTime: segment.startTime,
-          pickupZoneName: segment.pickupZoneName,
-          pickupZoneColor: segment.pickupZoneColor,
-          isFirstTime: segment.isFirstTimer,
-          specialOccasion: booking.specialOccasion,
-          specialRequests: booking.specialRequests,
-        });
-      } else if (segment.type === "tour" && segment.tour) {
-        const totalGuests = currentPickups.reduce((sum, b) => sum + b.guestCount, 0);
-        assignments.push({
-          tourRunId: segment.scheduleId || segment.id,
-          tourName: segment.tour.name,
-          startTime: segment.startTime,
-          endTime: segment.endTime,
-          guestCount: segment.totalGuests ?? totalGuests,
-          pickupCount: currentPickups.length,
-          bookings: [...currentPickups],
-        });
-        currentPickups = [];
-      }
-    }
-
-    const guideData: GuideCardData = {
-      id: guide.id,
-      name: `${guide.firstName} ${guide.lastName}`.trim(),
-      email: guide.email,
-      phone: guide.phone,
-      avatarUrl: guide.avatarUrl,
-      vehicleCapacity: guide.vehicleCapacity ?? 6,
-      status: assignments.length > 0 ? "assigned" : "available",
-      totalAssignments: assignments.length,
-      totalGuests: timeline.totalGuests ?? 0,
-      totalDriveMinutes: timeline.totalDriveMinutes ?? 0,
-      assignments,
-    };
-    setSelectedGuide(guideData);
-  }, [dispatchResponse]);
-
-  // ==========================================================================
-  // TRANSFORM DATA
-  // ==========================================================================
-
-  const data = useMemo<DispatchData | null>(() => {
-    if (!dispatchResponse) return null;
-
-    const { status, tourRuns, timelines } = dispatchResponse;
-
-    const serviceWarnings = status.warnings ?? [];
-    const fallbackWarnings: DispatchWarning[] = [];
-
-    if (serviceWarnings.length === 0 && tourRuns) {
-      for (const run of tourRuns) {
-        if (run.status === "unassigned") {
-          fallbackWarnings.push({
-            id: `warning_${run.key}_unassigned`,
-            type: "no_guide",
-            message: `${run.tour?.name || "Tour"} at ${run.time} has no guide assigned (${run.totalGuests} ${run.totalGuests === 1 ? "guest" : "guests"})`,
-            tourRunKey: run.key,
-            suggestions: [],
-          });
-        } else if (run.status === "partial") {
-          fallbackWarnings.push({
-            id: `warning_${run.key}_partial`,
-            type: "capacity",
-            message: `${run.tour?.name || "Tour"} at ${run.time} needs ${run.guidesNeeded - run.guidesAssigned} more guide(s)`,
-            guestCount: run.totalGuests,
-            tourRunKey: run.key,
-            suggestions: [],
-          });
-        } else if (run.status === "overstaffed") {
-          fallbackWarnings.push({
-            id: `warning_${run.key}_overstaffed`,
-            type: "conflict",
-            message: `${run.tour?.name || "Tour"} at ${run.time} has too many guides assigned`,
-            tourRunKey: run.key,
-            suggestions: [],
-          });
-        }
-      }
-    }
-
-    const warnings = serviceWarnings.length > 0
-      ? transformWarnings(serviceWarnings)
-      : fallbackWarnings;
-
-    const guideTimelines = timelines.map(transformGuideTimeline);
-    const displayStatus = mapDispatchStatus(status.status, status.unresolvedWarnings);
-
-    return {
-      status: displayStatus,
-      totalGuests: status.totalGuests,
-      totalGuides: status.totalGuides,
-      totalDriveMinutes: status.totalDriveMinutes,
-      efficiencyScore: status.efficiencyScore,
-      dispatchedAt: status.dispatchedAt ? new Date(status.dispatchedAt) : undefined,
-      warnings,
-      guideTimelines,
-    };
-  }, [dispatchResponse]);
-
-  const availableGuides = useMemo(() => {
-    if (!dispatchResponse?.timelines) return [];
-
-    return dispatchResponse.timelines.map((timeline) => ({
-      id: timeline.guide.id,
-      name: `${timeline.guide.firstName} ${timeline.guide.lastName}`.trim(),
-      vehicleCapacity: timeline.vehicleCapacity ?? 0,
-      currentGuests: timeline.totalGuests ?? 0,
-    }));
-  }, [dispatchResponse?.timelines]);
-
   const handleResolveWarning = useCallback(
     (warningId: string, suggestionId: string) => {
+      const warning = warnings.find((item) => item.id === warningId);
+      const suggestion = warning?.suggestions.find((item) => item.id === suggestionId);
+
       let type: "assign_guide" | "add_external" | "skip" | "cancel" = "skip";
       let guideId: string | undefined;
 
-      const warning = data?.warnings.find((item) => item.id === warningId);
-      const suggestion = warning?.suggestions.find((item) => item.id === suggestionId);
-      const assignPrefixes = ["res_assign_", "assign_", "quick_assign_"];
-
-      for (const prefix of assignPrefixes) {
-        if (suggestionId.startsWith(prefix)) {
-          type = "assign_guide";
-          guideId = suggestionId.replace(prefix, "");
-          break;
-        }
-      }
-
-      if (!guideId && suggestion?.guideId) {
+      if (suggestion?.action === "assign_guide" && suggestion.guideId) {
         type = "assign_guide";
         guideId = suggestion.guideId;
-      } else if (suggestion?.action === "add_external" || suggestionId === "res_add_external" || suggestionId === "add_external") {
+      } else if (suggestion?.action === "add_external") {
         type = "add_external";
-      } else if (suggestionId === "res_acknowledge" || suggestion?.action === "acknowledge") {
-        type = "skip";
+      } else if (suggestion?.action === "cancel_tour") {
+        type = "cancel";
+      }
+
+      if (!guideId && suggestionId.startsWith("quick_assign_")) {
+        type = "assign_guide";
+        guideId = suggestionId.replace("quick_assign_", "");
       }
 
       resolveWarningMutation.mutate({
@@ -370,53 +321,58 @@ function CommandCenterContent({
         },
       });
     },
-    [dateString, resolveWarningMutation, data?.warnings]
+    [dateString, resolveWarningMutation, warnings]
   );
 
-  // Extract unassigned bookings for mobile hopper
-  const hopperBookings = useMemo<HopperBooking[]>(() => {
-    if (!dispatchResponse?.tourRuns) return [];
+  const handleBookingClick = useCallback(
+    (bookingId: string) => {
+      const booking = viewModel?.bookingLookup.get(bookingId) ?? null;
+      setSelectedGuest(booking);
+    },
+    [viewModel]
+  );
 
-    const unassigned: HopperBooking[] = [];
+  const handleGuideClick = useCallback(
+    (guideId: string) => {
+      const guide = viewModel?.guideLookup.get(guideId) ?? null;
+      setSelectedGuide(guide);
+    },
+    [viewModel]
+  );
 
-    for (const run of dispatchResponse.tourRuns) {
-      if (run.status === "unassigned" || run.status === "partial") {
-        for (const booking of run.bookings) {
-          unassigned.push({
-            id: booking.id,
-            referenceNumber: booking.referenceNumber,
-            customerName: booking.customerName,
-            customerEmail: booking.customerEmail,
-            guestCount: booking.totalParticipants,
-            adultCount: booking.adultCount,
-            childCount: booking.childCount,
-            infantCount: booking.infantCount,
-            pickupZone: booking.pickupZone ?? null,
-            pickupLocation: booking.pickupLocation,
-            pickupTime: booking.pickupTime,
-            tourName: run.tour?.name || "Tour",
-            tourTime: run.time,
-            tourRunKey: run.key,
-            tourDurationMinutes: run.tour?.durationMinutes,
-            experienceMode: booking.experienceMode ?? undefined,
-            isVIP: false,
-            isFirstTimer: booking.isFirstTime,
-            specialOccasion: booking.specialOccasion,
-            accessibilityNeeds: booking.accessibilityNeeds,
-            hasChildren: booking.childCount > 0 || booking.infantCount > 0,
-          });
-        }
+  const handleMobileAssign = useCallback(
+    async (bookingId: string, guideId: string, guideName: string) => {
+      const operation: OperationRecord = {
+        changes: [{ type: "assign", bookingId, toGuideId: guideId }],
+        undoChanges: [{ type: "unassign", bookingIds: [bookingId], fromGuideId: guideId }],
+        description: `Assigned booking to ${guideName}`,
+      };
+      await executeOperation(operation);
+    },
+    [executeOperation]
+  );
+
+  useEffect(() => {
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && !event.shiftKey) {
+        event.preventDefault();
+        void handleUndo();
       }
-    }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && event.shiftKey) {
+        event.preventDefault();
+        void handleRedo();
+      }
+      if (event.key === "?") {
+        event.preventDefault();
+        setShowShortcutsModal(true);
+      }
+    };
 
-    return unassigned;
-  }, [dispatchResponse]);
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, [handleRedo, handleUndo]);
 
-  const guideTimelines = useMemo(() => {
-    return data?.guideTimelines ?? [];
-  }, [data?.guideTimelines]);
-
-  // Format date for display
   const formattedDate = useMemo(() => {
     if (isToday(date)) return "Today";
     if (isTomorrow(date)) return "Tomorrow";
@@ -424,65 +380,24 @@ function CommandCenterContent({
     return format(date, "EEE, MMM d");
   }, [date]);
 
-  // ==========================================================================
-  // KEYBOARD SHORTCUTS
-  // ==========================================================================
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        event.target instanceof HTMLSelectElement
-      ) {
-        return;
-      }
-
-      switch (event.key) {
-        case "ArrowLeft":
-          event.preventDefault();
-          onPreviousDay();
-          break;
-        case "ArrowRight":
-          event.preventDefault();
-          onNextDay();
-          break;
-        case "t":
-        case "T":
-          event.preventDefault();
-          onToday();
-          break;
-        case "?":
-          event.preventDefault();
-          setShowShortcutsModal(true);
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onPreviousDay, onNextDay, onToday]);
-
-  // Loading state
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full min-h-0 gap-2">
-        <Skeleton className="flex-none h-14 w-full rounded-lg" />
-        <Skeleton className="flex-1 min-h-0 w-full rounded-lg" />
+      <div className="flex h-full min-h-0 flex-col gap-2">
+        <Skeleton className="h-14 w-full flex-none rounded-lg" />
+        <Skeleton className="w-full flex-1 rounded-lg" />
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <div className="flex flex-col h-full min-h-0 gap-2">
+      <div className="flex h-full min-h-0 flex-col gap-2">
         <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
           <div className="flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-destructive" />
             <div>
               <p className="text-sm font-medium text-destructive">Failed to load dispatch data</p>
-              <p className="text-xs text-destructive/70 mt-0.5">{error.message}</p>
+              <p className="text-xs text-destructive/70">{error.message}</p>
             </div>
           </div>
         </div>
@@ -490,196 +405,118 @@ function CommandCenterContent({
     );
   }
 
-  // Empty state - no bookings for this day
-  if (!data || data.totalGuests === 0) {
+  if (!dispatchResponse || !dispatchData || !viewModel) {
     return (
-      <div className="flex flex-col h-full min-h-0 gap-2">
-        <CommandStrip
-          date={date}
-          formattedDate={formattedDate}
-          onPreviousDay={onPreviousDay}
-          onNextDay={onNextDay}
-          onToday={onToday}
-          status="pending"
-          totalGuests={0}
-          totalGuides={0}
-          efficiencyScore={0}
-          unassignedCount={0}
-          warningsCount={0}
-          onOptimize={handleOptimize}
-          onDispatch={handleDispatch}
-        />
-
-        <div className="flex-1 min-h-0 flex items-center justify-center rounded-lg border border-border bg-card">
-          <div className="text-center p-8">
-            <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <h3 className="text-base font-medium text-foreground mb-1.5">No Tours Scheduled</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              No confirmed bookings for this date. Tours appear here once booked.
-            </p>
-          </div>
+      <div className="flex h-full min-h-0 items-center justify-center rounded-lg border bg-card">
+        <div className="p-8 text-center">
+          <Calendar className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">No dispatch data available for this date.</p>
         </div>
       </div>
     );
   }
 
-  const hasWarnings = data.warnings.length > 0;
-  const isDispatched = data.status === "dispatched";
+  const hasWarnings = warnings.length > 0;
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-2">
-      {/* Command Strip - Unified header with date nav, status, and actions */}
+    <div className="flex h-full min-h-0 flex-col gap-2">
       <CommandStrip
         date={date}
         formattedDate={formattedDate}
         onPreviousDay={onPreviousDay}
         onNextDay={onNextDay}
         onToday={onToday}
-        status={data.status}
-        totalGuests={data.totalGuests}
-        totalGuides={data.totalGuides}
-        efficiencyScore={data.efficiencyScore}
-        unassignedCount={hopperBookings.length}
-        warningsCount={data.warnings.length}
-        dispatchedAt={data.dispatchedAt}
+        status={dispatchData.status}
+        totalGuests={dispatchData.totalGuests}
+        totalGuides={dispatchData.totalGuides}
+        efficiencyScore={dispatchData.efficiencyScore}
+        unassignedCount={unassignedCount}
+        warningsCount={warnings.length}
+        dispatchedAt={dispatchData.dispatchedAt}
+        tourRuns={dispatchResponse.tourRuns}
         onOptimize={handleOptimize}
         onDispatch={handleDispatch}
       />
 
-      {data.status === "ready" && (
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+      {dispatchData.status === "ready" && (
+        <div className="flex items-center gap-2 rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-sm text-success">
           <CheckCircle2 className="h-4 w-4" />
-          <div>
-            <span className="font-medium">Ready to dispatch.</span>{" "}
-            <span className="text-emerald-700/80 dark:text-emerald-300/80">
-              All assignments are clear and warnings are resolved.
-            </span>
-          </div>
+          <span className="font-medium">Ready to dispatch.</span>
+          <span className="text-success/80">All warnings are resolved.</span>
         </div>
       )}
 
-      {data.status === "dispatched" && (
-        <div className="rounded-lg border border-muted-foreground/20 bg-muted/40 px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+      {dispatchData.status === "dispatched" && (
+        <div className="flex items-center gap-2 rounded-lg border border-muted-foreground/20 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
           <Lock className="h-4 w-4" />
-          <div>
+          <span>
             <span className="font-medium text-foreground/90">Dispatched.</span>{" "}
-            {data.dispatchedAt
-              ? `Sent ${format(data.dispatchedAt, "MMM d, HH:mm")}.`
-              : "Dispatch sent."}{" "}
-            This day is locked for edits.
-          </div>
+            {dispatchData.dispatchedAt ? `Sent ${format(dispatchData.dispatchedAt, "MMM d, HH:mm")}.` : "Dispatch sent."} This day is locked.
+          </span>
         </div>
       )}
 
-      {/* Warnings Panel - collapsed by default */}
       {hasWarnings && (
         <WarningsPanel
-          warnings={data.warnings}
+          warnings={warnings}
           onResolve={handleResolveWarning}
           availableGuides={availableGuides}
-          defaultCollapsed={true}
+          defaultCollapsed
         />
       )}
 
-      {/* Main Timeline - Always uses the new simplified booking-centric timeline */}
-      <div className="flex-1 min-h-0 rounded-lg border border-border bg-card overflow-hidden">
-        <SimpleTimelineContainer
-          date={date}
-          tourRuns={dispatchResponse?.tourRuns ?? []}
-          guideTimelines={dispatchResponse?.timelines ?? []}
-          isLoading={isLoading}
-          isReadOnly={isDispatched}
-          onGuideClick={(guide) => {
-            const guideInfo: GuideInfo = {
-              id: guide.id,
-              firstName: guide.firstName,
-              lastName: guide.lastName,
-              email: guide.email,
-              phone: guide.phone,
-              avatarUrl: guide.avatarUrl,
-              vehicleCapacity: guide.vehicleCapacity,
-              status: guide.status,
-            };
-            handleGuideClick(guideInfo);
-          }}
-          className={cn(
-            "h-full",
-            isDispatched && "opacity-75"
-          )}
+      <div className={cn("min-h-0 flex-1 overflow-hidden rounded-lg border bg-card", isReadOnly && "opacity-90")}>
+        <DispatchCanvas
+          rows={viewModel.rows}
+          groups={viewModel.groups}
+          bookingLookup={viewModel.bookingLookup}
+          isReadOnly={isReadOnly}
+          isEditing={isEditing}
+          onEditingChange={setIsEditing}
+          isMutating={isMutating}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onApplyOperation={handleApplyOperation}
+          onGuideClick={handleGuideClick}
+          onBookingClick={handleBookingClick}
+          showCurrentTime={isToday(date)}
         />
       </div>
 
-      {/* Guest Details Panel */}
+      <MobileHopperSheet
+        bookings={viewModel.groups.flatMap((group) => group.bookings)}
+        guideTimelines={mapGuideTimelinesForMobile(dispatchResponse.timelines)}
+        onAssign={handleMobileAssign}
+        isLoading={isMutating}
+        isReadOnly={isReadOnly}
+      />
+
       <GuestCard
-        open={!!selectedGuest}
+        open={Boolean(selectedGuest)}
         onClose={() => setSelectedGuest(null)}
         booking={selectedGuest}
-        onViewBooking={(bookingId) => {
-          toast.info("View booking feature coming soon");
-        }}
       />
 
-      {/* Guide Details Panel */}
       <GuideCard
-        open={!!selectedGuide}
+        open={Boolean(selectedGuide)}
         onClose={() => setSelectedGuide(null)}
         guide={selectedGuide}
-        onViewProfile={(guideId) => {
-          toast.info("View profile feature coming soon");
-        }}
       />
 
-      {/* Mobile Hopper Sheet - FAB and bottom sheet for mobile booking assignment */}
-      <MobileHopperSheet
-        bookings={hopperBookings}
-        guideTimelines={guideTimelines}
-        onAssign={(bookingId, guideId, guideName) => {
-          toast.success(`Assigned booking to ${guideName}`);
-          announce(`Booking assigned to ${guideName}`);
-        }}
-        isLoading={isLoading}
-        isReadOnly={isDispatched}
-      />
-
-      {/* Dispatch Confirmation Dialog */}
       <DispatchConfirmDialog
         open={showDispatchConfirm}
         onOpenChange={setShowDispatchConfirm}
         onConfirm={handleConfirmDispatch}
         isLoading={dispatchMutation.isPending}
         date={date}
-        guideCount={guideTimelines.length}
-        totalGuests={data?.totalGuests ?? 0}
-        efficiencyScore={data?.efficiencyScore ?? 0}
-        warningsCount={data?.warnings?.length ?? 0}
+        guideCount={dispatchData.totalGuides}
+        totalGuests={dispatchData.totalGuests}
+        efficiencyScore={dispatchData.efficiencyScore}
+        warningsCount={warnings.length}
       />
 
-      {/* Keyboard Shortcut Hints */}
-      <div className="flex-none flex items-center justify-center gap-3 text-xs text-muted-foreground/70 py-1">
-        <span className="flex items-center gap-1">
-          <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">←</kbd>
-          <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">→</kbd>
-          <span className="ml-0.5">days</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">T</kbd>
-          <span className="ml-0.5">today</span>
-        </span>
-        <button
-          onClick={() => setShowShortcutsModal(true)}
-          className={cn(
-            "flex items-center gap-1 px-1.5 py-0.5 rounded",
-            "hover:bg-muted/70 hover:text-foreground transition-colors",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-          )}
-          aria-label="Show keyboard shortcuts"
-        >
-          <kbd className="px-1.5 py-0.5 rounded bg-muted/50 font-mono text-[11px] border border-border/50">?</kbd>
-          <span className="ml-0.5">shortcuts</span>
-        </button>
-      </div>
-
-      {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal
         open={showShortcutsModal}
         onOpenChange={setShowShortcutsModal}
@@ -688,22 +525,10 @@ function CommandCenterContent({
   );
 }
 
-// =============================================================================
-// EXPORTED COMPONENT WITH PROVIDERS
-// =============================================================================
-
-import { CommandCenterErrorBoundary } from "./command-center-error-boundary";
-
-/**
- * Command Center with Error Boundary support
- * The timeline is always in edit mode - no need for adjust mode toggle
- */
 export function CommandCenter(props: CommandCenterProps) {
   return (
-    <CommandCenterErrorBoundary>
-      <LiveAnnouncerProvider>
-        <CommandCenterContent {...props} />
-      </LiveAnnouncerProvider>
-    </CommandCenterErrorBoundary>
+    <LiveAnnouncerProvider>
+      <CommandCenterContent {...props} />
+    </LiveAnnouncerProvider>
   );
 }

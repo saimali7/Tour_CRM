@@ -25,28 +25,28 @@ export const confidenceColors: Record<ConfidenceLevel, {
   border: string;
 }> = {
   optimal: {
-    bg: "bg-emerald-500",
-    bgHover: "hover:bg-emerald-600",
-    text: "text-emerald-50",
-    border: "border-emerald-600",
+    bg: "bg-success",
+    bgHover: "hover:bg-success",
+    text: "text-success",
+    border: "border-success",
   },
   good: {
-    bg: "bg-blue-500",
-    bgHover: "hover:bg-blue-600",
-    text: "text-blue-50",
-    border: "border-blue-600",
+    bg: "bg-info",
+    bgHover: "hover:bg-info",
+    text: "text-info",
+    border: "border-info",
   },
   review: {
-    bg: "bg-amber-500",
-    bgHover: "hover:bg-amber-600",
-    text: "text-amber-50",
-    border: "border-amber-600",
+    bg: "bg-warning",
+    bgHover: "hover:bg-warning",
+    text: "text-warning",
+    border: "border-warning",
   },
   problem: {
-    bg: "bg-red-500",
-    bgHover: "hover:bg-red-600",
-    text: "text-red-50",
-    border: "border-red-600",
+    bg: "bg-destructive",
+    bgHover: "hover:bg-destructive",
+    text: "text-destructive",
+    border: "border-destructive",
   },
 };
 

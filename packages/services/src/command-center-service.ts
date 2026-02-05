@@ -134,6 +134,8 @@ export interface BookingWithCustomer {
   internalNotes: string | null;
   status: string;
   paymentStatus: string;
+  total: string | null;
+  currency: string | null;
   // Pickup info (if available)
   pickupZoneId: string | null;
   pickupZone: {
@@ -759,6 +761,8 @@ export class CommandCenterService extends BaseService {
           internalNotes: booking.internalNotes,
           status: booking.status,
           paymentStatus: booking.paymentStatus,
+          total: booking.total ? String(booking.total) : null,
+          currency: booking.currency ?? null,
           pickupZoneId: booking.pickupZoneId ?? null,
           pickupZone: booking.pickupZone
             ? {
@@ -2480,6 +2484,8 @@ export class CommandCenterService extends BaseService {
         internalNotes: booking.internalNotes,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
+        total: booking.total ? String(booking.total) : null,
+        currency: booking.currency ?? null,
         pickupZoneId: booking.pickupZoneId ?? null,
         pickupZone: booking.pickupZone
           ? {

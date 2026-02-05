@@ -20,7 +20,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BookingWithCustomer } from "./timeline/types";
 
 // =============================================================================
 // TYPES
@@ -48,8 +47,8 @@ export interface GuestCardBooking {
   tourTime: string;
   status: string;
   paymentStatus: string;
-  total: string;
-  currency: string;
+  total?: string | null;
+  currency?: string | null;
 }
 
 export interface GuestCardProps {
@@ -118,6 +117,7 @@ export function GuestCard({
     variant: "secondary" as const,
     label: booking.paymentStatus,
   };
+  const hasTotal = Boolean(booking.total) && Boolean(booking.currency);
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -144,13 +144,13 @@ export function GuestCard({
             <div
               className={cn(
                 "flex items-center gap-3 rounded-lg p-3",
-                "border border-amber-500/20 bg-amber-500/10"
+                "border border-warning/20 bg-warning/10"
               )}
               role="status"
               aria-label={`Special occasion: ${booking.specialOccasion}`}
             >
-              <Cake className="h-5 w-5 flex-shrink-0 text-amber-500" aria-hidden="true" />
-              <span className="font-medium text-amber-600 dark:text-amber-400">
+              <Cake className="h-5 w-5 flex-shrink-0 text-warning" aria-hidden="true" />
+              <span className="font-medium text-warning dark:text-warning">
                 {booking.specialOccasion}
               </span>
             </div>
@@ -297,7 +297,7 @@ export function GuestCard({
             <div className="flex items-center justify-between">
               <Badge variant={paymentStyle.variant}>{paymentStyle.label}</Badge>
               <span className="font-mono font-medium">
-                {booking.currency} {booking.total}
+                {hasTotal ? `${booking.currency} ${booking.total}` : "Total unavailable"}
               </span>
             </div>
           </section>

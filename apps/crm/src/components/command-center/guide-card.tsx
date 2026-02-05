@@ -15,7 +15,6 @@ import {
   Mail,
   Car,
   MapPin,
-  Clock,
   Users,
   Languages,
   Calendar,
@@ -31,11 +30,6 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDuration } from "./timeline/types";
 import { useState } from "react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 // =============================================================================
 // TYPES
@@ -502,12 +496,12 @@ function BookingRow({ booking }: { booking: AssignmentBooking }) {
           <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
             <span>{booking.guestCount} guest{booking.guestCount !== 1 ? "s" : ""}</span>
             {booking.childCount && booking.childCount > 0 && (
-              <span className="text-amber-600">
+              <span className="text-warning">
                 ({booking.childCount} child{booking.childCount !== 1 ? "ren" : ""})
               </span>
             )}
             {booking.infantCount && booking.infantCount > 0 && (
-              <span className="text-amber-600">
+              <span className="text-warning">
                 ({booking.infantCount} infant{booking.infantCount !== 1 ? "s" : ""})
               </span>
             )}
@@ -553,25 +547,25 @@ function BookingRow({ booking }: { booking: AssignmentBooking }) {
       {hasFlags && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {booking.isFirstTime && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-blue-50 text-blue-700 border-blue-200">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-info/10 text-info border-info/20">
               <Star className="h-2.5 w-2.5" aria-hidden="true" />
               First time
             </Badge>
           )}
           {booking.specialOccasion && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-pink-50 text-pink-700 border-pink-200">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-primary/10 text-primary border-primary/20">
               <Cake className="h-2.5 w-2.5" aria-hidden="true" />
               {booking.specialOccasion}
             </Badge>
           )}
           {booking.accessibilityNeeds && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-purple-50 text-purple-700 border-purple-200">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-info/10 text-info border-info/20">
               <Accessibility className="h-2.5 w-2.5" aria-hidden="true" />
               Accessibility
             </Badge>
           )}
           {((booking.childCount && booking.childCount > 0) || (booking.infantCount && booking.infantCount > 0)) && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-amber-50 text-amber-700 border-amber-200">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 bg-warning/10 text-warning border-warning/20">
               <Baby className="h-2.5 w-2.5" aria-hidden="true" />
               Family
             </Badge>

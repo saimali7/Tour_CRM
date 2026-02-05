@@ -39,7 +39,7 @@ interface MobileHopperSheetProps {
   /** Available guide timelines for assignment */
   guideTimelines: GuideTimeline[];
   /** Callback when a booking is assigned to a guide */
-  onAssign?: (bookingId: string, guideId: string, guideName: string, timelineIndex: number) => void;
+  onAssign?: (bookingId: string, guideId: string, guideName: string, timelineIndex: number) => Promise<void> | void;
   /** Whether the sheet is loading */
   isLoading?: boolean;
   /** Read-only mode (disables assignment UI) */
@@ -138,16 +138,16 @@ function MobileBookingCard({
           {hasSpecialIndicators && (
             <div className="flex items-center gap-1 ml-auto">
               {booking.isVIP && (
-                <Star className="h-3.5 w-3.5 text-amber-500" />
+                <Star className="h-3.5 w-3.5 text-warning" />
               )}
               {booking.specialOccasion && (
-                <Cake className="h-3.5 w-3.5 text-pink-500" />
+                <Cake className="h-3.5 w-3.5 text-primary" />
               )}
               {booking.accessibilityNeeds && (
-                <Accessibility className="h-3.5 w-3.5 text-purple-500" />
+                <Accessibility className="h-3.5 w-3.5 text-info" />
               )}
               {(booking.childCount > 0 || booking.infantCount > 0) && (
-                <Baby className="h-3.5 w-3.5 text-blue-500" />
+                <Baby className="h-3.5 w-3.5 text-info" />
               )}
             </div>
           )}
@@ -212,8 +212,8 @@ function GuideOption({
                 willExceedCapacity
                   ? "bg-destructive"
                   : capacityPercent > 80
-                    ? "bg-amber-500"
-                    : "bg-emerald-500"
+                    ? "bg-warning"
+                    : "bg-success"
               )}
               style={{ width: `${Math.min(100, (currentGuests / vehicleCapacity) * 100)}%` }}
             />
@@ -257,13 +257,10 @@ export function MobileHopperSheet({
   isLoading = false,
   isReadOnly = false,
 }: MobileHopperSheetProps) {
-  if (isReadOnly) {
-    return null;
-  }
-
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<HopperBooking | null>(null);
   const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Derived state
   const unassignedCount = bookings.length;
@@ -300,7 +297,7 @@ export function MobileHopperSheet({
   }, []);
 
   // Handle confirm assignment - calls the onAssign callback
-  const handleConfirmAssignment = useCallback(() => {
+  const handleConfirmAssignment = useCallback(async () => {
     if (!selectedBooking || !selectedGuideId) return;
 
     const selectedGuide = guideOptions.find((g) => g.guide.id === selectedGuideId);
@@ -308,16 +305,20 @@ export function MobileHopperSheet({
 
     const guideName = `${selectedGuide.guide.firstName} ${selectedGuide.guide.lastName}`;
 
-    // Callback for external handling (parent component handles the actual assignment)
-    onAssign?.(selectedBooking.id, selectedGuideId, guideName, selectedGuide.timelineIndex);
+    try {
+      setIsSubmitting(true);
+      await onAssign?.(selectedBooking.id, selectedGuideId, guideName, selectedGuide.timelineIndex);
 
-    // Reset state and close if this was the last booking
-    setSelectedBooking(null);
-    setSelectedGuideId(null);
+      // Reset state and close if this was the last booking
+      setSelectedBooking(null);
+      setSelectedGuideId(null);
 
-    // Close sheet if no more bookings (accounting for the one we just assigned)
-    if (bookings.length <= 1) {
-      setIsOpen(false);
+      // Close sheet if no more bookings (accounting for the one we just assigned)
+      if (bookings.length <= 1) {
+        setIsOpen(false);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   }, [
     selectedBooking,
@@ -327,8 +328,8 @@ export function MobileHopperSheet({
     bookings.length,
   ]);
 
-  // Don't render anything if no unassigned bookings
-  if (!hasUnassigned) {
+  // Don't render in read-only mode or if there are no unassigned bookings
+  if (isReadOnly || !hasUnassigned) {
     return null;
   }
 
@@ -345,7 +346,7 @@ export function MobileHopperSheet({
           "active:scale-95",
           // Amber if critical (has unassigned), subtle otherwise
           hasUnassigned
-            ? "bg-amber-500 hover:bg-amber-600 text-white"
+            ? "bg-warning hover:bg-warning text-warning-foreground"
             : "bg-muted hover:bg-muted/80 text-muted-foreground"
         )}
         aria-label={`${unassignedCount} unassigned booking${unassignedCount !== 1 ? "s" : ""}`}
@@ -354,7 +355,7 @@ export function MobileHopperSheet({
 
         {/* Count badge */}
         {hasUnassigned && (
-          <span className="absolute -top-1 -right-1 h-6 min-w-6 px-1.5 rounded-full bg-white text-amber-600 text-xs font-bold flex items-center justify-center shadow-sm">
+          <span className="absolute -top-1 -right-1 h-6 min-w-6 px-1.5 rounded-full bg-white text-warning text-xs font-bold flex items-center justify-center shadow-sm">
             {unassignedCount}
           </span>
         )}
@@ -449,8 +450,8 @@ export function MobileHopperSheet({
                   ) : bookings.length === 0 ? (
                     // Empty state
                     <div className="text-center py-8">
-                      <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
-                        <Check className="h-5 w-5 text-emerald-500" />
+                      <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
+                        <Check className="h-5 w-5 text-success" />
                       </div>
                       <p className="text-sm font-medium text-foreground">All Assigned!</p>
                       <p className="text-xs text-muted-foreground mt-1">Every booking has a guide</p>
@@ -475,10 +476,13 @@ export function MobileHopperSheet({
             <div className="p-4 border-t border-border bg-background">
               <Button
                 className="w-full h-12 text-base font-medium"
-                onClick={handleConfirmAssignment}
+                onClick={() => void handleConfirmAssignment()}
+                disabled={isSubmitting}
               >
                 <Check className="h-5 w-5 mr-2" />
-                Assign to {guideOptions.find((g) => g.guide.id === selectedGuideId)?.guide.firstName}
+                {isSubmitting
+                  ? "Assigning..."
+                  : `Assign to ${guideOptions.find((g) => g.guide.id === selectedGuideId)?.guide.firstName}`}
               </Button>
             </div>
           )}

@@ -151,13 +151,13 @@ export function HopperCard({
       className={cn(
         "group relative flex items-center gap-2 rounded-lg border bg-card p-2.5 transition-all duration-150",
         isPendingAssignment
-          ? "opacity-50 cursor-not-allowed pointer-events-none border-green-500/30 bg-green-500/5"
+          ? "opacity-50 cursor-not-allowed pointer-events-none border-success/30 bg-success/5"
           : isClickMode
             ? "cursor-pointer hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5"
             : "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         // Selected state in click mode - amber ring for "ready to assign"
-        isSelected && isClickMode && "ring-2 ring-amber-400 border-amber-400 bg-amber-50 dark:bg-amber-950/20",
+        isSelected && isClickMode && "ring-2 ring-warning/40 border-warning bg-warning/10",
         // Selected state in drag mode
         isSelected && !isClickMode && "ring-2 ring-primary border-primary",
         isDragging && "shadow-lg scale-[1.02]"
@@ -179,7 +179,7 @@ export function HopperCard({
 
           {/* Private indicator */}
           {isPrivate && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-orange-600 dark:text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded shrink-0">
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-warning dark:text-warning bg-warning/10 px-1.5 py-0.5 rounded shrink-0">
               <Lock className="h-2.5 w-2.5" />
               {booking.experienceMode === "charter" ? "Charter" : "Private"}
             </span>
@@ -189,22 +189,22 @@ export function HopperCard({
           {hasSpecialIndicators && (
             <div className="flex items-center gap-0.5 shrink-0">
               {booking.isFirstTimer && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1 py-0.5 rounded">
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-success dark:text-success bg-success/10 px-1 py-0.5 rounded">
                   <Sparkles className="h-2.5 w-2.5" />
                   NEW
                 </span>
               )}
               {booking.isVIP && (
-                <Star className="h-3 w-3 text-amber-500" />
+                <Star className="h-3 w-3 text-warning" />
               )}
               {booking.specialOccasion && (
-                <Cake className="h-3 w-3 text-pink-500" />
+                <Cake className="h-3 w-3 text-primary" />
               )}
               {booking.accessibilityNeeds && (
-                <Accessibility className="h-3 w-3 text-purple-500" />
+                <Accessibility className="h-3 w-3 text-info" />
               )}
               {(booking.childCount > 0 || booking.infantCount > 0) && (
-                <Baby className="h-3 w-3 text-blue-500" />
+                <Baby className="h-3 w-3 text-info" />
               )}
             </div>
           )}
@@ -228,7 +228,7 @@ export function HopperCard({
           )}
 
           {isPendingAssignment && (
-            <span className="text-[10px] font-medium text-green-600 dark:text-green-400 ml-auto">
+            <span className="text-[10px] font-medium text-success dark:text-success ml-auto">
               Assigned
             </span>
           )}
