@@ -309,6 +309,47 @@ export interface GuestDetails {
   tourInfo: Pick<Tour, "id" | "name" | "slug" | "meetingPoint" | "meetingPointDetails"> | null;
 }
 
+export type DispatchBatchChange =
+  | {
+      type: "assign";
+      bookingId: string;
+      toGuideId: string;
+    }
+  | {
+      type: "unassign";
+      bookingIds: string[];
+      fromGuideId: string;
+    }
+  | {
+      type: "reassign";
+      bookingIds: string[];
+      fromGuideId: string;
+      toGuideId: string;
+    }
+  | {
+      type: "time-shift";
+      bookingIds: string[];
+      guideId: string;
+      newStartTime: string;
+    };
+
+export interface DispatchBatchApplyResult {
+  success: boolean;
+  applied: number;
+  results: Array<{
+    type: DispatchBatchChange["type"];
+    bookingIds: string[];
+    success: boolean;
+  }>;
+}
+
+export interface AddOutsourcedGuideToRunResult {
+  success: boolean;
+  noop: boolean;
+  assignedCount: number;
+  message: string;
+}
+
 // =============================================================================
 // SERVICE
 // =============================================================================
@@ -1178,6 +1219,7 @@ export class CommandCenterService extends BaseService {
   async getGuideTimelines(date: Date | string): Promise<GuideTimeline[]> {
     // Ensure pickup assignments exist for the date
     await this.pickupAssignmentService.syncForDate(date);
+    const dateKey = this.formatDateKey(date);
 
     const [availableGuides, tourRuns, pickupAssignments] = await Promise.all([
       this.getAvailableGuides(date),
@@ -1195,10 +1237,21 @@ export class CommandCenterService extends BaseService {
     }
 
     // Fast lookup for bookings by ID
-    const bookingById = new Map<string, BookingWithCustomer>();
+    const bookingById = new Map<
+      string,
+      {
+        booking: BookingWithCustomer;
+        runKey: string;
+        startTime: string;
+      }
+    >();
     for (const run of tourRuns) {
       for (const booking of run.bookings) {
-        bookingById.set(booking.id, booking);
+        bookingById.set(booking.id, {
+          booking,
+          runKey: run.key,
+          startTime: run.time,
+        });
       }
     }
 
@@ -1326,7 +1379,8 @@ export class CommandCenterService extends BaseService {
           }
 
           const pickupEnd = this.addMinutesToTime(pickupTime, pickupDurationMinutes);
-          const booking = bookingById.get(pickup.bookingId);
+          const bookingRef = bookingById.get(pickup.bookingId);
+          const booking = bookingRef?.booking;
           const guestCount = booking?.totalParticipants ?? pickup.passengerCount;
 
           segments.push({
@@ -1366,7 +1420,7 @@ export class CommandCenterService extends BaseService {
         // Add tour segment
         const guideBookings = runPickups
           .map((pickup) => pickup.bookingId)
-          .map((id) => bookingById.get(id))
+          .map((id) => bookingById.get(id)?.booking)
           .filter(Boolean) as BookingWithCustomer[];
 
         segments.push({
@@ -1426,6 +1480,9 @@ export class CommandCenterService extends BaseService {
         utilization,
       });
     }
+
+    const outsourcedTimelines = await this.buildOutsourcedTimelinesForDate(dateKey, tourRuns, bookingById);
+    timelines.push(...outsourcedTimelines);
 
     return timelines;
   }
@@ -1945,56 +2002,16 @@ export class CommandCenterService extends BaseService {
   private async resolveAddExternal(warningId: string, resolution: WarningResolution): Promise<void> {
     // If external guide details are provided, create the outsourced assignment
     if (resolution.externalGuideName && resolution.tourRunKey) {
-      const [tourId, dateStr, time] = resolution.tourRunKey.split("|");
-
-      if (!tourId || !dateStr || !time) {
-        throw new ValidationError(`Invalid tourRunKey format: ${resolution.tourRunKey}`);
-      }
-
-      // Find bookings for this tour run
-      const tourRunBookings = await this.db.query.bookings.findMany({
-        where: and(
-          eq(bookings.organizationId, this.organizationId),
-          eq(bookings.tourId, tourId),
-          sql`${bookings.bookingDate}::text = ${dateStr}`,
-          eq(bookings.bookingTime, time),
-          inArray(bookings.status, ["pending", "confirmed"])
-        ),
+      const result = await this.addOutsourcedGuideToRun({
+        date: this.parseDateKey(parseTourRunKey(resolution.tourRunKey).date),
+        tourRunKey: resolution.tourRunKey,
+        externalGuideName: resolution.externalGuideName,
+        externalGuideContact: resolution.externalGuideContact,
       });
 
-      if (tourRunBookings.length === 0) {
-        throw new ValidationError(`No bookings found for tour run: ${resolution.tourRunKey}`);
-      }
-
-      // Assign outsourced guide to each booking
-      let assignedCount = 0;
-      for (const booking of tourRunBookings) {
-        try {
-          await this.guideAssignmentService.assignOutsourcedGuideToBooking(
-            {
-              bookingId: booking.id,
-              outsourcedGuideName: resolution.externalGuideName,
-              outsourcedGuideContact: resolution.externalGuideContact,
-              notes: `Added via warning resolution ${warningId}`,
-            },
-            { autoConfirm: true }
-          );
-          assignedCount++;
-        } catch (error) {
-          // Skip if already assigned
-          if (error instanceof ConflictError) {
-            this.logger.debug(`Outsourced guide already assigned to booking ${booking.id}, skipping`);
-            continue;
-          }
-          throw error;
-        }
-      }
-
-      // Refresh dispatch status
-      const date = new Date(dateStr);
-      await this.refreshDispatchStatus(date);
-
-      this.logger.info(`Resolved warning ${warningId}: added external guide "${resolution.externalGuideName}" to ${assignedCount} bookings`);
+      this.logger.info(
+        `Resolved warning ${warningId}: added external guide "${resolution.externalGuideName}" to ${result.assignedCount} bookings`
+      );
       return;
     }
 
@@ -2171,6 +2188,576 @@ export class CommandCenterService extends BaseService {
 
     // Note: Full split functionality (creating separate bookings) not yet implemented
     this.logger.warn(`Split booking for ${bookingId}: guide assignments updated, full split not implemented`);
+  }
+
+  // ===========================================================================
+  // DISPATCH CHANGES
+  // ===========================================================================
+
+  async addOutsourcedGuideToRun(input: {
+    date: Date | string;
+    tourRunKey: string;
+    externalGuideName: string;
+    externalGuideContact?: string;
+  }): Promise<AddOutsourcedGuideToRunResult> {
+    await this.assertNotDispatched(input.date, "Add outsourced guide");
+
+    const trimmedName = input.externalGuideName.trim();
+    if (!trimmedName) {
+      throw new ValidationError("External guide name is required");
+    }
+
+    const { tourId, date: dateStr, time } = parseTourRunKey(input.tourRunKey);
+    const effectiveDate = this.parseDateKey(dateStr);
+
+    const tourRunBookings = await this.db.query.bookings.findMany({
+      where: and(
+        eq(bookings.organizationId, this.organizationId),
+        eq(bookings.tourId, tourId),
+        sql`${bookings.bookingDate}::text = ${dateStr}`,
+        eq(bookings.bookingTime, time),
+        inArray(bookings.status, ["pending", "confirmed"])
+      ),
+      columns: {
+        id: true,
+      },
+    });
+
+    if (tourRunBookings.length === 0) {
+      throw new ValidationError(`No bookings found for tour run: ${input.tourRunKey}`);
+    }
+
+    const bookingIds = tourRunBookings.map((booking) => booking.id);
+    const confirmedAssignments = await this.db.query.guideAssignments.findMany({
+      where: and(
+        eq(guideAssignments.organizationId, this.organizationId),
+        eq(guideAssignments.status, "confirmed"),
+        inArray(guideAssignments.bookingId, bookingIds)
+      ),
+      columns: {
+        bookingId: true,
+      },
+    });
+
+    const assignedBookingIds = new Set(confirmedAssignments.map((assignment) => assignment.bookingId));
+    const unassignedBookingIds = bookingIds.filter((bookingId) => !assignedBookingIds.has(bookingId));
+
+    if (unassignedBookingIds.length === 0) {
+      return {
+        success: true,
+        noop: true,
+        assignedCount: 0,
+        message: "No unassigned bookings in this run. Outsourced guide was not added.",
+      };
+    }
+
+    let assignedCount = 0;
+    for (const bookingId of unassignedBookingIds) {
+      try {
+        await this.guideAssignmentService.assignOutsourcedGuideToBooking(
+          {
+            bookingId,
+            outsourcedGuideName: trimmedName,
+            outsourcedGuideContact: input.externalGuideContact,
+            notes: `Added from timeline for ${input.tourRunKey}`,
+          },
+          { autoConfirm: true }
+        );
+        assignedCount++;
+      } catch (error) {
+        if (error instanceof ConflictError) {
+          this.logger.debug({ bookingId, tourRunKey: input.tourRunKey }, "Outsourced guide assignment skipped due to conflict");
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    await this.refreshDispatchStatus(effectiveDate);
+
+    return {
+      success: true,
+      noop: assignedCount === 0,
+      assignedCount,
+      message:
+        assignedCount === 0
+          ? "No bookings were assigned. They may have been assigned concurrently."
+          : `Added outsourced guide to ${assignedCount} booking${assignedCount === 1 ? "" : "s"}.`,
+    };
+  }
+
+  async batchApplyChanges(date: Date | string, changes: DispatchBatchChange[]): Promise<DispatchBatchApplyResult> {
+    await this.assertNotDispatched(date, "Batch apply changes");
+
+    if (changes.length === 0) {
+      return {
+        success: true,
+        applied: 0,
+        results: [],
+      };
+    }
+
+    const dateKey = this.formatDateKey(date);
+    const changedBookingIds = new Set<string>();
+    const involvedGuideIds = new Set<string>();
+
+    for (const change of changes) {
+      if (change.type === "assign") {
+        changedBookingIds.add(change.bookingId);
+        involvedGuideIds.add(change.toGuideId);
+        continue;
+      }
+      for (const bookingId of change.bookingIds) {
+        changedBookingIds.add(bookingId);
+      }
+      if (change.type === "unassign") {
+      } else if (change.type === "reassign") {
+        involvedGuideIds.add(change.toGuideId);
+      } else if (change.type === "time-shift") {
+        involvedGuideIds.add(change.guideId);
+      }
+    }
+
+    const bookingIdList = [...changedBookingIds];
+    const bookingRows = await this.db.query.bookings.findMany({
+      where: and(
+        eq(bookings.organizationId, this.organizationId),
+        inArray(bookings.id, bookingIdList)
+      ),
+    });
+
+    if (bookingRows.length !== bookingIdList.length) {
+      throw new ValidationError("Some bookings were not found for batch apply");
+    }
+
+    const tourDurationById = new Map<string, number>();
+    const loadTourDurations = async (tourIds: string[]) => {
+      const uniqueMissing = [...new Set(tourIds.filter((tourId) => Boolean(tourId) && !tourDurationById.has(tourId)))];
+      if (uniqueMissing.length === 0) return;
+      const tourRows = await this.db.query.tours.findMany({
+        where: and(
+          eq(tours.organizationId, this.organizationId),
+          inArray(tours.id, uniqueMissing)
+        ),
+        columns: {
+          id: true,
+          durationMinutes: true,
+        },
+      });
+      for (const tour of tourRows) {
+        tourDurationById.set(tour.id, tour.durationMinutes ?? 60);
+      }
+    };
+
+    await loadTourDurations(bookingRows.map((booking) => booking.tourId).filter((tourId): tourId is string => Boolean(tourId)));
+
+    const working = new Map<
+      string,
+      {
+        bookingId: string;
+        tourId: string;
+        bookingDate: Date;
+        bookingDateKey: string;
+        bookingTime: string;
+        durationMinutes: number;
+        guestCount: number;
+        experienceMode: BookingWithCustomer["experienceMode"];
+        assignedGuideId: string | null;
+      }
+    >();
+
+    for (const booking of bookingRows) {
+      if (!booking.tourId || !booking.bookingDate || !booking.bookingTime) {
+        throw new ValidationError(`Booking ${booking.id} is missing tour/date/time`);
+      }
+      const bookingDateKey = this.formatDateKey(booking.bookingDate);
+      if (bookingDateKey !== dateKey) {
+        throw new ValidationError(`Booking ${booking.id} does not belong to ${dateKey}`);
+      }
+
+      working.set(booking.id, {
+        bookingId: booking.id,
+        tourId: booking.tourId,
+        bookingDate: booking.bookingDate,
+        bookingDateKey,
+        bookingTime: booking.bookingTime,
+        durationMinutes: tourDurationById.get(booking.tourId) ?? 60,
+        guestCount: booking.totalParticipants ?? 0,
+        experienceMode: this.extractExperienceMode(booking.pricingSnapshot),
+        assignedGuideId: null,
+      });
+    }
+
+    const confirmedChangedAssignments = await this.db.query.guideAssignments.findMany({
+      where: and(
+        eq(guideAssignments.organizationId, this.organizationId),
+        eq(guideAssignments.status, "confirmed"),
+        inArray(guideAssignments.bookingId, bookingIdList)
+      ),
+      columns: {
+        bookingId: true,
+        guideId: true,
+        assignedAt: true,
+      },
+      orderBy: (assignments, { desc }) => [desc(assignments.assignedAt)],
+    });
+
+    const assignedGuideByBooking = new Map<string, string>();
+    for (const assignment of confirmedChangedAssignments) {
+      if (!assignment.guideId) continue;
+      if (assignedGuideByBooking.has(assignment.bookingId)) continue;
+      assignedGuideByBooking.set(assignment.bookingId, assignment.guideId);
+    }
+
+    for (const [bookingId, guideId] of assignedGuideByBooking.entries()) {
+      const target = working.get(bookingId);
+      if (!target) continue;
+      target.assignedGuideId = guideId;
+      involvedGuideIds.add(guideId);
+    }
+
+    for (const change of changes) {
+      if (change.type === "assign") {
+        const state = working.get(change.bookingId);
+        if (!state) throw new ValidationError(`Booking ${change.bookingId} not found in working set`);
+        state.assignedGuideId = change.toGuideId;
+        continue;
+      }
+
+      if (change.type === "unassign") {
+        for (const bookingId of change.bookingIds) {
+          const state = working.get(bookingId);
+          if (!state) throw new ValidationError(`Booking ${bookingId} not found in working set`);
+          state.assignedGuideId = null;
+        }
+        continue;
+      }
+
+      if (change.type === "reassign") {
+        for (const bookingId of change.bookingIds) {
+          const state = working.get(bookingId);
+          if (!state) throw new ValidationError(`Booking ${bookingId} not found in working set`);
+          state.assignedGuideId = change.toGuideId;
+        }
+        continue;
+      }
+
+      if (!this.isValidCommandCenterTime(change.newStartTime)) {
+        throw new ValidationError(`Invalid time-shift value: ${change.newStartTime}`);
+      }
+
+      for (const bookingId of change.bookingIds) {
+        const state = working.get(bookingId);
+        if (!state) throw new ValidationError(`Booking ${bookingId} not found in working set`);
+        state.bookingTime = change.newStartTime;
+      }
+    }
+
+    const guideIdList = [...involvedGuideIds];
+    const guideRows = guideIdList.length > 0
+      ? await this.db.query.guides.findMany({
+          where: and(
+            eq(guides.organizationId, this.organizationId),
+            inArray(guides.id, guideIdList)
+          ),
+          columns: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            vehicleCapacity: true,
+          },
+        })
+      : [];
+
+    const guideById = new Map(guideRows.map((guide) => [guide.id, guide]));
+    const missingGuides = guideIdList.filter((guideId) => !guideById.has(guideId));
+    if (missingGuides.length > 0) {
+      throw new ValidationError(`Guide not found: ${missingGuides.join(", ")}`);
+    }
+
+    const existingGuideAssignments = guideIdList.length > 0
+      ? await this.db.query.guideAssignments.findMany({
+          where: and(
+            eq(guideAssignments.organizationId, this.organizationId),
+            eq(guideAssignments.status, "confirmed"),
+            inArray(guideAssignments.guideId, guideIdList)
+          ),
+          with: {
+            booking: true,
+          },
+        })
+      : [];
+
+    await loadTourDurations(
+      existingGuideAssignments
+        .map((assignment) => assignment.booking?.tourId)
+        .filter((tourId): tourId is string => Boolean(tourId))
+    );
+
+    type ValidationEntry = {
+      bookingId: string;
+      runKey: string;
+      slotKey: string;
+      startMinutes: number;
+      endMinutes: number;
+      guestCount: number;
+      isCharter: boolean;
+    };
+
+    const entriesByGuide = new Map<string, ValidationEntry[]>();
+    const pushEntry = (guideId: string, entry: ValidationEntry) => {
+      if (!entriesByGuide.has(guideId)) {
+        entriesByGuide.set(guideId, []);
+      }
+      entriesByGuide.get(guideId)!.push(entry);
+    };
+
+    for (const assignment of existingGuideAssignments) {
+      const guideId = assignment.guideId;
+      const booking = assignment.booking;
+      if (!guideId || !booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) continue;
+      if (changedBookingIds.has(booking.id)) continue;
+      if (this.formatDateKey(booking.bookingDate) !== dateKey) continue;
+
+      const durationMinutes = tourDurationById.get(booking.tourId) ?? 60;
+      const startMinutes = this.parseTimeToMinutes(booking.bookingTime);
+      const endMinutes = startMinutes + durationMinutes;
+      pushEntry(guideId, {
+        bookingId: booking.id,
+        runKey: createTourRunKey(booking.tourId, dateKey, booking.bookingTime),
+        slotKey: `${dateKey}|${booking.bookingTime}`,
+        startMinutes,
+        endMinutes,
+        guestCount: booking.totalParticipants ?? 0,
+        isCharter: this.extractExperienceMode(booking.pricingSnapshot) === "charter",
+      });
+    }
+
+    for (const state of working.values()) {
+      if (!state.assignedGuideId) continue;
+      const startMinutes = this.parseTimeToMinutes(state.bookingTime);
+      const endMinutes = startMinutes + state.durationMinutes;
+      if (endMinutes > 24 * 60) {
+        throw new ValidationError(`time_conflict: ${state.bookingId} exceeds end-of-day bounds`);
+      }
+
+      pushEntry(state.assignedGuideId, {
+        bookingId: state.bookingId,
+        runKey: createTourRunKey(state.tourId, state.bookingDateKey, state.bookingTime),
+        slotKey: `${state.bookingDateKey}|${state.bookingTime}`,
+        startMinutes,
+        endMinutes,
+        guestCount: state.guestCount,
+        isCharter: state.experienceMode === "charter",
+      });
+    }
+
+    for (const [guideId, entries] of entriesByGuide.entries()) {
+      const guide = guideById.get(guideId);
+      if (!guide) continue;
+
+      const runs = new Map<string, ValidationEntry[]>();
+      for (const entry of entries) {
+        if (!runs.has(entry.runKey)) runs.set(entry.runKey, []);
+        runs.get(entry.runKey)!.push(entry);
+      }
+
+      for (const [runKey, runEntries] of runs.entries()) {
+        const runGuests = runEntries.reduce((sum, entry) => sum + entry.guestCount, 0);
+        if (runGuests > guide.vehicleCapacity) {
+          this.logger.warn(
+            { reason: "capacity_exceeded", guideId, runKey, runGuests, vehicleCapacity: guide.vehicleCapacity },
+            "Dispatch change rejected"
+          );
+          throw new ValidationError(
+            `capacity_exceeded: ${guide.firstName} ${guide.lastName} would exceed capacity (${runGuests}/${guide.vehicleCapacity})`
+          );
+        }
+
+        if (runEntries.some((entry) => entry.isCharter) && runEntries.length > 1) {
+          this.logger.warn(
+            { reason: "charter_exclusive", guideId, runKey },
+            "Dispatch change rejected"
+          );
+          throw new ValidationError(
+            `charter_exclusive: ${guide.firstName} ${guide.lastName} cannot stack charter bookings in the same slot`
+          );
+        }
+      }
+
+      const slots = new Map<string, ValidationEntry[]>();
+      for (const entry of entries) {
+        if (!slots.has(entry.slotKey)) slots.set(entry.slotKey, []);
+        slots.get(entry.slotKey)!.push(entry);
+      }
+
+      for (const [slotKey, slotEntries] of slots.entries()) {
+        if (slotEntries.some((entry) => entry.isCharter) && slotEntries.length > 1) {
+          this.logger.warn(
+            { reason: "charter_exclusive", guideId, slotKey },
+            "Dispatch change rejected"
+          );
+          throw new ValidationError(
+            `charter_exclusive: ${guide.firstName} ${guide.lastName} cannot share slot ${slotKey.split("|")[1]} with a charter booking`
+          );
+        }
+      }
+
+      const sorted = [...entries].sort((a, b) => a.startMinutes - b.startMinutes);
+      for (let i = 0; i < sorted.length; i += 1) {
+        const current = sorted[i];
+        if (!current) continue;
+        for (let j = i + 1; j < sorted.length; j += 1) {
+          const next = sorted[j];
+          if (!next) continue;
+          if (current.runKey === next.runKey) continue;
+          if (current.startMinutes < next.endMinutes && current.endMinutes > next.startMinutes) {
+            this.logger.warn(
+              { reason: "time_conflict", guideId, bookingId: current.bookingId, conflictingBookingId: next.bookingId },
+              "Dispatch change rejected"
+            );
+            throw new ValidationError(
+              `time_conflict: ${guide.firstName} ${guide.lastName} has overlapping runs`
+            );
+          }
+        }
+      }
+    }
+
+    const now = new Date();
+    const results: DispatchBatchApplyResult["results"] = [];
+
+    await this.db.transaction(async (tx) => {
+      for (const change of changes) {
+        if (change.type === "assign") {
+          await tx
+            .delete(guideAssignments)
+            .where(
+              and(
+                eq(guideAssignments.organizationId, this.organizationId),
+                eq(guideAssignments.bookingId, change.bookingId),
+                eq(guideAssignments.status, "confirmed")
+              )
+            );
+
+          await tx.insert(guideAssignments).values({
+            organizationId: this.organizationId,
+            bookingId: change.bookingId,
+            guideId: change.toGuideId,
+            outsourcedGuideName: null,
+            outsourcedGuideContact: null,
+            status: "confirmed",
+            assignedAt: now,
+            confirmedAt: now,
+            updatedAt: now,
+          });
+
+          results.push({
+            type: "assign",
+            bookingIds: [change.bookingId],
+            success: true,
+          });
+          continue;
+        }
+
+        if (change.type === "unassign") {
+          if (change.bookingIds.length > 0) {
+            await tx
+              .delete(guideAssignments)
+              .where(
+                and(
+                  eq(guideAssignments.organizationId, this.organizationId),
+                  eq(guideAssignments.status, "confirmed"),
+                  inArray(guideAssignments.bookingId, change.bookingIds)
+                )
+              );
+          }
+
+          results.push({
+            type: "unassign",
+            bookingIds: change.bookingIds,
+            success: true,
+          });
+          continue;
+        }
+
+        if (change.type === "reassign") {
+          for (const bookingId of change.bookingIds) {
+            await tx
+              .delete(guideAssignments)
+              .where(
+                and(
+                  eq(guideAssignments.organizationId, this.organizationId),
+                  eq(guideAssignments.bookingId, bookingId),
+                  eq(guideAssignments.status, "confirmed")
+                )
+              );
+
+            await tx.insert(guideAssignments).values({
+              organizationId: this.organizationId,
+              bookingId,
+              guideId: change.toGuideId,
+              outsourcedGuideName: null,
+              outsourcedGuideContact: null,
+              status: "confirmed",
+              assignedAt: now,
+              confirmedAt: now,
+              updatedAt: now,
+            });
+          }
+
+          results.push({
+            type: "reassign",
+            bookingIds: change.bookingIds,
+            success: true,
+          });
+          continue;
+        }
+
+        await tx
+          .update(bookings)
+          .set({
+            bookingTime: change.newStartTime,
+            pickupTime: change.newStartTime,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(bookings.organizationId, this.organizationId),
+              inArray(bookings.id, change.bookingIds)
+            )
+          );
+
+        await tx
+          .update(guideAssignments)
+          .set({
+            calculatedPickupTime: change.newStartTime,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(guideAssignments.organizationId, this.organizationId),
+              eq(guideAssignments.status, "confirmed"),
+              eq(guideAssignments.guideId, change.guideId),
+              inArray(guideAssignments.bookingId, change.bookingIds)
+            )
+          );
+
+        results.push({
+          type: "time-shift",
+          bookingIds: change.bookingIds,
+          success: true,
+        });
+      }
+    });
+
+    await this.refreshDispatchStatus(date);
+
+    return {
+      success: true,
+      applied: results.length,
+      results,
+    };
   }
 
   // ===========================================================================
@@ -2655,5 +3242,177 @@ export class CommandCenterService extends BaseService {
     const endTotal = (endHours || 0) * 60 + (endMins || 0);
 
     return endTotal - startTotal;
+  }
+
+  private parseTimeToMinutes(time: string): number {
+    const [hourRaw, minuteRaw] = time.split(":");
+    const hour = Number(hourRaw);
+    const minute = Number(minuteRaw);
+    if (Number.isNaN(hour) || Number.isNaN(minute)) {
+      throw new ValidationError(`Invalid time format: ${time}`);
+    }
+    return hour * 60 + minute;
+  }
+
+  private isValidCommandCenterTime(time: string): boolean {
+    if (!/^\d{2}:\d{2}$/.test(time)) return false;
+    const [hourRaw, minuteRaw] = time.split(":");
+    const hour = Number(hourRaw);
+    const minute = Number(minuteRaw);
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return false;
+    if (hour < 0 || hour > 24) return false;
+    if (minute < 0 || minute > 59) return false;
+    if (hour === 24 && minute !== 0) return false;
+    return true;
+  }
+
+  private extractExperienceMode(
+    pricingSnapshot: unknown
+  ): BookingWithCustomer["experienceMode"] {
+    const mode = (pricingSnapshot as { experienceMode?: unknown } | null)?.experienceMode;
+    if (mode === "join" || mode === "book" || mode === "charter") {
+      return mode;
+    }
+    return null;
+  }
+
+  private async buildOutsourcedTimelinesForDate(
+    dateKey: string,
+    tourRuns: TourRun[],
+    bookingById: Map<
+      string,
+      {
+        booking: BookingWithCustomer;
+        runKey: string;
+        startTime: string;
+      }
+    >
+  ): Promise<GuideTimeline[]> {
+    const assignments = await this.db.query.guideAssignments.findMany({
+      where: and(
+        eq(guideAssignments.organizationId, this.organizationId),
+        eq(guideAssignments.status, "confirmed"),
+        sql`${guideAssignments.outsourcedGuideName} IS NOT NULL`
+      ),
+      with: {
+        booking: {
+          with: {
+            tour: true,
+          },
+        },
+      },
+    });
+
+    const runByKey = new Map(tourRuns.map((run) => [run.key, run]));
+    const grouped = new Map<
+      string,
+      {
+        name: string;
+        contact: string | null;
+        bookingIds: Set<string>;
+      }
+    >();
+
+    for (const assignment of assignments) {
+      const booking = assignment.booking;
+      const name = assignment.outsourcedGuideName?.trim();
+      if (!name || !booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) continue;
+      if (this.formatDateKey(booking.bookingDate) !== dateKey) continue;
+
+      const key = `${name}::${assignment.outsourcedGuideContact ?? ""}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          name,
+          contact: assignment.outsourcedGuideContact ?? null,
+          bookingIds: new Set<string>(),
+        });
+      }
+      grouped.get(key)!.bookingIds.add(booking.id);
+    }
+
+    const timelines: GuideTimeline[] = [];
+    for (const [groupKey, group] of grouped.entries()) {
+      const bookingRefs = [...group.bookingIds]
+        .map((bookingId) => bookingById.get(bookingId))
+        .filter(
+          (
+            booking
+          ): booking is {
+            booking: BookingWithCustomer;
+            runKey: string;
+            startTime: string;
+          } => Boolean(booking)
+        );
+
+      if (bookingRefs.length === 0) continue;
+
+      const bookingsByRun = new Map<string, { startTime: string; bookings: BookingWithCustomer[] }>();
+      for (const ref of bookingRefs) {
+        if (!bookingsByRun.has(ref.runKey)) {
+          bookingsByRun.set(ref.runKey, {
+            startTime: ref.startTime,
+            bookings: [],
+          });
+        }
+        bookingsByRun.get(ref.runKey)!.bookings.push(ref.booking);
+      }
+
+      const segments: TimelineSegment[] = [];
+      let totalGuests = 0;
+      for (const [runKey, runGroup] of bookingsByRun.entries()) {
+        const run = runByKey.get(runKey);
+        const runBookings = runGroup.bookings;
+        const firstBooking = runBookings[0];
+        if (!firstBooking) continue;
+
+        const startTime = runGroup.startTime;
+        const durationMinutes = run?.tour.durationMinutes ?? 60;
+        const guestCount = runBookings.reduce((sum, booking) => sum + (booking.totalParticipants ?? 0), 0);
+        totalGuests += guestCount;
+
+        segments.push({
+          type: "tour",
+          startTime,
+          endTime: this.addMinutesToTime(startTime, durationMinutes),
+          durationMinutes,
+          tour: run?.tour
+            ? {
+                id: run.tour.id,
+                name: run.tour.name,
+                slug: run.tour.slug,
+              }
+            : undefined,
+          tourRunKey: runKey,
+          bookingIds: runBookings.map((booking) => booking.id),
+          guestCount,
+          confidence: "good",
+        });
+      }
+
+      segments.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+      const [firstName, ...lastNameParts] = group.name.split(/\s+/);
+      const contact = group.contact ?? "";
+      const isEmail = contact.includes("@");
+      const normalized = this.slugify(group.name) || "outsourced";
+
+      timelines.push({
+        guide: {
+          id: `outsourced:${normalized}:${this.slugify(groupKey).slice(0, 8)}`,
+          firstName: firstName || "Outsourced",
+          lastName: lastNameParts.join(" ") || "Guide",
+          email: isEmail ? contact : `${normalized}@outsourced.local`,
+          phone: isEmail ? null : contact || null,
+          avatarUrl: null,
+        },
+        vehicleCapacity: Math.max(totalGuests, 1),
+        segments,
+        totalDriveMinutes: 0,
+        totalGuests,
+        utilization: totalGuests > 0 ? 100 : 0,
+      });
+    }
+
+    return timelines;
   }
 }

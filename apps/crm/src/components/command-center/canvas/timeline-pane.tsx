@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatTimeDisplay } from "../timeline/timeline-utils";
@@ -46,6 +47,7 @@ interface TimelinePaneProps {
   onRunDragStart: (guideId: string, run: CanvasRun) => void;
   onRunDragEnd: () => void;
   onRunNudge: (guideId: string, run: CanvasRun, deltaMinutes: number) => void;
+  onBackgroundClick: () => void;
 }
 
 function shouldShowMarkerLabel(time: string): boolean {
@@ -61,9 +63,8 @@ function shouldHideMarkerForCurrentTime(markerLeft: number, currentTimePercent: 
 }
 
 function currentLabelPositionClass(currentTimePercent: number): string {
-  if (currentTimePercent < 6) return "translate-x-0 ml-1";
-  if (currentTimePercent > 94) return "-translate-x-full -ml-1";
-  return "-translate-x-1/2";
+  if (currentTimePercent > 95) return "-translate-x-full -ml-1";
+  return "translate-x-0 ml-1";
 }
 
 export function TimelinePane({
@@ -94,14 +95,29 @@ export function TimelinePane({
   onRunDragStart,
   onRunDragEnd,
   onRunNudge,
+  onBackgroundClick,
 }: TimelinePaneProps) {
+  const handleBackgroundClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.closest("button, a, input, textarea, select, [role='button']")) return;
+      onBackgroundClick();
+    },
+    [onBackgroundClick]
+  );
+
   const timelineTrackStyle =
     timelineZoom > 1
       ? { width: `${Math.round(timelineZoom * 100)}%` }
       : undefined;
 
   return (
-    <div data-timeline-scroll="true" className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-background/20">
+    <div
+      data-timeline-scroll="true"
+      className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-background/20"
+      onClick={handleBackgroundClick}
+    >
       <div className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex h-9">
           <div className="sticky left-0 z-20 w-[180px] shrink-0 border-r bg-card/95 px-2.5 py-2 shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] supports-[backdrop-filter]:bg-card/90 min-[1400px]:w-[188px] 2xl:w-[196px]">
@@ -130,10 +146,10 @@ export function TimelinePane({
                 className="pointer-events-none absolute inset-y-0 z-20 border-l-2 border-destructive/70 shadow-[0_0_0_1px_hsl(var(--destructive)/0.22)]"
                 style={{ left: `${currentTimePercent}%` }}
               >
-                <span className="absolute top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-destructive shadow-[0_0_0_2px_hsl(var(--background))]" />
+                <span className="absolute left-0 top-1 h-2 w-2 -translate-x-1/2 rounded-full bg-destructive shadow-[0_0_0_2px_hsl(var(--background))]" />
                 <span
                   className={cn(
-                    "absolute -top-3 rounded-md border border-destructive/45 bg-card px-1.5 py-0.5 text-[10px] font-semibold text-destructive shadow-md",
+                    "absolute left-0 top-0.5 whitespace-nowrap rounded-md border border-destructive/45 bg-card px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive shadow-md",
                     currentLabelPositionClass(currentTimePercent)
                   )}
                 >

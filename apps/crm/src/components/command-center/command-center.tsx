@@ -80,7 +80,9 @@ function mapWarnings(response: DispatchResponse): DispatchWarning[] {
 function mapGuideTimelinesForMobile(
   timelines: DispatchResponse["timelines"]
 ): GuideTimeline[] {
-  return timelines.map((timeline) => ({
+  return timelines
+    .filter((timeline) => !timeline.guide.id.startsWith("outsourced:"))
+    .map((timeline) => ({
     guide: {
       ...timeline.guide,
       email: timeline.guide.email ?? "",
@@ -193,6 +195,12 @@ function CommandCenterContent({
     },
   });
 
+  const addOutsourcedGuideMutation = trpc.commandCenter.addOutsourcedGuideToRun.useMutation({
+    onError: (mutationError) => {
+      toast.error("Failed to add outsourced guide", { description: mutationError.message });
+    },
+  });
+
   const warnings = useMemo(() => {
     if (!dispatchResponse) return [];
     return mapWarnings(dispatchResponse);
@@ -240,7 +248,9 @@ function CommandCenterContent({
 
   const availableGuides = useMemo(() => {
     if (!viewModel) return [];
-    return viewModel.rows.map((row) => ({
+    return viewModel.rows
+      .filter((row) => !row.isOutsourced)
+      .map((row) => ({
       id: row.guide.id,
       name: `${row.guide.firstName} ${row.guide.lastName}`.trim(),
       vehicleCapacity: row.vehicleCapacity,
@@ -265,7 +275,9 @@ function CommandCenterContent({
 
   const mobileAssignedRuns = useMemo(
     () =>
-      rowsForCanvas.flatMap((row) =>
+      rowsForCanvas
+        .filter((row) => !row.isOutsourced)
+        .flatMap((row) =>
         row.runs.map((run) => ({
           id: run.id,
           guideId: row.guide.id,
@@ -281,9 +293,8 @@ function CommandCenterContent({
 
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
-  const isMutating = batchMutation.isPending;
+  const isMutating = batchMutation.isPending || addOutsourcedGuideMutation.isPending;
   const isReadOnly = dispatchData?.status === "dispatched" || isPastDate;
-  const isEditing = !isReadOnly;
 
   useEffect(() => {
     if (!selectedWarningId) return;
@@ -433,11 +444,17 @@ function CommandCenterContent({
 
       const targetRow = rowsForCanvas.find((row) => row.guide.id === toGuideId);
       if (!targetRow) return;
+      if (targetRow.isOutsourced) {
+        toast.error("Cannot assign directly to outsourced lanes");
+        return;
+      }
 
-      const projectedGuests = targetRow.totalGuests + source.run.guestCount;
+      const projectedGuests = targetRow.runs
+        .filter((run) => run.startTime === source.run.startTime)
+        .reduce((sum, run) => sum + run.guestCount, 0) + source.run.guestCount;
       if (projectedGuests > targetRow.vehicleCapacity) {
         toast.error(
-          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
+          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed slot capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
         );
         return;
       }
@@ -464,6 +481,28 @@ function CommandCenterContent({
       await executeOperation(operation);
     },
     [executeOperation, rowsForCanvas, runLookup]
+  );
+
+  const handleAddOutsourcedGuideToRun = useCallback(
+    async (tourRunKey: string, draft: { name: string; contact?: string }) => {
+      const result = await addOutsourcedGuideMutation.mutateAsync({
+        date: dateString,
+        tourRunKey,
+        externalGuideName: draft.name,
+        externalGuideContact: draft.contact,
+      });
+
+      await utils.commandCenter.getDispatch.invalidate({ date: dateString });
+      if (result.noop) {
+        toast.message(result.message);
+        announce(result.message);
+        return;
+      }
+
+      toast.success(result.message);
+      announce(result.message);
+    },
+    [addOutsourcedGuideMutation, announce, dateString, utils.commandCenter.getDispatch]
   );
 
   const handleMobileNudgeRun = useCallback(
@@ -609,6 +648,7 @@ function CommandCenterContent({
           onGuideClick={handleGuideClick}
           onBookingClick={handleBookingClick}
           onResolveWarning={handleResolveWarning}
+          onAddOutsourcedGuideToRun={handleAddOutsourcedGuideToRun}
           showCurrentTime={isToday(date)}
         />
       </div>

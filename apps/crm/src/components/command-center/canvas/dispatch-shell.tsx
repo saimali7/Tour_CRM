@@ -16,6 +16,7 @@ import type {
   QueueFilterState,
   QueueSortMode,
   RunSignals,
+  OutsourcedGuideDraft,
 } from "./canvas-types";
 import { QueuePane } from "./queue-pane";
 import { TimelinePane } from "./timeline-pane";
@@ -52,6 +53,7 @@ interface DispatchShellProps {
   onGuideClick: (guideId: string) => void;
   onBookingClick: (bookingId: string) => void;
   onResolveWarning: (warningId: string, suggestionId: string) => void;
+  onAddOutsourcedGuideToRun: (tourRunKey: string, draft: OutsourcedGuideDraft) => Promise<void>;
   showCurrentTime: boolean;
 }
 
@@ -155,14 +157,15 @@ export function DispatchShell({
   isReadOnly,
   isEditing,
   isMutating,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
+  canUndo: _canUndo,
+  canRedo: _canRedo,
+  onUndo: _onUndo,
+  onRedo: _onRedo,
   onApplyOperation,
   onGuideClick,
   onBookingClick,
   onResolveWarning,
+  onAddOutsourcedGuideToRun,
   showCurrentTime,
 }: DispatchShellProps) {
   const [filterState, setFilterState] = useState<QueueFilterState>({
@@ -224,7 +227,7 @@ export function DispatchShell({
     for (const row of rows) {
       for (const run of row.runs) {
         let hasVIP = false;
-        let hasFirstTimer = false;
+        const hasFirstTimer = false;
         let hasAccessibility = false;
         let hasChildren = false;
         for (const bookingId of run.bookingIds) {
@@ -427,16 +430,13 @@ export function DispatchShell({
     setSelection({ type: "warning", warningId: selectedWarningId });
   }, [selectedWarningId]);
 
-  // Auto-open context on selection, auto-close 3s after deselection
+  // Auto-open context on selection and close immediately on deselection.
   useEffect(() => {
     if (selection.type !== "none") {
       setIsContextOpen(true);
       return;
     }
-    const timeout = window.setTimeout(() => {
-      setIsContextOpen(false);
-    }, 3000);
-    return () => window.clearTimeout(timeout);
+    setIsContextOpen(false);
   }, [selection]);
 
   useEffect(() => {
@@ -445,13 +445,40 @@ export function DispatchShell({
     }
   }, [dragPayload]);
 
+  const slotGuestCount = useCallback(
+    (row: CanvasRow, startTime: string, ignoreRunId?: string) =>
+      row.runs.reduce((sum, run) => {
+        if (ignoreRunId && run.id === ignoreRunId) return sum;
+        if (run.startTime !== startTime) return sum;
+        return sum + run.guestCount;
+      }, 0),
+    []
+  );
+
   const projectedGuestsForRow = useCallback(
     (row: CanvasRow): number => {
       if (!dragPayload) return row.totalGuests;
-      if (dragPayload.sourceGuideId === row.guide.id) return row.totalGuests;
-      return row.totalGuests + dragPayload.guestCount;
+      if (row.isOutsourced) return row.totalGuests;
+
+      if (dragPayload.source === "hopper") {
+        const incomingStartTime = bookingLookup.get(dragPayload.bookingIds[0] ?? "")?.tourTime;
+        if (!incomingStartTime) return row.totalGuests;
+        const baseGuests = slotGuestCount(row, incomingStartTime);
+        return baseGuests + dragPayload.guestCount;
+      }
+
+      const targetStartTime =
+        dragPreview?.guideId === row.guide.id
+          ? dragPreview.startTime
+          : dragPayload.startTime;
+
+      if (!targetStartTime) return row.totalGuests;
+      if (dragPayload.sourceGuideId === row.guide.id) {
+        return slotGuestCount(row, targetStartTime, dragPayload.runId) + dragPayload.guestCount;
+      }
+      return slotGuestCount(row, targetStartTime) + dragPayload.guestCount;
     },
-    [dragPayload]
+    [bookingLookup, dragPayload, dragPreview, slotGuestCount]
   );
 
   const executeOperation = useCallback(
@@ -488,6 +515,10 @@ export function DispatchShell({
     async (bookingIds: string[], targetGuideId: string, contextLabel?: string) => {
       const targetRow = rowLookup.get(targetGuideId);
       if (!targetRow) return;
+      if (targetRow.isOutsourced) {
+        toast.error("Cannot assign directly to an outsourced lane");
+        return;
+      }
       const incomingStartTime = bookingLookup.get(bookingIds[0] ?? "")?.tourTime;
 
       if (violatesCharterSlotRule(targetRow, bookingIds, incomingStartTime)) {
@@ -495,16 +526,21 @@ export function DispatchShell({
         return;
       }
 
+      if (!incomingStartTime) {
+        toast.error("Unable to determine booking start time for assignment");
+        return;
+      }
+
       const deltaGuests = bookingIds.reduce((sum, bookingId) => {
         const assignment = bookingAssignments.get(bookingId);
-        if (assignment?.guideId === targetGuideId) return sum;
+        if (assignment?.guideId === targetGuideId && assignment.run.startTime === incomingStartTime) return sum;
         return sum + (bookingLookup.get(bookingId)?.guestCount ?? 0);
       }, 0);
 
-      const projectedGuests = targetRow.totalGuests + deltaGuests;
+      const projectedGuests = slotGuestCount(targetRow, incomingStartTime) + deltaGuests;
       if (projectedGuests > targetRow.vehicleCapacity) {
         toast.error(
-          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
+          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed slot capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
         );
         return;
       }
@@ -554,20 +590,27 @@ export function DispatchShell({
           `Assigned ${changes.length} booking${changes.length === 1 ? "" : "s"} to ${targetRow.guide.firstName} ${targetRow.guide.lastName}`,
       });
     },
-    [bookingAssignments, bookingLookup, executeOperation, rowLookup, violatesCharterSlotRule]
+    [bookingAssignments, bookingLookup, executeOperation, rowLookup, slotGuestCount, violatesCharterSlotRule]
   );
 
   const assignBestFit = useCallback(
     async (bookingIds: string[], label: string) => {
+      const incomingStartTime = bookingLookup.get(bookingIds[0] ?? "")?.tourTime;
+      if (!incomingStartTime) {
+        toast.error("Unable to determine booking start time for best fit");
+        return;
+      }
+
       const candidates = rows
+        .filter((row) => !row.isOutsourced)
         .map((row) => {
           const deltaGuests = bookingIds.reduce((sum, bookingId) => {
             const assignment = bookingAssignments.get(bookingId);
-            if (assignment?.guideId === row.guide.id) return sum;
+            if (assignment?.guideId === row.guide.id && assignment.run.startTime === incomingStartTime) return sum;
             return sum + (bookingLookup.get(bookingId)?.guestCount ?? 0);
           }, 0);
 
-          const projectedGuests = row.totalGuests + deltaGuests;
+          const projectedGuests = slotGuestCount(row, incomingStartTime) + deltaGuests;
           return {
             row,
             projectedGuests,
@@ -589,7 +632,7 @@ export function DispatchShell({
         `Assigned ${label} to ${best.row.guide.firstName} ${best.row.guide.lastName}`
       );
     },
-    [assignBookingIdsToGuide, bookingAssignments, bookingLookup, rows]
+    [assignBookingIdsToGuide, bookingAssignments, bookingLookup, rows, slotGuestCount]
   );
 
   const executeDropToGuide = useCallback(
@@ -598,6 +641,11 @@ export function DispatchShell({
 
       const targetRow = rowLookup.get(targetGuideId);
       if (!targetRow) {
+        resetDrag();
+        return;
+      }
+      if (targetRow.isOutsourced) {
+        toast.error("Cannot drop assignments onto an outsourced lane");
         resetDrag();
         return;
       }
@@ -642,13 +690,18 @@ export function DispatchShell({
         return;
       }
 
-      const projectedGuests =
-        targetRow.totalGuests + (dragPayload.sourceGuideId === targetGuideId ? 0 : dragPayload.guestCount);
-      const dropStart = dropStartTime ?? dragPayload.startTime;
+      const inferredHopperStart =
+        dragPayload.source === "hopper"
+          ? bookingLookup.get(dragPayload.bookingIds[0] ?? "")?.tourTime
+          : undefined;
+      const dropStart = dropStartTime ?? dragPayload.startTime ?? inferredHopperStart;
+      const projectedGuests = dropStart
+        ? slotGuestCount(targetRow, dropStart, dragPayload.sourceGuideId === targetGuideId ? dragPayload.runId : undefined) + dragPayload.guestCount
+        : targetRow.totalGuests + (dragPayload.sourceGuideId === targetGuideId ? 0 : dragPayload.guestCount);
 
       if (projectedGuests > targetRow.vehicleCapacity) {
         toast.error(
-          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed vehicle capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
+          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed slot capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
         );
         resetDrag();
         return;
@@ -719,7 +772,7 @@ export function DispatchShell({
         resetDrag();
       }
     },
-    [assignBookingIdsToGuide, dragPayload, executeOperation, resetDrag, rowLookup, violatesCharterSlotRule]
+    [assignBookingIdsToGuide, bookingLookup, dragPayload, executeOperation, resetDrag, rowLookup, slotGuestCount, violatesCharterSlotRule]
   );
 
   const executeDropToHopper = useCallback(async () => {
@@ -783,16 +836,20 @@ export function DispatchShell({
       const selected = runLookup.get(runId);
       const targetRow = rowLookup.get(targetGuideId);
       if (!selected || !targetRow) return;
+      if (targetRow.isOutsourced) {
+        toast.error("Cannot move runs to an outsourced lane");
+        return;
+      }
 
       if (violatesCharterSlotRule(targetRow, selected.run.bookingIds, selected.run.startTime, selected.run.id)) {
         toast.error("Charter tours require an exclusive guide timeslot");
         return;
       }
 
-      const projectedGuests = targetRow.totalGuests + selected.run.guestCount;
+      const projectedGuests = slotGuestCount(targetRow, selected.run.startTime) + selected.run.guestCount;
       if (projectedGuests > targetRow.vehicleCapacity) {
         toast.error(
-          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
+          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed slot capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
         );
         return;
       }
@@ -817,7 +874,7 @@ export function DispatchShell({
         description: `Moved ${selected.run.tourName} to ${targetRow.guide.firstName} ${targetRow.guide.lastName}`,
       });
     },
-    [executeOperation, rowLookup, runLookup, violatesCharterSlotRule]
+    [executeOperation, rowLookup, runLookup, slotGuestCount, violatesCharterSlotRule]
   );
 
   const handleRescheduleRun = useCallback(
@@ -1012,7 +1069,8 @@ export function DispatchShell({
               setSelection({ type: "guide", guideId });
             }}
             onLaneDragOver={(guideId, event) => {
-              if (!isEditing || isReadOnly || !dragPayload) return;
+              const targetRow = rowLookup.get(guideId);
+              if (!isEditing || isReadOnly || !dragPayload || !targetRow || targetRow.isOutsourced) return;
               event.preventDefault();
               event.dataTransfer.dropEffect = "move";
               autoScrollTimeline(event);
@@ -1056,7 +1114,8 @@ export function DispatchShell({
             onLaneDrop={(guideId, event) => {
               event.preventDefault();
               setDragPreview(null);
-              if (!isEditing || isReadOnly) return;
+              const targetRow = rowLookup.get(guideId);
+              if (!isEditing || isReadOnly || !targetRow || targetRow.isOutsourced) return;
               void executeDropToGuide(guideId, event);
             }}
             onRunClick={(guideId, run) => {
@@ -1081,6 +1140,7 @@ export function DispatchShell({
             onRunNudge={(guideId, run, deltaMinutes) => {
               void handleRunNudge(guideId, run, deltaMinutes);
             }}
+            onBackgroundClick={() => setSelection({ type: "none" })}
           />
 
           {isContextOpen && (
@@ -1099,6 +1159,11 @@ export function DispatchShell({
                   onMoveRun={handleMoveRun}
                   onRescheduleRun={handleRescheduleRun}
                   onReturnRunToQueue={handleReturnRunToQueue}
+                  onAddOutsourcedGuideToRun={async (runId, draft) => {
+                    const selectedRun = runLookup.get(runId);
+                    if (!selectedRun) return;
+                    await onAddOutsourcedGuideToRun(selectedRun.run.tourRunKey, draft);
+                  }}
                   onResolveWarning={onResolveWarning}
                   onClearSelection={() => setSelection({ type: "none" })}
                   onClose={() => setIsContextOpen(false)}

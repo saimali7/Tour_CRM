@@ -31,6 +31,7 @@ export interface CanvasRow {
   vehicleCapacity: number;
   totalGuests: number;
   utilization: number;
+  isOutsourced: boolean;
   runs: CanvasRun[];
   rawSegments: ServiceSegment[];
 }
@@ -283,6 +284,7 @@ export function buildCommandCenterViewModel(response: DispatchResponse): Command
       vehicleCapacity: timeline.vehicleCapacity,
       totalGuests: timeline.totalGuests,
       utilization: timeline.utilization,
+      isOutsourced: timeline.guide.id.startsWith("outsourced:"),
       rawSegments: timeline.segments,
       runs: buildRuns(timeline, bookingLookup),
     }))

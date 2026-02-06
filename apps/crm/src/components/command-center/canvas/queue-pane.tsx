@@ -68,6 +68,10 @@ export function QueuePane({
   onAssignToGuide,
 }: QueuePaneProps) {
   const canEdit = isEditing && !isReadOnly && !isMutating;
+  const assignableRows = useMemo(
+    () => rows.filter((row) => !row.isOutsourced),
+    [rows]
+  );
 
   return (
     <div
@@ -312,7 +316,7 @@ export function QueuePane({
                             }}
                           >
                             <option value="">Assign</option>
-                            {rows.map((row) => (
+                            {assignableRows.map((row) => (
                               <option key={`${booking.id}_${row.guide.id}`} value={row.guide.id}>
                                 {row.guide.firstName}
                               </option>

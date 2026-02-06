@@ -87,7 +87,7 @@ export function LaneRow({
         type="button"
         className="sticky left-0 z-10 flex w-[180px] shrink-0 items-center gap-2 border-r bg-card/90 px-2 py-2 text-left shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] transition-colors hover:bg-muted/30 min-[1400px]:w-[188px] 2xl:w-[196px]"
         onClick={() => onGuideClick(row.guide.id)}
-        title={`${guideFullName}\n${row.utilization}% utilization \u00B7 ${row.runs.length} runs`}
+        title={`${guideFullName}${row.isOutsourced ? " (Outsourced)" : ""}\n${row.utilization}% utilization \u00B7 ${row.runs.length} runs`}
       >
         <UserAvatar
           name={guideFullName}
@@ -99,6 +99,11 @@ export function LaneRow({
             {guideFirstName}
           </p>
           <div className="mt-0.5 flex items-center gap-1.5">
+            {row.isOutsourced && (
+              <span className="inline-flex items-center rounded-full bg-warning/15 px-1.5 py-0.5 text-[9px] font-semibold text-warning">
+                OUT
+              </span>
+            )}
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums",
@@ -146,7 +151,7 @@ export function LaneRow({
             key={run.id}
             run={run}
             isEditing={isEditing}
-            isReadOnly={isReadOnly}
+            isReadOnly={isReadOnly || row.isOutsourced}
             isMutating={isMutating}
             isSelected={selectedRunId === run.id}
             isDragging={dragPayload?.source === "guide" && dragPayload.runId === run.id}

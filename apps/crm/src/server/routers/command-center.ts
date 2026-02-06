@@ -88,6 +88,22 @@ const guestDetailsInputSchema = z.object({
   bookingId: z.string(),
 });
 
+const addOutsourcedGuideToRunInputSchema = z.object({
+  date: z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+    z.string().datetime().transform((val) => val.split("T")[0]!),
+    z.date().transform((val) => {
+      const year = val.getFullYear();
+      const month = String(val.getMonth() + 1).padStart(2, "0");
+      const day = String(val.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }),
+  ]),
+  tourRunKey: z.string().min(1),
+  externalGuideName: z.string().min(1),
+  externalGuideContact: z.string().optional(),
+});
+
 // =============================================================================
 // ROUTER
 // =============================================================================
@@ -643,121 +659,38 @@ export const commandCenterRouter = createRouter({
     .mutation(async ({ ctx, input }) => {
       const services = getServices(ctx);
 
-      const results: Array<{
-        type: string;
-        bookingIds: string[];
-        success: boolean;
-        error?: string;
-      }> = [];
-
-      // Track applied changes for rollback
-      const rollbackActions: Array<() => Promise<void>> = [];
-
       try {
-        for (const change of input.changes) {
-          switch (change.type) {
-            case "assign": {
-              await services.commandCenter.manualAssign(change.bookingId, change.toGuideId);
-
-              // Rollback: unassign
-              const bookingId = change.bookingId;
-              rollbackActions.push(async () => {
-                await services.commandCenter.unassign(bookingId);
-              });
-
-              results.push({
-                type: "assign",
-                bookingIds: [change.bookingId],
-                success: true,
-              });
-              break;
-            }
-
-            case "unassign": {
-              for (const bookingId of change.bookingIds) {
-                await services.commandCenter.unassign(bookingId);
-
-                // Rollback: re-assign to original guide
-                const guideId = change.fromGuideId;
-                rollbackActions.push(async () => {
-                  await services.commandCenter.manualAssign(bookingId, guideId);
-                });
-              }
-
-              results.push({
-                type: "unassign",
-                bookingIds: change.bookingIds,
-                success: true,
-              });
-              break;
-            }
-
-            case "reassign": {
-              for (const bookingId of change.bookingIds) {
-                // Unassign from old guide
-                await services.commandCenter.unassign(bookingId);
-                // Assign to new guide
-                await services.commandCenter.manualAssign(bookingId, change.toGuideId);
-
-                // Rollback: move back to original guide
-                const fromGuideId = change.fromGuideId;
-                rollbackActions.push(async () => {
-                  await services.commandCenter.unassign(bookingId);
-                  await services.commandCenter.manualAssign(bookingId, fromGuideId);
-                });
-              }
-
-              results.push({
-                type: "reassign",
-                bookingIds: change.bookingIds,
-                success: true,
-              });
-              break;
-            }
-
-            case "time-shift": {
-              // Update pickup time for all bookings in this segment
-              for (const bookingId of change.bookingIds) {
-                await services.commandCenter.updatePickupTime(
-                  bookingId,
-                  change.guideId,
-                  change.newStartTime
-                );
-              }
-
-              // Note: Time shift rollback would need original times, which we don't track
-              // For now, time shifts are not rolled back on error
-
-              results.push({
-                type: "time-shift",
-                bookingIds: change.bookingIds,
-                success: true,
-              });
-              break;
-            }
-          }
-        }
-
-        return {
-          success: true,
-          applied: results.length,
-          results,
-        };
+        return await services.commandCenter.batchApplyChanges(input.date, input.changes);
       } catch (error) {
-        // Rollback all applied changes in reverse order
-        for (const rollback of rollbackActions.reverse()) {
-          try {
-            await rollback();
-          } catch (rollbackError) {
-            console.error("Rollback failed:", rollbackError);
-          }
-        }
-
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error
-            ? `Batch apply failed: ${error.message}. Changes have been rolled back.`
-            : "Batch apply failed. Changes have been rolled back.",
+            ? `Batch apply failed: ${error.message}`
+            : "Batch apply failed.",
+          cause: error,
+        });
+      }
+    }),
+
+  addOutsourcedGuideToRun: adminProcedure
+    .input(addOutsourcedGuideToRunInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const services = getServices(ctx);
+
+      try {
+        return await services.commandCenter.addOutsourcedGuideToRun({
+          date: input.date,
+          tourRunKey: input.tourRunKey,
+          externalGuideName: input.externalGuideName,
+          externalGuideContact: input.externalGuideContact,
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to add outsourced guide to run",
           cause: error,
         });
       }

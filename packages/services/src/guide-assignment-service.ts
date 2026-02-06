@@ -308,6 +308,22 @@ export class GuideAssignmentService extends BaseService {
       throw new NotFoundError("Guide", input.guideId);
     }
 
+    const exceedsRunCapacity = await this.wouldExceedRunCapacity({
+      guideId: guide.id,
+      vehicleCapacity: guide.vehicleCapacity ?? 0,
+      tourId: booking.tourId,
+      bookingDate: booking.bookingDate,
+      bookingTime: booking.bookingTime,
+      incomingGuestCount: booking.totalParticipants ?? 0,
+      excludeBookingId: booking.id,
+    });
+
+    if (exceedsRunCapacity) {
+      throw new ConflictError(
+        `Guide capacity exceeded for this run (${booking.bookingTime}).`
+      );
+    }
+
     // Check if assignment already exists for this booking-guide pair
     const existing = await this.db.query.guideAssignments.findFirst({
       where: and(
@@ -400,6 +416,33 @@ export class GuideAssignmentService extends BaseService {
 
     // Check for conflicts only for insourced guides (outsourced guides don't have guideId)
     if (assignment.guideId) {
+      const guide = await this.db.query.guides.findFirst({
+        where: and(
+          eq(guides.id, assignment.guideId),
+          eq(guides.organizationId, this.organizationId)
+        ),
+      });
+
+      if (!guide) {
+        throw new ValidationError("Guide not found");
+      }
+
+      const exceedsRunCapacity = await this.wouldExceedRunCapacity({
+        guideId: assignment.guideId,
+        vehicleCapacity: guide.vehicleCapacity ?? 0,
+        tourId: booking.tourId,
+        bookingDate: booking.bookingDate,
+        bookingTime: booking.bookingTime,
+        incomingGuestCount: booking.totalParticipants ?? 0,
+        excludeBookingId: booking.id,
+      });
+
+      if (exceedsRunCapacity) {
+        throw new ConflictError(
+          `Guide capacity exceeded for this run (${booking.bookingTime}).`
+        );
+      }
+
       // Get tour for duration
       const tour = await this.db.query.tours.findFirst({
         where: and(
@@ -846,5 +889,61 @@ export class GuideAssignmentService extends BaseService {
     }
 
     return Array.from(confirmedGuides.values());
+  }
+
+  private async wouldExceedRunCapacity(input: {
+    guideId: string;
+    vehicleCapacity: number;
+    tourId: string;
+    bookingDate: Date;
+    bookingTime: string;
+    incomingGuestCount: number;
+    excludeBookingId?: string;
+  }): Promise<boolean> {
+    const runBookings = await this.db.query.bookings.findMany({
+      where: and(
+        eq(bookings.organizationId, this.organizationId),
+        eq(bookings.tourId, input.tourId),
+        eq(bookings.bookingDate, input.bookingDate),
+        eq(bookings.bookingTime, input.bookingTime),
+        inArray(bookings.status, ["pending", "confirmed"])
+      ),
+      columns: {
+        id: true,
+        totalParticipants: true,
+      },
+    });
+
+    const runBookingIds = runBookings.map((booking) => booking.id);
+    if (runBookingIds.length === 0) {
+      return input.incomingGuestCount > input.vehicleCapacity;
+    }
+
+    const confirmedAssignments = await this.db.query.guideAssignments.findMany({
+      where: and(
+        eq(guideAssignments.organizationId, this.organizationId),
+        eq(guideAssignments.guideId, input.guideId),
+        eq(guideAssignments.status, "confirmed"),
+        inArray(guideAssignments.bookingId, runBookingIds)
+      ),
+      columns: {
+        bookingId: true,
+      },
+    });
+
+    const assignedBookingIds = new Set(
+      confirmedAssignments
+        .map((assignment) => assignment.bookingId)
+        .filter((bookingId) => bookingId !== input.excludeBookingId)
+    );
+
+    let assignedGuests = 0;
+    for (const booking of runBookings) {
+      if (assignedBookingIds.has(booking.id)) {
+        assignedGuests += booking.totalParticipants ?? 0;
+      }
+    }
+
+    return assignedGuests + input.incomingGuestCount > input.vehicleCapacity;
   }
 }
