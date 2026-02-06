@@ -49,6 +49,7 @@ export interface GuestCardBooking {
   paymentStatus: string;
   total?: string | null;
   currency?: string | null;
+  experienceMode?: "join" | "book" | "charter" | null;
 }
 
 export interface GuestCardProps {

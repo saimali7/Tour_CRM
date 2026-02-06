@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import type { DispatchStatus } from "./types";
+import { WarningsPanel } from "./warnings-panel";
+import type { DispatchWarning } from "./types";
 
 // =============================================================================
 // TYPES
@@ -56,6 +58,21 @@ interface CommandStripProps {
   unassignedCount: number;
   /** Number of warnings */
   warningsCount: number;
+  /** Warning rows for quick resolution */
+  warnings: DispatchWarning[];
+  /** Currently selected warning id */
+  selectedWarningId?: string | null;
+  /** Warning selection callback */
+  onSelectWarning?: (warningId: string) => void;
+  /** Resolve a warning suggestion */
+  onResolveWarning?: (warningId: string, suggestionId: string) => void;
+  /** Available guides for quick-assign suggestions */
+  availableGuides?: Array<{
+    id: string;
+    name: string;
+    vehicleCapacity: number;
+    currentGuests: number;
+  }>;
   /** When dispatch was sent */
   dispatchedAt?: Date;
   /** Tour runs for manifest access */
@@ -96,6 +113,11 @@ export function CommandStrip({
   efficiencyScore,
   unassignedCount,
   warningsCount,
+  warnings,
+  selectedWarningId,
+  onSelectWarning,
+  onResolveWarning,
+  availableGuides = [],
   dispatchedAt,
   tourRuns,
   onOptimize,
@@ -111,6 +133,7 @@ export function CommandStrip({
   const isDispatched = status === "dispatched";
   const hasUnassigned = unassignedCount > 0;
   const hasWarnings = warningsCount > 0;
+  const hasBlockingIssues = hasUnassigned || hasWarnings;
   const manifestRuns = (tourRuns ?? []).filter((run) => run.tour?.id && run.time);
 
   // Determine the health state
@@ -168,7 +191,7 @@ export function CommandStrip({
         config.accent
       )} />
 
-      <div className="flex items-center justify-between gap-4 pl-4 pr-3 py-2">
+      <div className="flex items-center justify-between gap-3 pl-3 pr-2 py-2">
         {/* Left: Date Navigation - compact */}
         <div className="flex items-center gap-0.5">
           <Button
@@ -206,7 +229,7 @@ export function CommandStrip({
         </div>
 
         {/* Center: Status + Stats - clean and minimal */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* Status indicator */}
           <div className="flex items-center gap-2">
             <HealthIcon className={cn("h-4 w-4", config.iconColor)} />
@@ -228,9 +251,6 @@ export function CommandStrip({
               )}
             </span>
           </div>
-
-          {/* Separator */}
-          <div className="h-4 w-px bg-border" />
 
           {/* Guest count - expandable */}
           <Popover>
@@ -276,6 +296,34 @@ export function CommandStrip({
               </div>
             </PopoverContent>
           </Popover>
+
+          {hasWarnings && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs transition-colors",
+                    selectedWarningId ? "border-warning/50 bg-warning/10 text-foreground" : "border-border bg-muted/25 text-muted-foreground",
+                    "hover:bg-muted/40"
+                  )}
+                >
+                  <AlertCircle className="h-3.5 w-3.5 text-warning" />
+                  <span className="font-semibold tabular-nums">{warningsCount}</span>
+                  <span className="hidden sm:inline">issues</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="center" className="w-[360px] p-2">
+                <WarningsPanel
+                  inline
+                  warnings={warnings}
+                  onResolve={(warningId, suggestionId) => onResolveWarning?.(warningId, suggestionId)}
+                  selectedWarningId={selectedWarningId}
+                  onSelectWarning={onSelectWarning}
+                  availableGuides={availableGuides}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         {/* Right: Actions */}
@@ -372,6 +420,10 @@ export function CommandStrip({
                   Dispatch
                 </Button>
               )}
+
+              <span className={cn("hidden text-[11px] text-muted-foreground lg:inline", hasBlockingIssues && "text-warning")}>
+                {hasBlockingIssues ? `${unassignedCount + warningsCount} blockers` : "Ready"}
+              </span>
             </div>
           )}
         </div>

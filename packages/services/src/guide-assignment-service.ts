@@ -1,4 +1,4 @@
-import { eq, and, lt, gt, ne, sql, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import {
   guideAssignments,
   bookings,
@@ -43,6 +43,17 @@ export interface CreateOutsourcedGuideAssignmentInput {
   outsourcedGuideName: string;
   outsourcedGuideContact?: string;
   notes?: string;
+}
+
+type ExperienceMode = "join" | "book" | "charter" | null;
+
+function parseExperienceMode(pricingSnapshot: unknown): ExperienceMode {
+  if (!pricingSnapshot || typeof pricingSnapshot !== "object") return null;
+  const mode = (pricingSnapshot as { experienceMode?: unknown }).experienceMode;
+  if (mode === "join" || mode === "book" || mode === "charter") {
+    return mode;
+  }
+  return null;
 }
 
 /**
@@ -318,6 +329,8 @@ export class GuideAssignmentService extends BaseService {
       startsAt,
       endsAt,
       {
+        bookingId: booking.id,
+        experienceMode: parseExperienceMode(booking.pricingSnapshot),
         tourId: booking.tourId,
         bookingDate: booking.bookingDate,
         bookingTime: booking.bookingTime,
@@ -412,6 +425,8 @@ export class GuideAssignmentService extends BaseService {
         startsAt,
         endsAt,
         {
+          bookingId: booking.id,
+          experienceMode: parseExperienceMode(booking.pricingSnapshot),
           tourId: booking.tourId,
           bookingDate: booking.bookingDate,
           bookingTime: booking.bookingTime,
@@ -534,14 +549,21 @@ export class GuideAssignmentService extends BaseService {
 
   /**
    * Check if a guide has a scheduling conflict for a tour run.
-   * A guide can be assigned to multiple bookings on the SAME tour run (no conflict),
-   * but cannot be assigned to overlapping DIFFERENT tour runs.
+   * A guide can be assigned to multiple bookings on the SAME shared tour run,
+   * but charter runs are exclusive and block that timeslot for the guide.
+   * Guides cannot be assigned to overlapping DIFFERENT tour runs.
    */
   async hasConflictForTourRun(
     guideId: string,
     startsAt: Date,
     endsAt: Date,
-    excludeTourRun: { tourId: string; bookingDate: Date; bookingTime: string }
+    excludeTourRun: {
+      bookingId?: string;
+      experienceMode?: ExperienceMode;
+      tourId: string;
+      bookingDate: Date;
+      bookingTime: string;
+    }
   ): Promise<boolean> {
     // Verify guide belongs to this organization
     const guide = await this.db.query.guides.findFirst({
@@ -581,8 +603,19 @@ export class GuideAssignmentService extends BaseService {
       // Build tour run key for comparison
       const tourRunKey = `${booking.tourId}|${booking.bookingDate.toISOString().split("T")[0]}|${booking.bookingTime}`;
 
-      // Skip if same tour run (guide can handle multiple bookings on same tour run)
-      if (tourRunKey === excludeTourRunKey) continue;
+      // Same run is usually allowed (shared tours), but charter blocks the slot.
+      if (tourRunKey === excludeTourRunKey) {
+        if (excludeTourRun.bookingId && booking.id === excludeTourRun.bookingId) {
+          continue;
+        }
+        const existingMode = parseExperienceMode(booking.pricingSnapshot);
+        const incomingIsCharter = excludeTourRun.experienceMode === "charter";
+        const existingIsCharter = existingMode === "charter";
+        if (incomingIsCharter || existingIsCharter) {
+          return true;
+        }
+        continue;
+      }
 
       // Get tour for duration
       const tour = booking.tour;

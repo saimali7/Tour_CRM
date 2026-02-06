@@ -27,6 +27,10 @@ import type { DispatchWarning, DispatchSuggestion } from "./types";
 interface WarningsPanelProps {
   warnings: DispatchWarning[];
   onResolve: (warningId: string, suggestionId: string) => void;
+  /** Externally selected warning id for context-pane linking */
+  selectedWarningId?: string | null;
+  /** Callback when a warning row is selected */
+  onSelectWarning?: (warningId: string) => void;
   /** Available guides for quick-assign suggestions */
   availableGuides?: Array<{
     id: string;
@@ -88,7 +92,9 @@ interface CompactWarningProps {
   onResolve: (suggestionId: string) => void;
   availableGuides?: WarningsPanelProps["availableGuides"];
   isExpanded: boolean;
+  isSelected: boolean;
   onToggle: () => void;
+  onSelect?: () => void;
 }
 
 function CompactWarning({
@@ -96,7 +102,9 @@ function CompactWarning({
   onResolve,
   availableGuides = [],
   isExpanded,
+  isSelected,
   onToggle,
+  onSelect,
 }: CompactWarningProps) {
   const config = warningTypeConfig[warning.type];
 
@@ -134,19 +142,22 @@ function CompactWarning({
     <div
       className={cn(
         "group rounded-md transition-all duration-150",
-        isExpanded ? "bg-muted/50" : "hover:bg-muted/30"
+        isSelected ? "bg-warning/10 ring-1 ring-warning/25" : isExpanded ? "bg-muted/50" : "hover:bg-muted/30"
       )}
     >
       {/* Compact header row */}
       <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-2.5 px-2.5 py-2 text-left"
+        onClick={() => {
+          onToggle();
+          onSelect?.();
+        }}
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
       >
         {/* Warning type indicator - colored dot */}
         <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", config.dotColor)} />
 
         {/* Message - truncated */}
-        <span className="flex-1 text-xs text-foreground truncate">
+        <span className="flex-1 truncate text-sm text-foreground">
           {warning.message}
         </span>
 
@@ -166,10 +177,10 @@ function CompactWarning({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-2.5 pb-2.5 pt-0 ml-4">
+        <div className="ml-5 px-3 pb-3 pt-0">
           {/* Guest info if available */}
           {warning.guestName && (
-            <p className="text-[11px] text-muted-foreground mb-2">
+            <p className="mb-2 text-xs text-muted-foreground">
               {warning.guestName}
             </p>
           )}
@@ -225,12 +236,16 @@ function CompactWarning({
 interface InlineWarningsProps {
   warnings: DispatchWarning[];
   onResolve: (warningId: string, suggestionId: string) => void;
+  selectedWarningId?: string | null;
+  onSelectWarning?: (warningId: string) => void;
   availableGuides?: WarningsPanelProps["availableGuides"];
 }
 
 function InlineWarnings({
   warnings,
   onResolve,
+  selectedWarningId,
+  onSelectWarning,
   availableGuides = [],
 }: InlineWarningsProps) {
   const [expandedWarnings, setExpandedWarnings] = useState<Set<string>>(
@@ -261,7 +276,9 @@ function InlineWarnings({
           onResolve={(suggestionId) => onResolve(warning.id, suggestionId)}
           availableGuides={availableGuides}
           isExpanded={expandedWarnings.has(warning.id)}
+          isSelected={selectedWarningId === warning.id}
           onToggle={() => toggleWarning(warning.id)}
+          onSelect={() => onSelectWarning?.(warning.id)}
         />
       ))}
       {visibleWarnings.length > 3 && (
@@ -281,6 +298,8 @@ function InlineWarnings({
 export function WarningsPanel({
   warnings,
   onResolve,
+  selectedWarningId,
+  onSelectWarning,
   availableGuides = [],
   defaultCollapsed = false,
   inline = false,
@@ -324,6 +343,8 @@ export function WarningsPanel({
       <InlineWarnings
         warnings={warnings}
         onResolve={onResolve}
+        selectedWarningId={selectedWarningId}
+        onSelectWarning={onSelectWarning}
         availableGuides={availableGuides}
       />
     );
@@ -335,7 +356,7 @@ export function WarningsPanel({
       <CollapsibleTrigger asChild>
         <button
           className={cn(
-            "w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-all",
+            "flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 transition-all",
             "bg-card border border-border hover:bg-muted/50",
             isOpen && "rounded-b-none border-b-transparent"
           )}
@@ -348,7 +369,7 @@ export function WarningsPanel({
             </span>
 
             {/* Count and label */}
-            <span className="text-sm">
+            <span className="text-base">
               <span className="font-semibold tabular-nums">{warnings.length}</span>
               <span className="text-muted-foreground ml-1.5">{pluralize(warnings.length, "issue")} to resolve</span>
             </span>
@@ -392,7 +413,7 @@ export function WarningsPanel({
 
       {/* Collapsible Content */}
       <CollapsibleContent>
-        <div className="border border-t-0 border-border rounded-b-lg bg-card px-2 py-2 space-y-1 max-h-[200px] overflow-y-auto">
+        <div className="max-h-[260px] space-y-1.5 overflow-y-auto rounded-b-lg border border-t-0 border-border bg-card px-3 py-3">
           {warnings.map((warning) => (
             <CompactWarning
               key={warning.id}
@@ -400,7 +421,9 @@ export function WarningsPanel({
               onResolve={(suggestionId) => onResolve(warning.id, suggestionId)}
               availableGuides={availableGuides}
               isExpanded={expandedWarnings.has(warning.id)}
+              isSelected={selectedWarningId === warning.id}
               onToggle={() => toggleWarning(warning.id)}
+              onSelect={() => onSelectWarning?.(warning.id)}
             />
           ))}
         </div>

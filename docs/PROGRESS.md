@@ -76,10 +76,14 @@
 - Added operation-based assignment workflow with server-backed undo/redo (`batchApplyChanges`).
 - Added drag and explicit non-drag assignment flows in hopper for accessibility and speed.
 - Added live current-time marker, drop capacity preview, and escape-to-cancel drag behavior.
+- Added same-lane drag-to-reschedule for assigned tour runs (time-shift, 15-minute snap).
+- Added keyboard run time nudging (`Alt + Left/Right`) with undo/redo support.
 - Fixed command-center type issues (`Link` typing, guide capacity access, guest detail `total/currency` mapping).
 - Removed legacy/orphaned command-center modules to reduce dead code and maintenance overhead.
 - Rewrote command center spec as a production-ready interaction and release contract:
   `docs/COMMAND_CENTER_SPEC.md`.
+- Added explicit command center feature backlog and release checklist:
+  `docs/COMMAND_CENTER_FEATURE_LIST.md`.
 
 ---
 

@@ -2,13 +2,12 @@
 
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { format, isToday, isTomorrow, isYesterday, isPast, startOfDay } from "date-fns";
-import { AlertCircle, Calendar, CheckCircle2, Lock } from "lucide-react";
+import { AlertCircle, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type RouterInputs, type RouterOutputs } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { CommandStrip } from "./command-strip";
-import { WarningsPanel } from "./warnings-panel";
 import { DispatchConfirmDialog } from "./dispatch-confirm-dialog";
 import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { GuestCard, type GuestCardBooking } from "./guest-card";
@@ -22,6 +21,9 @@ import type { GuideTimeline } from "./timeline/types";
 
 type BatchChange = RouterInputs["commandCenter"]["batchApplyChanges"]["changes"][number];
 type DispatchResponse = RouterOutputs["commandCenter"]["getDispatch"];
+const MOBILE_TIMELINE_START_MINUTES = 6 * 60;
+const MOBILE_TIMELINE_END_MINUTES = 24 * 60;
+const MOBILE_SNAP_MINUTES = 15;
 
 interface OperationRecord {
   changes: BatchChange[];
@@ -92,6 +94,30 @@ function mapGuideTimelinesForMobile(
   }));
 }
 
+function parseMinutes(time: string): number {
+  const [hourPart, minutePart] = time.split(":");
+  const hour = Number(hourPart);
+  const minute = Number(minutePart);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return MOBILE_TIMELINE_START_MINUTES;
+  return hour * 60 + minute;
+}
+
+function formatMinutes(minutes: number): string {
+  const safe = Math.max(MOBILE_TIMELINE_START_MINUTES, Math.min(MOBILE_TIMELINE_END_MINUTES, minutes));
+  const hour = Math.floor(safe / 60);
+  const minute = safe % 60;
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+}
+
+function shiftStartTime(time: string, deltaMinutes: number, durationMinutes: number): string {
+  const current = parseMinutes(time);
+  const latestStart = MOBILE_TIMELINE_END_MINUTES - durationMinutes;
+  const target = current + deltaMinutes;
+  const snapped = Math.round(target / MOBILE_SNAP_MINUTES) * MOBILE_SNAP_MINUTES;
+  const clamped = Math.max(MOBILE_TIMELINE_START_MINUTES, Math.min(latestStart, snapped));
+  return formatMinutes(clamped);
+}
+
 function CommandCenterContent({
   date,
   onDateChange: _onDateChange,
@@ -106,6 +132,7 @@ function CommandCenterContent({
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<GuestCardBooking | null>(null);
   const [selectedGuide, setSelectedGuide] = useState<GuideCardData | null>(null);
+  const [selectedWarningId, setSelectedWarningId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(true);
   const [undoStack, setUndoStack] = useState<OperationRecord[]>([]);
   const [redoStack, setRedoStack] = useState<OperationRecord[]>([]);
@@ -177,6 +204,26 @@ function CommandCenterContent({
     return buildCommandCenterViewModel(dispatchResponse);
   }, [dispatchResponse]);
 
+  const rowsForCanvas = useMemo(() => {
+    if (!viewModel) return [];
+    const warningRunKeys = new Set(
+      warnings.map((warning) => warning.tourRunKey).filter((value): value is string => Boolean(value))
+    );
+    const warningBookingIds = new Set(
+      warnings.map((warning) => warning.bookingId).filter((value): value is string => Boolean(value))
+    );
+
+    return viewModel.rows.map((row) => ({
+      ...row,
+      runs: row.runs.map((run) => ({
+        ...run,
+        isWarningLinked:
+          warningRunKeys.has(run.tourRunKey) ||
+          run.bookingIds.some((bookingId) => warningBookingIds.has(bookingId)),
+      })),
+    }));
+  }, [viewModel, warnings]);
+
   const dispatchData = useMemo<DispatchData | null>(() => {
     if (!dispatchResponse) return null;
 
@@ -207,6 +254,32 @@ function CommandCenterContent({
     [viewModel]
   );
 
+  const runLookup = useMemo(() => {
+    const map = new Map<string, { guideId: string; run: (typeof rowsForCanvas)[number]["runs"][number] }>();
+    for (const row of rowsForCanvas) {
+      for (const run of row.runs) {
+        map.set(run.id, { guideId: row.guide.id, run });
+      }
+    }
+    return map;
+  }, [rowsForCanvas]);
+
+  const mobileAssignedRuns = useMemo(
+    () =>
+      rowsForCanvas.flatMap((row) =>
+        row.runs.map((run) => ({
+          id: run.id,
+          guideId: row.guide.id,
+          guideName: `${row.guide.firstName} ${row.guide.lastName}`.trim(),
+          tourName: run.tourName,
+          startTime: run.startTime,
+          endTime: run.endTime,
+          guestCount: run.guestCount,
+        }))
+      ),
+    [rowsForCanvas]
+  );
+
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
   const isMutating = batchMutation.isPending;
@@ -217,6 +290,12 @@ function CommandCenterContent({
       setIsEditing(false);
     }
   }, [isReadOnly]);
+
+  useEffect(() => {
+    if (!selectedWarningId) return;
+    if (warnings.some((warning) => warning.id === selectedWarningId)) return;
+    setSelectedWarningId(null);
+  }, [selectedWarningId, warnings]);
 
   const executeOperation = useCallback(
     async (operation: OperationRecord, options?: { record?: boolean; toastPrefix?: string }) => {
@@ -289,6 +368,7 @@ function CommandCenterContent({
 
   const handleResolveWarning = useCallback(
     (warningId: string, suggestionId: string) => {
+      setSelectedWarningId(warningId);
       const warning = warnings.find((item) => item.id === warningId);
       const suggestion = warning?.suggestions.find((item) => item.id === suggestionId);
 
@@ -350,6 +430,78 @@ function CommandCenterContent({
       await executeOperation(operation);
     },
     [executeOperation]
+  );
+
+  const handleMobileReassignRun = useCallback(
+    async (runId: string, fromGuideId: string, toGuideId: string) => {
+      const source = runLookup.get(runId);
+      if (!source) return;
+
+      const targetRow = rowsForCanvas.find((row) => row.guide.id === toGuideId);
+      if (!targetRow) return;
+
+      const projectedGuests = targetRow.totalGuests + source.run.guestCount;
+      if (projectedGuests > targetRow.vehicleCapacity) {
+        toast.error(
+          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
+        );
+        return;
+      }
+
+      const operation: OperationRecord = {
+        changes: [
+          {
+            type: "reassign",
+            bookingIds: [...source.run.bookingIds],
+            fromGuideId,
+            toGuideId,
+          },
+        ],
+        undoChanges: [
+          {
+            type: "reassign",
+            bookingIds: [...source.run.bookingIds],
+            fromGuideId: toGuideId,
+            toGuideId: fromGuideId,
+          },
+        ],
+        description: `Moved ${source.run.tourName} to ${targetRow.guide.firstName} ${targetRow.guide.lastName}`,
+      };
+      await executeOperation(operation);
+    },
+    [executeOperation, rowsForCanvas, runLookup]
+  );
+
+  const handleMobileNudgeRun = useCallback(
+    async (runId: string, guideId: string, deltaMinutes: number) => {
+      const source = runLookup.get(runId);
+      if (!source) return;
+
+      const newStartTime = shiftStartTime(source.run.startTime, deltaMinutes, source.run.durationMinutes);
+      if (newStartTime === source.run.startTime) return;
+
+      const operation: OperationRecord = {
+        changes: [
+          {
+            type: "time-shift",
+            bookingIds: [...source.run.bookingIds],
+            guideId,
+            newStartTime,
+          },
+        ],
+        undoChanges: [
+          {
+            type: "time-shift",
+            bookingIds: [...source.run.bookingIds],
+            guideId,
+            newStartTime: source.run.startTime,
+          },
+        ],
+        description: `Rescheduled ${source.run.tourName} to ${newStartTime}`,
+      };
+      await executeOperation(operation);
+    },
+    [executeOperation, runLookup]
   );
 
   useEffect(() => {
@@ -416,8 +568,6 @@ function CommandCenterContent({
     );
   }
 
-  const hasWarnings = warnings.length > 0;
-
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <CommandStrip
@@ -434,42 +584,22 @@ function CommandCenterContent({
         warningsCount={warnings.length}
         dispatchedAt={dispatchData.dispatchedAt}
         tourRuns={dispatchResponse.tourRuns}
+        warnings={warnings}
+        selectedWarningId={selectedWarningId}
+        onSelectWarning={(warningId) => setSelectedWarningId(warningId)}
+        availableGuides={availableGuides}
         onOptimize={handleOptimize}
         onDispatch={handleDispatch}
+        onResolveWarning={handleResolveWarning}
       />
-
-      {dispatchData.status === "ready" && (
-        <div className="flex items-center gap-2 rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-sm text-success">
-          <CheckCircle2 className="h-4 w-4" />
-          <span className="font-medium">Ready to dispatch.</span>
-          <span className="text-success/80">All warnings are resolved.</span>
-        </div>
-      )}
-
-      {dispatchData.status === "dispatched" && (
-        <div className="flex items-center gap-2 rounded-lg border border-muted-foreground/20 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-          <Lock className="h-4 w-4" />
-          <span>
-            <span className="font-medium text-foreground/90">Dispatched.</span>{" "}
-            {dispatchData.dispatchedAt ? `Sent ${format(dispatchData.dispatchedAt, "MMM d, HH:mm")}.` : "Dispatch sent."} This day is locked.
-          </span>
-        </div>
-      )}
-
-      {hasWarnings && (
-        <WarningsPanel
-          warnings={warnings}
-          onResolve={handleResolveWarning}
-          availableGuides={availableGuides}
-          defaultCollapsed
-        />
-      )}
 
       <div className={cn("min-h-0 flex-1 overflow-hidden rounded-lg border bg-card", isReadOnly && "opacity-90")}>
         <DispatchCanvas
-          rows={viewModel.rows}
+          rows={rowsForCanvas}
           groups={viewModel.groups}
           bookingLookup={viewModel.bookingLookup}
+          warnings={warnings}
+          selectedWarningId={selectedWarningId}
           isReadOnly={isReadOnly}
           isEditing={isEditing}
           onEditingChange={setIsEditing}
@@ -481,6 +611,7 @@ function CommandCenterContent({
           onApplyOperation={handleApplyOperation}
           onGuideClick={handleGuideClick}
           onBookingClick={handleBookingClick}
+          onResolveWarning={handleResolveWarning}
           showCurrentTime={isToday(date)}
         />
       </div>
@@ -488,7 +619,10 @@ function CommandCenterContent({
       <MobileHopperSheet
         bookings={viewModel.groups.flatMap((group) => group.bookings)}
         guideTimelines={mapGuideTimelinesForMobile(dispatchResponse.timelines)}
+        assignedRuns={mobileAssignedRuns}
         onAssign={handleMobileAssign}
+        onReassignRun={handleMobileReassignRun}
+        onNudgeRun={handleMobileNudgeRun}
         isLoading={isMutating}
         isReadOnly={isReadOnly}
       />

@@ -149,7 +149,7 @@ export function HopperCard({
         }
       }}
       className={cn(
-        "group relative flex items-center gap-2 rounded-lg border bg-card p-2.5 transition-all duration-150",
+        "group relative flex items-start gap-2 rounded-lg border bg-card p-2.5 transition-all duration-150",
         isPendingAssignment
           ? "opacity-50 cursor-not-allowed pointer-events-none border-success/30 bg-success/5"
           : isClickMode
@@ -170,51 +170,49 @@ export function HopperCard({
       />
 
       {/* Main content */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1 space-y-1">
         {/* Name row */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 flex-1 line-clamp-2 text-sm font-medium leading-tight" title={booking.customerName}>
             {booking.customerName}
           </span>
-
-          {/* Private indicator */}
           {isPrivate && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-warning dark:text-warning bg-warning/10 px-1.5 py-0.5 rounded shrink-0">
+            <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning dark:text-warning">
               <Lock className="h-2.5 w-2.5" />
               {booking.experienceMode === "charter" ? "Charter" : "Private"}
             </span>
           )}
-
-          {/* Special indicators - inline, compact */}
-          {hasSpecialIndicators && (
-            <div className="flex items-center gap-0.5 shrink-0">
-              {booking.isFirstTimer && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-success dark:text-success bg-success/10 px-1 py-0.5 rounded">
-                  <Sparkles className="h-2.5 w-2.5" />
-                  NEW
-                </span>
-              )}
-              {booking.isVIP && (
-                <Star className="h-3 w-3 text-warning" />
-              )}
-              {booking.specialOccasion && (
-                <Cake className="h-3 w-3 text-primary" />
-              )}
-              {booking.accessibilityNeeds && (
-                <Accessibility className="h-3 w-3 text-info" />
-              )}
-              {(booking.childCount > 0 || booking.infantCount > 0) && (
-                <Baby className="h-3 w-3 text-info" />
-              )}
-            </div>
-          )}
         </div>
 
+        {/* Special indicators - wrapped below name to prevent clipping */}
+        {hasSpecialIndicators && (
+          <div className="flex flex-wrap items-center gap-1">
+            {booking.isFirstTimer && (
+              <span className="inline-flex items-center gap-0.5 rounded bg-success/10 px-1 py-0.5 text-[10px] font-medium text-success dark:text-success">
+                <Sparkles className="h-2.5 w-2.5" />
+                NEW
+              </span>
+            )}
+            {booking.isVIP && (
+              <Star className="h-3 w-3 text-warning" />
+            )}
+            {booking.specialOccasion && (
+              <Cake className="h-3 w-3 text-primary" />
+            )}
+            {booking.accessibilityNeeds && (
+              <Accessibility className="h-3 w-3 text-info" />
+            )}
+            {(booking.childCount > 0 || booking.infantCount > 0) && (
+              <Baby className="h-3 w-3 text-info" />
+            )}
+          </div>
+        )}
+
         {/* Zone row */}
-        <div className="flex items-center gap-1.5 mt-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           {booking.pickupZone ? (
             <span
-              className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
               style={{
                 backgroundColor: `${zoneColor}15`,
                 color: zoneColor,
@@ -228,7 +226,7 @@ export function HopperCard({
           )}
 
           {isPendingAssignment && (
-            <span className="text-[10px] font-medium text-success dark:text-success ml-auto">
+            <span className="ml-auto text-[10px] font-medium text-success dark:text-success">
               Assigned
             </span>
           )}

@@ -3,6 +3,7 @@ import type { DispatchWarning, DispatchData } from "./types";
 import type { GuestCardBooking } from "./guest-card";
 import type { GuideAssignment, GuideCardData, AssignmentBooking } from "./guide-card";
 import type { HopperBooking } from "./hopper/hopper-card";
+import { formatTimeDisplay } from "./timeline/timeline-utils";
 
 type DispatchResponse = RouterOutputs["commandCenter"]["getDispatch"];
 type ServiceTourRun = DispatchResponse["tourRuns"][number];
@@ -16,10 +17,13 @@ export interface CanvasRun {
   tourName: string;
   startTime: string;
   endTime: string;
+  displayStartLabel: string;
+  displayEndLabel: string;
   durationMinutes: number;
   confidence: "optimal" | "good" | "review" | "problem";
   bookingIds: string[];
   guestCount: number;
+  isWarningLinked: boolean;
 }
 
 export interface CanvasRow {
@@ -75,6 +79,7 @@ function toGuestCardBooking(run: ServiceTourRun, booking: ServiceTourRun["bookin
     paymentStatus: booking.paymentStatus ?? "pending",
     total: booking.total ?? null,
     currency: booking.currency ?? null,
+    experienceMode: booking.experienceMode ?? null,
   };
 }
 
@@ -149,10 +154,13 @@ function buildRuns(
       tourName: segment.tour?.name ?? "Tour",
       startTime: segment.startTime,
       endTime: segment.endTime,
+      displayStartLabel: formatTimeDisplay(segment.startTime),
+      displayEndLabel: formatTimeDisplay(segment.endTime),
       durationMinutes: segment.durationMinutes,
       confidence: (segment.confidence ?? "optimal") as CanvasRun["confidence"],
       bookingIds,
       guestCount: segment.guestCount ?? guestCount,
+      isWarningLinked: false,
     });
   }
 
