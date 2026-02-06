@@ -73,3 +73,10 @@ export interface QueueGroupView {
   group: HopperGroup;
   score: number;
 }
+
+export interface RunSignals {
+  hasVIP: boolean;
+  hasFirstTimer: boolean;
+  hasAccessibility: boolean;
+  hasChildren: boolean;
+}

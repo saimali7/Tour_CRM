@@ -27,8 +27,8 @@ interface ContextPaneProps {
   onClose?: () => void;
 }
 
-function panelSectionTitle(title: string) {
-  return <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>;
+function sectionTitle(title: string) {
+  return <h3 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>;
 }
 
 function isValidTimeInput(value: string): boolean {
@@ -38,6 +38,17 @@ function isValidTimeInput(value: string): boolean {
   if (h < 6 || h > 24) return false;
   if (m < 0 || m > 59) return false;
   return true;
+}
+
+/** Dynamic title based on selection type */
+function panelTitle(selection: DispatchContextData["selection"]): string {
+  switch (selection.type) {
+    case "guide": return "Guide";
+    case "run": return "Run";
+    case "booking": return "Booking";
+    case "warning": return "Warning";
+    default: return "Context";
+  }
 }
 
 export function ContextPane({
@@ -74,6 +85,19 @@ export function ContextPane({
     }
   }, [context.selectedBooking]);
 
+  // Escape key closes pane
+  useEffect(() => {
+    if (!onClose) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
   const canMutate = isEditing && !isReadOnly && !isMutating;
 
   const guideOptions = useMemo(
@@ -83,72 +107,33 @@ export function ContextPane({
 
   const selectedWarning = context.selectedWarning;
 
+  // If nothing is selected, don't render the pane body
+  if (context.selection.type === "none") {
+    return null;
+  }
+
   return (
     <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-card/95 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-card/90">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <h2 className="text-base font-semibold text-foreground">Context</h2>
-        <div className="flex items-center gap-1">
-          {context.selection.type !== "none" && (
-            <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={onClearSelection}>
-              Clear
-            </Button>
-          )}
-          {onClose && (
-            <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={onClose}>
-              Hide
-            </Button>
-          )}
-        </div>
+      <div className="flex items-center justify-between border-b px-3 py-1.5">
+        <h2 className="text-sm font-semibold text-foreground">{panelTitle(context.selection)}</h2>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 pb-5">
-        {context.selection.type === "none" && (
-          <>
-            <section className="space-y-2.5 rounded-xl border bg-muted/20 p-3">
-              {panelSectionTitle("Dispatch Snapshot")}
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-lg bg-card px-2.5 py-2">
-                  <p className="text-muted-foreground">Unassigned</p>
-                  <p className="mt-0.5 text-base font-semibold tabular-nums">{unassignedGroupsCount}</p>
-                </div>
-                <div className="rounded-lg bg-card px-2.5 py-2">
-                  <p className="text-muted-foreground">Warnings</p>
-                  <p className="mt-0.5 text-base font-semibold tabular-nums">{warningsCount}</p>
-                </div>
-                <div className="rounded-lg bg-card px-2.5 py-2">
-                  <p className="text-muted-foreground">Guides</p>
-                  <p className="mt-0.5 text-base font-semibold tabular-nums">{rows.length}</p>
-                </div>
-                <div className="rounded-lg bg-card px-2.5 py-2">
-                  <p className="text-muted-foreground">Editing</p>
-                  <p className={cn("mt-0.5 text-base font-semibold", canMutate ? "text-success" : "text-muted-foreground")}>
-                    {canMutate ? "On" : "Off"}
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
-              <p>Select a guide, run, booking, or warning to unlock one-click actions.</p>
-            </section>
-          </>
-        )}
-
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-2.5 pb-4">
         {context.selection.type === "guide" && context.selectedGuide && (
-          <section className="space-y-3 rounded-xl border p-4">
-            {panelSectionTitle("Guide")}
+          <section className="space-y-2.5 rounded-lg border p-3">
+            {sectionTitle("Guide")}
             <div>
-              <p className="text-base font-semibold text-foreground">
+              <p className="text-sm font-semibold text-foreground">
                 {context.selectedGuide.guide.firstName} {context.selectedGuide.guide.lastName}
               </p>
-              <p className="text-sm text-muted-foreground">{context.selectedGuide.totalGuests}/{context.selectedGuide.vehicleCapacity} guests</p>
+              <p className="text-xs text-muted-foreground">{context.selectedGuide.totalGuests}/{context.selectedGuide.vehicleCapacity} guests</p>
             </div>
-            <div className="grid grid-cols-2 gap-2.5 text-sm">
-              <div className="rounded-lg bg-muted/30 px-3 py-2">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-md bg-muted/30 px-2.5 py-1.5">
                 <p className="text-muted-foreground">Runs</p>
                 <p className="font-semibold tabular-nums">{context.selectedGuide.runs.length}</p>
               </div>
-              <div className="rounded-lg bg-muted/30 px-3 py-2">
+              <div className="rounded-md bg-muted/30 px-2.5 py-1.5">
                 <p className="text-muted-foreground">Utilization</p>
                 <p className="font-semibold tabular-nums">{context.selectedGuide.utilization}%</p>
               </div>
@@ -157,21 +142,21 @@ export function ContextPane({
         )}
 
         {context.selection.type === "run" && context.selectedRun && (
-          <section className="space-y-4 rounded-xl border p-4">
-            {panelSectionTitle("Run Actions")}
+          <section className="space-y-3 rounded-lg border p-3">
+            {sectionTitle("Run Actions")}
             <div>
-              <p className="text-base font-semibold text-foreground">{context.selectedRun.run.tourName}</p>
-              <p className="text-sm text-muted-foreground">
-                {context.selectedRun.run.displayStartLabel} - {context.selectedRun.run.displayEndLabel} • {context.selectedRun.run.guestCount} guests
+              <p className="text-sm font-semibold text-foreground">{context.selectedRun.run.tourName}</p>
+              <p className="text-xs text-muted-foreground">
+                {context.selectedRun.run.displayStartLabel} - {context.selectedRun.run.displayEndLabel} &middot; {context.selectedRun.run.guestCount} guests
               </p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="run-move-guide">Move To Guide</label>
-              <div className="flex items-center gap-2">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-medium text-muted-foreground" htmlFor="run-move-guide">Move To Guide</label>
+              <div className="flex items-center gap-1.5">
                 <select
                   id="run-move-guide"
-                  className="h-9 flex-1 rounded-lg border bg-background px-3 text-sm"
+                  className="h-8 flex-1 rounded-md border bg-background px-2 text-xs"
                   value={moveGuideId}
                   onChange={(event) => setMoveGuideId(event.target.value)}
                   disabled={!canMutate}
@@ -188,7 +173,7 @@ export function ContextPane({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 gap-1.5 rounded-lg px-3 text-xs"
+                  className="h-8 gap-1 rounded-md px-2.5 text-[11px]"
                   disabled={!canMutate || !moveGuideId}
                   onClick={() =>
                     void onMoveRun(context.selectedRun!.row.guide.id, context.selectedRun!.run.id, moveGuideId)
@@ -200,27 +185,27 @@ export function ContextPane({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="run-jump-time">Start Time (HH:MM)</label>
-              <div className="flex items-center gap-2">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-medium text-muted-foreground" htmlFor="run-jump-time">Start Time (HH:MM)</label>
+              <div className="flex items-center gap-1.5">
                 <Input
                   id="run-jump-time"
                   value={jumpTime}
                   onChange={(event) => setJumpTime(event.target.value)}
-                  className="h-9 text-sm"
+                  className="h-8 text-xs"
                   placeholder="09:30"
                   disabled={!canMutate}
                 />
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 rounded-lg px-3 text-xs"
+                  className="h-8 rounded-md px-2.5 text-[11px]"
                   disabled={!canMutate || !isValidTimeInput(jumpTime)}
                   onClick={() =>
                     void onRescheduleRun(context.selectedRun!.row.guide.id, context.selectedRun!.run.id, jumpTime)
                   }
                 >
-                  <CalendarClock className="mr-1 h-3 w-3" />
+                  <CalendarClock className="mr-0.5 h-3 w-3" />
                   Set
                 </Button>
               </div>
@@ -229,7 +214,7 @@ export function ContextPane({
             <Button
               variant="outline"
               size="sm"
-              className="h-9 w-full justify-center gap-1.5 rounded-lg text-xs"
+              className="h-8 w-full justify-center gap-1.5 rounded-md text-[11px]"
               disabled={!canMutate}
               onClick={() =>
                 void onReturnRunToQueue(context.selectedRun!.row.guide.id, context.selectedRun!.run.id)
@@ -242,26 +227,26 @@ export function ContextPane({
         )}
 
         {context.selection.type === "booking" && context.selectedBooking && (
-          <section className="space-y-4 rounded-xl border p-4">
-            {panelSectionTitle("Booking Actions")}
+          <section className="space-y-3 rounded-lg border p-3">
+            {sectionTitle("Booking Actions")}
             <div>
-              <p className="text-base font-semibold text-foreground">{context.selectedBooking.booking.customerName}</p>
-              <p className="text-sm text-muted-foreground">
-                {context.selectedBooking.booking.referenceNumber} • {context.selectedBooking.booking.guestCount} guests
+              <p className="text-sm font-semibold text-foreground">{context.selectedBooking.booking.customerName}</p>
+              <p className="text-xs text-muted-foreground">
+                {context.selectedBooking.booking.referenceNumber} &middot; {context.selectedBooking.booking.guestCount} guests
               </p>
               <div className="mt-1">
-                <Badge variant="outline" className="h-6 rounded-full px-2 text-xs">
+                <Badge variant="outline" className="h-5 rounded-full px-1.5 text-[10px]">
                   {context.selectedBooking.assignedGuideId ? "Assigned" : "Unassigned"}
                 </Badge>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="booking-guide-select">Assign Guide</label>
-              <div className="flex items-center gap-2">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-medium text-muted-foreground" htmlFor="booking-guide-select">Assign Guide</label>
+              <div className="flex items-center gap-1.5">
                 <select
                   id="booking-guide-select"
-                  className="h-9 flex-1 rounded-lg border bg-background px-3 text-sm"
+                  className="h-8 flex-1 rounded-md border bg-background px-2 text-xs"
                   value={bookingGuideId}
                   onChange={(event) => setBookingGuideId(event.target.value)}
                   disabled={!canMutate}
@@ -276,13 +261,13 @@ export function ContextPane({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 rounded-lg px-3 text-xs"
+                  className="h-8 rounded-md px-2.5 text-[11px]"
                   disabled={!canMutate || !bookingGuideId}
                   onClick={() =>
                     void onAssignBooking(context.selectedBooking!.booking.id, bookingGuideId)
                   }
                 >
-                  <UserRound className="mr-1 h-3 w-3" />
+                  <UserRound className="mr-0.5 h-3 w-3" />
                   Apply
                 </Button>
               </div>
@@ -291,7 +276,7 @@ export function ContextPane({
             <Button
               variant="outline"
               size="sm"
-              className="h-9 w-full gap-1.5 rounded-lg text-xs"
+              className="h-8 w-full gap-1.5 rounded-md text-[11px]"
               disabled={!canMutate}
               onClick={() => void onAssignBookingBestFit(context.selectedBooking!.booking.id)}
             >
@@ -302,27 +287,27 @@ export function ContextPane({
         )}
 
         {context.selection.type === "warning" && selectedWarning && (
-          <section className="space-y-4 rounded-xl border border-warning/30 bg-warning/5 p-4">
-            {panelSectionTitle("Warning")}
+          <section className="space-y-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
+            {sectionTitle("Warning")}
             <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 text-warning" />
               <div className="min-w-0">
-                <p className="text-base font-medium text-foreground">{selectedWarning.message}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="text-sm font-medium text-foreground">{selectedWarning.message}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {selectedWarning.tourRunKey ? `Run ${selectedWarning.tourRunKey}` : "No run key"}
-                  {selectedWarning.bookingId ? ` • Booking ${selectedWarning.bookingId}` : ""}
+                  {selectedWarning.bookingId ? ` \u00B7 Booking ${selectedWarning.bookingId}` : ""}
                 </p>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Suggested Actions</p>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-medium text-muted-foreground">Suggested Actions</p>
               {selectedWarning.suggestions.length > 0 ? (
                 selectedWarning.suggestions.map((suggestion) => (
                   <button
                     key={suggestion.id}
                     type="button"
-                    className="flex w-full items-center justify-between rounded-lg border bg-card px-3 py-2 text-left text-sm hover:border-primary/40"
+                    className="flex w-full items-center justify-between rounded-md border bg-card px-2.5 py-1.5 text-left text-xs hover:border-primary/40"
                     onClick={() => onResolveWarning(selectedWarning.id, suggestion.id)}
                     disabled={isMutating}
                   >
@@ -334,7 +319,7 @@ export function ContextPane({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 w-full justify-center rounded-lg text-xs"
+                  className="h-8 w-full justify-center rounded-md text-[11px]"
                   onClick={() => onResolveWarning(selectedWarning.id, "res_acknowledge")}
                   disabled={isMutating}
                 >
@@ -345,32 +330,24 @@ export function ContextPane({
           </section>
         )}
 
-        {context.selection.type !== "none" && (
-          <section className="rounded-xl border bg-muted/20 p-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Signals</p>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Linked guides</span>
-              <span className="font-medium tabular-nums">{context.warningLinkedGuides.size}</span>
-            </div>
-            <div className="mt-1.5 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Linked runs</span>
-              <span className="font-medium tabular-nums">{context.warningLinkedRunIds.size}</span>
-            </div>
-            <div className="mt-1.5 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Linked bookings</span>
-              <span className="font-medium tabular-nums">{context.warningLinkedBookingIds.size}</span>
-            </div>
-          </section>
-        )}
-
-        {!isEditing && !isReadOnly && (
-          <div className="rounded-xl border border-info/30 bg-info/5 p-4 text-sm text-info">
-            Enable editing to apply assignment and reschedule actions.
+        <section className="rounded-lg border bg-muted/20 p-3">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Signals</p>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Linked guides</span>
+            <span className="font-medium tabular-nums">{context.warningLinkedGuides.size}</span>
           </div>
-        )}
+          <div className="mt-1 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Linked runs</span>
+            <span className="font-medium tabular-nums">{context.warningLinkedRunIds.size}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Linked bookings</span>
+            <span className="font-medium tabular-nums">{context.warningLinkedBookingIds.size}</span>
+          </div>
+        </section>
 
         {isReadOnly && (
-          <div className="rounded-xl border border-muted-foreground/25 bg-muted/30 p-4 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-muted-foreground/25 bg-muted/30 p-3 text-xs text-muted-foreground">
             This date is read-only. Dispatch changes are disabled.
           </div>
         )}

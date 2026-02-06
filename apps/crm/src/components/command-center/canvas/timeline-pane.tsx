@@ -1,9 +1,10 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatTimeDisplay } from "../timeline/timeline-utils";
 import type { CanvasRow, CanvasRun } from "../dispatch-model";
-import type { DragPayload, DragPreview, LanePressureLevel } from "./canvas-types";
+import type { DragPayload, DragPreview, LanePressureLevel, RunSignals } from "./canvas-types";
 import { LaneRow } from "./lane-row";
 
 interface Marker {
@@ -12,10 +13,17 @@ interface Marker {
   left: number;
 }
 
+interface ZoomOption {
+  label: string;
+  value: number;
+}
+
 interface TimelinePaneProps {
   rows: CanvasRow[];
   markers: Marker[];
   timelineZoom: number;
+  zoomOptions: readonly ZoomOption[];
+  onZoomChange: (value: number) => void;
   showCurrentTime: boolean;
   currentTimeLabel: string;
   currentTimePercent: number;
@@ -29,6 +37,7 @@ interface TimelinePaneProps {
   isMutating: boolean;
   selectedRunId: string | null;
   warningLinkedRunIds: Set<string>;
+  runSignalsMap: Map<string, RunSignals>;
   onGuideClick: (guideId: string) => void;
   onLaneDragOver: (guideId: string, event: React.DragEvent<HTMLDivElement>) => void;
   onLaneDragLeave: (guideId: string, event: React.DragEvent<HTMLDivElement>) => void;
@@ -61,6 +70,8 @@ export function TimelinePane({
   rows,
   markers,
   timelineZoom,
+  zoomOptions,
+  onZoomChange,
   showCurrentTime,
   currentTimeLabel,
   currentTimePercent,
@@ -74,6 +85,7 @@ export function TimelinePane({
   isMutating,
   selectedRunId,
   warningLinkedRunIds,
+  runSignalsMap,
   onGuideClick,
   onLaneDragOver,
   onLaneDragLeave,
@@ -89,11 +101,11 @@ export function TimelinePane({
       : undefined;
 
   return (
-    <div data-timeline-scroll="true" className="min-h-0 min-w-0 flex-1 overflow-auto bg-background/20">
+    <div data-timeline-scroll="true" className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-background/20">
       <div className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="flex h-11">
-          <div className="sticky left-0 z-20 w-[228px] shrink-0 border-r bg-card/95 px-3 py-2.5 shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] supports-[backdrop-filter]:bg-card/90 min-[1400px]:w-[240px] 2xl:w-[252px]">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guide Lanes</span>
+        <div className="flex h-9">
+          <div className="sticky left-0 z-20 w-[180px] shrink-0 border-r bg-card/95 px-2.5 py-2 shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] supports-[backdrop-filter]:bg-card/90 min-[1400px]:w-[188px] 2xl:w-[196px]">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Guides</span>
           </div>
           <div className={cn("relative px-1.5", timelineZoom > 1 ? "shrink-0" : "flex-1")} style={timelineTrackStyle}>
             {markers.map((marker) => (
@@ -107,7 +119,7 @@ export function TimelinePane({
               >
                 {shouldShowMarkerLabel(marker.time) &&
                   !shouldHideMarkerForCurrentTime(marker.left, currentTimePercent, showCurrentTime) && (
-                  <span className="pointer-events-none relative z-10 ml-1.5 mt-1 inline-flex whitespace-nowrap rounded-sm bg-card/95 px-1 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
+                  <span className="pointer-events-none relative z-10 ml-1.5 mt-0.5 inline-flex whitespace-nowrap rounded-sm bg-card/95 px-1 py-0.5 text-[9px] font-medium text-muted-foreground shadow-sm">
                     {marker.label}
                   </span>
                 )}
@@ -162,6 +174,7 @@ export function TimelinePane({
             isMutating={isMutating}
             selectedRunId={selectedRunId}
             warningLinkedRunIds={warningLinkedRunIds}
+            runSignalsMap={runSignalsMap}
             onGuideClick={onGuideClick}
             onLaneDragOver={(event) => onLaneDragOver(row.guide.id, event)}
             onLaneDragLeave={(event) => onLaneDragLeave(row.guide.id, event)}
@@ -173,6 +186,25 @@ export function TimelinePane({
           />
         );
       })}
+
+      {/* Floating zoom pill */}
+      <div className="sticky bottom-3 z-20 flex justify-end pr-3 pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border bg-card/90 p-0.5 shadow-lg opacity-40 hover:opacity-100 transition-opacity backdrop-blur">
+          {zoomOptions.map((option) => (
+            <Button
+              key={option.label}
+              type="button"
+              variant={timelineZoom === option.value ? "secondary" : "ghost"}
+              size="sm"
+              className="h-6 rounded-full px-2 text-[10px]"
+              onClick={() => onZoomChange(option.value)}
+              disabled={isMutating}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -133,7 +133,6 @@ function CommandCenterContent({
   const [selectedGuest, setSelectedGuest] = useState<GuestCardBooking | null>(null);
   const [selectedGuide, setSelectedGuide] = useState<GuideCardData | null>(null);
   const [selectedWarningId, setSelectedWarningId] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(true);
   const [undoStack, setUndoStack] = useState<OperationRecord[]>([]);
   const [redoStack, setRedoStack] = useState<OperationRecord[]>([]);
 
@@ -284,12 +283,7 @@ function CommandCenterContent({
   const canRedo = redoStack.length > 0;
   const isMutating = batchMutation.isPending;
   const isReadOnly = dispatchData?.status === "dispatched" || isPastDate;
-
-  useEffect(() => {
-    if (isReadOnly) {
-      setIsEditing(false);
-    }
-  }, [isReadOnly]);
+  const isEditing = !isReadOnly;
 
   useEffect(() => {
     if (!selectedWarningId) return;
@@ -591,6 +585,11 @@ function CommandCenterContent({
         onOptimize={handleOptimize}
         onDispatch={handleDispatch}
         onResolveWarning={handleResolveWarning}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        isMutating={isMutating}
       />
 
       <div className={cn("min-h-0 flex-1 overflow-hidden rounded-lg border bg-card", isReadOnly && "opacity-90")}>
@@ -601,8 +600,6 @@ function CommandCenterContent({
           warnings={warnings}
           selectedWarningId={selectedWarningId}
           isReadOnly={isReadOnly}
-          isEditing={isEditing}
-          onEditingChange={setIsEditing}
           isMutating={isMutating}
           canUndo={canUndo}
           canRedo={canRedo}

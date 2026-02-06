@@ -13,8 +13,6 @@ interface DispatchCanvasProps {
   warnings: DispatchWarning[];
   selectedWarningId?: string | null;
   isReadOnly: boolean;
-  isEditing: boolean;
-  onEditingChange: (value: boolean) => void;
   isMutating: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -30,5 +28,6 @@ interface DispatchCanvasProps {
 export type { DispatchOperation };
 
 export function DispatchCanvas(props: DispatchCanvasProps) {
-  return <DispatchShell {...props} />;
+  const isEditing = !props.isReadOnly;
+  return <DispatchShell {...props} isEditing={isEditing} />;
 }

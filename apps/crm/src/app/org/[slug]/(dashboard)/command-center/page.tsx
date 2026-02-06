@@ -69,23 +69,10 @@ export default function CommandCenterPage() {
   );
 
   // Height calculation accounts for:
-  // - Mobile: header (4rem) + padding (2rem) + mobile nav (4rem) = 10rem offset
-  // - Desktop: padding only (3rem) = 3rem offset
+  // - Mobile: header (4rem) + mobile nav (4rem) = 8rem offset
+  // - Desktop: minimal padding (1.5rem) = 1.5rem offset
   return (
-    <div className="flex flex-col h-[calc(100vh-10rem)] md:h-[calc(100vh-3rem)]">
-      {/* Page Header - fixed height, doesn't scroll */}
-      <header className="flex-none flex items-center justify-between gap-4 pb-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            Tour Command Center
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Manage guide assignments and dispatch for the day
-          </p>
-        </div>
-      </header>
-
-      {/* Main Command Center Component - fills remaining space */}
+    <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-1.5rem)]">
       <div className="flex-1 min-h-0 overflow-hidden">
         <CommandCenter
           date={selectedDate}

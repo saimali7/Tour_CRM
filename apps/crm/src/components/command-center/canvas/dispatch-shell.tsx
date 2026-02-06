@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Lock, Redo2, Undo2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { CanvasRow, CanvasRun, HopperGroup } from "../dispatch-model";
 import type { GuestCardBooking } from "../guest-card";
@@ -17,6 +15,7 @@ import type {
   LanePressureLevel,
   QueueFilterState,
   QueueSortMode,
+  RunSignals,
 } from "./canvas-types";
 import { QueuePane } from "./queue-pane";
 import { TimelinePane } from "./timeline-pane";
@@ -44,7 +43,6 @@ interface DispatchShellProps {
   selectedWarningId?: string | null;
   isReadOnly: boolean;
   isEditing: boolean;
-  onEditingChange: (value: boolean) => void;
   isMutating: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -156,7 +154,6 @@ export function DispatchShell({
   selectedWarningId,
   isReadOnly,
   isEditing,
-  onEditingChange,
   isMutating,
   canUndo,
   canRedo,
@@ -183,8 +180,6 @@ export function DispatchShell({
   const [selection, setSelection] = useState<ContextSelection>({ type: "none" });
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [isQueueCollapsed, setIsQueueCollapsed] = useState(false);
-  const [queueCollapsedByContext, setQueueCollapsedByContext] = useState(false);
-  const [viewportWidth, setViewportWidth] = useState(1600);
   const [timelineZoom, setTimelineZoom] = useState<number>(1);
 
   const markers = useMemo(() => hourMarkers(), []);
@@ -222,6 +217,28 @@ export function DispatchShell({
     }
     return map;
   }, [rows]);
+
+  // Compute signals per run from booking data
+  const runSignalsMap = useMemo(() => {
+    const map = new Map<string, RunSignals>();
+    for (const row of rows) {
+      for (const run of row.runs) {
+        let hasVIP = false;
+        let hasFirstTimer = false;
+        let hasAccessibility = false;
+        let hasChildren = false;
+        for (const bookingId of run.bookingIds) {
+          const booking = bookingLookup.get(bookingId);
+          if (!booking) continue;
+          if (booking.specialOccasion) hasVIP = true;
+          if (booking.accessibilityNeeds) hasAccessibility = true;
+          if (booking.childCount && booking.childCount > 0) hasChildren = true;
+        }
+        map.set(run.id, { hasVIP, hasFirstTimer, hasAccessibility, hasChildren });
+      }
+    }
+    return map;
+  }, [rows, bookingLookup]);
 
   const warningRunKeys = useMemo(
     () => new Set(warnings.map((warning) => warning.tourRunKey).filter((value): value is string => Boolean(value))),
@@ -392,29 +409,6 @@ export function DispatchShell({
     return () => window.clearInterval(intervalId);
   }, [showCurrentTime]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const syncViewport = () => setViewportWidth(window.innerWidth);
-    syncViewport();
-    window.addEventListener("resize", syncViewport);
-    return () => window.removeEventListener("resize", syncViewport);
-  }, []);
-
-  const isNarrowLayout = viewportWidth < 1360;
-
-  useEffect(() => {
-    if (isContextOpen && isNarrowLayout && !isQueueCollapsed) {
-      setIsQueueCollapsed(true);
-      setQueueCollapsedByContext(true);
-    }
-  }, [isContextOpen, isNarrowLayout, isQueueCollapsed]);
-
-  useEffect(() => {
-    if (!isContextOpen && queueCollapsedByContext) {
-      setIsQueueCollapsed(false);
-      setQueueCollapsedByContext(false);
-    }
-  }, [isContextOpen, queueCollapsedByContext]);
 
   useEffect(() => {
     if (!dragPayload) return;
@@ -432,6 +426,18 @@ export function DispatchShell({
     if (!selectedWarningId) return;
     setSelection({ type: "warning", warningId: selectedWarningId });
   }, [selectedWarningId]);
+
+  // Auto-open context on selection, auto-close 3s after deselection
+  useEffect(() => {
+    if (selection.type !== "none") {
+      setIsContextOpen(true);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setIsContextOpen(false);
+    }, 3000);
+    return () => window.clearTimeout(timeout);
+  }, [selection]);
 
   useEffect(() => {
     if (!dragPayload || dragPayload.source !== "guide") {
@@ -906,136 +912,38 @@ export function DispatchShell({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background/20">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-1.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm">
-          <span className="font-medium tabular-nums text-foreground">{rows.length} guides</span>
-          <span className="text-muted-foreground">
-            <span className="font-medium tabular-nums text-foreground">{assignedGuests}</span>/{totalGuests} assigned
-          </span>
+      {/* Compact 28px summary strip */}
+      <div className="flex h-7 items-center justify-between border-b px-3 text-[11px]">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <span className="font-medium tabular-nums text-foreground">{rows.length}</span> guides
+          <span className="text-muted-foreground/40">|</span>
+          <span className="font-medium tabular-nums text-foreground">{assignedGuests}</span>/<span className="tabular-nums">{totalGuests}</span> assigned
           {groups.length > 0 && (
-            <span className="font-medium text-warning">
-              <span className="tabular-nums">{groups.length}</span> queue groups
-            </span>
+            <>
+              <span className="text-muted-foreground/40">|</span>
+              <span className="font-medium tabular-nums text-warning">{groups.length}</span>
+              <span className="text-warning">in queue</span>
+            </>
           )}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <div className="hidden items-center gap-1 rounded-md border bg-card p-1 2xl:flex">
-            {TIMELINE_ZOOM_OPTIONS.map((zoomOption) => (
-              <Button
-                key={zoomOption.label}
-                type="button"
-                variant={timelineZoom === zoomOption.value ? "secondary" : "ghost"}
-                size="sm"
-                className="h-7 rounded px-2 text-[11px]"
-                onClick={() => setTimelineZoom(zoomOption.value)}
-                disabled={isMutating}
-              >
-                {zoomOption.label}
-              </Button>
-            ))}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-md px-2.5"
-            onClick={() => onUndo()}
-            disabled={!canUndo || isMutating || isReadOnly}
-          >
-            <Undo2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-md px-2.5"
-            onClick={() => onRedo()}
-            disabled={!canRedo || isMutating || isReadOnly}
-          >
-            <Redo2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            variant={isEditing ? "default" : "outline"}
-            className="h-8 rounded-md px-2.5"
-            onClick={() => onEditingChange(!isEditing)}
-            disabled={isReadOnly || isMutating}
-          >
-            {isReadOnly ? (
-              <>
-                <Lock className="mr-1.5 h-3.5 w-3.5" />
-                Read Only
-              </>
-            ) : isEditing ? (
-              "Done Editing"
-            ) : (
-              "Edit Assignments"
-            )}
-          </Button>
-          <Button
-            size="sm"
-            variant={queueCollapsed ? "outline" : "secondary"}
-            className="h-8 rounded-md px-2.5"
-            onClick={() => {
-              if (isNarrowLayout && isContextOpen) {
-                setIsContextOpen(false);
-                if (queueCollapsedByContext) {
-                  setIsQueueCollapsed(false);
-                }
-                setQueueCollapsedByContext(false);
-                return;
-              }
-              setQueueCollapsedByContext(false);
-              setIsQueueCollapsed((prev) => !prev);
-            }}
-          >
-            {queueCollapsed ? "Show Queue" : "Hide Queue"}
-          </Button>
-          <Button
-            size="sm"
-            variant={isContextOpen ? "secondary" : "outline"}
-            className="h-8 rounded-md px-2.5"
-            onClick={() => {
-              const nextOpen = !isContextOpen;
-              if (nextOpen && isNarrowLayout && !isQueueCollapsed) {
-                setIsQueueCollapsed(true);
-                setQueueCollapsedByContext(true);
-              } else if (!nextOpen && queueCollapsedByContext) {
-                setIsQueueCollapsed(false);
-                setQueueCollapsedByContext(false);
-              }
-              setIsContextOpen(nextOpen);
-            }}
-          >
-            {isContextOpen ? "Hide Context" : "Context"}
-          </Button>
         </div>
       </div>
 
       <div className="flex min-h-0 flex-1">
         {queueCollapsed ? (
           <div
-            className={`relative z-40 hidden min-h-0 w-[72px] shrink-0 border-r bg-card/85 lg:flex lg:flex-col ${hopperDropActive ? "bg-primary/[0.08]" : ""}`}
+            className={`relative z-40 hidden min-h-0 w-[48px] shrink-0 border-r bg-card/85 lg:flex lg:flex-col items-center ${hopperDropActive ? "bg-primary/[0.08]" : ""}`}
             onDragOver={handleHopperDragOver}
             onDragLeave={handleHopperDragLeave}
             onDrop={handleHopperDrop}
           >
             <button
               type="button"
-              className="m-2 rounded-md border bg-card px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-              onClick={() => {
-                setQueueCollapsedByContext(false);
-                setIsQueueCollapsed(false);
-              }}
+              className="mt-2 flex h-8 w-8 items-center justify-center rounded-md border bg-card text-xs font-semibold tabular-nums text-foreground hover:bg-muted"
+              onClick={() => setIsQueueCollapsed(false)}
+              title={`${groups.length} groups in queue`}
             >
-              Queue
+              {groups.length}
             </button>
-            <div className="mx-2 rounded-md border bg-card/70 px-2 py-2 text-center">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Groups</p>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{groups.length}</p>
-            </div>
-            <div className="mx-2 mt-2 rounded-md border border-dashed bg-muted/20 px-2 py-2 text-center text-[10px] text-muted-foreground">
-              {hopperDropActive ? "Release to unassign" : "Drop runs here"}
-            </div>
           </div>
         ) : (
           <QueuePane
@@ -1083,6 +991,8 @@ export function DispatchShell({
             rows={rows}
             markers={markers}
             timelineZoom={timelineZoom}
+            zoomOptions={TIMELINE_ZOOM_OPTIONS}
+            onZoomChange={setTimelineZoom}
             showCurrentTime={showCurrentTime}
             currentTimeLabel={currentTimeValue}
             currentTimePercent={currentTimePercent}
@@ -1096,6 +1006,7 @@ export function DispatchShell({
             isMutating={isMutating}
             selectedRunId={selection.type === "run" ? selection.runId : null}
             warningLinkedRunIds={warningLinkedRunIds}
+            runSignalsMap={runSignalsMap}
             onGuideClick={(guideId) => {
               onGuideClick(guideId);
               setSelection({ type: "guide", guideId });
@@ -1152,12 +1063,8 @@ export function DispatchShell({
               setSelection({ type: "run", guideId, runId: run.id });
             }}
             onRunDragStart={(guideId, run) => {
-              if (isContextOpen && isNarrowLayout) {
+              if (isContextOpen) {
                 setIsContextOpen(false);
-                if (queueCollapsedByContext) {
-                  setIsQueueCollapsed(false);
-                  setQueueCollapsedByContext(false);
-                }
               }
               setDragPayload({
                 source: "guide",
@@ -1177,11 +1084,7 @@ export function DispatchShell({
           />
 
           {isContextOpen && (
-            <div
-              className={`pointer-events-none absolute inset-y-2 right-2 z-30 2xl:hidden ${
-                isNarrowLayout ? "w-[min(72vw,280px)]" : "w-[min(82vw,304px)]"
-              }`}
-            >
+            <div className="pointer-events-none absolute inset-y-2 right-2 z-30 w-[260px] animate-in slide-in-from-right-4 duration-200">
               <div className="pointer-events-auto h-full">
                 <ContextPane
                   context={contextData}
@@ -1204,28 +1107,6 @@ export function DispatchShell({
             </div>
           )}
         </div>
-
-        {isContextOpen && (
-          <div className="hidden 2xl:block 2xl:w-[280px] 2xl:shrink-0 2xl:border-l 2xl:bg-card/35 2xl:p-2">
-            <ContextPane
-              context={contextData}
-              rows={rows}
-              warningsCount={warnings.length}
-              unassignedGroupsCount={groups.length}
-              isEditing={isEditing}
-              isReadOnly={isReadOnly}
-              isMutating={isMutating}
-              onAssignBooking={(bookingId, guideId) => assignBookingIdsToGuide([bookingId], guideId)}
-              onAssignBookingBestFit={(bookingId) => assignBestFit([bookingId], "booking")}
-              onMoveRun={handleMoveRun}
-              onRescheduleRun={handleRescheduleRun}
-              onReturnRunToQueue={handleReturnRunToQueue}
-              onResolveWarning={onResolveWarning}
-              onClearSelection={() => setSelection({ type: "none" })}
-              onClose={() => setIsContextOpen(false)}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

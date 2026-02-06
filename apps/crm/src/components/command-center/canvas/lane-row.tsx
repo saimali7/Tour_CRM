@@ -1,11 +1,11 @@
 "use client";
 
-import { Users, AlertTriangle, Gauge } from "lucide-react";
+import { Users, AlertTriangle } from "lucide-react";
 import { UserAvatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { formatTimeDisplay } from "../timeline/timeline-utils";
 import type { CanvasRow, CanvasRun } from "../dispatch-model";
-import type { DragPayload, DragPreview, LanePressureLevel } from "./canvas-types";
+import type { DragPayload, DragPreview, LanePressureLevel, RunSignals } from "./canvas-types";
 import { RunBlock } from "./run-block";
 
 interface Marker {
@@ -28,6 +28,7 @@ interface LaneRowProps {
   isMutating: boolean;
   selectedRunId: string | null;
   warningLinkedRunIds: Set<string>;
+  runSignalsMap: Map<string, RunSignals>;
   onGuideClick: (guideId: string) => void;
   onLaneDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
   onLaneDragLeave: (event: React.DragEvent<HTMLDivElement>) => void;
@@ -38,19 +39,12 @@ interface LaneRowProps {
   onRunNudge: (run: CanvasRun, deltaMinutes: number) => void;
 }
 
-const pressureChipClass: Record<LanePressureLevel, string> = {
-  low: "bg-success/15 text-success border-success/25",
-  medium: "bg-info/15 text-info border-info/25",
-  high: "bg-warning/15 text-warning border-warning/25",
-  critical: "bg-destructive/15 text-destructive border-destructive/25",
+const capacityColor: Record<LanePressureLevel, string> = {
+  low: "bg-success/15 text-success",
+  medium: "bg-info/15 text-info",
+  high: "bg-warning/15 text-warning",
+  critical: "bg-destructive/15 text-destructive",
 };
-
-function pressureLabel(level: LanePressureLevel): string {
-  if (level === "critical") return "critical";
-  if (level === "high") return "high";
-  if (level === "medium") return "medium";
-  return "low";
-}
 
 export function LaneRow({
   row,
@@ -67,6 +61,7 @@ export function LaneRow({
   isMutating,
   selectedRunId,
   warningLinkedRunIds,
+  runSignalsMap,
   onGuideClick,
   onLaneDragOver,
   onLaneDragLeave,
@@ -76,8 +71,8 @@ export function LaneRow({
   onRunDragEnd,
   onRunNudge,
 }: LaneRowProps) {
+  const guideFirstName = row.guide.firstName;
   const guideFullName = `${row.guide.firstName} ${row.guide.lastName}`.trim();
-  const guideDisplayName = guideFullName || row.guide.firstName;
   const previewLeft = dragPreview?.leftPercent ?? 0;
   const previewWidth = dragPreview
     ? Math.max(2, Math.min(dragPreview.widthPercent, Math.max(2, 99.65 - previewLeft)))
@@ -87,11 +82,12 @@ export function LaneRow({
   );
 
   return (
-    <div key={row.guide.id} className="flex min-h-[112px] border-b">
+    <div key={row.guide.id} className="group/lane flex min-h-[80px] border-b">
       <button
         type="button"
-        className="sticky left-0 z-10 flex w-[228px] shrink-0 items-start gap-2.5 border-r bg-card/90 px-3 py-2.5 text-left shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] transition-colors hover:bg-muted/30 min-[1400px]:w-[240px] 2xl:w-[252px]"
+        className="sticky left-0 z-10 flex w-[180px] shrink-0 items-center gap-2 border-r bg-card/90 px-2 py-2 text-left shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] transition-colors hover:bg-muted/30 min-[1400px]:w-[188px] 2xl:w-[196px]"
         onClick={() => onGuideClick(row.guide.id)}
+        title={`${guideFullName}\n${row.utilization}% utilization \u00B7 ${row.runs.length} runs`}
       >
         <UserAvatar
           name={guideFullName}
@@ -99,35 +95,18 @@ export function LaneRow({
           size="sm"
         />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <p
-              className="line-clamp-2 min-w-0 flex-1 text-[13.5px] font-semibold leading-tight text-foreground"
-              title={guideFullName}
-            >
-              {guideDisplayName}
-            </p>
+          <p className="truncate text-[12px] font-semibold leading-tight text-foreground">
+            {guideFirstName}
+          </p>
+          <div className="mt-0.5 flex items-center gap-1.5">
             <span
               className={cn(
-                "inline-flex shrink-0 items-center justify-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide",
-                pressureChipClass[pressureLevel]
+                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums",
+                capacityColor[pressureLevel]
               )}
             >
-              {pressureLabel(pressureLevel)}
-            </span>
-          </div>
-          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10.5px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1 tabular-nums">
-              <Users className="h-3 w-3" />
+              <Users className="h-2.5 w-2.5" />
               {row.totalGuests}/{row.vehicleCapacity}
-            </span>
-            <span className="text-muted-foreground/50">•</span>
-            <span className="inline-flex items-center gap-1 tabular-nums">
-              <Gauge className="h-3 w-3" />
-              {row.utilization}%
-            </span>
-            <span className="text-muted-foreground/50">•</span>
-            <span className="tabular-nums">
-              {row.runs.length} run{row.runs.length === 1 ? "" : "s"}
             </span>
           </div>
         </div>
@@ -157,7 +136,7 @@ export function LaneRow({
         </div>
 
         {row.runs.length === 0 && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/60">
             No assignments
           </div>
         )}
@@ -172,6 +151,7 @@ export function LaneRow({
             isSelected={selectedRunId === run.id}
             isDragging={dragPayload?.source === "guide" && dragPayload.runId === run.id}
             isWarningFocus={warningLinkedRunIds.has(run.id)}
+            signals={runSignalsMap.get(run.id)}
             onClick={() => onRunClick(run)}
             onDragStart={() => onRunDragStart(run)}
             onDragEnd={onRunDragEnd}
@@ -182,7 +162,7 @@ export function LaneRow({
         {dragPreview && dragPayload?.source === "guide" && (
           <div
             data-drag-preview="true"
-            className="pointer-events-none absolute bottom-2.5 top-2.5 z-20 overflow-hidden rounded-lg border border-primary/70 bg-primary/20 shadow-sm"
+            className="pointer-events-none absolute bottom-2 top-2 z-20 overflow-hidden rounded-lg border border-primary/70 bg-primary/20 shadow-sm"
             style={{
               left: `${previewLeft}%`,
               width: `${previewWidth}%`,
@@ -209,7 +189,7 @@ export function LaneRow({
         {isActiveDrop && dragPayload && (
           <div
             className={cn(
-              "pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium",
+              "pointer-events-none absolute right-3 top-2 z-20 flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium",
               willExceedCapacity
                 ? "bg-destructive text-destructive-foreground"
                 : "bg-primary text-primary-foreground"
@@ -217,7 +197,7 @@ export function LaneRow({
           >
             {willExceedCapacity && <AlertTriangle className="h-3 w-3" />}
             <span className="tabular-nums">
-              {projectedGuests}/{row.vehicleCapacity} seats
+              {projectedGuests}/{row.vehicleCapacity}
             </span>
           </div>
         )}

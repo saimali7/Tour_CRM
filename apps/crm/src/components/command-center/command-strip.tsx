@@ -9,10 +9,10 @@ import {
   Send,
   ChevronLeft,
   ChevronRight,
-  Users,
   Lock,
   Sparkles,
-  ChevronDown,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,46 +36,28 @@ import type { DispatchWarning } from "./types";
 // =============================================================================
 
 interface CommandStripProps {
-  /** Current date being viewed */
   date: Date;
-  /** Formatted date string for display */
   formattedDate: string;
-  /** Go to previous day */
   onPreviousDay: () => void;
-  /** Go to next day */
   onNextDay: () => void;
-  /** Go to today */
   onToday: () => void;
-  /** Current dispatch status */
   status: DispatchStatus;
-  /** Total guests for the day */
   totalGuests: number;
-  /** Total guides assigned */
   totalGuides: number;
-  /** Efficiency score 0-100 */
   efficiencyScore: number;
-  /** Number of unassigned bookings */
   unassignedCount: number;
-  /** Number of warnings */
   warningsCount: number;
-  /** Warning rows for quick resolution */
   warnings: DispatchWarning[];
-  /** Currently selected warning id */
   selectedWarningId?: string | null;
-  /** Warning selection callback */
   onSelectWarning?: (warningId: string) => void;
-  /** Resolve a warning suggestion */
   onResolveWarning?: (warningId: string, suggestionId: string) => void;
-  /** Available guides for quick-assign suggestions */
   availableGuides?: Array<{
     id: string;
     name: string;
     vehicleCapacity: number;
     currentGuests: number;
   }>;
-  /** When dispatch was sent */
   dispatchedAt?: Date;
-  /** Tour runs for manifest access */
   tourRuns?: Array<{
     key: string;
     date: string;
@@ -83,10 +65,13 @@ interface CommandStripProps {
     totalGuests: number;
     tour?: { id: string; name: string } | null;
   }>;
-  /** Optimize assignments */
   onOptimize: () => void;
-  /** Send dispatch */
   onDispatch: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  isMutating: boolean;
 }
 
 // =============================================================================
@@ -122,21 +107,24 @@ export function CommandStrip({
   tourRuns,
   onOptimize,
   onDispatch,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  isMutating,
 }: CommandStripProps) {
   const params = useParams();
   const slugParam = params?.slug;
   const slug = typeof slugParam === "string" ? slugParam : Array.isArray(slugParam) ? slugParam[0] : undefined;
 
   const isDateToday = isToday(date);
-  // Check if date is in the past (before today)
   const isPastDate = isPast(startOfDay(date)) && !isDateToday;
   const isDispatched = status === "dispatched";
+  const isReadOnly = isPastDate || isDispatched;
   const hasUnassigned = unassignedCount > 0;
   const hasWarnings = warningsCount > 0;
-  const hasBlockingIssues = hasUnassigned || hasWarnings;
   const manifestRuns = (tourRuns ?? []).filter((run) => run.tour?.id && run.time);
 
-  // Determine the health state
   type HealthState = "critical" | "warning" | "ready" | "dispatched";
   const healthState: HealthState = isDispatched
     ? "dispatched"
@@ -146,69 +134,44 @@ export function CommandStrip({
         ? "warning"
         : "ready";
 
-  const healthConfig = {
-    critical: {
-      bg: "bg-card border-border",
-      accent: "bg-destructive",
-      text: "text-foreground",
-      icon: AlertCircle,
-      iconColor: "text-destructive",
-    },
-    warning: {
-      bg: "bg-card border-border",
-      accent: "bg-warning",
-      text: "text-foreground",
-      icon: AlertCircle,
-      iconColor: "text-warning",
-    },
-    ready: {
-      bg: "bg-card border-border",
-      accent: "bg-success",
-      text: "text-foreground",
-      icon: CheckCircle2,
-      iconColor: "text-success",
-    },
-    dispatched: {
-      bg: "bg-card border-border",
-      accent: "bg-muted-foreground/50",
-      text: "text-muted-foreground",
-      icon: Lock,
-      iconColor: "text-muted-foreground",
-    },
-  };
+  const borderColor = {
+    critical: "border-b-destructive",
+    warning: "border-b-warning",
+    ready: "border-b-success",
+    dispatched: "border-b-muted-foreground/50",
+  }[healthState];
 
-  const config = healthConfig[healthState];
-  const HealthIcon = config.icon;
+  const healthIcon = {
+    critical: <AlertCircle className="h-3.5 w-3.5 text-destructive" />,
+    warning: <AlertCircle className="h-3.5 w-3.5 text-warning" />,
+    ready: <CheckCircle2 className="h-3.5 w-3.5 text-success" />,
+    dispatched: <Lock className="h-3.5 w-3.5 text-muted-foreground" />,
+  }[healthState];
 
   return (
     <div className={cn(
-      "relative rounded-lg border overflow-hidden transition-all duration-200",
-      config.bg
+      "relative rounded-md border border-b-2 bg-card overflow-hidden transition-all duration-200",
+      borderColor,
+      isPastDate && "opacity-60"
     )}>
-      {/* Left accent bar - status indicator */}
-      <div className={cn(
-        "absolute left-0 top-0 bottom-0 w-1 transition-colors",
-        config.accent
-      )} />
-
-      <div className="flex items-center justify-between gap-3 pl-3 pr-2 py-2">
-        {/* Left: Date Navigation - compact */}
+      <div className="flex items-center justify-between gap-2 px-2 py-1">
+        {/* Left: Date Navigation */}
         <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7"
             onClick={onPreviousDay}
             aria-label="Previous day"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
 
           <button
             onClick={onToday}
             disabled={isDateToday}
             className={cn(
-              "px-3 py-1.5 rounded-md text-sm font-semibold transition-colors",
+              "px-2.5 py-1 rounded-md text-sm font-semibold transition-colors",
               isDateToday
                 ? "bg-primary/10 text-primary cursor-default"
                 : "hover:bg-muted"
@@ -220,20 +183,19 @@ export function CommandStrip({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7"
             onClick={onNextDay}
             aria-label="Next day"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </div>
 
-        {/* Center: Status + Stats - clean and minimal */}
-        <div className="flex items-center gap-3">
-          {/* Status indicator */}
-          <div className="flex items-center gap-2">
-            <HealthIcon className={cn("h-4 w-4", config.iconColor)} />
-            <span className={cn("text-sm", config.text)}>
+        {/* Center: Status + Inline Stats */}
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            {healthIcon}
+            <span className="text-foreground">
               {healthState === "critical" ? (
                 <span>
                   <span className="font-semibold tabular-nums">{unassignedCount}</span>
@@ -245,71 +207,40 @@ export function CommandStrip({
                   <span className="text-muted-foreground ml-1">{pluralize(warningsCount, "issue")}</span>
                 </span>
               ) : healthState === "ready" ? (
-                <span className="text-success dark:text-success font-medium">Ready to Dispatch</span>
+                <span className="text-success font-medium">Ready</span>
               ) : (
-                <span>Sent {dispatchedAt ? format(dispatchedAt, "HH:mm") : "--:--"}</span>
+                <span className="text-muted-foreground">Sent {dispatchedAt ? format(dispatchedAt, "HH:mm") : "--:--"}</span>
               )}
             </span>
           </div>
 
-          {/* Guest count - expandable */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className={cn(
-                  "flex items-center gap-1.5 text-sm",
-                  "hover:text-foreground transition-colors",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded"
-                )}
-              >
-                <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="tabular-nums font-medium">{totalGuests}</span>
-                <span className="text-[11px] text-muted-foreground">guests</span>
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              side="bottom"
-              align="center"
-              className="w-44 p-3"
-            >
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Guests</span>
-                  <span className="font-medium tabular-nums">{totalGuests}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Guides</span>
-                  <span className="font-medium tabular-nums">{totalGuides}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Efficiency</span>
-                  <span className={cn(
-                    "font-medium tabular-nums",
-                    efficiencyScore >= 90 ? "text-success" :
-                    efficiencyScore >= 70 ? "text-warning" :
-                    "text-destructive"
-                  )}>
-                    {efficiencyScore}%
-                  </span>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <span className="hidden text-muted-foreground/40 sm:inline">|</span>
+
+          <div className="hidden items-center gap-2.5 text-muted-foreground sm:flex">
+            <span className="tabular-nums"><span className="font-medium text-foreground">{totalGuests}</span> guests</span>
+            <span className="tabular-nums"><span className="font-medium text-foreground">{totalGuides}</span> guides</span>
+            <span className={cn(
+              "tabular-nums font-medium",
+              efficiencyScore >= 90 ? "text-success" :
+              efficiencyScore >= 70 ? "text-warning" :
+              "text-destructive"
+            )}>
+              {efficiencyScore}%
+            </span>
+          </div>
 
           {hasWarnings && (
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   className={cn(
-                    "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs transition-colors",
+                    "inline-flex h-6 items-center gap-1 rounded-md border px-2 text-[11px] transition-colors",
                     selectedWarningId ? "border-warning/50 bg-warning/10 text-foreground" : "border-border bg-muted/25 text-muted-foreground",
                     "hover:bg-muted/40"
                   )}
                 >
-                  <AlertCircle className="h-3.5 w-3.5 text-warning" />
+                  <AlertCircle className="h-3 w-3 text-warning" />
                   <span className="font-semibold tabular-nums">{warningsCount}</span>
-                  <span className="hidden sm:inline">issues</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent side="bottom" align="center" className="w-[360px] p-2">
@@ -326,19 +257,34 @@ export function CommandStrip({
           )}
         </div>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-2">
-          {isPastDate ? (
-            /* Past date - read-only mode */
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-muted/50 text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" />
-              <span className="text-xs font-medium">View Only</span>
-            </div>
-          ) : isDispatched ? (
+        {/* Right: Undo/Redo + Actions */}
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onUndo}
+            disabled={!canUndo || isMutating || isReadOnly}
+            aria-label="Undo"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onRedo}
+            disabled={!canRedo || isMutating || isReadOnly}
+            aria-label="Redo"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </Button>
+
+          {isDispatched ? (
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-xs">
-                  View Manifests
+                <Button variant="outline" size="sm" className="h-7 text-[11px]">
+                  Manifests
                 </Button>
               </PopoverTrigger>
               <PopoverContent side="bottom" align="end" className="w-72 p-2">
@@ -387,11 +333,11 @@ export function CommandStrip({
                 )}
               </PopoverContent>
             </Popover>
-          ) : (
-            <div className="flex items-center gap-2">
+          ) : !isPastDate && (
+            <>
               {hasUnassigned ? (
-                <Button size="sm" onClick={onOptimize} className="h-8 gap-1.5 text-xs">
-                  <Sparkles className="h-3.5 w-3.5" />
+                <Button size="sm" onClick={onOptimize} className="h-7 gap-1.5 text-[11px]">
+                  <Sparkles className="h-3 w-3" />
                   Auto-Assign
                 </Button>
               ) : hasWarnings ? (
@@ -399,8 +345,8 @@ export function CommandStrip({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span>
-                        <Button size="sm" disabled className="h-8 gap-1.5 text-xs">
-                          <Send className="h-3.5 w-3.5" />
+                        <Button size="sm" disabled className="h-7 gap-1.5 text-[11px]">
+                          <Send className="h-3 w-3" />
                           Dispatch
                         </Button>
                       </span>
@@ -414,17 +360,13 @@ export function CommandStrip({
                 <Button
                   size="sm"
                   onClick={onDispatch}
-                  className="h-8 gap-1.5 text-xs bg-success hover:bg-success"
+                  className="h-7 gap-1.5 text-[11px] bg-success hover:bg-success"
                 >
-                  <Send className="h-3.5 w-3.5" />
+                  <Send className="h-3 w-3" />
                   Dispatch
                 </Button>
               )}
-
-              <span className={cn("hidden text-[11px] text-muted-foreground lg:inline", hasBlockingIssues && "text-warning")}>
-                {hasBlockingIssues ? `${unassignedCount + warningsCount} blockers` : "Ready"}
-              </span>
-            </div>
+            </>
           )}
         </div>
       </div>
