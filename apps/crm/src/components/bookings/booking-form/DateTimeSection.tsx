@@ -286,7 +286,7 @@ export function DateTimeSection({
                       {dayInfo.day}
                       {/* Availability indicator dot */}
                       {dayInfo.isAvailable && dayInfo.totalSpots > 0 && dayInfo.totalSpots <= 5 && (
-                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-500" />
+                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-warning" />
                       )}
                     </button>
                   );
@@ -304,7 +304,7 @@ export function DateTimeSection({
                   <span>Selected</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-warning" />
                   <span>Low availability</span>
                 </div>
               </div>
@@ -365,7 +365,7 @@ export function DateTimeSection({
                       className={cn(
                         "flex items-center gap-1 text-xs mt-1",
                         isSelected ? "text-primary-foreground/80" : "text-muted-foreground",
-                        slot.almostFull && !isSelected && "text-amber-600"
+                        slot.almostFull && !isSelected && "text-warning"
                       )}
                     >
                       <Users className="h-3 w-3" />

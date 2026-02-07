@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Calendar,
   Play,
+  Pause,
   FileEdit,
   Archive,
   Zap,
@@ -267,7 +268,7 @@ export function ScheduleStatusBadge({
 // TOUR STATUS BADGE
 // =============================================================================
 
-type TourStatus = "draft" | "active" | "archived";
+type TourStatus = "draft" | "active" | "paused" | "archived";
 
 const tourStatusConfig: Record<
   TourStatus,
@@ -275,13 +276,18 @@ const tourStatusConfig: Record<
 > = {
   draft: {
     label: "Draft",
-    className: "status-no-show", // gray
+    className: "status-pending", // yellow
     icon: FileEdit,
   },
   active: {
     label: "Active",
     className: "status-confirmed", // green
     icon: Zap,
+  },
+  paused: {
+    label: "Paused",
+    className: "status-pending", // yellow
+    icon: Pause,
   },
   archived: {
     label: "Archived",

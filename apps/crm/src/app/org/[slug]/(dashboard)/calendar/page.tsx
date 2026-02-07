@@ -105,7 +105,7 @@ export default function CalendarPage() {
             <span><span className="font-medium text-foreground">{stats.totalTourRuns}</span> departures</span>
             <span><span className="font-medium text-foreground">{stats.totalBooked}</span>/{stats.totalCapacity} booked</span>
             {stats.needsGuide > 0 && (
-              <span><span className="font-medium text-amber-600">{stats.needsGuide}</span> need guide</span>
+              <span><span className="font-medium text-warning">{stats.needsGuide}</span> need guide</span>
             )}
           </div>
         </div>

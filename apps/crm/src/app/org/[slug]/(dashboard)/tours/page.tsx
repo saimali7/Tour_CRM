@@ -179,7 +179,7 @@ export default function ToursPage() {
             {stats && (
               <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
                 <span><span className="font-medium text-foreground">{stats.byStatus.active}</span> active</span>
-                <span><span className="font-medium text-amber-600">{stats.byStatus.draft}</span> draft</span>
+                <span><span className="font-medium text-warning">{stats.byStatus.draft}</span> draft</span>
                 <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
               </div>
             )}

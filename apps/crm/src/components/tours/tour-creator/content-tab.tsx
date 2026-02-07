@@ -46,9 +46,9 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-start gap-4 p-4 bg-blue-500/5 rounded-xl border border-blue-500/10">
-        <div className="p-2 bg-blue-500/10 rounded-lg">
-          <FileText className="h-5 w-5 text-blue-500" />
+      <div className="flex items-start gap-4 p-4 bg-info/5 rounded-xl border border-info/10">
+        <div className="p-2 bg-info/10 rounded-lg">
+          <FileText className="h-5 w-5 text-info" />
         </div>
         <div>
           <h2 className="font-semibold text-foreground">Tour Content</h2>
@@ -81,7 +81,7 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
         {/* What's Included */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-foreground flex items-center gap-2">
-            <Check className="h-4 w-4 text-emerald-500" />
+            <Check className="h-4 w-4 text-success" />
             What's Included
           </label>
           <div className="flex gap-2">
@@ -105,7 +105,7 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
             <button
               type="button"
               onClick={() => addToList("includes", includeInput, setIncludeInput)}
-              className="px-3 py-2 bg-emerald-500/10 text-emerald-600 rounded-lg hover:bg-emerald-500/20 transition-colors"
+              className="px-3 py-2 bg-success/10 text-success rounded-lg hover:bg-success/20 transition-colors"
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -115,10 +115,10 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
               {formState.includes.map((item, index) => (
                 <li
                   key={index}
-                  className="flex items-center justify-between px-3 py-2 bg-emerald-500/5 border border-emerald-500/10 rounded-lg group"
+                  className="flex items-center justify-between px-3 py-2 bg-success/5 border border-success/10 rounded-lg group"
                 >
                   <span className="text-sm text-foreground flex items-center gap-2">
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                    <Check className="h-3.5 w-3.5 text-success" />
                     {item}
                   </span>
                   <button
@@ -137,7 +137,7 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
         {/* Not Included */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-foreground flex items-center gap-2">
-            <X className="h-4 w-4 text-rose-500" />
+            <X className="h-4 w-4 text-destructive" />
             Not Included
           </label>
           <div className="flex gap-2">
@@ -161,7 +161,7 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
             <button
               type="button"
               onClick={() => addToList("excludes", excludeInput, setExcludeInput)}
-              className="px-3 py-2 bg-rose-500/10 text-rose-600 rounded-lg hover:bg-rose-500/20 transition-colors"
+              className="px-3 py-2 bg-destructive/10 text-destructive rounded-lg hover:bg-destructive/20 transition-colors"
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -171,10 +171,10 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
               {formState.excludes.map((item, index) => (
                 <li
                   key={index}
-                  className="flex items-center justify-between px-3 py-2 bg-rose-500/5 border border-rose-500/10 rounded-lg group"
+                  className="flex items-center justify-between px-3 py-2 bg-destructive/5 border border-destructive/10 rounded-lg group"
                 >
                   <span className="text-sm text-foreground flex items-center gap-2">
-                    <X className="h-3.5 w-3.5 text-rose-500" />
+                    <X className="h-3.5 w-3.5 text-destructive" />
                     {item}
                   </span>
                   <button
@@ -193,7 +193,7 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
         {/* Requirements */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-foreground flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <AlertCircle className="h-4 w-4 text-warning" />
             Requirements
           </label>
           <div className="flex gap-2">
@@ -217,7 +217,7 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
             <button
               type="button"
               onClick={() => addToList("requirements", requirementInput, setRequirementInput)}
-              className="px-3 py-2 bg-amber-500/10 text-amber-600 rounded-lg hover:bg-amber-500/20 transition-colors"
+              className="px-3 py-2 bg-warning/10 text-warning rounded-lg hover:bg-warning/20 transition-colors"
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -227,10 +227,10 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
               {formState.requirements.map((item, index) => (
                 <li
                   key={index}
-                  className="flex items-center justify-between px-3 py-2 bg-amber-500/5 border border-amber-500/10 rounded-lg group"
+                  className="flex items-center justify-between px-3 py-2 bg-warning/5 border border-warning/10 rounded-lg group"
                 >
                   <span className="text-sm text-foreground flex items-center gap-2">
-                    <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                    <AlertCircle className="h-3.5 w-3.5 text-warning" />
                     {item}
                   </span>
                   <button
@@ -303,8 +303,8 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
       {/* Images Section */}
       <div className="space-y-6 pt-6 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-violet-500/10 rounded-lg">
-            <ImageIcon className="h-5 w-5 text-violet-500" />
+          <div className="p-2 bg-info/10 rounded-lg">
+            <ImageIcon className="h-5 w-5 text-info" />
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Images</h3>

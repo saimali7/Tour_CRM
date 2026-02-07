@@ -30,19 +30,6 @@ export interface DragPreview {
   widthPercent: number;
 }
 
-export interface SlotCapacitySnapshot {
-  startTime: string;
-  currentGuests: number;
-  incomingGuests: number;
-  projectedGuests: number;
-  vehicleCapacity: number;
-}
-
-export interface OutsourcedGuideDraft {
-  name: string;
-  contact?: string;
-}
-
 export type QueueSortMode = "time" | "tour" | "guests";
 
 export interface QueueFilterState {

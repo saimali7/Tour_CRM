@@ -325,8 +325,8 @@ export default function TourRunPage() {
 
       {/* Special Notes Alert */}
       {hasSpecialNeeds && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30 p-4 print:bg-amber-50">
-          <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-200 flex items-center gap-2 mb-3">
+        <div className="rounded-lg border border-warning bg-warning dark:border-warning/50 dark:bg-warning/30 p-4 print:bg-warning">
+          <h3 className="text-sm font-semibold text-warning dark:text-warning flex items-center gap-2 mb-3">
             <AlertCircle className="h-4 w-4" />
             Special Requirements
           </h3>
@@ -335,10 +335,10 @@ export default function TourRunPage() {
               .filter((b) => b.dietaryRequirements || b.accessibilityNeeds || b.specialRequests)
               .map((booking) => (
                 <div key={booking.id} className="text-sm">
-                  <span className="font-medium text-amber-900 dark:text-amber-100">
+                  <span className="font-medium text-warning dark:text-warning">
                     {booking.customer.name}:
                   </span>
-                  <ul className="ml-4 mt-1 space-y-0.5 text-amber-800 dark:text-amber-200">
+                  <ul className="ml-4 mt-1 space-y-0.5 text-warning dark:text-warning">
                     {booking.dietaryRequirements && (
                       <li className="flex items-center gap-1.5">
                         <ChefHat className="h-3 w-3" />
@@ -446,7 +446,7 @@ export default function TourRunPage() {
                       className={cn(
                         "flex items-center justify-between py-2 px-3 rounded-lg transition-colors",
                         isCheckedIn
-                          ? "bg-emerald-50 dark:bg-emerald-950/30"
+                          ? "bg-success dark:bg-success/30"
                           : "bg-muted/30 hover:bg-muted/50"
                       )}
                     >
@@ -464,7 +464,7 @@ export default function TourRunPage() {
                           className={cn(
                             "flex-shrink-0 transition-colors print:hidden",
                             isCheckedIn
-                              ? "text-emerald-600 cursor-default"
+                              ? "text-success cursor-default"
                               : "text-muted-foreground hover:text-primary cursor-pointer"
                           )}
                         >
@@ -475,12 +475,12 @@ export default function TourRunPage() {
                           )}
                         </button>
                         {/* Print checkbox */}
-                        <span className="hidden print:inline-block w-4 h-4 border border-gray-400 rounded-sm" />
+                        <span className="hidden print:inline-block w-4 h-4 border border-border rounded-sm" />
                         <div>
                           <p
                             className={cn(
                               "text-sm font-medium",
-                              isCheckedIn && "text-emerald-700 dark:text-emerald-300"
+                              isCheckedIn && "text-success dark:text-success"
                             )}
                           >
                             {participant.firstName} {participant.lastName}
@@ -492,7 +492,7 @@ export default function TourRunPage() {
                             {participant.dietaryRequirements && (
                               <Tooltip>
                                 <TooltipTrigger>
-                                  <ChefHat className="h-3 w-3 text-amber-600" />
+                                  <ChefHat className="h-3 w-3 text-warning" />
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   {participant.dietaryRequirements}
@@ -502,7 +502,7 @@ export default function TourRunPage() {
                             {participant.accessibilityNeeds && (
                               <Tooltip>
                                 <TooltipTrigger>
-                                  <Accessibility className="h-3 w-3 text-blue-600" />
+                                  <Accessibility className="h-3 w-3 text-info" />
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   {participant.accessibilityNeeds}
@@ -513,7 +513,7 @@ export default function TourRunPage() {
                         </div>
                       </div>
                       {isCheckedIn && participant.checkedInAt && (
-                        <span className="text-xs text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        <span className="text-xs text-success dark:text-success tabular-nums">
                           {format(new Date(participant.checkedInAt), "h:mm a")}
                         </span>
                       )}
@@ -592,7 +592,7 @@ export default function TourRunPage() {
       )}
 
       {/* Print Footer */}
-      <div className="hidden print:block text-center text-xs text-gray-500 pt-4 border-t">
+      <div className="hidden print:block text-center text-xs text-muted-foreground pt-4 border-t">
         Printed on {format(new Date(), "MMMM d, yyyy 'at' h:mm a")} | Tour CRM
       </div>
     </div>

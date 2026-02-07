@@ -210,7 +210,7 @@ function ServiceCard({
           {functionalTestResult && (
             <div className={`mt-2 p-2 rounded text-xs ${
               functionalTestResult.success
-                ? "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                ? "bg-info/10 text-info border border-info/20"
                 : "bg-destructive/10 text-destructive border border-destructive/20"
             }`}>
               <div className="flex items-center gap-1.5">

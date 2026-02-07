@@ -133,9 +133,9 @@ function ParticipantRow({ participant }: { participant: BookingParticipant }) {
             <span
               className={cn(
                 "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                participant.type === "adult" && "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-                participant.type === "child" && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-                participant.type === "infant" && "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                participant.type === "adult" && "bg-muted text-muted-foreground",
+                participant.type === "child" && "bg-info/10 text-info",
+                participant.type === "infant" && "bg-info/10 text-info"
               )}
             >
               {participant.type}
@@ -152,20 +152,20 @@ function ParticipantRow({ participant }: { participant: BookingParticipant }) {
         {hasNeeds ? (
           <div className="flex flex-col items-end gap-1">
             {participant.dietaryRequirements && (
-              <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+              <div className="flex items-center gap-1.5 text-xs text-warning dark:text-warning">
                 <Utensils className="h-3.5 w-3.5" />
                 <span className="font-medium">{participant.dietaryRequirements}</span>
               </div>
             )}
             {participant.accessibilityNeeds && (
-              <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+              <div className="flex items-center gap-1.5 text-xs text-warning dark:text-warning">
                 <Accessibility className="h-3.5 w-3.5" />
                 <span className="font-medium">{participant.accessibilityNeeds}</span>
               </div>
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+          <div className="flex items-center gap-1 text-xs text-success dark:text-success">
             <CheckCircle className="h-3.5 w-3.5" />
             <span>No special needs</span>
           </div>
@@ -364,7 +364,7 @@ export function PaymentsSection({
       size="sm"
       variant="outline"
       onClick={onRecordPayment}
-      className="gap-1.5 h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950"
+      className="gap-1.5 h-7 text-xs border-warning text-warning hover:bg-warning dark:border-warning dark:text-warning dark:hover:bg-warning"
     >
       <CreditCard className="h-3 w-3" />
       Collect
@@ -389,14 +389,14 @@ export function PaymentsSection({
             <span className="text-muted-foreground">Total</span>
             <span className="font-mono tabular-nums font-medium">${total.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+          <div className="flex justify-between text-success dark:text-success">
             <span>Paid</span>
             <span className="font-mono tabular-nums font-medium">${totalPaid.toFixed(2)}</span>
           </div>
           <div
             className={cn(
               "flex justify-between font-bold pt-2 border-t border-border",
-              hasBalance ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"
+              hasBalance ? "text-warning dark:text-warning" : "text-success dark:text-success"
             )}
           >
             <span>Balance</span>
@@ -410,7 +410,7 @@ export function PaymentsSection({
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-500",
-                isPaid ? "bg-emerald-500" : "bg-amber-500"
+                isPaid ? "bg-success" : "bg-warning"
               )}
               style={{ width: `${Math.min((totalPaid / total) * 100, 100)}%` }}
             />

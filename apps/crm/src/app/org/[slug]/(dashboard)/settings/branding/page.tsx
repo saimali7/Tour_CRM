@@ -436,29 +436,29 @@ export default function BrandingPage() {
 
               {/* Email Body */}
               <div className="p-6 space-y-4">
-                <h3 className="text-xl font-semibold text-gray-900">
+                <h3 className="text-xl font-semibold text-foreground">
                   Booking Confirmed!
                 </h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Thank you for your booking. Here are the details:
                 </p>
 
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
+                <div className="bg-muted/40 rounded-lg p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Tour:</span>
-                    <span className="font-medium text-gray-900">City Walking Tour</span>
+                    <span className="text-muted-foreground">Tour:</span>
+                    <span className="font-medium text-foreground">City Walking Tour</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Date:</span>
-                    <span className="font-medium text-gray-900">Jan 15, 2025</span>
+                    <span className="text-muted-foreground">Date:</span>
+                    <span className="font-medium text-foreground">Jan 15, 2025</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Time:</span>
-                    <span className="font-medium text-gray-900">10:00 AM</span>
+                    <span className="text-muted-foreground">Time:</span>
+                    <span className="font-medium text-foreground">10:00 AM</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Guests:</span>
-                    <span className="font-medium text-gray-900">2 adults</span>
+                    <span className="text-muted-foreground">Guests:</span>
+                    <span className="font-medium text-foreground">2 adults</span>
                   </div>
                 </div>
 
@@ -470,7 +470,7 @@ export default function BrandingPage() {
                   View Booking Details
                 </button>
 
-                <p className="text-xs text-gray-500 text-center pt-2">
+                <p className="text-xs text-muted-foreground text-center pt-2">
                   We look forward to seeing you!
                 </p>
               </div>

@@ -354,8 +354,8 @@ export default function DashboardPage() {
         <section>
           <div className="flex items-center gap-2 mb-3">
             <div className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive"></span>
             </div>
             <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">
               Live Now
@@ -483,8 +483,8 @@ function MetricCard({
         </span>
         <span className={cn(
           "p-1.5 rounded-lg",
-          variant === "primary" && "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400",
-          variant === "success" && "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400",
+          variant === "primary" && "bg-info dark:bg-info/50 text-info dark:text-info",
+          variant === "success" && "bg-success dark:bg-success/50 text-success dark:text-success",
           variant === "default" && "bg-muted text-muted-foreground"
         )}>
           {icon}
@@ -499,15 +499,15 @@ function MetricCard({
             <div
               className={cn(
                 "flex items-center gap-1.5 mt-2 text-xs font-medium",
-                isPositive && "text-emerald-600 dark:text-emerald-400",
-                isNegative && "text-red-600 dark:text-red-400",
+                isPositive && "text-success dark:text-success",
+                isNegative && "text-destructive dark:text-destructive",
                 !isPositive && !isNegative && "text-muted-foreground"
               )}
             >
               <span className={cn(
                 "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px]",
-                isPositive && "bg-emerald-100 dark:bg-emerald-900/50",
-                isNegative && "bg-red-100 dark:bg-red-900/50"
+                isPositive && "bg-success dark:bg-success/50",
+                isNegative && "bg-destructive dark:bg-destructive/50"
               )}>
                 {isPositive ? (
                   <TrendingUp className="h-3 w-3" />
@@ -532,22 +532,22 @@ function MetricCard({
 function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   return (
     <div className="rounded-lg card-danger overflow-hidden">
-      <div className="px-4 py-2.5 bg-red-100 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800/50">
+      <div className="px-4 py-2.5 bg-destructive border-b border-destructive/40">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-red-700 dark:text-red-400" />
-          <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+          <AlertTriangle className="h-4 w-4 text-destructive-foreground" />
+          <span className="text-sm font-semibold text-destructive-foreground">
             {alerts.length} {alerts.length === 1 ? "issue needs" : "issues need"} attention
           </span>
         </div>
       </div>
-      <div className="divide-y divide-red-200/50 dark:divide-red-800/30">
+      <div className="divide-y divide-destructive/20">
         {alerts.map((alert, idx) => (
           <div
             key={alert.id}
-            className="flex items-center justify-between px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            className="flex items-center justify-between px-4 py-3 hover:bg-destructive/5 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-red-500" />
+              <div className="h-2 w-2 rounded-full bg-destructive" />
               <div>
                 <p className="text-sm font-medium text-foreground">{alert.title}</p>
                 <p className="text-xs text-muted-foreground">{alert.subtitle}</p>
@@ -555,7 +555,7 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
             </div>
             <Link
               href={alert.action.href as Route}
-              className="text-xs font-medium text-red-700 dark:text-red-400 hover:underline flex items-center gap-0.5 px-3 py-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+              className="text-xs font-medium text-destructive hover:underline flex items-center gap-0.5 px-3 py-1.5 rounded-md hover:bg-destructive/10 transition-colors"
             >
               {alert.action.label}
               <ChevronRight className="h-3 w-3" />
@@ -570,14 +570,14 @@ function AlertsPanel({ alerts }: { alerts: Alert[] }) {
 function AllClearBanner() {
   return (
     <div className="flex items-center gap-3 rounded-lg card-success px-4 py-3">
-      <div className="flex-shrink-0 h-9 w-9 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-        <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+      <div className="flex-shrink-0 h-9 w-9 rounded-full bg-success dark:bg-success/50 flex items-center justify-center">
+        <CheckCircle2 className="h-5 w-5 text-success dark:text-success" />
       </div>
       <div>
-        <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+        <p className="text-sm font-medium text-success dark:text-success">
           All clear
         </p>
-        <p className="text-xs text-emerald-700 dark:text-emerald-400">
+        <p className="text-xs text-success dark:text-success">
           No urgent issues need your attention
         </p>
       </div>
@@ -725,12 +725,12 @@ function ScheduleRow({ schedule, slug, index }: ScheduleRowProps) {
             className={cn(
               "h-full transition-all",
               util >= 80
-                ? "bg-emerald-500"
+                ? "bg-success"
                 : util >= 50
                   ? "bg-primary"
                   : util >= 20
-                    ? "bg-amber-500"
-                    : "bg-red-400"
+                    ? "bg-warning"
+                    : "bg-destructive"
             )}
             style={{ width: `${Math.max(util, 5)}%` }}
           />
@@ -771,12 +771,12 @@ function UpcomingRow({ schedule, slug, index }: ScheduleRowProps) {
           {schedule.bookedCount}/{schedule.maxParticipants}
         </span>
         {schedule.hasUnconfirmedGuide && (
-          <span className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+          <span className="text-warning dark:text-warning flex items-center gap-0.5">
             <AlertTriangle className="h-3 w-3" />
           </span>
         )}
         {util < 30 && util > 0 && (
-          <span className="text-amber-600 dark:text-amber-400 text-[10px]">Low</span>
+          <span className="text-warning dark:text-warning text-[10px]">Low</span>
         )}
       </div>
 
@@ -799,9 +799,9 @@ function ActivityRow({
   index: number;
 }) {
   const icons: Record<string, React.ReactNode> = {
-    booking_created: <Calendar className="h-3.5 w-3.5 text-emerald-500" />,
-    booking_cancelled: <XCircle className="h-3.5 w-3.5 text-red-500" />,
-    payment_received: <DollarSign className="h-3.5 w-3.5 text-emerald-500" />,
+    booking_created: <Calendar className="h-3.5 w-3.5 text-success" />,
+    booking_cancelled: <XCircle className="h-3.5 w-3.5 text-destructive" />,
+    payment_received: <DollarSign className="h-3.5 w-3.5 text-success" />,
     guide_confirmed: <User className="h-3.5 w-3.5 text-primary" />,
   };
 

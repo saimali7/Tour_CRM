@@ -6,9 +6,9 @@ export default function BookingNotFound() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
       <div className="relative mb-8">
-        <div className="absolute inset-0 bg-amber-500/10 rounded-full blur-2xl" />
-        <div className="relative bg-gradient-to-br from-amber-500/20 to-amber-500/5 rounded-full p-8">
-          <CalendarX className="h-16 w-16 text-amber-500" strokeWidth={1.5} />
+        <div className="absolute inset-0 bg-warning/10 rounded-full blur-2xl" />
+        <div className="relative bg-gradient-to-br from-warning/20 to-warning/5 rounded-full p-8">
+          <CalendarX className="h-16 w-16 text-warning" strokeWidth={1.5} />
         </div>
       </div>
 

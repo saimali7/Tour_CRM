@@ -49,9 +49,9 @@ export function CalendarDayCell({
 
   // Capacity bar color based on utilization
   const getBarColor = () => {
-    if (utilization >= 80) return "bg-emerald-500";
+    if (utilization >= 80) return "bg-success";
     if (utilization >= 50) return "bg-primary";
-    return "bg-amber-500";
+    return "bg-warning";
   };
 
   // Build alert tooltip text
@@ -99,13 +99,13 @@ export function CalendarDayCell({
             <TooltipTrigger asChild>
               <div className="flex items-center gap-0.5">
                 {stats.needsGuide > 0 && (
-                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  <span className="h-2 w-2 rounded-full bg-warning" />
                 )}
                 {stats.pendingPayments > 0 && (
-                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  <span className="h-2 w-2 rounded-full bg-destructive" />
                 )}
                 {stats.unconfirmed > 0 && (
-                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="h-2 w-2 rounded-full bg-info" />
                 )}
               </div>
             </TooltipTrigger>
@@ -137,7 +137,7 @@ export function CalendarDayCell({
             </p>
             <div className="flex items-center gap-1">
               {utilization >= 100 ? (
-                <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600">
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-success/15 text-success">
                   Full
                 </span>
               ) : (

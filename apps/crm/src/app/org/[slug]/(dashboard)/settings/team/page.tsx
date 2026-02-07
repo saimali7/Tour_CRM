@@ -24,36 +24,36 @@ const ROLE_CONFIG = {
   owner: {
     label: "Owner",
     icon: Crown,
-    color: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-    iconColor: "text-amber-500",
+    color: "bg-warning/10 text-warning border-warning/20",
+    iconColor: "text-warning",
     description: "Full access including billing and deletion",
   },
   admin: {
     label: "Admin",
     icon: Shield,
-    color: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-    iconColor: "text-blue-500",
+    color: "bg-info/10 text-info border-info/20",
+    iconColor: "text-info",
     description: "Full access except billing and org deletion",
   },
   manager: {
     label: "Manager",
     icon: UserCog,
-    color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-    iconColor: "text-emerald-500",
+    color: "bg-success/10 text-success border-success/20",
+    iconColor: "text-success",
     description: "Manage bookings, schedules, and guides",
   },
   support: {
     label: "Support",
     icon: Headphones,
-    color: "bg-violet-500/10 text-violet-600 border-violet-500/20",
-    iconColor: "text-violet-500",
+    color: "bg-info/10 text-info border-info/20",
+    iconColor: "text-info",
     description: "View and update bookings and customers",
   },
   guide: {
     label: "Guide",
     icon: Compass,
-    color: "bg-rose-500/10 text-rose-600 border-rose-500/20",
-    iconColor: "text-rose-500",
+    color: "bg-secondary text-secondary-foreground border-secondary/60",
+    iconColor: "text-secondary-foreground",
     description: "View assigned schedules and bookings only",
   },
 };
@@ -165,7 +165,7 @@ export default function TeamSettingsPage() {
                           )}
                         </div>
                         {member.status === "active" && (
-                          <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 ring-2 ring-background" />
+                          <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-success ring-2 ring-background" />
                         )}
                       </div>
 
@@ -186,7 +186,7 @@ export default function TeamSettingsPage() {
                     <div className="flex items-center gap-3">
                       {/* Status Badge */}
                       {member.status === "invited" && (
-                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-warning/10 text-warning border border-warning/20">
                           Pending
                         </span>
                       )}

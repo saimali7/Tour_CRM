@@ -350,6 +350,12 @@ export interface AddOutsourcedGuideToRunResult {
   message: string;
 }
 
+export interface CreateTempGuideForDateResult {
+  success: boolean;
+  guideId: string;
+  guideName: string;
+}
+
 // =============================================================================
 // SERVICE
 // =============================================================================
@@ -1005,7 +1011,7 @@ export class CommandCenterService extends BaseService {
             and(
               eq(guideAvailabilityOverrides.organizationId, this.organizationId),
               inArray(guideAvailabilityOverrides.guideId, guideIds),
-              sql`${guideAvailabilityOverrides.date}::text = ${dateStr}`
+              sql`DATE(${guideAvailabilityOverrides.date}) = ${dateStr}::DATE`
             )
           ),
         // Get weekly availability for this day for all guides
@@ -2283,6 +2289,77 @@ export class CommandCenterService extends BaseService {
         assignedCount === 0
           ? "No bookings were assigned. They may have been assigned concurrently."
           : `Added outsourced guide to ${assignedCount} booking${assignedCount === 1 ? "" : "s"}.`,
+    };
+  }
+
+  async createTempGuideForDate(input: {
+    date: Date | string;
+    name: string;
+    phone: string;
+  }): Promise<CreateTempGuideForDateResult> {
+    await this.assertNotDispatched(input.date, "Create temporary guide");
+
+    const trimmedName = input.name.trim();
+    const trimmedPhone = input.phone.trim();
+    if (!trimmedName) {
+      throw new ValidationError("Guide name is required");
+    }
+    if (!trimmedPhone) {
+      throw new ValidationError("Guide phone is required");
+    }
+
+    const [firstNameRaw = "", ...lastNameParts] = trimmedName.split(/\s+/);
+    const firstName = firstNameRaw.trim() || "Temp";
+    const lastName = lastNameParts.join(" ").trim() || "Guide";
+
+    const dateKey = this.formatDateKey(input.date);
+    const overrideDateUtc = new Date(`${dateKey}T12:00:00.000Z`);
+    const dateSuffix = dateKey.replace(/-/g, "");
+    const slug = this.slugify(trimmedName) || "temp-guide";
+    const uniqueSuffix = Math.random().toString(36).slice(2, 8);
+    const email = `${slug}.${dateSuffix}.${uniqueSuffix}@temp-outsourced.local`;
+
+    const guide = await this.db.transaction(async (tx) => {
+      const [createdGuide] = await tx
+        .insert(guides)
+        .values({
+          organizationId: this.organizationId,
+          firstName,
+          lastName,
+          email,
+          phone: trimmedPhone,
+          status: "active",
+          isPublic: false,
+          notes: `Temporary outsourced guide for ${dateKey}`,
+          vehicleCapacity: 6,
+        })
+        .returning({
+          id: guides.id,
+          firstName: guides.firstName,
+          lastName: guides.lastName,
+        });
+
+      if (!createdGuide) {
+        throw new ValidationError("Failed to create temporary guide");
+      }
+
+      await tx.insert(guideAvailabilityOverrides).values({
+        organizationId: this.organizationId,
+        guideId: createdGuide.id,
+        date: overrideDateUtc,
+        isAvailable: true,
+        startTime: "06:00",
+        endTime: "24:00",
+        reason: `Temporary outsourced guide for ${dateKey}`,
+      });
+
+      return createdGuide;
+    });
+
+    return {
+      success: true,
+      guideId: guide.id,
+      guideName: `${guide.firstName} ${guide.lastName}`.trim(),
     };
   }
 

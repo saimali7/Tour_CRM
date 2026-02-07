@@ -123,7 +123,7 @@ export default function GeneralSettingsPage() {
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
               saveSuccess
-                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
+                ? "bg-success/10 text-success border border-success/20 translate-x-0 opacity-100"
                 : "translate-x-4 opacity-0 pointer-events-none"
             )}
           >
@@ -306,8 +306,8 @@ export default function GeneralSettingsPage() {
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
-                <MapPin className="h-4 w-4 text-amber-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10">
+                <MapPin className="h-4 w-4 text-warning" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Business Address</h3>

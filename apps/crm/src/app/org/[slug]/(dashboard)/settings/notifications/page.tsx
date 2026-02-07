@@ -106,7 +106,7 @@ const CUSTOMER_EVENTS = [
     label: "Booking Confirmed",
     description: "Sent when booking is confirmed",
     icon: CalendarCheck,
-    iconColor: "text-emerald-500",
+    iconColor: "text-success",
     hasTiming: true,
   },
   {
@@ -114,7 +114,7 @@ const CUSTOMER_EVENTS = [
     label: "Payment Received",
     description: "Sent when payment is processed",
     icon: CreditCard,
-    iconColor: "text-blue-500",
+    iconColor: "text-info",
     hasTiming: true,
   },
   {
@@ -122,7 +122,7 @@ const CUSTOMER_EVENTS = [
     label: "Tour Reminder (24h)",
     description: "Reminder sent 24 hours before tour",
     icon: Clock,
-    iconColor: "text-amber-500",
+    iconColor: "text-warning",
     fixedTiming: "24h before",
   },
   {
@@ -130,7 +130,7 @@ const CUSTOMER_EVENTS = [
     label: "Tour Reminder (2h)",
     description: "Reminder sent 2 hours before tour",
     icon: Clock,
-    iconColor: "text-orange-500",
+    iconColor: "text-warning",
     fixedTiming: "2h before",
   },
   {
@@ -138,7 +138,7 @@ const CUSTOMER_EVENTS = [
     label: "Booking Cancelled",
     description: "Sent when booking is cancelled",
     icon: XCircle,
-    iconColor: "text-red-500",
+    iconColor: "text-destructive",
     hasTiming: true,
   },
   {
@@ -146,7 +146,7 @@ const CUSTOMER_EVENTS = [
     label: "Refund Processed",
     description: "Sent when refund is completed",
     icon: RotateCcw,
-    iconColor: "text-violet-500",
+    iconColor: "text-info",
     hasTiming: true,
   },
 ];
@@ -157,28 +157,28 @@ const STAFF_EVENTS = [
     label: "New Booking",
     description: "When a new booking is created",
     icon: CalendarCheck,
-    iconColor: "text-emerald-500",
+    iconColor: "text-success",
   },
   {
     key: "paymentReceived" as const,
     label: "Payment Received",
     description: "When a payment is processed",
     icon: CreditCard,
-    iconColor: "text-blue-500",
+    iconColor: "text-info",
   },
   {
     key: "bookingCancelled" as const,
     label: "Booking Cancelled",
     description: "When a booking is cancelled",
     icon: XCircle,
-    iconColor: "text-red-500",
+    iconColor: "text-destructive",
   },
   {
     key: "lowAvailability" as const,
     label: "Low Availability Alert",
     description: "When tour capacity is running low",
     icon: AlertTriangle,
-    iconColor: "text-amber-500",
+    iconColor: "text-warning",
   },
 ];
 
@@ -188,21 +188,21 @@ const GUIDE_EVENTS = [
     label: "Schedule Assignment",
     description: "When assigned to a tour",
     icon: CalendarDays,
-    iconColor: "text-blue-500",
+    iconColor: "text-info",
   },
   {
     key: "scheduleUpdate" as const,
     label: "Schedule Update",
     description: "When their schedule changes",
     icon: RotateCcw,
-    iconColor: "text-amber-500",
+    iconColor: "text-warning",
   },
   {
     key: "dayOfReminder" as const,
     label: "Day-of Reminder",
     description: "Morning reminder for today's tours",
     icon: Megaphone,
-    iconColor: "text-emerald-500",
+    iconColor: "text-success",
   },
 ];
 
@@ -335,7 +335,7 @@ export default function NotificationsSettingsPage() {
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
               saveSuccess
-                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
+                ? "bg-success/10 text-success border border-success/20 translate-x-0 opacity-100"
                 : "translate-x-4 opacity-0 pointer-events-none"
             )}
           >
@@ -387,24 +387,24 @@ export default function NotificationsSettingsPage() {
           <div className={cn(
             "flex items-center justify-between p-4 rounded-lg border transition-colors",
             settings.emailEnabled
-              ? "border-emerald-500/30 bg-emerald-500/5"
+              ? "border-success/30 bg-success/5"
               : "border-border bg-muted/30"
           )}>
             <div className="flex items-center gap-3">
               <div className={cn(
                 "h-10 w-10 rounded-lg flex items-center justify-center transition-colors",
-                settings.emailEnabled ? "bg-emerald-500/10" : "bg-muted"
+                settings.emailEnabled ? "bg-success/10" : "bg-muted"
               )}>
                 <Mail className={cn(
                   "h-5 w-5 transition-colors",
-                  settings.emailEnabled ? "text-emerald-600" : "text-muted-foreground"
+                  settings.emailEnabled ? "text-success" : "text-muted-foreground"
                 )} />
               </div>
               <div>
                 <p className="font-medium text-foreground flex items-center gap-2">
                   Email Notifications
                   {settings.emailEnabled && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success font-medium">
                       ACTIVE
                     </span>
                   )}
@@ -424,24 +424,24 @@ export default function NotificationsSettingsPage() {
           <div className={cn(
             "flex items-center justify-between p-4 rounded-lg border transition-colors",
             settings.smsEnabled
-              ? "border-emerald-500/30 bg-emerald-500/5"
+              ? "border-success/30 bg-success/5"
               : "border-border bg-muted/30"
           )}>
             <div className="flex items-center gap-3">
               <div className={cn(
                 "h-10 w-10 rounded-lg flex items-center justify-center transition-colors",
-                settings.smsEnabled ? "bg-emerald-500/10" : "bg-muted"
+                settings.smsEnabled ? "bg-success/10" : "bg-muted"
               )}>
                 <MessageSquare className={cn(
                   "h-5 w-5 transition-colors",
-                  settings.smsEnabled ? "text-emerald-600" : "text-muted-foreground"
+                  settings.smsEnabled ? "text-success" : "text-muted-foreground"
                 )} />
               </div>
               <div>
                 <p className="font-medium text-foreground flex items-center gap-2">
                   SMS Notifications
                   {settings.smsEnabled && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success font-medium">
                       ACTIVE
                     </span>
                   )}
@@ -463,8 +463,8 @@ export default function NotificationsSettingsPage() {
       <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
-              <Users className="h-4 w-4 text-blue-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10">
+              <Users className="h-4 w-4 text-info" />
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Customer Notifications</h3>
@@ -574,8 +574,8 @@ export default function NotificationsSettingsPage() {
       <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
-              <Users className="h-4 w-4 text-violet-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10">
+              <Users className="h-4 w-4 text-info" />
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Staff Notifications</h3>
@@ -642,8 +642,8 @@ export default function NotificationsSettingsPage() {
       <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10">
-              <Compass className="h-4 w-4 text-rose-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
+              <Compass className="h-4 w-4 text-secondary-foreground" />
             </div>
             <div>
               <h3 className="font-semibold text-foreground">Guide Notifications</h3>

@@ -67,21 +67,21 @@ export function DayPreviewPopover({
     const parts: React.ReactNode[] = [];
     if (stats.needsGuide > 0) {
       parts.push(
-        <span key="guide" className="text-amber-600">
+        <span key="guide" className="text-warning">
           {stats.needsGuide} needs guide
         </span>
       );
     }
     if (stats.pendingPayments > 0) {
       parts.push(
-        <span key="payment" className="text-red-600">
+        <span key="payment" className="text-destructive">
           {stats.pendingPayments} pending
         </span>
       );
     }
     if (stats.unconfirmed > 0) {
       parts.push(
-        <span key="unconfirmed" className="text-blue-600">
+        <span key="unconfirmed" className="text-info">
           {stats.unconfirmed} unconfirmed
         </span>
       );
@@ -141,11 +141,11 @@ export function DayPreviewPopover({
                     </span>
                     <span className="w-4 flex justify-center shrink-0">
                       {tour.needsGuide ? (
-                        <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                        <AlertCircle className="h-3.5 w-3.5 text-warning" />
                       ) : isFull ? (
-                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        <span className="h-2 w-2 rounded-full bg-success" />
                       ) : tour.hasPendingPayments ? (
-                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        <span className="h-2 w-2 rounded-full bg-destructive" />
                       ) : null}
                     </span>
                   </div>

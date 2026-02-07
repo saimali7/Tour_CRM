@@ -111,7 +111,7 @@ function InlineEditField({
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="p-1 text-emerald-500 hover:bg-accent rounded transition-colors"
+          className="p-1 text-success hover:bg-accent rounded transition-colors"
         >
           <Check className="h-3.5 w-3.5" />
         </button>
@@ -209,7 +209,7 @@ function TagAdder({
         />
         <button
           onClick={handleAdd}
-          className="p-0.5 text-emerald-500 hover:bg-accent rounded transition-colors"
+          className="p-0.5 text-success hover:bg-accent rounded transition-colors"
         >
           <Check className="h-3 w-3" />
         </button>
@@ -245,11 +245,11 @@ interface Customer360SheetProps {
 }
 
 const SEGMENT_CONFIG = {
-  vip: { color: "bg-amber-500", text: "text-amber-600", label: "VIP", icon: Crown },
-  loyal: { color: "bg-emerald-500", text: "text-emerald-600", label: "Loyal", icon: Star },
-  promising: { color: "bg-blue-500", text: "text-blue-600", label: "Promising", icon: TrendingUp },
-  at_risk: { color: "bg-orange-500", text: "text-orange-600", label: "At Risk", icon: AlertTriangle },
-  dormant: { color: "bg-gray-400", text: "text-gray-500", label: "Dormant", icon: Clock },
+  vip: { className: "bg-primary/10 text-primary", label: "VIP", icon: Crown },
+  loyal: { className: "bg-success/10 text-success", label: "Loyal", icon: Star },
+  promising: { className: "bg-info/10 text-info", label: "Promising", icon: TrendingUp },
+  at_risk: { className: "bg-warning/10 text-warning", label: "At Risk", icon: AlertTriangle },
+  dormant: { className: "bg-muted text-muted-foreground", label: "Dormant", icon: Clock },
 } as const;
 
 type TimelineFilter = "all" | "bookings" | "communications" | "notes";
@@ -429,8 +429,7 @@ export function Customer360Sheet({
                   <div
                     className={cn(
                       "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
-                      segmentConfig.color.replace("bg-", "bg-opacity-10 bg-"),
-                      segmentConfig.text
+                      segmentConfig.className
                     )}
                   >
                     <SegmentIcon className="h-3.5 w-3.5" />
@@ -451,7 +450,7 @@ export function Customer360Sheet({
                       className={cn(
                         "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs group/tag",
                         tag === "vip"
-                          ? "bg-amber-500/10 text-amber-600"
+                          ? "bg-warning/10 text-warning"
                           : "bg-muted text-muted-foreground"
                       )}
                     >
@@ -562,7 +561,7 @@ export function Customer360Sheet({
                 <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
                   <Calendar className="h-3.5 w-3.5" />
                 </div>
-                <p className="text-xl font-bold text-foreground">
+                <p className="text-2xl font-semibold text-foreground font-mono tabular-nums">
                   {customer.totalBookings || 0}
                 </p>
                 <p className="text-xs text-muted-foreground">Bookings</p>
@@ -571,7 +570,7 @@ export function Customer360Sheet({
                 <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
                   <DollarSign className="h-3.5 w-3.5" />
                 </div>
-                <p className="text-xl font-bold text-emerald-600">
+                <p className="text-2xl font-semibold text-success font-mono tabular-nums">
                   ${parseFloat(customer.totalSpent || "0").toLocaleString(undefined, {
                     maximumFractionDigits: 0,
                   })}
@@ -582,7 +581,7 @@ export function Customer360Sheet({
                 <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
                   <Sparkles className="h-3.5 w-3.5" />
                 </div>
-                <p className="text-xl font-bold text-foreground">
+                <p className="text-2xl font-semibold text-foreground font-mono tabular-nums">
                   ${customer.totalBookings && customer.totalBookings > 0
                     ? (
                       parseFloat(customer.totalSpent || "0") / customer.totalBookings
@@ -625,19 +624,19 @@ export function Customer360Sheet({
                       <div
                         className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                          item.type === "booking" && "bg-blue-500/10",
-                          item.type === "communication" && "bg-purple-500/10",
-                          item.type === "note" && "bg-amber-500/10"
+                          item.type === "booking" && "bg-info/10",
+                          item.type === "communication" && "bg-muted",
+                          item.type === "note" && "bg-warning/10"
                         )}
                       >
                         {item.type === "booking" && (
-                          <BookOpen className="h-4 w-4 text-blue-600" />
+                          <BookOpen className="h-4 w-4 text-info" />
                         )}
                         {item.type === "communication" && (
-                          <Mail className="h-4 w-4 text-purple-600" />
+                          <Mail className="h-4 w-4 text-muted-foreground" />
                         )}
                         {item.type === "note" && (
-                          <MessageSquare className="h-4 w-4 text-amber-600" />
+                          <MessageSquare className="h-4 w-4 text-warning" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -652,7 +651,7 @@ export function Customer360Sheet({
                         </p>
                       </div>
                       {item.type === "booking" && item.metadata?.status === "confirmed" && (
-                        <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <CheckCircle className="h-4 w-4 text-success shrink-0" />
                       )}
                     </div>
                   ))

@@ -116,7 +116,7 @@ export function TourPreview({ tourId }: TourPreviewProps) {
             </div>
             <p className={cn(
               "text-lg font-semibold tabular-nums",
-              basePrice > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
+              basePrice > 0 ? "text-success dark:text-success" : "text-foreground"
             )}>
               {formatPrice(basePrice)}
             </p>
@@ -198,7 +198,7 @@ export function TourPreview({ tourId }: TourPreviewProps) {
                 key={index}
                 className="flex items-start gap-2 text-sm text-muted-foreground"
               >
-                <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                <CheckCircle className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
                 <span className="line-clamp-1">{item}</span>
               </li>
             ))}

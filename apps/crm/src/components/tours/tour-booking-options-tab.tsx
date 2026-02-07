@@ -470,11 +470,11 @@ export function TourBookingOptionsTab({ tourId }: TourBookingOptionsTabProps) {
   const getBadgeColor = (badge?: string | null) => {
     switch (badge) {
       case "BEST_VALUE":
-        return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+        return "bg-success/10 text-success dark:text-success";
       case "RECOMMENDED":
         return "bg-primary/10 text-primary";
       case "LUXURY":
-        return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+        return "bg-warning/10 text-warning dark:text-warning";
       default:
         return "bg-muted text-muted-foreground";
     }
@@ -694,7 +694,7 @@ export function TourBookingOptionsTab({ tourId }: TourBookingOptionsTabProps) {
       {/* Presets Info */}
       <div className="bg-muted/30 rounded-lg border border-border p-4">
         <div className="flex items-start gap-3">
-          <Lightbulb className="h-5 w-5 text-amber-500 mt-0.5" />
+          <Lightbulb className="h-5 w-5 text-warning mt-0.5" />
           <div className="space-y-3">
             <p className="font-medium text-foreground">Quick Setup Tips</p>
             <div className="grid gap-3 text-sm">

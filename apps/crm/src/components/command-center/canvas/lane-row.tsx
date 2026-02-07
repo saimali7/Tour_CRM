@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, AlertTriangle } from "lucide-react";
+import { Users, AlertTriangle, Phone } from "lucide-react";
 import { UserAvatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { formatTimeDisplay } from "../timeline/timeline-utils";
@@ -46,6 +46,13 @@ const capacityColor: Record<LanePressureLevel, string> = {
   critical: "bg-destructive/15 text-destructive",
 };
 
+function shouldShowMarkerLabel(time: string): boolean {
+  const hour = Number(time.split(":")[0]);
+  if (Number.isNaN(hour)) return true;
+  if (hour === 6 || hour === 24) return true;
+  return hour % 2 === 0;
+}
+
 export function LaneRow({
   row,
   markers,
@@ -73,6 +80,7 @@ export function LaneRow({
 }: LaneRowProps) {
   const guideFirstName = row.guide.firstName;
   const guideFullName = `${row.guide.firstName} ${row.guide.lastName}`.trim();
+  const isTempGuide = row.guide.email?.endsWith("@temp-outsourced.local") ?? false;
   const previewLeft = dragPreview?.leftPercent ?? 0;
   const previewWidth = dragPreview
     ? Math.max(2, Math.min(dragPreview.widthPercent, Math.max(2, 99.65 - previewLeft)))
@@ -85,7 +93,12 @@ export function LaneRow({
     <div key={row.guide.id} className="group/lane flex min-h-[80px] border-b">
       <button
         type="button"
-        className="sticky left-0 z-10 flex w-[180px] shrink-0 items-center gap-2 border-r bg-card/90 px-2 py-2 text-left shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] transition-colors hover:bg-muted/30 min-[1400px]:w-[188px] 2xl:w-[196px]"
+        className={cn(
+          "sticky left-0 z-10 flex w-[180px] shrink-0 items-start gap-2 border-r px-2 py-2 text-left shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] transition-colors min-[1400px]:w-[188px] 2xl:w-[196px]",
+          row.isOutsourced
+            ? "border-l-2 border-l-warning/35 bg-warning/[0.08] hover:bg-warning/[0.14]"
+            : "bg-card/90 hover:bg-muted/30"
+        )}
         onClick={() => onGuideClick(row.guide.id)}
         title={`${guideFullName}${row.isOutsourced ? " (Outsourced)" : ""}\n${row.utilization}% utilization \u00B7 ${row.runs.length} runs`}
       >
@@ -96,12 +109,18 @@ export function LaneRow({
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[12px] font-semibold leading-tight text-foreground">
-            {guideFirstName}
+            {guideFullName || guideFirstName}
           </p>
-          <div className="mt-0.5 flex items-center gap-1.5">
+          <div className="mt-1 flex flex-wrap items-center gap-1">
             {row.isOutsourced && (
-              <span className="inline-flex items-center rounded-full bg-warning/15 px-1.5 py-0.5 text-[9px] font-semibold text-warning">
-                OUT
+              <span className="inline-flex items-center rounded-full border border-warning/35 bg-warning/15 px-1.5 py-0.5 text-[9px] font-semibold text-warning">
+                {isTempGuide ? "TEMP" : "OUT"}
+              </span>
+            )}
+            {row.isOutsourced && row.guide.phone && (
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/55 bg-card/65 px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                <Phone className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate">{row.guide.phone}</span>
               </span>
             )}
             <span
@@ -113,6 +132,9 @@ export function LaneRow({
               <Users className="h-2.5 w-2.5" />
               {row.totalGuests}/{row.vehicleCapacity}
             </span>
+            <span className="text-[9px] text-muted-foreground/75 tabular-nums">
+              {row.runs.length} {row.runs.length === 1 ? "run" : "runs"}
+            </span>
           </div>
         </div>
       </button>
@@ -121,7 +143,7 @@ export function LaneRow({
         className={cn(
           "relative overflow-hidden",
           timelineZoom > 1 ? "shrink-0" : "flex-1",
-          "bg-[linear-gradient(90deg,hsl(var(--muted)/0.14)_0%,transparent_12%,transparent_88%,hsl(var(--muted)/0.14)_100%)]",
+          row.isOutsourced ? "bg-warning/[0.035]" : "bg-background/[0.01]",
           isActiveDrop && !willExceedCapacity && "bg-primary/5",
           isActiveDrop && willExceedCapacity && "bg-destructive/5"
         )}
@@ -134,15 +156,27 @@ export function LaneRow({
           {markers.map((marker) => (
             <div
               key={`${row.guide.id}_${marker.time}`}
-              className="absolute top-0 bottom-0 border-l border-border/30"
+              className={cn(
+                "absolute bottom-0 top-0 border-l",
+                shouldShowMarkerLabel(marker.time) ? "border-border/18" : "border-border/10"
+              )}
               style={{ left: `${marker.left}%` }}
             />
           ))}
         </div>
 
         {row.runs.length === 0 && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/60">
-            No assignments
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                row.isOutsourced
+                  ? "border-warning/30 bg-warning/10 text-warning/90"
+                  : "border-border/45 bg-card/65 text-muted-foreground/75"
+              )}
+            >
+              No assignments
+            </span>
           </div>
         )}
 

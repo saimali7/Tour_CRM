@@ -139,7 +139,7 @@ export function TourMobileCard({
               className={cn(
                 'flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
                 isActive
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  ? 'bg-success/10 text-success dark:text-success'
                   : 'bg-muted text-muted-foreground'
               )}
             >
@@ -180,7 +180,7 @@ export function TourMobileCard({
             {scheduleCount} schedule{scheduleCount !== 1 && 's'}
           </span>
           {bookingCount > 0 && (
-            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+            <span className="text-success dark:text-success font-medium">
               {bookingCount} booking{bookingCount !== 1 && 's'}
             </span>
           )}

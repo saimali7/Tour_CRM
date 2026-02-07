@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 // =============================================================================
 // ILLUSTRATION COMPONENTS
@@ -158,8 +159,14 @@ function GuideIllustration({ className }: { className?: string }) {
         className="fill-primary"
       />
       {/* Badge/checkmark */}
-      <circle cx="95" cy="60" r="12" className="fill-emerald-500" />
-      <path d="M90 60 L93 63 L100 56" className="stroke-white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="95" cy="60" r="12" className="fill-success" />
+      <path
+        d="M90 60 L93 63 L100 56"
+        className="stroke-primary-foreground"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -337,40 +344,37 @@ export function EmptyState({
           <div className="flex flex-col sm:flex-row items-center gap-3 animate-in slide-in-from-bottom-2 duration-500 delay-300">
             {action && (
               action.href ? (
-                <Link
-                  href={action.href as Route}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
-                  <ActionIcon className="h-4 w-4" aria-hidden="true" />
-                  {action.label}
-                </Link>
+                <Button asChild className="gap-2 px-6 py-3">
+                  <Link href={action.href as Route}>
+                    <ActionIcon className="h-4 w-4" aria-hidden="true" />
+                    {action.label}
+                  </Link>
+                </Button>
               ) : (
-                <button
-                  onClick={action.onClick}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
+                <Button onClick={action.onClick} className="gap-2 px-6 py-3">
                   <ActionIcon className="h-4 w-4" aria-hidden="true" />
                   {action.label}
-                </button>
+                </Button>
               )
             )}
             {secondaryAction && (
               secondaryAction.href ? (
-                <Link
-                  href={secondaryAction.href as Route}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md"
-                >
-                  {secondaryAction.label}
-                  <ArrowRight className="h-3 w-3" aria-hidden="true" />
-                </Link>
+                <Button asChild variant="ghost" size="sm" className="gap-1.5">
+                  <Link href={secondaryAction.href as Route}>
+                    {secondaryAction.label}
+                    <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                  </Link>
+                </Button>
               ) : (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={secondaryAction.onClick}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md"
+                  className="gap-1.5"
                 >
                   {secondaryAction.label}
                   <ArrowRight className="h-3 w-3" aria-hidden="true" />
-                </button>
+                </Button>
               )
             )}
           </div>

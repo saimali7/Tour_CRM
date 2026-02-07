@@ -103,24 +103,24 @@ export function ActionItemsCard({
     switch (variant) {
       case "confirm":
         return {
-          bg: "bg-emerald-50 dark:bg-emerald-950/30",
-          border: "border-emerald-200 dark:border-emerald-800",
-          text: "text-emerald-700 dark:text-emerald-400",
-          button: "bg-emerald-600 hover:bg-emerald-700 text-white",
+          bg: "bg-success dark:bg-success/30",
+          border: "border-success dark:border-success",
+          text: "text-success dark:text-success",
+          button: "bg-success hover:bg-success text-success-foreground",
         };
       case "payment":
         return {
-          bg: "bg-amber-50 dark:bg-amber-950/30",
-          border: "border-amber-200 dark:border-amber-800",
-          text: "text-amber-700 dark:text-amber-400",
-          button: "bg-amber-600 hover:bg-amber-700 text-white",
+          bg: "bg-warning dark:bg-warning/30",
+          border: "border-warning dark:border-warning",
+          text: "text-warning dark:text-warning",
+          button: "bg-warning hover:bg-warning text-warning-foreground",
         };
       case "guide":
         return {
-          bg: "bg-blue-50 dark:bg-blue-950/30",
-          border: "border-blue-200 dark:border-blue-800",
-          text: "text-blue-700 dark:text-blue-400",
-          button: "bg-blue-600 hover:bg-blue-700 text-white",
+          bg: "bg-info dark:bg-info/30",
+          border: "border-info dark:border-info",
+          text: "text-info dark:text-info",
+          button: "bg-info hover:bg-info text-info-foreground",
         };
     }
   };
@@ -128,9 +128,9 @@ export function ActionItemsCard({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {/* Alert icon and count */}
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/50">
-        <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-warning dark:bg-warning/50">
+        <AlertCircle className="h-3.5 w-3.5 text-warning dark:text-warning" />
+        <span className="text-xs font-semibold text-warning dark:text-warning">
           {actionItems.length} action{actionItems.length !== 1 ? "s" : ""}
         </span>
       </div>

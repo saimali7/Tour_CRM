@@ -63,18 +63,18 @@ export default function CustomerReportPage() {
 
   // Prepare chart data - Customer segments
   const segmentColors: Record<CustomerSegment, string> = {
-    vip: "#8b5cf6", // purple
-    loyal: "#3b82f6", // blue
-    promising: "#10b981", // green
-    at_risk: "#f59e0b", // amber
-    dormant: "#ef4444", // red
+    vip: "hsl(var(--primary))",
+    loyal: "hsl(var(--success))",
+    promising: "hsl(var(--info))",
+    at_risk: "hsl(var(--warning))",
+    dormant: "hsl(var(--muted-foreground))",
   };
 
   const customerSegments = data?.segmentDistribution
     ? Object.entries(data.segmentDistribution).map(([segment, count]) => ({
         label: segment.toUpperCase(),
         value: count,
-        color: segmentColors[segment as CustomerSegment] || "#9ca3af",
+        color: segmentColors[segment as CustomerSegment] || "hsl(var(--muted-foreground))",
       }))
     : [];
 

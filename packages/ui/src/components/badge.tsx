@@ -12,31 +12,27 @@ const badgeVariants = cva(
           "border-transparent bg-primary text-primary-foreground",
         secondary:
           "border-transparent bg-secondary text-secondary-foreground",
-        outline: "text-foreground border-border",
+        outline: "text-foreground border-border bg-transparent",
 
         // Semantic variants - matching UI_UX_DESIGN_PRINCIPLES.md
         success:
-          "border-transparent bg-[hsl(160_84%_95%)] text-[hsl(160_84%_25%)]",
+          "border-transparent bg-success/10 text-success",
         warning:
-          "border-transparent bg-[hsl(38_92%_95%)] text-[hsl(38_92%_30%)]",
+          "border-transparent bg-warning/10 text-warning",
         destructive:
-          "border-transparent bg-[hsl(0_72%_95%)] text-[hsl(0_72%_30%)]",
+          "border-transparent bg-destructive/10 text-destructive",
         info:
-          "border-transparent bg-[hsl(217_91%_95%)] text-[hsl(217_91%_30%)]",
+          "border-transparent bg-info/10 text-info",
 
         // Muted/neutral
         muted:
-          "border-transparent bg-[hsl(220_14%_95%)] text-[hsl(220_13%_30%)]",
+          "border-transparent bg-muted text-muted-foreground",
 
         // Status-specific (booking, payment)
-        pending:
-          "border-transparent bg-[hsl(38_92%_95%)] text-[hsl(38_92%_30%)]",
-        confirmed:
-          "border-transparent bg-[hsl(160_84%_95%)] text-[hsl(160_84%_25%)]",
-        completed:
-          "border-transparent bg-[hsl(217_91%_95%)] text-[hsl(217_91%_30%)]",
-        cancelled:
-          "border-transparent bg-[hsl(0_72%_95%)] text-[hsl(0_72%_30%)]",
+        pending: "status-pending",
+        confirmed: "status-confirmed",
+        completed: "status-completed",
+        cancelled: "status-cancelled",
       },
       size: {
         default: "px-2.5 py-0.5 text-xs",

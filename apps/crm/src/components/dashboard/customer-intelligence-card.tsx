@@ -22,11 +22,11 @@ interface CustomerIntelligenceCardProps {
 }
 
 const SEGMENT_COLORS = {
-  vip: { bg: "bg-amber-500", text: "text-amber-600", light: "bg-amber-500/10" },
-  loyal: { bg: "bg-emerald-500", text: "text-emerald-600", light: "bg-emerald-500/10" },
-  promising: { bg: "bg-blue-500", text: "text-blue-600", light: "bg-blue-500/10" },
-  at_risk: { bg: "bg-orange-500", text: "text-orange-600", light: "bg-orange-500/10" },
-  dormant: { bg: "bg-gray-400", text: "text-gray-500", light: "bg-gray-500/10" },
+  vip: { bg: "bg-primary", text: "text-primary", light: "bg-primary/10", stroke: "stroke-primary" },
+  loyal: { bg: "bg-success", text: "text-success", light: "bg-success/10", stroke: "stroke-success" },
+  promising: { bg: "bg-info", text: "text-info", light: "bg-info/10", stroke: "stroke-info" },
+  at_risk: { bg: "bg-warning", text: "text-warning", light: "bg-warning/10", stroke: "stroke-warning" },
+  dormant: { bg: "bg-muted-foreground/60", text: "text-muted-foreground", light: "bg-muted/60", stroke: "stroke-muted-foreground" },
 } as const;
 
 const SEGMENT_LABELS = {
@@ -94,7 +94,7 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
     <div className="card-opportunity rounded-xl p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-purple-700 dark:text-purple-400" />
+          <Sparkles className="h-5 w-5 text-info dark:text-info" />
           <h3 className="text-lg font-semibold text-foreground">Customer Intelligence</h3>
         </div>
         <Button
@@ -134,7 +134,7 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
                       r="40"
                       fill="none"
                       strokeWidth="12"
-                      className={SEGMENT_COLORS[segment].bg}
+                      className={SEGMENT_COLORS[segment].stroke}
                       strokeDasharray={`${strokeDasharray} ${circumference}`}
                       strokeDashoffset={strokeDashoffset}
                       strokeLinecap="round"
@@ -166,13 +166,13 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
+              <AlertTriangle className="h-4 w-4 text-warning" />
               <span className="text-sm font-medium text-muted-foreground">
                 At-Risk Customers
               </span>
             </div>
             {atRiskCustomers && atRiskCustomers.length > 0 && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 font-medium">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-medium">
                 {atRiskCustomers.length}
               </span>
             )}
@@ -184,11 +184,11 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
                 <Link
                   key={customer.customerId}
                   href={`/org/${orgSlug}/customers/${customer.customerId}` as Route}
-                  className="flex items-center justify-between p-2 rounded-lg bg-background/50 hover:bg-background transition-colors border border-transparent hover:border-orange-500/20"
+                  className="flex items-center justify-between p-2 rounded-lg bg-background/50 hover:bg-background transition-colors border border-transparent hover:border-warning/20"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-orange-500/10 flex items-center justify-center">
-                      <UserX className="h-3.5 w-3.5 text-orange-500" />
+                    <div className="w-7 h-7 rounded-full bg-warning/10 flex items-center justify-center">
+                      <UserX className="h-3.5 w-3.5 text-warning" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground">
@@ -223,7 +223,7 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
         {/* VIP Spotlight */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Crown className="h-4 w-4 text-amber-500" />
+            <Crown className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium text-muted-foreground">
               VIP Spotlight (Top CLV)
             </span>
@@ -235,14 +235,14 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
                 <Link
                   key={customer.customerId}
                   href={`/org/${orgSlug}/customers/${customer.customerId}` as Route}
-                  className="flex items-center justify-between p-2 rounded-lg bg-background/50 hover:bg-background transition-colors border border-transparent hover:border-amber-500/20"
+                  className="flex items-center justify-between p-2 rounded-lg bg-background/50 hover:bg-background transition-colors border border-transparent hover:border-warning/20"
                 >
                   <div className="flex items-center gap-2">
                     <div className={cn(
                       "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold",
-                      idx === 0 && "bg-amber-500 text-white",
-                      idx === 1 && "bg-gray-300 text-gray-700",
-                      idx === 2 && "bg-amber-700 text-amber-100",
+                      idx === 0 && "bg-primary text-primary-foreground",
+                      idx === 1 && "bg-info/15 text-info",
+                      idx === 2 && "bg-warning/15 text-warning",
                       idx > 2 && "bg-muted text-muted-foreground"
                     )}>
                       {idx + 1}
@@ -257,7 +257,7 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-emerald-600">
+                    <p className="text-sm font-semibold text-success">
                       ${parseFloat(customer.historicalCLV).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </p>
                     <p className="text-[10px] text-muted-foreground">lifetime</p>
@@ -276,7 +276,7 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-blue-500" />
+              <TrendingUp className="h-4 w-4 text-info" />
               <span className="text-sm font-medium text-muted-foreground">
                 Re-engagement
               </span>
@@ -296,7 +296,7 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
                     </p>
                   </div>
                   <div className="p-2 rounded-lg bg-muted">
-                    <UserCheck className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                    <UserCheck className="h-5 w-5 text-info dark:text-info" />
                   </div>
                 </div>
               </div>
@@ -304,13 +304,13 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
               <div className="flex items-center justify-between text-xs">
                 <div>
                   <span className="text-muted-foreground">At risk (60+ days): </span>
-                  <span className="font-medium text-orange-600">
+                  <span className="font-medium text-warning">
                     {reengagementCandidates.filter((c) => c.triggerType === "at_risk_60_days").length}
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Dormant (120+ days): </span>
-                  <span className="font-medium text-gray-500">
+                  <span className="font-medium text-muted-foreground">
                     {reengagementCandidates.filter((c) => c.triggerType === "dormant_120_days").length}
                   </span>
                 </div>
@@ -329,7 +329,7 @@ export function CustomerIntelligenceCard({ orgSlug }: CustomerIntelligenceCardPr
             </div>
           ) : (
             <div className="text-center py-4">
-              <UserCheck className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
+              <UserCheck className="h-6 w-6 text-success mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
                 All customers are engaged
               </p>

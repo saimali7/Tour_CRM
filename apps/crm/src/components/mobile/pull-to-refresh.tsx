@@ -166,7 +166,7 @@ export function PullToRefresh({
         {state === 'refreshing' ? (
           <Loader2 className="h-6 w-6 animate-spin" />
         ) : state === 'complete' ? (
-          <Check className="h-6 w-6 text-emerald-500" />
+          <Check className="h-6 w-6 text-success" />
         ) : (
           <ArrowDown
             className={cn(

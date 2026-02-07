@@ -111,8 +111,8 @@ export function GoalProgressRing({ className, orgSlug }: GoalProgressRingProps) 
               className={cn(
                 "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
                 primaryGoal.isOnTrack
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  ? "bg-success/10 text-success dark:text-success"
+                  : "bg-warning/10 text-warning dark:text-warning"
               )}
             >
               {primaryGoal.isOnTrack ? "On Track" : "Behind"}
@@ -131,9 +131,9 @@ export function GoalProgressRing({ className, orgSlug }: GoalProgressRingProps) 
           <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               {primaryGoal.isOnTrack ? (
-                <TrendingUp className="h-3 w-3 text-emerald-500" />
+                <TrendingUp className="h-3 w-3 text-success" />
               ) : (
-                <TrendingDown className="h-3 w-3 text-amber-500" />
+                <TrendingDown className="h-3 w-3 text-warning" />
               )}
               <span>
                 Projected: {formatValue(primaryGoal.projectedValue, primaryGoal.metricType)}
@@ -191,10 +191,10 @@ function ProgressRing({
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   const progressColor = isOnTrack
-    ? "stroke-emerald-500"
+    ? "stroke-success"
     : progress >= 50
-      ? "stroke-amber-500"
-      : "stroke-red-500";
+      ? "stroke-warning"
+      : "stroke-destructive";
 
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>

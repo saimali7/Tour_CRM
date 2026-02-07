@@ -241,7 +241,7 @@ export default function CommunicationsPage() {
           </div>
           <div className="bg-card p-4 rounded-lg border border-border">
             <p className="text-sm text-muted-foreground">Delivered Rate</p>
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-success">
               {logStats.totalSent > 0
                 ? Math.round((logStats.totalDelivered / logStats.totalSent) * 100)
                 : 0}%

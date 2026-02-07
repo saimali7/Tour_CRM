@@ -133,7 +133,7 @@ export default function BookingSettingsPage() {
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
               saveSuccess
-                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
+                ? "bg-success/10 text-success border border-success/20 translate-x-0 opacity-100"
                 : "translate-x-4 opacity-0 pointer-events-none"
             )}
           >
@@ -225,8 +225,8 @@ export default function BookingSettingsPage() {
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Users className="h-4 w-4 text-emerald-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10">
+                <Users className="h-4 w-4 text-success" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Customer Requirements</h3>
@@ -312,8 +312,8 @@ export default function BookingSettingsPage() {
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
-                <FileText className="h-4 w-4 text-violet-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10">
+                <FileText className="h-4 w-4 text-info" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Policies</h3>

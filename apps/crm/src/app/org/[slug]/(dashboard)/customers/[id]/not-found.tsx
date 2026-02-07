@@ -6,9 +6,9 @@ export default function CustomerNotFound() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
       <div className="relative mb-8">
-        <div className="absolute inset-0 bg-blue-500/10 rounded-full blur-2xl" />
-        <div className="relative bg-gradient-to-br from-blue-500/20 to-blue-500/5 rounded-full p-8">
-          <UserX className="h-16 w-16 text-blue-500" strokeWidth={1.5} />
+        <div className="absolute inset-0 bg-info/10 rounded-full blur-2xl" />
+        <div className="relative bg-gradient-to-br from-info/20 to-info/5 rounded-full p-8">
+          <UserX className="h-16 w-16 text-info" strokeWidth={1.5} />
         </div>
       </div>
 

@@ -170,12 +170,12 @@ export default function WaiversSettingsPage() {
       </div>
 
       {/* Info Card */}
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+      <div className="bg-info/10 border border-info/20 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <FileSignature className="h-5 w-5 text-blue-600 mt-0.5" />
+          <FileSignature className="h-5 w-5 text-info mt-0.5" />
           <div>
-            <p className="font-medium text-blue-600">About Digital Waivers</p>
-            <p className="text-sm text-blue-600/80 mt-1">
+            <p className="font-medium text-info">About Digital Waivers</p>
+            <p className="text-sm text-info/80 mt-1">
               Digital waivers collect legally-binding signatures from customers before their tour.
               Customers can sign on their device and the signed waiver is stored with their booking.
               You can require waivers per tour and configure what information to collect.

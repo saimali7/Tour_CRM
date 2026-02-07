@@ -299,7 +299,7 @@ function StatCard({
       <p
         className={`text-2xl font-bold tabular-nums ${
           variant === "warning" && value !== "0"
-            ? "text-amber-600"
+            ? "text-warning"
             : "text-foreground"
         }`}
       >

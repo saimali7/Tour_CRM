@@ -50,17 +50,17 @@ const STATUS_CONFIG = {
   active: {
     label: "Active",
     icon: Clock,
-    className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    className: "bg-info/10 text-info border-info/20",
   },
   completed: {
     label: "Completed",
     icon: CheckCircle,
-    className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    className: "bg-success/10 text-success border-success/20",
   },
   missed: {
     label: "Missed",
     icon: XCircle,
-    className: "bg-red-500/10 text-red-600 border-red-500/20",
+    className: "bg-destructive/10 text-destructive border-destructive/20",
   },
 } as const;
 
@@ -136,7 +136,7 @@ export default function GoalsSettingsPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Target className="h-6 w-6 text-emerald-600" />
+              <Target className="h-6 w-6 text-success" />
               Goals
             </h1>
             <p className="text-muted-foreground mt-1">
@@ -149,7 +149,7 @@ export default function GoalsSettingsPage() {
             setEditingGoal(null);
             setShowModal(true);
           }}
-          className="bg-emerald-600 hover:bg-emerald-700"
+          className="bg-success hover:bg-success"
         >
           <Plus className="h-4 w-4 mr-2" />
           New Goal
@@ -163,13 +163,13 @@ export default function GoalsSettingsPage() {
             <p className="text-sm text-muted-foreground">Total Active</p>
             <p className="text-2xl font-bold text-foreground">{summary.totalActive}</p>
           </div>
-          <div className="bg-card rounded-lg border border-emerald-500/20 p-4">
-            <p className="text-sm text-emerald-600">On Track</p>
-            <p className="text-2xl font-bold text-emerald-600">{summary.onTrack}</p>
+          <div className="bg-card rounded-lg border border-success/20 p-4">
+            <p className="text-sm text-success">On Track</p>
+            <p className="text-2xl font-bold text-success">{summary.onTrack}</p>
           </div>
-          <div className="bg-card rounded-lg border border-orange-500/20 p-4">
-            <p className="text-sm text-orange-600">Needs Attention</p>
-            <p className="text-2xl font-bold text-orange-600">{summary.offTrack}</p>
+          <div className="bg-card rounded-lg border border-warning/20 p-4">
+            <p className="text-sm text-warning">Needs Attention</p>
+            <p className="text-2xl font-bold text-warning">{summary.offTrack}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4">
             <p className="text-sm text-muted-foreground">Completed</p>
@@ -192,7 +192,7 @@ export default function GoalsSettingsPage() {
               className={cn(
                 "py-3 px-1 border-b-2 font-medium text-sm transition-colors",
                 statusFilter === status
-                  ? "border-emerald-600 text-emerald-600"
+                  ? "border-success text-success"
                   : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
               )}
             >
@@ -240,8 +240,8 @@ export default function GoalsSettingsPage() {
                           className={cn(
                             "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
                             progress.isOnTrack
-                              ? "bg-emerald-500/10 text-emerald-600"
-                              : "bg-orange-500/10 text-orange-600"
+                              ? "bg-success/10 text-success"
+                              : "bg-warning/10 text-warning"
                           )}
                         >
                           {progress.isOnTrack ? (
@@ -298,7 +298,7 @@ export default function GoalsSettingsPage() {
                           <div
                             className={cn(
                               "h-full rounded-full transition-all",
-                              progress.isOnTrack ? "bg-emerald-500" : "bg-orange-500"
+                              progress.isOnTrack ? "bg-success" : "bg-warning"
                             )}
                             style={{ width: `${Math.min(100, progress.progress)}%` }}
                           />
@@ -344,8 +344,8 @@ export default function GoalsSettingsPage() {
         </div>
       ) : (
         <div className="bg-card rounded-xl border border-border p-12 text-center">
-          <div className="mx-auto h-16 w-16 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4">
-            <Target className="h-8 w-8 text-emerald-600" />
+          <div className="mx-auto h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mb-4">
+            <Target className="h-8 w-8 text-success" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">
             {statusFilter === "all" ? "No goals yet" : `No ${statusFilter} goals`}
@@ -361,7 +361,7 @@ export default function GoalsSettingsPage() {
                 setEditingGoal(null);
                 setShowModal(true);
               }}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-success hover:bg-success"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Your First Goal
@@ -372,12 +372,12 @@ export default function GoalsSettingsPage() {
 
       {/* Tips Section */}
       {goals && goals.length > 0 && (
-        <div className="bg-emerald-500/5 rounded-xl border border-emerald-500/10 p-5">
+        <div className="bg-success/5 rounded-xl border border-success/10 p-5">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-emerald-600 mt-0.5" />
+            <AlertCircle className="h-5 w-5 text-success mt-0.5" />
             <div>
-              <h4 className="font-medium text-emerald-600 mb-1">Goal Tips</h4>
-              <ul className="text-sm text-emerald-600/80 space-y-1">
+              <h4 className="font-medium text-success mb-1">Goal Tips</h4>
+              <ul className="text-sm text-success/80 space-y-1">
                 <li>• Goals are automatically calculated based on actual bookings and revenue</li>
                 <li>• Active goals are checked and updated whenever you view this page</li>
                 <li>• Goals past their end date are automatically marked as completed or missed</li>

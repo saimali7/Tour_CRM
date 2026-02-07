@@ -70,10 +70,10 @@ const variantStyles: Record<SectionVariant, {
     iconBg: "bg-muted",
   },
   important: {
-    border: "border-amber-300 dark:border-amber-700",
-    indicator: "bg-amber-500",
-    header: "bg-amber-50/50 dark:bg-amber-950/20",
-    iconBg: "bg-amber-100 dark:bg-amber-900/50",
+    border: "border-warning dark:border-warning",
+    indicator: "bg-warning",
+    header: "bg-warning/50 dark:bg-warning/20",
+    iconBg: "bg-warning dark:bg-warning/50",
   },
   empty: {
     border: "border-border",
@@ -82,16 +82,16 @@ const variantStyles: Record<SectionVariant, {
     iconBg: "bg-muted/50",
   },
   success: {
-    border: "border-emerald-300 dark:border-emerald-700",
-    indicator: "bg-emerald-500",
+    border: "border-success dark:border-success",
+    indicator: "bg-success",
     header: "",
-    iconBg: "bg-emerald-100 dark:bg-emerald-900/50",
+    iconBg: "bg-success dark:bg-success/50",
   },
   warning: {
-    border: "border-amber-300 dark:border-amber-700",
-    indicator: "bg-amber-500",
+    border: "border-warning dark:border-warning",
+    indicator: "bg-warning",
     header: "",
-    iconBg: "bg-amber-100 dark:bg-amber-900/50",
+    iconBg: "bg-warning dark:bg-warning/50",
   },
 };
 
@@ -220,9 +220,9 @@ export function CollapsibleSection({
               className={cn(
                 "h-4 w-4 transition-colors",
                 variant === "important" || variant === "warning"
-                  ? "text-amber-600 dark:text-amber-400"
+                  ? "text-warning dark:text-warning"
                   : variant === "success"
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-success dark:text-success"
                   : "text-muted-foreground"
               )}
             />
@@ -237,7 +237,7 @@ export function CollapsibleSection({
             </h3>
             {badge}
             {variant === "important" && (
-              <AlertCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+              <AlertCircle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
             )}
           </div>
           <div
@@ -357,7 +357,7 @@ export function SectionListItem({
     <div
       className={cn(
         "px-4 sm:px-5 py-3",
-        highlight && "bg-amber-50/50 dark:bg-amber-950/20",
+        highlight && "bg-warning/50 dark:bg-warning/20",
         className
       )}
     >

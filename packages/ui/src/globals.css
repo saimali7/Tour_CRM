@@ -2,7 +2,7 @@
 
 /* =============================================================================
    DESIGN TOKENS
-   Based on UI_UX_DESIGN_PRINCIPLES.md
+   Based on docs/DESIGN_SYSTEM.md (single source of truth)
    =============================================================================*/
 
 /* Custom theme extending Tailwind defaults */
@@ -49,7 +49,18 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   /* Font family */
-  --font-sans: "Inter", var(--font-sans), system-ui, sans-serif;
+  --font-sans: var(--font-sans-custom, ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(
+    --font-mono-custom,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace
+  );
 
   /* Animations */
   --animate-accordion-down: accordion-down 0.2s ease-out;

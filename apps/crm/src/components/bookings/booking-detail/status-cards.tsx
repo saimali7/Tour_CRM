@@ -39,42 +39,48 @@ export function StatusCards({
     icon: React.ComponentType<{ className?: string }>;
     textClass: string;
     iconBgClass: string;
+    iconTextClass: string;
     dotClass: string;
   }> = {
     confirmed: {
       label: "Confirmed",
       icon: Check,
-      textClass: "text-emerald-600 dark:text-emerald-400",
-      iconBgClass: "bg-emerald-500",
-      dotClass: "bg-emerald-500",
+      textClass: "text-success",
+      iconBgClass: "bg-success",
+      iconTextClass: "text-success-foreground",
+      dotClass: "bg-success",
     },
     pending: {
       label: "Pending",
       icon: Clock,
-      textClass: "text-amber-600 dark:text-amber-400",
-      iconBgClass: "bg-amber-500",
-      dotClass: "bg-amber-500",
+      textClass: "text-warning",
+      iconBgClass: "bg-warning",
+      iconTextClass: "text-warning-foreground",
+      dotClass: "bg-warning",
     },
     cancelled: {
       label: "Cancelled",
       icon: X,
-      textClass: "text-red-600 dark:text-red-400",
-      iconBgClass: "bg-red-500",
-      dotClass: "bg-red-500",
+      textClass: "text-destructive",
+      iconBgClass: "bg-destructive",
+      iconTextClass: "text-destructive-foreground",
+      dotClass: "bg-destructive",
     },
     completed: {
       label: "Completed",
       icon: Check,
-      textClass: "text-slate-600 dark:text-slate-400",
-      iconBgClass: "bg-slate-500",
-      dotClass: "bg-slate-500",
+      textClass: "text-muted-foreground",
+      iconBgClass: "bg-muted",
+      iconTextClass: "text-muted-foreground",
+      dotClass: "bg-muted-foreground/60",
     },
     no_show: {
       label: "No Show",
       icon: Ban,
-      textClass: "text-slate-500 dark:text-slate-500",
-      iconBgClass: "bg-slate-400",
-      dotClass: "bg-slate-400",
+      textClass: "text-muted-foreground",
+      iconBgClass: "bg-muted/80",
+      iconTextClass: "text-muted-foreground",
+      dotClass: "bg-muted-foreground/60",
     },
   };
 
@@ -92,7 +98,7 @@ export function StatusCards({
           "flex items-center justify-center w-6 h-6 rounded-full",
           status.iconBgClass
         )}>
-          <StatusIcon className="h-3 w-3 text-white" />
+          <StatusIcon className={cn("h-3 w-3", status.iconTextClass)} />
         </div>
         <div className="flex flex-col">
           <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -109,7 +115,7 @@ export function StatusCards({
         <div className="hidden sm:flex items-center gap-2 flex-1 max-w-[200px]">
           <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+              className="h-full rounded-full bg-gradient-to-r from-success to-success/70"
               style={{ width: `${paidPercentage}%` }}
             />
           </div>
@@ -128,8 +134,8 @@ export function StatusCards({
           <span className={cn(
             "text-lg font-bold tabular-nums leading-tight",
             balanceDue > 0
-              ? "text-amber-600 dark:text-amber-400"
-              : "text-emerald-600 dark:text-emerald-400"
+              ? "text-warning"
+              : "text-success"
           )}>
             ${balanceDue.toFixed(2)}
           </span>
@@ -144,8 +150,7 @@ export function StatusCards({
             disabled={isPaymentLoading}
             className={cn(
               "h-7 text-xs gap-1.5",
-              "border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800",
-              "dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950"
+              "border-warning text-warning hover:bg-warning hover:text-warning-foreground"
             )}
           >
             <CreditCard className="h-3 w-3" />
@@ -155,8 +160,7 @@ export function StatusCards({
           <span className={cn(
             "inline-flex items-center gap-1 px-2 py-1 rounded-md",
             "text-[10px] font-semibold",
-            "bg-emerald-100 text-emerald-700",
-            "dark:bg-emerald-900/50 dark:text-emerald-400"
+            "bg-success/10 text-success"
           )}>
             <Check className="h-3 w-3" />
             Paid

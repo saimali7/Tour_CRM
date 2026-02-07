@@ -143,7 +143,7 @@ export function DayTourSection({
         className={cn(
           "w-full flex items-center justify-between p-4 text-left transition-colors",
           "hover:bg-muted/50",
-          needsGuide && "bg-amber-500/5"
+          needsGuide && "bg-warning/5"
         )}
       >
         <div className="flex-1 min-w-0">
@@ -162,7 +162,7 @@ export function DayTourSection({
             {guideName ? (
               <span>Guide: {guideName}</span>
             ) : needsGuide ? (
-              <span className="text-amber-600 flex items-center gap-1">
+              <span className="text-warning flex items-center gap-1">
                 <AlertCircle className="h-3.5 w-3.5" />
                 No guide assigned
               </span>
@@ -181,7 +181,7 @@ export function DayTourSection({
               <span className="text-muted-foreground">/{capacity}</span>
             </span>
             {isFull && (
-              <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/20">
+              <Badge className="bg-success/15 text-success border-success/20">
                 Full
               </Badge>
             )}
@@ -292,9 +292,9 @@ function BookingRow({
 
   // Status dot color
   const getStatusColor = () => {
-    if (isReady) return "bg-emerald-500";
-    if (needsPayment && isConfirmed) return "bg-amber-500";
-    if (needsConfirmation) return "bg-blue-500";
+    if (isReady) return "bg-success";
+    if (needsPayment && isConfirmed) return "bg-warning";
+    if (needsConfirmation) return "bg-info";
     if (booking.status === "cancelled") return "bg-muted";
     return "bg-muted";
   };
@@ -340,7 +340,7 @@ function BookingRow({
         <span
           className={cn(
             "text-sm font-medium tabular-nums",
-            isPaid ? "text-foreground" : "text-amber-600"
+            isPaid ? "text-foreground" : "text-warning"
           )}
         >
           {formatCurrency(booking.total)}
@@ -352,7 +352,7 @@ function BookingRow({
         {isPaid ? (
           <Badge
             variant="outline"
-            className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+            className="bg-success/10 text-success border-success/20"
           >
             <CheckCircle2 className="h-3 w-3 mr-1" />
             Paid
@@ -360,7 +360,7 @@ function BookingRow({
         ) : (
           <Badge
             variant="outline"
-            className="bg-amber-500/10 text-amber-600 border-amber-500/20"
+            className="bg-warning/10 text-warning border-warning/20"
           >
             <CreditCard className="h-3 w-3 mr-1" />
             Pending

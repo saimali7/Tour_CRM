@@ -145,12 +145,12 @@ function TomorrowBookingRow({
       {/* Status indicators */}
       <div className="flex items-center gap-2 flex-shrink-0">
         {needsAttention ? (
-          <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+          <span className="flex items-center gap-1 text-xs text-warning dark:text-warning">
             <AlertCircle className="h-3 w-3" />
             {booking.status === "pending" ? "Pending" : "Unpaid"}
           </span>
         ) : (
-          <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+          <span className="flex items-center gap-1 text-xs text-success dark:text-success">
             <CheckCircle2 className="h-3 w-3" />
             Ready
           </span>

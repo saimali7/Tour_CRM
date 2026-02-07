@@ -59,13 +59,13 @@ interface TodayBookingsProps {
 function getStatusColor(status: TodayBooking["status"]): string {
   switch (status) {
     case "confirmed":
-      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+      return "bg-success/10 text-success dark:text-success";
     case "pending":
-      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+      return "bg-warning/10 text-warning dark:text-warning";
     case "completed":
-      return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+      return "bg-info/10 text-info dark:text-info";
     case "no_show":
-      return "bg-red-500/10 text-red-600 dark:text-red-400";
+      return "bg-destructive/10 text-destructive dark:text-destructive";
     default:
       return "bg-muted text-muted-foreground";
   }
@@ -74,13 +74,13 @@ function getStatusColor(status: TodayBooking["status"]): string {
 function getPaymentStatusIcon(paymentStatus: TodayBooking["paymentStatus"]) {
   switch (paymentStatus) {
     case "paid":
-      return <CheckCircle2 className="h-3 w-3 text-emerald-500" />;
+      return <CheckCircle2 className="h-3 w-3 text-success" />;
     case "partial":
-      return <CreditCard className="h-3 w-3 text-amber-500" />;
+      return <CreditCard className="h-3 w-3 text-warning" />;
     case "pending":
-      return <AlertCircle className="h-3 w-3 text-amber-500" />;
+      return <AlertCircle className="h-3 w-3 text-warning" />;
     case "failed":
-      return <AlertCircle className="h-3 w-3 text-red-500" />;
+      return <AlertCircle className="h-3 w-3 text-destructive" />;
     default:
       return null;
   }

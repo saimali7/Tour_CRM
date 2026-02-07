@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { Search, GripVertical, ChevronDown, ChevronUp, WandSparkles } from "lucide-react";
+import { useMemo, type CSSProperties } from "react";
+import { Search, GripVertical, ChevronDown, ChevronUp, WandSparkles, Clock3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,66 @@ function groupLabel(group: HopperGroup): string {
   }
   return `${group.totalBookings} bookings`;
 }
+
+function tourHue(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % 360;
+}
+
+function parseTourHour(tourTime: string): number | null {
+  const value = tourTime.trim().toUpperCase();
+  const amPmMatch = value.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (amPmMatch) {
+    const hour = Number(amPmMatch[1]);
+    const period = amPmMatch[3];
+    if (Number.isNaN(hour)) return null;
+    if (period === "AM") return hour === 12 ? 0 : hour;
+    return hour === 12 ? 12 : hour + 12;
+  }
+
+  const hhmmMatch = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (hhmmMatch) {
+    const hour = Number(hhmmMatch[1]);
+    if (Number.isNaN(hour)) return null;
+    return Math.max(0, Math.min(23, hour));
+  }
+
+  return null;
+}
+
+type TimeBand = "early" | "morning" | "midday" | "afternoon" | "evening" | "night";
+
+function getTimeBand(tourTime: string): TimeBand {
+  const hour = parseTourHour(tourTime);
+  if (hour === null) return "midday";
+  if (hour < 8) return "early";
+  if (hour < 11) return "morning";
+  if (hour < 14) return "midday";
+  if (hour < 17) return "afternoon";
+  if (hour < 20) return "evening";
+  return "night";
+}
+
+const timeBandClass: Record<TimeBand, string> = {
+  early: "border-cyan-500/35 bg-cyan-500/12 text-cyan-700 dark:text-cyan-300",
+  morning: "border-emerald-500/35 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+  midday: "border-sky-500/35 bg-sky-500/12 text-sky-700 dark:text-sky-300",
+  afternoon: "border-amber-500/35 bg-amber-500/12 text-amber-700 dark:text-amber-300",
+  evening: "border-violet-500/35 bg-violet-500/12 text-violet-700 dark:text-violet-300",
+  night: "border-indigo-500/35 bg-indigo-500/12 text-indigo-700 dark:text-indigo-300",
+};
+
+const timeBandLabel: Record<TimeBand, string> = {
+  early: "Early",
+  morning: "Morning",
+  midday: "Midday",
+  afternoon: "Afternoon",
+  evening: "Evening",
+  night: "Night",
+};
 
 const sortOptions: Array<{ mode: QueueSortMode; label: string }> = [
   { mode: "time", label: "Time" },
@@ -168,14 +228,22 @@ export function QueuePane({
 
         {groups.map((group) => {
           const isExpanded = expandedGroups.has(group.id);
+          const hue = tourHue(`${group.tourName}|${group.tourTime}`);
+          const accentColor = `hsl(${hue} 78% 52%)`;
+          const accentTint = `hsl(${hue} 82% 52% / 0.10)`;
+          const band = getTimeBand(group.tourTime);
+          const cardStyle: CSSProperties = {
+            backgroundImage: `linear-gradient(90deg, ${accentTint} 0%, transparent 45%)`,
+          };
           return (
             <div
               key={group.id}
               className={cn(
                 "group relative overflow-hidden rounded-lg border bg-card shadow-sm transition-colors duration-150",
-                group.isCharter && "border-warning/45 bg-warning/[0.06]",
+                group.isCharter && "border-warning/45",
                 canEdit && "hover:border-primary/35 hover:shadow-md"
               )}
+              style={cardStyle}
               draggable={canEdit}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
@@ -192,8 +260,9 @@ export function QueuePane({
               <span
                 className={cn(
                   "absolute inset-y-0 left-0 w-1",
-                  group.isCharter ? "bg-warning" : "bg-primary/70"
+                  group.isCharter ? "bg-warning" : ""
                 )}
+                style={!group.isCharter ? { backgroundColor: accentColor } : undefined}
               />
 
               <div className="px-2 py-2 pl-3">
@@ -205,17 +274,31 @@ export function QueuePane({
                   <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-start justify-between gap-1">
-                      <span
-                        className="min-w-0 flex-1 line-clamp-2 text-[13px] font-semibold leading-tight"
-                        title={group.tourName}
+                      <div className="min-w-0 flex flex-1 items-start gap-1.5">
+                        <span
+                          className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: accentColor }}
+                          aria-hidden="true"
+                        />
+                        <span
+                          className="min-w-0 flex-1 line-clamp-2 text-[13px] font-semibold leading-tight"
+                          title={group.tourName}
+                        >
+                          {group.tourName}
+                        </span>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={cn("h-5 shrink-0 rounded-full px-1.5 text-[10px] tabular-nums", timeBandClass[band])}
                       >
-                        {group.tourName}
-                      </span>
-                      <Badge variant="outline" className="h-5 shrink-0 rounded-full px-1.5 text-[10px]">
+                        <Clock3 className="mr-0.5 h-2.5 w-2.5" />
                         {group.tourTime}
                       </Badge>
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <span className={cn("inline-flex items-center rounded-full border px-1.5 py-0.5 font-medium", timeBandClass[band])}>
+                        {timeBandLabel[band]}
+                      </span>
                       <span>{groupLabel(group)}</span>
                       <span className="text-muted-foreground/60">&middot;</span>
                       <span className="tabular-nums">{group.totalGuests}p</span>
@@ -255,7 +338,10 @@ export function QueuePane({
               </div>
 
               {isExpanded && (
-                <div className="space-y-1 border-t bg-muted/20 px-2 py-1.5 pl-3">
+                <div
+                  className="space-y-1 border-t bg-muted/20 px-2 py-1.5 pl-3"
+                  style={{ borderTopColor: `${accentColor}55` }}
+                >
                   {group.bookings.map((booking) => (
                     <div
                       key={booking.id}

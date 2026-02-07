@@ -446,8 +446,8 @@ export function TourAvailabilityEditor({
           className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10">
-              <Clock className="h-5 w-5 text-blue-500" />
+            <div className="p-2 rounded-lg bg-info/10">
+              <Clock className="h-5 w-5 text-info" />
             </div>
             <div className="text-left">
               <h3 className="font-semibold text-foreground">Departure Times</h3>

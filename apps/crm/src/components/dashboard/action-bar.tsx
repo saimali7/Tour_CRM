@@ -86,11 +86,11 @@ export function ActionBar({
   if (actionItems.length === 0) {
     return (
       <div className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800",
+        "flex items-center gap-2 px-3 py-2 rounded-lg bg-success dark:bg-success/30 border border-success dark:border-success",
         className
       )}>
-        <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-        <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+        <CheckCircle className="h-4 w-4 text-success dark:text-success" />
+        <span className="text-sm font-medium text-success dark:text-success">
           All caught up - no pending actions
         </span>
       </div>
@@ -102,23 +102,23 @@ export function ActionBar({
     switch (variant) {
       case "confirm":
         return {
-          bg: "bg-amber-50 dark:bg-amber-950/30",
-          border: "border-amber-200 dark:border-amber-800",
-          text: "text-amber-700 dark:text-amber-400",
+          bg: "bg-warning dark:bg-warning/30",
+          border: "border-warning dark:border-warning",
+          text: "text-warning dark:text-warning",
           icon: Clock,
         };
       case "payment":
         return {
-          bg: "bg-emerald-50 dark:bg-emerald-950/30",
-          border: "border-emerald-200 dark:border-emerald-800",
-          text: "text-emerald-700 dark:text-emerald-400",
+          bg: "bg-success dark:bg-success/30",
+          border: "border-success dark:border-success",
+          text: "text-success dark:text-success",
           icon: CreditCard,
         };
       case "guide":
         return {
-          bg: "bg-blue-50 dark:bg-blue-950/30",
-          border: "border-blue-200 dark:border-blue-800",
-          text: "text-blue-700 dark:text-blue-400",
+          bg: "bg-info dark:bg-info/30",
+          border: "border-info dark:border-info",
+          text: "text-info dark:text-info",
           icon: UserPlus,
         };
       default:
@@ -136,9 +136,9 @@ export function ActionBar({
   return (
     <div className={cn("flex items-center gap-2 flex-wrap", className)}>
       {/* Action count badge */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/50">
-        <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning dark:bg-warning/50">
+        <AlertCircle className="h-3.5 w-3.5 text-warning dark:text-warning" />
+        <span className="text-xs font-semibold text-warning dark:text-warning">
           {actionItems.length} action{actionItems.length !== 1 ? "s" : ""}
         </span>
       </div>

@@ -105,8 +105,8 @@ export function QuickContactMenu({
         {/* Call Option */}
         {phone ? (
           <DropdownMenuItem onClick={handleCall} className="gap-3 cursor-pointer">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50">
-              <Phone className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success dark:bg-success/50">
+              <Phone className="h-4 w-4 text-success dark:text-success" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium">Call</p>
@@ -127,8 +127,8 @@ export function QuickContactMenu({
 
         {/* Email Option */}
         <DropdownMenuItem onClick={handleEmail} className="gap-3 cursor-pointer">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50">
-            <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-info dark:bg-info/50">
+            <Mail className="h-4 w-4 text-info dark:text-info" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">Email</p>
@@ -139,8 +139,8 @@ export function QuickContactMenu({
         {/* SMS Option */}
         {phone ? (
           <DropdownMenuItem onClick={handleSMS} className="gap-3 cursor-pointer">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/50">
-              <MessageSquare className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-info dark:bg-info/50">
+              <MessageSquare className="h-4 w-4 text-info dark:text-info" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium">SMS</p>
@@ -168,7 +168,7 @@ export function QuickContactMenu({
             className="gap-3 cursor-pointer"
           >
             {copied === "phone" ? (
-              <Check className="h-4 w-4 text-emerald-500" />
+              <Check className="h-4 w-4 text-success" />
             ) : (
               <Copy className="h-4 w-4 text-muted-foreground" />
             )}
@@ -180,7 +180,7 @@ export function QuickContactMenu({
           className="gap-3 cursor-pointer"
         >
           {copied === "email" ? (
-            <Check className="h-4 w-4 text-emerald-500" />
+            <Check className="h-4 w-4 text-success" />
           ) : (
             <Copy className="h-4 w-4 text-muted-foreground" />
           )}

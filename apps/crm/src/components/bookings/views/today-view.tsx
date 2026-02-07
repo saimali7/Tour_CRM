@@ -55,22 +55,22 @@ interface TimelineBooking {
 
 const urgencyConfig = {
   critical: {
-    borderColor: "border-red-500",
-    badgeClass: "bg-red-500 text-white",
-    dotClass: "bg-red-500",
-    glowClass: "shadow-red-500/50",
+    borderColor: "border-destructive",
+    badgeClass: "bg-destructive text-destructive-foreground",
+    dotClass: "bg-destructive",
+    glowClass: "shadow-destructive/50",
   },
   high: {
-    borderColor: "border-amber-500",
-    badgeClass: "bg-amber-500 text-white",
-    dotClass: "bg-amber-500",
-    glowClass: "shadow-amber-500/50",
+    borderColor: "border-warning",
+    badgeClass: "bg-warning text-warning-foreground",
+    dotClass: "bg-warning",
+    glowClass: "shadow-warning/50",
   },
   medium: {
-    borderColor: "border-blue-500",
-    badgeClass: "bg-blue-500 text-white",
-    dotClass: "bg-blue-500",
-    glowClass: "shadow-blue-500/50",
+    borderColor: "border-info",
+    badgeClass: "bg-info text-info-foreground",
+    dotClass: "bg-info",
+    glowClass: "shadow-info/50",
   },
   low: {
     borderColor: "border-border",
@@ -135,7 +135,7 @@ function TodayViewSkeleton() {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20 py-16 text-center">
-      <Sun className="mb-4 h-16 w-16 text-amber-500" />
+      <Sun className="mb-4 h-16 w-16 text-warning" />
       <h3 className="text-lg font-semibold text-foreground">No tours scheduled for today</h3>
       <p className="mt-2 max-w-md text-sm text-muted-foreground">
         Enjoy your day off! Check back tomorrow or view all bookings to see your upcoming schedule.
@@ -354,19 +354,19 @@ export function TodayView({ orgSlug }: TodayViewProps) {
           icon={CheckCircle2}
           label="Confirmed"
           value={stats.confirmed}
-          className="border-emerald-500/20 bg-emerald-500/5"
+          className="border-success/20 bg-success/5"
         />
         <StatsCard
           icon={AlertCircle}
           label="Pending"
           value={stats.pending}
-          className="border-amber-500/20 bg-amber-500/5"
+          className="border-warning/20 bg-warning/5"
         />
         <StatsCard
           icon={DollarSign}
           label="Paid"
           value={stats.paid}
-          className="border-blue-500/20 bg-blue-500/5"
+          className="border-info/20 bg-info/5"
         />
       </div>
 

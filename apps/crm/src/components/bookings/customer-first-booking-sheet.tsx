@@ -131,15 +131,15 @@ function getBadgeIcon(badge?: string | null) {
 function getBadgeColor(badge?: string | null) {
   switch (badge) {
     case "BEST_VALUE":
-      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+      return "bg-success/10 text-success dark:text-success";
     case "RECOMMENDED":
       return "bg-primary/10 text-primary";
     case "BEST_FOR_FAMILIES":
-      return "bg-pink-500/10 text-pink-600 dark:text-pink-400";
+      return "bg-info/10 text-info";
     case "LUXURY":
-      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+      return "bg-warning/10 text-warning dark:text-warning";
     case "SAVE_MONEY":
-      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+      return "bg-success/10 text-success dark:text-success";
     default:
       return "bg-muted text-muted-foreground";
   }
@@ -1013,7 +1013,7 @@ export function CustomerFirstBookingSheet({
                                   >
                                     {slot.time}
                                     {slot.available && slot.spotsLeft !== undefined && slot.spotsLeft <= 5 && (
-                                      <span className="ml-1 text-xs text-orange-600">({slot.spotsLeft} left)</span>
+                                      <span className="ml-1 text-xs text-warning">({slot.spotsLeft} left)</span>
                                     )}
                                   </button>
                                 ))}
@@ -1025,7 +1025,7 @@ export function CustomerFirstBookingSheet({
                           <div className="text-right">
                             <p className="text-2xl font-bold text-foreground">{formatCurrency(option.totalPrice.amount)}</p>
                             {option.urgency && (
-                              <p className="text-xs text-orange-600 font-medium mt-1">{option.urgency}</p>
+                              <p className="text-xs text-warning font-medium mt-1">{option.urgency}</p>
                             )}
                           </div>
                         </div>

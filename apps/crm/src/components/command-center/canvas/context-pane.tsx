@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { DispatchContextData } from "./canvas-types";
-import type { OutsourcedGuideDraft } from "./canvas-types";
 import type { CanvasRow } from "../dispatch-model";
 
 interface ContextPaneProps {
@@ -22,7 +21,6 @@ interface ContextPaneProps {
   onMoveRun: (guideId: string, runId: string, targetGuideId: string) => Promise<void>;
   onRescheduleRun: (guideId: string, runId: string, newStartTime: string) => Promise<void>;
   onReturnRunToQueue: (guideId: string, runId: string) => Promise<void>;
-  onAddOutsourcedGuideToRun: (runId: string, draft: OutsourcedGuideDraft) => Promise<void>;
   onResolveWarning: (warningId: string, suggestionId: string) => void;
   onClearSelection: () => void;
   onClose?: () => void;
@@ -65,7 +63,6 @@ export function ContextPane({
   onMoveRun,
   onRescheduleRun,
   onReturnRunToQueue,
-  onAddOutsourcedGuideToRun,
   onResolveWarning,
   onClearSelection: _onClearSelection,
   onClose,
@@ -73,15 +70,11 @@ export function ContextPane({
   const [moveGuideId, setMoveGuideId] = useState("");
   const [jumpTime, setJumpTime] = useState("");
   const [bookingGuideId, setBookingGuideId] = useState("");
-  const [outsourcedGuideName, setOutsourcedGuideName] = useState("");
-  const [outsourcedGuideContact, setOutsourcedGuideContact] = useState("");
 
   useEffect(() => {
     if (context.selectedRun) {
       setMoveGuideId("");
       setJumpTime(context.selectedRun.run.startTime);
-      setOutsourcedGuideName("");
-      setOutsourcedGuideContact("");
     }
   }, [context.selectedRun]);
 
@@ -232,40 +225,6 @@ export function ContextPane({
               <Undo2 className="h-3 w-3" />
               Return To Queue
             </Button>
-
-            <div className="space-y-1.5 rounded-md border bg-muted/20 p-2">
-              <p className="text-[10px] font-medium text-muted-foreground">Add Outsourced Guide</p>
-              <Input
-                value={outsourcedGuideName}
-                onChange={(event) => setOutsourcedGuideName(event.target.value)}
-                placeholder="Guide name"
-                className="h-8 text-xs"
-                disabled={!canMutate}
-              />
-              <Input
-                value={outsourcedGuideContact}
-                onChange={(event) => setOutsourcedGuideContact(event.target.value)}
-                placeholder="Contact (optional)"
-                className="h-8 text-xs"
-                disabled={!canMutate}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-full justify-center rounded-md text-[11px]"
-                disabled={!canMutate || outsourcedGuideName.trim().length === 0}
-                onClick={async () => {
-                  await onAddOutsourcedGuideToRun(context.selectedRun!.run.id, {
-                    name: outsourcedGuideName.trim(),
-                    contact: outsourcedGuideContact.trim() || undefined,
-                  });
-                  setOutsourcedGuideName("");
-                  setOutsourcedGuideContact("");
-                }}
-              >
-                Add Outsourced Guide
-              </Button>
-            </div>
           </section>
         )}
 

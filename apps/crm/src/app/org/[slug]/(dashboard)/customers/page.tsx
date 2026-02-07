@@ -343,7 +343,7 @@ export default function CustomersPage() {
           {stats && (
             <div className="hidden sm:flex items-center gap-5 text-sm text-muted-foreground">
               <span><span className="font-medium text-foreground">{stats.total}</span> total</span>
-              <span><span className="font-medium text-emerald-600">+{stats.thisMonth}</span> this month</span>
+              <span><span className="font-medium text-success">+{stats.thisMonth}</span> this month</span>
             </div>
           )}
           {/* Mobile Add button */}
@@ -371,7 +371,7 @@ export default function CustomersPage() {
         <div className="sm:hidden flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
           <div className="flex items-center gap-4 text-xs">
             <span><span className="font-semibold text-foreground">{stats.total}</span> <span className="text-muted-foreground">total</span></span>
-            <span><span className="font-semibold text-emerald-600">+{stats.thisMonth}</span> <span className="text-muted-foreground">this month</span></span>
+            <span><span className="font-semibold text-success">+{stats.thisMonth}</span> <span className="text-muted-foreground">this month</span></span>
           </div>
         </div>
       )}
@@ -599,7 +599,7 @@ export default function CustomersPage() {
                                       className={cn(
                                         "inline-flex items-center px-1.5 py-0 rounded text-[10px]",
                                         tag === "vip"
-                                          ? "bg-amber-500/10 text-amber-600"
+                                          ? "bg-primary/10 text-primary"
                                           : "bg-muted text-muted-foreground"
                                       )}
                                     >

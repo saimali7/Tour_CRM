@@ -104,6 +104,21 @@ const addOutsourcedGuideToRunInputSchema = z.object({
   externalGuideContact: z.string().optional(),
 });
 
+const createTempGuideInputSchema = z.object({
+  date: z.union([
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+    z.string().datetime().transform((val) => val.split("T")[0]!),
+    z.date().transform((val) => {
+      const year = val.getFullYear();
+      const month = String(val.getMonth() + 1).padStart(2, "0");
+      const day = String(val.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }),
+  ]),
+  name: z.string().min(1),
+  phone: z.string().min(1),
+});
+
 // =============================================================================
 // ROUTER
 // =============================================================================
@@ -691,6 +706,29 @@ export const commandCenterRouter = createRouter({
             error instanceof Error
               ? error.message
               : "Failed to add outsourced guide to run",
+          cause: error,
+        });
+      }
+    }),
+
+  createTempGuide: adminProcedure
+    .input(createTempGuideInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const services = getServices(ctx);
+
+      try {
+        return await services.commandCenter.createTempGuideForDate({
+          date: input.date,
+          name: input.name,
+          phone: input.phone,
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to create temporary guide",
           cause: error,
         });
       }

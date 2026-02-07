@@ -209,7 +209,7 @@ export default function TaxDepositsPage() {
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
               saveSuccess
-                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
+                ? "bg-success/10 text-success border border-success/20 translate-x-0 opacity-100"
                 : "translate-x-4 opacity-0 pointer-events-none"
             )}
           >
@@ -248,8 +248,8 @@ export default function TaxDepositsPage() {
         <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Receipt className="h-4 w-4 text-emerald-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10">
+                <Receipt className="h-4 w-4 text-success" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Tax Configuration</h3>
@@ -258,7 +258,7 @@ export default function TaxDepositsPage() {
             </div>
             <div className="flex items-center gap-2">
               {taxEnabled && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success font-medium">
                   ENABLED
                 </span>
               )}
@@ -448,8 +448,8 @@ export default function TaxDepositsPage() {
         <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10">
-                <DollarSign className="h-4 w-4 text-blue-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10">
+                <DollarSign className="h-4 w-4 text-info" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Deposit Settings</h3>
@@ -458,7 +458,7 @@ export default function TaxDepositsPage() {
             </div>
             <div className="flex items-center gap-2">
               {depositEnabled && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-info/10 text-info font-medium">
                   ENABLED
                 </span>
               )}

@@ -4,7 +4,7 @@ import type { CanvasRow, HopperGroup } from "./dispatch-model";
 import type { GuestCardBooking } from "./guest-card";
 import type { DispatchWarning } from "./types";
 import { DispatchShell } from "./canvas/dispatch-shell";
-import type { DispatchOperation, OutsourcedGuideDraft } from "./canvas/canvas-types";
+import type { DispatchOperation } from "./canvas/canvas-types";
 
 interface DispatchCanvasProps {
   rows: CanvasRow[];
@@ -22,7 +22,7 @@ interface DispatchCanvasProps {
   onGuideClick: (guideId: string) => void;
   onBookingClick: (bookingId: string) => void;
   onResolveWarning: (warningId: string, suggestionId: string) => void;
-  onAddOutsourcedGuideToRun: (tourRunKey: string, draft: OutsourcedGuideDraft) => Promise<void>;
+  onCreateTempGuide: (draft: { name: string; phone: string }) => Promise<void>;
   showCurrentTime: boolean;
 }
 

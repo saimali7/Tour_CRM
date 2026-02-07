@@ -332,7 +332,7 @@ export function EssentialsTab({
             </p>
           )}
           {formState.category && (
-            <p className="text-sm text-emerald-600 flex items-center gap-1.5 animate-in fade-in duration-200">
+            <p className="text-sm text-success flex items-center gap-1.5 animate-in fade-in duration-200">
               <Sparkles className="h-3.5 w-3.5" />
               Smart defaults applied based on category
             </p>
@@ -398,7 +398,7 @@ export function EssentialsTab({
             max={1440}
           />
           <div className="min-h-[20px]">
-            <p className="text-sm text-emerald-600 flex items-center gap-1.5">
+            <p className="text-sm text-success flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 flex-shrink-0" />
               <span>Duration set</span>
             </p>
@@ -488,8 +488,8 @@ export function EssentialsTab({
 
       {/* Validation Summary */}
       {!isValid && (
-        <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-          <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+        <div className="flex items-center gap-3 p-4 bg-warning/10 border border-warning/20 rounded-xl">
+          <AlertCircle className="h-5 w-5 text-warning flex-shrink-0" />
           <div>
             <p className="text-sm font-medium text-foreground">Complete required fields to continue</p>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -503,8 +503,8 @@ export function EssentialsTab({
       )}
 
       {isValid && (
-        <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-          <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+        <div className="flex items-center gap-3 p-4 bg-success/10 border border-success/20 rounded-xl">
+          <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center flex-shrink-0">
             <Check className="w-3 h-3 text-white" strokeWidth={3} />
           </div>
           <div>

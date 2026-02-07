@@ -450,11 +450,11 @@ export default function AnalyticsPage() {
               {segmentDistribution ? (
                 <div className="space-y-4">
                   {[
-                    { label: "VIP", value: segmentDistribution.vip || 0, color: "bg-purple-500" },
-                    { label: "Loyal", value: segmentDistribution.loyal || 0, color: "bg-green-500" },
-                    { label: "Promising", value: segmentDistribution.promising || 0, color: "bg-blue-500" },
-                    { label: "At Risk", value: segmentDistribution.at_risk || 0, color: "bg-orange-500" },
-                    { label: "Dormant", value: segmentDistribution.dormant || 0, color: "bg-gray-400" },
+                    { label: "VIP", value: segmentDistribution.vip || 0, color: "bg-primary" },
+                    { label: "Loyal", value: segmentDistribution.loyal || 0, color: "bg-success" },
+                    { label: "Promising", value: segmentDistribution.promising || 0, color: "bg-info" },
+                    { label: "At Risk", value: segmentDistribution.at_risk || 0, color: "bg-warning" },
+                    { label: "Dormant", value: segmentDistribution.dormant || 0, color: "bg-muted-foreground/60" },
                   ].map((segment) => {
                     const total = Object.values(segmentDistribution).reduce((sum, val) => sum + val, 0) || 1;
                     const percentage = (segment.value / total) * 100;
@@ -599,15 +599,15 @@ export default function AnalyticsPage() {
                       <span
                         className={cn(
                           "px-2 py-0.5 text-xs font-medium rounded-full",
-                          guide.status === "active" && "bg-green-500/10 text-green-600",
-                          guide.status === "inactive" && "bg-gray-500/10 text-gray-600",
-                          guide.status === "on_leave" && "bg-orange-500/10 text-orange-600"
+                          guide.status === "active" && "bg-success/10 text-success",
+                          guide.status === "inactive" && "bg-muted/60 text-muted-foreground",
+                          guide.status === "on_leave" && "bg-warning/10 text-warning"
                         )}
                       >
                         {guide.status}
                       </span>
                       {guide.isPublic && (
-                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-500/10 text-blue-600">
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-info/10 text-info">
                           Public
                         </span>
                       )}
@@ -664,7 +664,13 @@ function Sparkline({ data, trend }: { data: number[]; trend: "up" | "down" | "ne
     <svg width={width} height={height} className="overflow-visible">
       <polyline
         fill="none"
-        stroke={trend === "up" ? "#22c55e" : trend === "down" ? "#ef4444" : "#9ca3af"}
+        stroke={
+          trend === "up"
+            ? "hsl(var(--success))"
+            : trend === "down"
+              ? "hsl(var(--destructive))"
+              : "hsl(var(--muted-foreground))"
+        }
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -696,11 +702,11 @@ function StatCard({ label, value, icon: Icon, trend, change, sparklineData, prim
       <div className="flex items-center justify-between">
         <p className={cn(
           "text-sm",
-          primary ? "font-semibold text-emerald-600" : "text-muted-foreground"
+          primary ? "font-semibold text-success" : "text-muted-foreground"
         )}>{label}</p>
         <Icon className={cn(
           "h-4 w-4",
-          primary ? "text-emerald-600" : "text-muted-foreground"
+          primary ? "text-success" : "text-muted-foreground"
         )} />
       </div>
       <div className="flex items-end justify-between mt-1">
@@ -713,14 +719,14 @@ function StatCard({ label, value, icon: Icon, trend, change, sparklineData, prim
         )}
       </div>
       <div className="flex items-center gap-1 mt-1">
-        {trend === "up" && <ArrowUpRight className="h-3 w-3 text-green-600" />}
-        {trend === "down" && <ArrowDownRight className="h-3 w-3 text-red-600" />}
+        {trend === "up" && <ArrowUpRight className="h-3 w-3 text-success" />}
+        {trend === "down" && <ArrowDownRight className="h-3 w-3 text-destructive" />}
         {trend === "neutral" && <Minus className="h-3 w-3 text-muted-foreground" />}
         <p
           className={cn(
             "text-xs",
-            trend === "up" && "text-green-600",
-            trend === "down" && "text-red-600",
+            trend === "up" && "text-success",
+            trend === "down" && "text-destructive",
             trend === "neutral" && "text-muted-foreground"
           )}
         >

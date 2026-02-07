@@ -456,7 +456,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           {pendingConfirmCount > 0 && (
             <Link
               href={`/org/${slug}/bookings?view=needs-action` as Route}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-warning/30 bg-warning/10 text-warning dark:text-warning text-sm font-medium hover:bg-warning/20 transition-colors"
             >
               <Clock className="h-3.5 w-3.5" />
               <span>Confirm {pendingConfirmCount}</span>
@@ -467,7 +467,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           {unpaidCount > 0 && (
             <Link
               href={`/org/${slug}/bookings?view=needs-action` as Route}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm font-medium hover:bg-blue-500/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-info/30 bg-info/10 text-info dark:text-info text-sm font-medium hover:bg-info/20 transition-colors"
             >
               <CreditCard className="h-3.5 w-3.5" />
               <span>Collect {unpaidCount} unpaid</span>
@@ -660,10 +660,10 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
                   data-state={selection.isSelected(booking.id) ? "selected" : undefined}
                   className={cn(
                     "transition-colors cursor-pointer",
-                    booking.status === "confirmed" && "border-l-2 border-l-emerald-500",
-                    booking.status === "pending" && "border-l-2 border-l-amber-500",
-                    booking.status === "cancelled" && "border-l-2 border-l-red-400",
-                    booking.paymentStatus === "paid" && !selection.isSelected(booking.id) && "bg-emerald-50/30 dark:bg-emerald-950/10",
+                    booking.status === "confirmed" && "border-l-2 border-l-success",
+                    booking.status === "pending" && "border-l-2 border-l-warning",
+                    booking.status === "cancelled" && "border-l-2 border-l-destructive",
+                    booking.paymentStatus === "paid" && !selection.isSelected(booking.id) && "bg-success/30 dark:bg-success/10",
                     // Optimistic update styling - subtle opacity to indicate pending server confirmation
                     isOptimistic && "opacity-70"
                   )}
@@ -743,12 +743,12 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
                     <div className="flex flex-col items-end">
                       <span className={cn(
                         "text-sm font-semibold tabular-nums",
-                        isHighValue ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
+                        isHighValue ? "text-success dark:text-success" : "text-foreground"
                       )}>
                         ${total.toFixed(0)}
                       </span>
                       {isHighValue && (
-                        <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                        <span className="text-[10px] font-medium text-success dark:text-success uppercase tracking-wider">
                           High Value
                         </span>
                       )}

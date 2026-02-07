@@ -199,7 +199,7 @@ export function useFieldValidation<T>(
       return "border-destructive focus-visible:ring-destructive/30 animate-[error-glow-pulse_2s_ease-in-out_infinite]";
     }
     if (touched && valid && showSuccess) {
-      return "border-emerald-500 focus-visible:ring-emerald-500/30";
+      return "border-success focus-visible:ring-success/30";
     }
     return "border-input";
   }, [touched, error, valid, showSuccess]);

@@ -133,8 +133,8 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
       className={cn(
         "relative overflow-hidden rounded-xl border-2 transition-all duration-300",
         hasHighPriority
-          ? "border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/50"
-          : "border-blue-300 bg-blue-50 dark:border-blue-500 dark:bg-blue-950/50",
+          ? "border-warning/60 bg-warning/10"
+          : "border-info/60 bg-info/10",
         className
       )}
     >
@@ -143,7 +143,7 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
         <div
           className={cn(
             "absolute inset-0 pointer-events-none",
-            "bg-gradient-to-r from-amber-400/5 via-amber-400/10 to-amber-400/5",
+            "bg-gradient-to-r from-warning/5 via-warning/10 to-warning/5",
             "animate-pulse-slow"
           )}
         />
@@ -157,8 +157,8 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
           "relative flex items-start gap-3 p-3 sm:p-4 w-full text-left",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
           hasHighPriority
-            ? "focus-visible:ring-amber-500"
-            : "focus-visible:ring-blue-500",
+            ? "focus-visible:ring-warning/40"
+            : "focus-visible:ring-info/40",
           hasMultipleItems && "cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
         )}
         aria-expanded={isExpanded}
@@ -168,8 +168,8 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
         <div className={cn(
           "flex-shrink-0 p-2.5 rounded-full shadow-sm",
           hasHighPriority
-            ? "bg-amber-500 text-white"
-            : "bg-blue-500 text-white"
+            ? "bg-warning text-warning-foreground"
+            : "bg-info text-info-foreground"
         )}>
           <AlertTriangle className="h-4 w-4" />
         </div>
@@ -180,8 +180,8 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
             <p className={cn(
               "text-xs font-bold uppercase tracking-wider",
               hasHighPriority
-                ? "text-amber-800 dark:text-amber-200"
-                : "text-blue-800 dark:text-blue-200"
+                ? "text-warning"
+                : "text-info"
             )}>
               Operations Alert
             </p>
@@ -190,8 +190,8 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
                 className={cn(
                   "h-4 w-4 transition-transform duration-300 ease-out",
                   hasHighPriority
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-blue-600 dark:text-blue-400",
+                    ? "text-warning"
+                    : "text-info",
                   isExpanded && "rotate-180"
                 )}
               />
@@ -206,16 +206,16 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
                 className={cn(
                   "flex items-center gap-2 text-sm",
                   alert.priority === "high"
-                    ? "text-amber-900 dark:text-amber-100 font-medium"
-                    : "text-blue-900 dark:text-blue-100"
+                    ? "text-warning font-medium"
+                    : "text-info"
                 )}
               >
                 {/* Icon with circular background */}
                 <div className={cn(
                   "flex items-center justify-center w-6 h-6 rounded-full",
                   alert.priority === "high"
-                    ? "bg-amber-200/70 dark:bg-amber-800/50"
-                    : "bg-blue-200/70 dark:bg-blue-800/50"
+                    ? "bg-warning/20 text-warning"
+                    : "bg-info/20 text-info"
                 )}>
                   <alert.icon className="h-3.5 w-3.5 flex-shrink-0" />
                 </div>
@@ -224,8 +224,8 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
                   <span className={cn(
                     "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold",
                     alert.priority === "high"
-                      ? "bg-amber-600 text-white"
-                      : "bg-blue-600 text-white"
+                      ? "bg-warning text-warning-foreground"
+                      : "bg-info text-info-foreground"
                   )}>
                     {alert.count}
                   </span>
@@ -253,8 +253,8 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
             "hover:bg-black/5 dark:hover:bg-white/10",
             "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2",
             hasHighPriority
-              ? "text-amber-600 dark:text-amber-400 focus-visible:ring-amber-500"
-              : "text-blue-600 dark:text-blue-400 focus-visible:ring-blue-500"
+              ? "text-warning focus-visible:ring-warning/40"
+              : "text-info focus-visible:ring-info/40"
           )}
           aria-label="Dismiss alert for this session"
         >
@@ -278,8 +278,8 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
             className={cn(
               "border-t px-4 py-3 sm:px-5 sm:py-4",
               hasHighPriority
-                ? "border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/30"
-                : "border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-950/30"
+                ? "border-warning/40 bg-warning/10"
+                : "border-info/40 bg-info/10"
             )}
           >
             <div className="space-y-4">
@@ -290,16 +290,21 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
                     <div className={cn(
                       "flex items-center justify-center w-5 h-5 rounded-full",
                       alert.priority === "high"
-                        ? "bg-amber-500"
-                        : "bg-blue-500"
+                        ? "bg-warning"
+                        : "bg-info"
                     )}>
-                      <alert.icon className="h-3 w-3 text-white" />
+                      <alert.icon
+                        className={cn(
+                          "h-3 w-3",
+                          alert.priority === "high" ? "text-warning-foreground" : "text-info-foreground"
+                        )}
+                      />
                     </div>
                     <h4 className={cn(
                       "text-xs font-semibold uppercase tracking-wide",
                       alert.priority === "high"
-                        ? "text-amber-700 dark:text-amber-300"
-                        : "text-blue-700 dark:text-blue-300"
+                        ? "text-warning"
+                        : "text-info"
                     )}>
                       {alert.label === "Dietary" && "Dietary Requirements"}
                       {alert.label === "Accessibility" && "Accessibility Needs"}
@@ -315,15 +320,15 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
                         className={cn(
                           "flex items-start gap-2 text-sm",
                           alert.priority === "high"
-                            ? "text-amber-900 dark:text-amber-100"
-                            : "text-blue-900 dark:text-blue-100"
+                            ? "text-warning"
+                            : "text-info"
                         )}
                       >
                         <span className={cn(
                           "inline-block w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
                           alert.priority === "high"
-                            ? "bg-amber-500"
-                            : "bg-blue-500"
+                            ? "bg-warning"
+                            : "bg-info"
                         )} />
                         <span>
                           <span className="font-medium">{item.name}:</span>{" "}

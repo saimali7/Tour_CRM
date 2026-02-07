@@ -141,10 +141,10 @@ export function UrgencyCounter({
       className={cn(
         "rounded-xl border-2 p-5 transition-all",
         isVeryCritical
-          ? "card-danger border-red-300 dark:border-red-700"
+          ? "card-danger border-destructive dark:border-destructive"
           : isCritical
-            ? "card-warning border-amber-300 dark:border-amber-700"
-            : "card-info border-blue-200 dark:border-blue-700",
+            ? "card-warning border-warning dark:border-warning"
+            : "card-info border-info dark:border-info",
         className
       )}
     >
@@ -167,10 +167,10 @@ export function UrgencyCounter({
                 className={cn(
                   "h-4 w-4",
                   isVeryCritical
-                    ? "text-red-600 dark:text-red-400"
+                    ? "text-destructive dark:text-destructive"
                     : isCritical
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-blue-600 dark:text-blue-400",
+                      ? "text-warning dark:text-warning"
+                      : "text-info dark:text-info",
                   isVeryCritical && ""
                 )}
               />
@@ -179,10 +179,10 @@ export function UrgencyCounter({
               className={cn(
                 "text-2xl font-bold tabular-nums tracking-tight",
                 isVeryCritical
-                  ? "text-red-700 dark:text-red-300"
+                  ? "text-destructive dark:text-destructive"
                   : isCritical
-                    ? "text-amber-700 dark:text-amber-300"
-                    : "text-blue-700 dark:text-blue-300"
+                    ? "text-warning dark:text-warning"
+                    : "text-info dark:text-info"
               )}
             >
               {formatTimeUntil(hoursUntilFirstCritical, minutesUntilFirstCritical % 60)}
@@ -213,10 +213,10 @@ export function UrgencyCounter({
               className={cn(
                 "font-semibold",
                 isVeryCritical
-                  ? "text-red-600 dark:text-red-400"
+                  ? "text-destructive dark:text-destructive"
                   : isCritical
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-blue-600 dark:text-blue-400"
+                    ? "text-warning dark:text-warning"
+                    : "text-info dark:text-info"
               )}
             >
               {formatCurrency(potentialRevenueLoss)}
@@ -234,10 +234,10 @@ export function UrgencyCounter({
               "bg-white dark:bg-black/20 border",
               "hover:-translate-y-0.5 active:scale-[0.98]",
               isVeryCritical
-                ? "border-red-200 dark:border-red-800 text-red-700 dark:text-red-300"
+                ? "border-destructive dark:border-destructive text-destructive dark:text-destructive"
                 : isCritical
-                  ? "border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300"
-                  : "border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+                  ? "border-warning dark:border-warning text-warning dark:text-warning"
+                  : "border-info dark:border-info text-info dark:text-info"
             )}
           >
             <Send className="h-3.5 w-3.5" />
@@ -248,10 +248,10 @@ export function UrgencyCounter({
             className={cn(
               "inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all",
               isVeryCritical
-                ? "bg-red-600 hover:bg-red-700 text-white"
+                ? "bg-destructive hover:bg-destructive text-destructive-foreground"
                 : isCritical
-                  ? "bg-amber-600 hover:bg-amber-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white",
+                  ? "bg-warning hover:bg-warning text-warning-foreground"
+                  : "bg-info hover:bg-info text-info-foreground",
               "hover:-translate-y-0.5 active:scale-[0.98]"
             )}
           >
@@ -285,7 +285,7 @@ export function UrgencyCounter({
                   <span
                     className={cn(
                       "font-semibold",
-                      schedule.bookedCount === 0 ? "text-red-600" : "text-amber-600"
+                      schedule.bookedCount === 0 ? "text-destructive" : "text-warning"
                     )}
                   >
                     {schedule.bookedCount}/{schedule.maxParticipants}

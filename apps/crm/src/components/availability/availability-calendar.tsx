@@ -106,7 +106,7 @@ function getCapacityColor(booked: number, max: number): string {
   const percent = (booked / max) * 100;
   if (percent >= 100) return "bg-destructive";
   if (percent >= 80) return "bg-warning";
-  if (percent >= 50) return "bg-amber-400";
+  if (percent >= 50) return "bg-warning";
   return "bg-success";
 }
 
@@ -558,7 +558,7 @@ function MonthView({
           <span>&lt;50%</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded bg-amber-400" />
+          <div className="w-3 h-3 rounded bg-warning" />
           <span>50-80%</span>
         </div>
         <div className="flex items-center gap-1.5">

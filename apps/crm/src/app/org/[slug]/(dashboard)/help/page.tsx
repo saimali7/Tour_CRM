@@ -45,7 +45,7 @@ export default function HelpPage() {
           onClick={() => handleComingSoon("Video tutorials")}
           className="flex items-start gap-4 p-5 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-left group"
         >
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success group-hover:bg-success group-hover:text-white transition-colors">
             <Video className="h-5 w-5" />
           </div>
           <div>
@@ -64,7 +64,7 @@ export default function HelpPage() {
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-6 py-4 border-b border-border bg-muted/30">
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Lightbulb className="h-5 w-5 text-amber-500" />
+            <Lightbulb className="h-5 w-5 text-warning" />
             Quick Tips
           </h2>
         </div>
@@ -106,7 +106,7 @@ export default function HelpPage() {
           onClick={() => handleComingSoon("Documentation")}
           className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-center group"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-info/10 text-info group-hover:bg-info group-hover:text-white transition-colors">
             <Book className="h-6 w-6" />
           </div>
           <div>
@@ -119,7 +119,7 @@ export default function HelpPage() {
           href="mailto:support@tourcrm.app"
           className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-center group"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/10 text-violet-500 group-hover:bg-violet-500 group-hover:text-white transition-colors">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-info/10 text-info group-hover:bg-info group-hover:text-white transition-colors">
             <Mail className="h-6 w-6" />
           </div>
           <div>
@@ -132,7 +132,7 @@ export default function HelpPage() {
           onClick={() => handleComingSoon("Community forum")}
           className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-center group"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             <MessageCircle className="h-6 w-6" />
           </div>
           <div>

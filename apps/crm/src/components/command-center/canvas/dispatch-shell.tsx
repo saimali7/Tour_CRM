@@ -6,6 +6,16 @@ import type { CanvasRow, CanvasRun, HopperGroup } from "../dispatch-model";
 import type { GuestCardBooking } from "../guest-card";
 import type { DispatchWarning } from "../types";
 import { durationToPercent, timeToPercent } from "../timeline/timeline-utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type {
   ContextSelection,
   DispatchContextData,
@@ -16,7 +26,6 @@ import type {
   QueueFilterState,
   QueueSortMode,
   RunSignals,
-  OutsourcedGuideDraft,
 } from "./canvas-types";
 import { QueuePane } from "./queue-pane";
 import { TimelinePane } from "./timeline-pane";
@@ -53,7 +62,7 @@ interface DispatchShellProps {
   onGuideClick: (guideId: string) => void;
   onBookingClick: (bookingId: string) => void;
   onResolveWarning: (warningId: string, suggestionId: string) => void;
-  onAddOutsourcedGuideToRun: (tourRunKey: string, draft: OutsourcedGuideDraft) => Promise<void>;
+  onCreateTempGuide: (draft: { name: string; phone: string }) => Promise<void>;
   showCurrentTime: boolean;
 }
 
@@ -165,7 +174,7 @@ export function DispatchShell({
   onGuideClick,
   onBookingClick,
   onResolveWarning,
-  onAddOutsourcedGuideToRun,
+  onCreateTempGuide,
   showCurrentTime,
 }: DispatchShellProps) {
   const [filterState, setFilterState] = useState<QueueFilterState>({
@@ -184,6 +193,9 @@ export function DispatchShell({
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [isQueueCollapsed, setIsQueueCollapsed] = useState(false);
   const [timelineZoom, setTimelineZoom] = useState<number>(1);
+  const [isAddTempGuideOpen, setIsAddTempGuideOpen] = useState(false);
+  const [tempGuideName, setTempGuideName] = useState("");
+  const [tempGuidePhone, setTempGuidePhone] = useState("");
 
   const markers = useMemo(() => hourMarkers(), []);
 
@@ -931,6 +943,21 @@ export function DispatchShell({
     [executeOperation, runLookup]
   );
 
+  const handleCreateTempGuideSubmit = useCallback(async () => {
+    if (!isEditing || isReadOnly || isMutating) return;
+    const name = tempGuideName.trim();
+    const phone = tempGuidePhone.trim();
+    if (!name || !phone) {
+      toast.error("Name and phone are required");
+      return;
+    }
+
+    await onCreateTempGuide({ name, phone });
+    setTempGuideName("");
+    setTempGuidePhone("");
+    setIsAddTempGuideOpen(false);
+  }, [isEditing, isMutating, isReadOnly, onCreateTempGuide, tempGuideName, tempGuidePhone]);
+
   const autoScrollTimeline = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     const scrollContainer = event.currentTarget.closest("[data-timeline-scroll='true']");
     if (!(scrollContainer instanceof HTMLElement)) return;
@@ -1141,6 +1168,7 @@ export function DispatchShell({
               void handleRunNudge(guideId, run, deltaMinutes);
             }}
             onBackgroundClick={() => setSelection({ type: "none" })}
+            onAddTempGuideClick={() => setIsAddTempGuideOpen(true)}
           />
 
           {isContextOpen && (
@@ -1159,11 +1187,6 @@ export function DispatchShell({
                   onMoveRun={handleMoveRun}
                   onRescheduleRun={handleRescheduleRun}
                   onReturnRunToQueue={handleReturnRunToQueue}
-                  onAddOutsourcedGuideToRun={async (runId, draft) => {
-                    const selectedRun = runLookup.get(runId);
-                    if (!selectedRun) return;
-                    await onAddOutsourcedGuideToRun(selectedRun.run.tourRunKey, draft);
-                  }}
                   onResolveWarning={onResolveWarning}
                   onClearSelection={() => setSelection({ type: "none" })}
                   onClose={() => setIsContextOpen(false)}
@@ -1173,6 +1196,56 @@ export function DispatchShell({
           )}
         </div>
       </div>
+
+      <Dialog open={isAddTempGuideOpen} onOpenChange={setIsAddTempGuideOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Add Temporary Outsourced Guide</DialogTitle>
+            <DialogDescription>
+              This adds a day-only guide lane. Then assign runs to this guide like any other lane.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="temp-guide-name">Guide Name</label>
+              <Input
+                id="temp-guide-name"
+                value={tempGuideName}
+                onChange={(event) => setTempGuideName(event.target.value)}
+                placeholder="John Doe"
+                disabled={isMutating}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="temp-guide-phone">Phone Number</label>
+              <Input
+                id="temp-guide-phone"
+                value={tempGuidePhone}
+                onChange={(event) => setTempGuidePhone(event.target.value)}
+                placeholder="+1 555 123 4567"
+                disabled={isMutating}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddTempGuideOpen(false)}
+              disabled={isMutating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCreateTempGuideSubmit()}
+              disabled={isMutating || tempGuideName.trim().length === 0 || tempGuidePhone.trim().length === 0}
+            >
+              Add Guide
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -136,7 +136,7 @@ export function UpcomingView({ orgSlug }: UpcomingViewProps) {
               key={day.date}
               className={cn(
                 "overflow-hidden rounded-lg border border-border bg-card",
-                hasNeedsAction && "border-l-4 border-l-amber-500"
+                hasNeedsAction && "border-l-4 border-l-warning"
               )}
             >
               {/* Day Header */}
@@ -154,7 +154,7 @@ export function UpcomingView({ orgSlug }: UpcomingViewProps) {
                       {day.dayLabel}
                     </h3>
                     {hasNeedsAction && (
-                      <div className="flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900/30 dark:text-amber-300">
+                      <div className="flex items-center gap-1 rounded-md bg-warning px-2 py-0.5 text-xs font-medium text-warning dark:bg-warning/30 dark:text-warning">
                         <AlertTriangle className="h-3 w-3" />
                         {day.stats.needsAction} need action
                       </div>

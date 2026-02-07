@@ -562,8 +562,8 @@ export default function BookingDetailPage() {
                 </div>
               )}
               {booking.internalNotes && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-1">
+                <div className="p-3 bg-warning dark:bg-warning/30 border border-warning dark:border-warning rounded-lg">
+                  <p className="text-xs font-medium text-warning dark:text-warning uppercase tracking-wide mb-1">
                     Internal Note
                   </p>
                   <p className="text-sm text-foreground">{booking.internalNotes}</p>
@@ -627,7 +627,7 @@ export default function BookingDetailPage() {
               {booking.confirmedAt && (
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Confirmed</dt>
-                  <dd className="font-medium text-emerald-600">
+                  <dd className="font-medium text-success">
                     {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(booking.confirmedAt))}
                   </dd>
                 </div>
@@ -862,7 +862,7 @@ export default function BookingDetailPage() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Balance Due</p>
                 <p className={cn(
                   "text-3xl font-bold tabular-nums",
-                  balanceInfo && parseFloat(balanceInfo.balance) > 0 ? "text-amber-600" : "text-emerald-600"
+                  balanceInfo && parseFloat(balanceInfo.balance) > 0 ? "text-warning" : "text-success"
                 )}>
                   ${balanceInfo ? parseFloat(balanceInfo.balance).toFixed(2) : "0.00"}
                 </p>
@@ -995,7 +995,7 @@ export default function BookingDetailPage() {
                   <span className="text-muted-foreground">Balance after</span>
                   <span className={cn(
                     "font-semibold",
-                    parseFloat(balanceInfo.balance) - parseFloat(paymentAmount) <= 0 ? "text-emerald-600" : ""
+                    parseFloat(balanceInfo.balance) - parseFloat(paymentAmount) <= 0 ? "text-success" : ""
                   )}>
                     ${Math.max(0, parseFloat(balanceInfo.balance) - parseFloat(paymentAmount)).toFixed(2)}
                     {parseFloat(balanceInfo.balance) - parseFloat(paymentAmount) <= 0 && " ✓ Paid"}

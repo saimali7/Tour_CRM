@@ -138,28 +138,28 @@ function ActionCard({
   const variantStyles = {
     danger: {
       container: "bg-card border border-border",
-      icon: "bg-muted text-red-500 dark:text-red-400",
+      icon: "bg-muted text-destructive dark:text-destructive",
       value: "text-foreground",
       label: "text-muted-foreground",
       urgent: true,
     },
     warning: {
       container: "bg-card border border-border",
-      icon: "bg-muted text-amber-500 dark:text-amber-400",
+      icon: "bg-muted text-warning dark:text-warning",
       value: "text-foreground",
       label: "text-muted-foreground",
       urgent: false,
     },
     info: {
       container: "bg-card border border-border",
-      icon: "bg-muted text-blue-500 dark:text-blue-400",
+      icon: "bg-muted text-info dark:text-info",
       value: "text-foreground",
       label: "text-muted-foreground",
       urgent: false,
     },
     success: {
       container: "bg-card border border-border",
-      icon: "bg-muted text-emerald-500 dark:text-emerald-400",
+      icon: "bg-muted text-success dark:text-success",
       value: "text-foreground",
       label: "text-muted-foreground",
       urgent: false,

@@ -104,7 +104,7 @@ export function getInputValidationClasses(
   }
 
   if (touched && valid && showSuccessState) {
-    return "border-emerald-500 focus-visible:ring-emerald-500/30";
+    return "border-success focus-visible:ring-success/30";
   }
 
   return "border-input";
@@ -242,7 +242,7 @@ export function ValidatedFormField({
           </p>
         )}
         {!showError && showValid && (
-          <p className="text-xs text-emerald-600 flex items-center gap-1.5 animate-in fade-in duration-200">
+          <p className="text-xs text-success flex items-center gap-1.5 animate-in fade-in duration-200">
             <Check className="h-3.5 w-3.5 flex-shrink-0" />
             <span>{successMessage}</span>
           </p>
@@ -371,7 +371,7 @@ export function ValidatedTextareaField({
               isOverLimit
                 ? "text-destructive font-medium"
                 : isNearLimit
-                  ? "text-amber-500"
+                  ? "text-warning"
                   : "text-muted-foreground"
             )}
           >
@@ -747,7 +747,7 @@ export function ValidatedInput({
       return "border-destructive focus-visible:ring-destructive/30 shadow-[0_0_0_1px_hsl(var(--destructive)/0.2),0_0_8px_2px_hsl(var(--destructive)/0.1)]";
     }
     if (showValid) {
-      return "border-emerald-500 focus-visible:ring-emerald-500/30";
+      return "border-success focus-visible:ring-success/30";
     }
     return "border-input";
   }, [validating, showError, showValid]);
@@ -820,7 +820,7 @@ export function ValidatedInput({
           />
           {showValid && (
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <Check className="h-4 w-4 text-emerald-500" />
+              <Check className="h-4 w-4 text-success" />
             </div>
           )}
         </div>
@@ -838,7 +838,7 @@ export function ValidatedInput({
           </p>
         )}
         {!showError && showValid && (
-          <p className="text-xs text-emerald-600 flex items-center gap-1.5 animate-in fade-in duration-200">
+          <p className="text-xs text-success flex items-center gap-1.5 animate-in fade-in duration-200">
             <Check className="h-3.5 w-3.5 flex-shrink-0" />
             <span>{successMessage}</span>
           </p>

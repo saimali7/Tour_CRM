@@ -345,13 +345,13 @@ export default function GuidesPage() {
                 </span>
                 <span className="text-border">·</span>
                 <span>
-                  <span className="font-medium text-emerald-600">{stats.active}</span> active
+                  <span className="font-medium text-success">{stats.active}</span> active
                 </span>
                 {stats.onLeave > 0 && (
                   <>
                     <span className="text-border">·</span>
                     <span>
-                      <span className="font-medium text-yellow-600">{stats.onLeave}</span> on leave
+                      <span className="font-medium text-warning">{stats.onLeave}</span> on leave
                     </span>
                   </>
                 )}

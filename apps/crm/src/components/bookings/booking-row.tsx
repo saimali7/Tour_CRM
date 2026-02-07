@@ -47,18 +47,18 @@ interface BookingRowProps {
 
 const urgencyConfig = {
   critical: {
-    borderColor: "border-l-red-500",
-    badgeClass: "bg-red-500 text-white",
-    rowClass: "bg-red-50/50 dark:bg-red-950/10",
+    borderColor: "border-l-destructive",
+    badgeClass: "bg-destructive text-destructive-foreground",
+    rowClass: "bg-destructive/10",
   },
   high: {
-    borderColor: "border-l-amber-500",
-    badgeClass: "bg-amber-500 text-white",
-    rowClass: "bg-amber-50/50 dark:bg-amber-950/10",
+    borderColor: "border-l-warning",
+    badgeClass: "bg-warning text-warning-foreground",
+    rowClass: "bg-warning/10",
   },
   medium: {
-    borderColor: "border-l-blue-500",
-    badgeClass: "bg-blue-500 text-white",
+    borderColor: "border-l-info",
+    badgeClass: "bg-info text-info-foreground",
     rowClass: "",
   },
   low: {

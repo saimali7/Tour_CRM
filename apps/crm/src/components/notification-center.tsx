@@ -140,14 +140,14 @@ export function NotificationCenter() {
   const getIcon = (type: Notification["type"]) => {
     switch (type) {
       case "critical":
-        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+        return <AlertTriangle className="h-4 w-4 text-destructive" />;
       case "warning":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+        return <AlertTriangle className="h-4 w-4 text-warning" />;
       case "success":
-        return <Check className="h-4 w-4 text-green-500" />;
+        return <Check className="h-4 w-4 text-success" />;
       case "info":
       default:
-        return <Clock className="h-4 w-4 text-blue-500" />;
+        return <Clock className="h-4 w-4 text-info" />;
     }
   };
 
@@ -176,7 +176,7 @@ export function NotificationCenter() {
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-white">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -217,7 +217,7 @@ export function NotificationCenter() {
                   key={notification.id}
                   className={cn(
                     "p-3 hover:bg-muted/50 cursor-pointer transition-colors relative group",
-                    notification.type === "critical" && "bg-red-500/5"
+                    notification.type === "critical" && "bg-destructive/5"
                   )}
                   onClick={() => handleNotificationClick(notification)}
                 >
@@ -300,7 +300,7 @@ export function NotificationBell() {
     <div className="relative">
       <Bell className="h-4 w-4" />
       {unreadCount > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[9px] font-medium text-white">
+        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-medium text-white">
           {unreadCount > 9 ? "+" : unreadCount}
         </span>
       )}

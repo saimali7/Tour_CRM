@@ -12,7 +12,7 @@ interface PageContainerProps {
 const maxWidthClasses = {
   default: "max-w-6xl", // 1152px - ideal for data tables and forms
   wide: "max-w-7xl",    // 1280px - for dashboards and calendars
-  full: "",              // No max-width constraint
+  full: "max-w-none",    // No max-width constraint
 };
 
 /**
@@ -34,7 +34,7 @@ export function PageContainer({
   return (
     <div
       className={cn(
-        "w-full",
+        "w-full mx-auto",
         maxWidthClasses[maxWidth],
         className
       )}
@@ -52,7 +52,7 @@ interface PageSectionProps {
 /** A section within a page with consistent vertical spacing */
 export function PageSection({ children, className }: PageSectionProps) {
   return (
-    <section className={cn("space-y-4", className)}>
+    <section className={cn("space-y-6", className)}>
       {children}
     </section>
   );

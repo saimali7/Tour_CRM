@@ -6,9 +6,9 @@ export default function TourNotFound() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
       <div className="relative mb-8">
-        <div className="absolute inset-0 bg-emerald-500/10 rounded-full blur-2xl" />
-        <div className="relative bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 rounded-full p-8">
-          <Map className="h-16 w-16 text-emerald-500" strokeWidth={1.5} />
+        <div className="absolute inset-0 bg-success/10 rounded-full blur-2xl" />
+        <div className="relative bg-gradient-to-br from-success/20 to-success/5 rounded-full p-8">
+          <Map className="h-16 w-16 text-success" strokeWidth={1.5} />
         </div>
       </div>
 

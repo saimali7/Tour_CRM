@@ -235,7 +235,7 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-emerald-600" />
+            <Target className="h-5 w-5 text-success" />
             {isEditing ? "Edit Goal" : "Create New Goal"}
           </DialogTitle>
         </DialogHeader>
@@ -251,7 +251,7 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
               value={formData.name}
               onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
               placeholder="e.g., Q1 Revenue Target"
-              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-success/30 focus:border-success"
             />
             {errors.name && (
               <p className="mt-1 text-sm text-destructive">{errors.name}</p>
@@ -268,7 +268,7 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
               onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               placeholder="Add context or notes about this goal..."
               rows={2}
-              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-success/30 focus:border-success resize-none"
             />
           </div>
 
@@ -289,13 +289,13 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
                     disabled={isEditing}
                     className={`p-3 rounded-lg border-2 text-left transition-all ${
                       isSelected
-                        ? "border-emerald-500 bg-emerald-500/5"
-                        : "border-border hover:border-emerald-500/50"
+                        ? "border-success bg-success/5"
+                        : "border-border hover:border-success/50"
                     } ${isEditing ? "opacity-60 cursor-not-allowed" : ""}`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Icon className={`h-4 w-4 ${isSelected ? "text-emerald-600" : "text-muted-foreground"}`} />
-                      <span className={`text-sm font-medium ${isSelected ? "text-emerald-600" : "text-foreground"}`}>
+                      <Icon className={`h-4 w-4 ${isSelected ? "text-success" : "text-muted-foreground"}`} />
+                      <span className={`text-sm font-medium ${isSelected ? "text-success" : "text-foreground"}`}>
                         {option.label}
                       </span>
                     </div>
@@ -322,7 +322,7 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
                 placeholder={selectedMetric?.placeholder}
                 min="0"
                 step={formData.metricType === "capacity_utilization" ? "0.1" : "1"}
-                className={`w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 ${
+                className={`w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-success/30 focus:border-success ${
                   formData.metricType === "revenue" ? "pl-7" : ""
                 } ${formData.metricType === "capacity_utilization" ? "pr-8" : ""}`}
               />
@@ -354,8 +354,8 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
                   disabled={isEditing}
                   className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${
                     formData.periodType === option.value
-                      ? "border-emerald-500 bg-emerald-500/5 text-emerald-600"
-                      : "border-border text-muted-foreground hover:border-emerald-500/50"
+                      ? "border-success bg-success/5 text-success"
+                      : "border-border text-muted-foreground hover:border-success/50"
                   } ${isEditing ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
                   {option.label}
@@ -372,7 +372,7 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
                   value={formData.periodStart}
                   onChange={(e) => setFormData((prev) => ({ ...prev, periodStart: e.target.value }))}
                   disabled={isEditing}
-                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-success/30 focus:border-success disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 {errors.periodStart && (
                   <p className="mt-1 text-sm text-destructive">{errors.periodStart}</p>
@@ -385,7 +385,7 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
                   value={formData.periodEnd}
                   onChange={(e) => setFormData((prev) => ({ ...prev, periodEnd: e.target.value }))}
                   disabled={isEditing}
-                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-success/30 focus:border-success disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 {errors.periodEnd && (
                   <p className="mt-1 text-sm text-destructive">{errors.periodEnd}</p>
@@ -407,7 +407,7 @@ export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProp
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              className="flex-1 bg-success hover:bg-success"
             >
               {isSubmitting ? (
                 <>

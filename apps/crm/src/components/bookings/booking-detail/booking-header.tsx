@@ -74,11 +74,11 @@ export const BookingHeader = forwardRef<HTMLElement, BookingHeaderProps>(functio
   const getPrimaryActionStyle = (variant: PrimaryAction["variant"]) => {
     switch (variant) {
       case "confirm":
-        return "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/25";
+        return "bg-success hover:bg-success text-success-foreground shadow-lg shadow-success/25";
       case "complete":
-        return "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25";
+        return "bg-info hover:bg-info text-info-foreground shadow-lg shadow-info/25";
       case "refund":
-        return "bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-500/25";
+        return "bg-warning hover:bg-warning text-warning-foreground shadow-lg shadow-warning/25";
       default:
         return "bg-primary hover:bg-primary/90 text-primary-foreground";
     }
@@ -138,7 +138,7 @@ export const BookingHeader = forwardRef<HTMLElement, BookingHeaderProps>(functio
             >
               <span>{booking.referenceNumber}</span>
               {copied ? (
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <span className="inline-flex items-center gap-1 text-success">
                   <Check className="h-3 w-3" />
                   <span className="text-[10px] font-sans font-medium">Copied!</span>
                 </span>

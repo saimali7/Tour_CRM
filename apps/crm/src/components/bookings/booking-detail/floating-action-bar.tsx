@@ -67,11 +67,11 @@ export function FloatingActionBar({
   const getPrimaryActionStyle = (variant: PrimaryAction["variant"]) => {
     switch (variant) {
       case "confirm":
-        return "bg-emerald-600 hover:bg-emerald-700 text-white";
+        return "bg-success hover:bg-success text-success-foreground";
       case "complete":
-        return "bg-blue-600 hover:bg-blue-700 text-white";
+        return "bg-info hover:bg-info text-info-foreground";
       case "refund":
-        return "bg-amber-600 hover:bg-amber-700 text-white";
+        return "bg-warning hover:bg-warning text-warning-foreground";
       default:
         return "bg-primary hover:bg-primary/90 text-primary-foreground";
     }
@@ -110,8 +110,8 @@ export function FloatingActionBar({
                 <p className={cn(
                   "text-sm font-bold tabular-nums",
                   balanceDue > 0
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-emerald-600 dark:text-emerald-400"
+                    ? "text-warning dark:text-warning"
+                    : "text-success dark:text-success"
                 )}>
                   ${balanceDue.toFixed(2)}
                   <span className="font-normal text-muted-foreground ml-1">
@@ -128,7 +128,7 @@ export function FloatingActionBar({
                 <Button
                   size="sm"
                   onClick={onCollectPayment}
-                  className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                  className="gap-1.5 bg-warning hover:bg-warning text-warning-foreground"
                 >
                   <CreditCard className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Collect</span>

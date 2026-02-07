@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { ArrowLeft, MoreVertical, Archive, Pause, Play, Trash2, Copy, Package } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
+import { TourStatusBadge } from "@/components/ui/status-badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,13 +29,6 @@ interface TourPageHeaderProps {
   isLoading?: boolean;
 }
 
-const statusColors = {
-  active: "bg-success/10 text-success",
-  draft: "bg-warning/10 text-warning",
-  paused: "bg-warning/10 text-warning",
-  archived: "bg-muted text-muted-foreground",
-};
-
 export function TourPageHeader({
   tour,
   orgSlug,
@@ -50,24 +44,26 @@ export function TourPageHeader({
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <button
+        <IconButton
+          aria-label="Go back"
+          variant="ghost"
+          size="sm"
           onClick={() => router.back()}
-          className="p-2 hover:bg-accent rounded-lg transition-colors"
         >
-          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-        </button>
+          <ArrowLeft className="h-4 w-4" />
+        </IconButton>
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-foreground">{tour.name}</h1>
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[tour.status]}`}
-            >
-              {tour.status}
-            </span>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              {tour.name}
+            </h1>
+            <TourStatusBadge status={tour.status} />
           </div>
           <div className="flex items-center gap-3 mt-1">
             {tour.slug && (
-              <p className="text-muted-foreground">{tour.slug}</p>
+              <p className="text-xs text-muted-foreground font-mono tabular-nums">
+                {tour.slug}
+              </p>
             )}
             {tour.productId && (
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">

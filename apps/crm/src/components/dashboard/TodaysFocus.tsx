@@ -196,9 +196,9 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
                           <div
                             className={cn(
                               "h-full rounded-full",
-                              utilization >= 80 ? "bg-emerald-500" :
+                              utilization >= 80 ? "bg-success" :
                               utilization >= 50 ? "bg-primary" :
-                              utilization >= 20 ? "bg-amber-500" : "bg-red-400"
+                              utilization >= 20 ? "bg-warning" : "bg-destructive"
                             )}
                             style={{ width: `${Math.min(utilization, 100)}%` }}
                           />
@@ -214,7 +214,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
                         Needs guide
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
+                      <span className="flex items-center gap-1 text-sm text-success dark:text-success">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         {group.guidesAssigned} guide{group.guidesAssigned !== 1 ? "s" : ""}
                       </span>
@@ -341,7 +341,7 @@ function BookingRow({ booking, orgSlug }: BookingRowProps) {
       {/* Status Indicator */}
       <div className={cn(
         "h-2 w-2 rounded-full flex-shrink-0",
-        isReady ? "bg-emerald-500" : isPaid ? "bg-amber-500" : "bg-red-400"
+        isReady ? "bg-success" : isPaid ? "bg-warning" : "bg-destructive"
       )} />
 
       {/* Customer Info */}
@@ -372,7 +372,7 @@ function BookingRow({ booking, orgSlug }: BookingRowProps) {
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className={cn(
           "text-sm font-medium tabular-nums",
-          isPaid ? "text-foreground" : "text-amber-600 dark:text-amber-400"
+          isPaid ? "text-foreground" : "text-warning dark:text-warning"
         )}>
           ${parseFloat(booking.total).toFixed(0)}
         </span>

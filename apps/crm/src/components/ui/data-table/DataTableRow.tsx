@@ -54,7 +54,7 @@ export const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      "px-4 py-3 align-middle [&:has([role=checkbox])]:pr-0",
+      "px-4 py-3 align-middle text-sm text-foreground [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -107,7 +107,7 @@ export const ActionButton = React.forwardRef<HTMLButtonElement, ActionButtonProp
       default:
         "text-muted-foreground hover:text-foreground hover:bg-accent",
       success:
-        "text-emerald-500 hover:text-emerald-600 hover:bg-accent dark:text-emerald-400 dark:hover:text-emerald-300",
+        "text-success hover:text-success hover:bg-accent dark:text-success dark:hover:text-success",
       danger:
         "text-destructive hover:text-destructive/80 hover:bg-accent",
     };

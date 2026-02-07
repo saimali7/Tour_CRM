@@ -159,7 +159,7 @@ export function CustomerQuickView({ customerId }: CustomerQuickViewProps) {
             </div>
             <p className={cn(
               "text-lg font-semibold tabular-nums",
-              lifetimeValue > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
+              lifetimeValue > 0 ? "text-success dark:text-success" : "text-foreground"
             )}>
               ${lifetimeValue.toLocaleString()}
             </p>

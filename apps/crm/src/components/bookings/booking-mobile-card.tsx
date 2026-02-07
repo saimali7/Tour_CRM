@@ -69,9 +69,9 @@ export function BookingMobileCard({
       className={cn(
         'mobile-card space-y-3',
         isSelected && 'ring-2 ring-primary bg-primary/5',
-        booking.status === 'confirmed' && 'border-l-4 border-l-emerald-500',
-        booking.status === 'pending' && 'border-l-4 border-l-amber-500',
-        booking.status === 'cancelled' && 'border-l-4 border-l-red-400 opacity-70'
+        booking.status === 'confirmed' && 'border-l-4 border-l-success',
+        booking.status === 'pending' && 'border-l-4 border-l-warning',
+        booking.status === 'cancelled' && 'border-l-4 border-l-destructive opacity-70'
       )}
     >
       {/* Top row: Customer + Status */}
@@ -119,7 +119,7 @@ export function BookingMobileCard({
           <span
             className={cn(
               'text-sm font-semibold tabular-nums',
-              isHighValue ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
+              isHighValue ? 'text-success dark:text-success' : 'text-foreground'
             )}
           >
             ${total.toFixed(0)}
@@ -134,7 +134,7 @@ export function BookingMobileCard({
                 e.preventDefault();
                 onConfirm(booking.id);
               }}
-              className="p-2 rounded-md text-emerald-500 hover:bg-accent transition-colors touch-target"
+              className="p-2 rounded-md text-success hover:bg-accent transition-colors touch-target"
               aria-label="Confirm booking"
             >
               <CheckCircle className="h-5 w-5" />

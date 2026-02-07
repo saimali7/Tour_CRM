@@ -79,8 +79,8 @@ export function MetricsBar({
           {todayChange !== undefined && todayChange !== 0 && (
             <span className={cn(
               "flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded",
-              isPositive && "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/50",
-              isNegative && "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/50"
+              isPositive && "text-success bg-success dark:text-success dark:bg-success/50",
+              isNegative && "text-destructive bg-destructive dark:text-destructive dark:bg-destructive/50"
             )}>
               {isPositive ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
               {isPositive && "+"}{todayChange.toFixed(0)}%

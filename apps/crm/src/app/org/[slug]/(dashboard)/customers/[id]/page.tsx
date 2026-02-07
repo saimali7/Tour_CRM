@@ -135,11 +135,11 @@ export default function CustomerDetailPage() {
   const getSegmentBadge = (segment?: string) => {
     if (!segment) return null;
     const styles = {
-      vip: { bg: "bg-amber-500/10", text: "text-amber-600", icon: Star },
-      loyal: { bg: "bg-emerald-500/10", text: "text-emerald-600", icon: TrendingUp },
-      promising: { bg: "bg-blue-500/10", text: "text-blue-600", icon: Target },
-      at_risk: { bg: "bg-orange-500/10", text: "text-orange-600", icon: AlertTriangle },
-      dormant: { bg: "bg-gray-500/10", text: "text-gray-600", icon: Clock },
+      vip: { bg: "bg-primary/10", text: "text-primary", icon: Star },
+      loyal: { bg: "bg-success/10", text: "text-success", icon: TrendingUp },
+      promising: { bg: "bg-info/10", text: "text-info", icon: Target },
+      at_risk: { bg: "bg-warning/10", text: "text-warning", icon: AlertTriangle },
+      dormant: { bg: "bg-muted/60", text: "text-muted-foreground", icon: Clock },
     };
     const style = styles[segment as keyof typeof styles] || styles.dormant;
     const Icon = style.icon;
@@ -153,10 +153,10 @@ export default function CustomerDetailPage() {
 
   const getScoreColor = (score?: number) => {
     if (!score) return "text-muted-foreground";
-    if (score >= 80) return "text-emerald-600";
-    if (score >= 60) return "text-blue-600";
-    if (score >= 40) return "text-amber-600";
-    return "text-red-600";
+    if (score >= 80) return "text-success";
+    if (score >= 60) return "text-info";
+    if (score >= 40) return "text-warning";
+    return "text-destructive";
   };
 
   const handleRebook = (booking: { tourId?: string | null; scheduleId?: string | null }) => {
@@ -285,7 +285,7 @@ export default function CustomerDetailPage() {
                 <span className="text-sm text-muted-foreground">/ 100</span>
               </div>
               {customerScore?.score && customerScore.score < 40 && (
-                <p className="text-xs text-orange-600 flex items-center gap-1">
+                <p className="text-xs text-warning flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
                   Needs attention
                 </p>
@@ -299,7 +299,7 @@ export default function CustomerDetailPage() {
                 ${parseFloat(customerCLV?.historicalCLV ?? "0").toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
               {customerCLV?.predictedCLV && parseFloat(customerCLV.predictedCLV) > 0 && (
-                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                <p className="text-xs text-success flex items-center gap-1">
                   <TrendingUp className="h-3 w-3" />
                   +${parseFloat(customerCLV.predictedCLV).toLocaleString(undefined, { maximumFractionDigits: 0 })} predicted
                 </p>
@@ -325,13 +325,13 @@ export default function CustomerDetailPage() {
               <p className={cn(
                 "text-3xl font-bold",
                 customerScore?.daysSinceLastBooking && customerScore.daysSinceLastBooking > 90
-                  ? "text-orange-600"
+                  ? "text-warning"
                   : "text-foreground"
               )}>
                 {customerScore?.daysSinceLastBooking ?? "—"}
               </p>
               {customerScore?.daysSinceLastBooking && customerScore.daysSinceLastBooking > 60 && (
-                <p className="text-xs text-orange-600 flex items-center gap-1">
+                <p className="text-xs text-warning flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   Time for outreach
                 </p>
@@ -342,7 +342,7 @@ export default function CustomerDetailPage() {
           {/* Quick Actions for at-risk customers */}
           {customerScore?.segment === "at_risk" && (
             <div className="mt-4 pt-4 border-t border-primary/20 flex items-center justify-between">
-              <p className="text-sm text-orange-600 font-medium">
+              <p className="text-sm text-warning font-medium">
                 This customer is at risk of churning. Consider reaching out with a special offer.
               </p>
               <Button size="sm" variant="outline" onClick={handleQuickBook} className="gap-1">
@@ -497,10 +497,10 @@ export default function CustomerDetailPage() {
                   className={cn(
                     "inline-flex items-center px-3 py-1 rounded-full text-sm",
                     tag === "vip"
-                      ? "bg-amber-500/10 text-amber-600"
+                      ? "bg-primary/10 text-primary"
                       : tag === "repeat-customer"
-                        ? "bg-emerald-500/10 text-emerald-600"
-                        : "bg-primary/10 text-primary"
+                        ? "bg-success/10 text-success"
+                        : "bg-muted text-muted-foreground"
                   )}
                 >
                   {tag}

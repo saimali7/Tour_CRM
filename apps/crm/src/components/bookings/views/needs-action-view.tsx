@@ -124,8 +124,8 @@ function LoadingState() {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-      <div className="rounded-full bg-green-500/10 p-4 mb-4">
-        <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400" />
+      <div className="rounded-full bg-success/10 p-4 mb-4">
+        <CheckCircle2 className="h-12 w-12 text-success dark:text-success" />
       </div>
       <h3 className="text-xl font-semibold tracking-tight text-foreground mb-2">
         All caught up!
@@ -279,7 +279,7 @@ export function NeedsActionView({ orgSlug }: NeedsActionViewProps) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
         <h3 className="text-xl font-semibold tracking-tight text-foreground mb-2">
           Failed to load bookings
         </h3>

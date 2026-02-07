@@ -74,7 +74,7 @@ export function CustomerMobileCard({ customer, orgSlug }: CustomerMobileCardProp
             <span
               className={cn(
                 'font-semibold tabular-nums',
-                isHighValue ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
+                isHighValue ? 'text-success dark:text-success' : 'text-foreground'
               )}
             >
               {totalSpent.toFixed(0)}

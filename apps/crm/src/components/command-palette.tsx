@@ -77,32 +77,32 @@ const entityConfig: Record<
   booking: {
     icon: ClipboardList,
     label: "Bookings",
-    iconClass: "text-blue-600 dark:text-blue-400",
-    bgClass: "bg-blue-500/10 dark:bg-blue-500/20",
+    iconClass: "text-info dark:text-info",
+    bgClass: "bg-info/10 dark:bg-info/20",
   },
   customer: {
     icon: User,
     label: "Customers",
-    iconClass: "text-emerald-600 dark:text-emerald-400",
-    bgClass: "bg-emerald-500/10 dark:bg-emerald-500/20",
+    iconClass: "text-success dark:text-success",
+    bgClass: "bg-success/10 dark:bg-success/20",
   },
   tour: {
     icon: Map,
     label: "Tours",
-    iconClass: "text-purple-600 dark:text-purple-400",
-    bgClass: "bg-purple-500/10 dark:bg-purple-500/20",
+    iconClass: "text-info dark:text-info",
+    bgClass: "bg-info/10 dark:bg-info/20",
   },
   schedule: {
     icon: Calendar,
     label: "Schedules",
-    iconClass: "text-orange-600 dark:text-orange-400",
-    bgClass: "bg-orange-500/10 dark:bg-orange-500/20",
+    iconClass: "text-warning dark:text-warning",
+    bgClass: "bg-warning/10 dark:bg-warning/20",
   },
   guide: {
     icon: Users,
     label: "Guides",
-    iconClass: "text-pink-600 dark:text-pink-400",
-    bgClass: "bg-pink-500/10 dark:bg-pink-500/20",
+    iconClass: "text-primary",
+    bgClass: "bg-primary/10",
   },
 };
 
@@ -172,32 +172,32 @@ const quickActions: QuickAction[] = [
     icon: Zap,
     shortcut: "B",
     description: "Create a reservation",
-    iconBg: "bg-blue-500/10 dark:bg-blue-500/20",
-    iconColor: "text-blue-600 dark:text-blue-400",
+    iconBg: "bg-info/10 dark:bg-info/20",
+    iconColor: "text-info dark:text-info",
   },
   {
     name: "Add Customer",
     action: "new-customer",
     icon: UserPlus,
     description: "Register new customer",
-    iconBg: "bg-emerald-500/10 dark:bg-emerald-500/20",
-    iconColor: "text-emerald-600 dark:text-emerald-400",
+    iconBg: "bg-success/10 dark:bg-success/20",
+    iconColor: "text-success dark:text-success",
   },
   {
     name: "Create Tour",
     action: "new-tour",
     icon: Plus,
     description: "Add a new tour",
-    iconBg: "bg-purple-500/10 dark:bg-purple-500/20",
-    iconColor: "text-purple-600 dark:text-purple-400",
+    iconBg: "bg-info/10 dark:bg-info/20",
+    iconColor: "text-info dark:text-info",
   },
   {
     name: "New Schedule",
     action: "new-schedule",
     icon: CalendarPlus,
     description: "Schedule a departure",
-    iconBg: "bg-orange-500/10 dark:bg-orange-500/20",
-    iconColor: "text-orange-600 dark:text-orange-400",
+    iconBg: "bg-warning/10 dark:bg-warning/20",
+    iconColor: "text-warning dark:text-warning",
   },
 ];
 
@@ -227,7 +227,7 @@ function HighlightedText({
           part.toLowerCase() === query.toLowerCase() ? (
             <mark
               key={i}
-              className="bg-yellow-200/60 dark:bg-yellow-500/30 text-foreground rounded-sm px-0.5 -mx-0.5"
+              className="bg-warning/60 dark:bg-warning/30 text-foreground rounded-sm px-0.5 -mx-0.5"
             >
               {part}
             </mark>

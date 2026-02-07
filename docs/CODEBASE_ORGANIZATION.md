@@ -354,7 +354,7 @@ See `docs/TECHNICAL_DEBT.md` for full tracking.
 |----------|---------|
 | `docs/ARCHITECTURE.md` | Domain model, entity relationships |
 | `docs/PROGRESS.md` | Implementation status by phase |
-| `docs/DESIGN_SYSTEM_V2.md` | UI patterns and tokens |
+| `docs/DESIGN_SYSTEM.md` | UI patterns and tokens |
 | `docs/DEPLOYMENT.md` | Production setup guide |
 | `docs/INFRASTRUCTURE_PLAN.md` | Self-hosted stack details |
 | `CLAUDE.md` | AI assistant context |

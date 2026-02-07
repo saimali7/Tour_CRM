@@ -58,52 +58,52 @@ const urgencyConfig: Record<UrgencyType, UrgencyConfig> = {
     label: "Today",
     icon: AlertCircle,
     // Light: Warm red with subtle depth
-    containerLight: "bg-red-50 border-red-200/60",
-    textLight: "text-red-700",
-    iconLight: "text-red-500",
+    containerLight: "bg-destructive border-destructive/60",
+    textLight: "text-destructive",
+    iconLight: "text-destructive",
     // Dark: Deep red, softer for eye comfort
-    containerDark: "dark:bg-red-950/40 dark:border-red-800/40",
-    textDark: "dark:text-red-300",
-    iconDark: "dark:text-red-400",
+    containerDark: "dark:bg-destructive/40 dark:border-destructive/40",
+    textDark: "dark:text-destructive",
+    iconDark: "dark:text-destructive",
     animate: true,
   },
   tomorrow: {
     label: "Tomorrow",
     icon: CalendarClock,
     // Light: Warm amber
-    containerLight: "bg-amber-50 border-amber-200/60",
-    textLight: "text-amber-700",
-    iconLight: "text-amber-500",
+    containerLight: "bg-warning border-warning/60",
+    textLight: "text-warning",
+    iconLight: "text-warning",
     // Dark: Deep amber
-    containerDark: "dark:bg-amber-950/40 dark:border-amber-700/40",
-    textDark: "dark:text-amber-300",
-    iconDark: "dark:text-amber-400",
+    containerDark: "dark:bg-warning/40 dark:border-warning/40",
+    textDark: "dark:text-warning",
+    iconDark: "dark:text-warning",
     animate: false,
   },
   soon: {
     label: "Soon",
     icon: Clock,
     // Light: Cool blue for medium priority
-    containerLight: "bg-blue-50 border-blue-200/60",
-    textLight: "text-blue-700",
-    iconLight: "text-blue-500",
+    containerLight: "bg-info border-info/60",
+    textLight: "text-info",
+    iconLight: "text-info",
     // Dark: Deep blue
-    containerDark: "dark:bg-blue-950/40 dark:border-blue-800/40",
-    textDark: "dark:text-blue-300",
-    iconDark: "dark:text-blue-400",
+    containerDark: "dark:bg-info/40 dark:border-info/40",
+    textDark: "dark:text-info",
+    iconDark: "dark:text-info",
     animate: false,
   },
   past: {
     label: "Past",
     icon: CheckCircle2,
-    // Light: Neutral gray for historical
-    containerLight: "bg-slate-50 border-slate-200/60",
-    textLight: "text-slate-500",
-    iconLight: "text-slate-400",
+    // Light: Neutral muted
+    containerLight: "bg-muted border-border",
+    textLight: "text-muted-foreground",
+    iconLight: "text-muted-foreground",
     // Dark: Muted gray
-    containerDark: "dark:bg-slate-800/40 dark:border-slate-700/40",
-    textDark: "dark:text-slate-400",
-    iconDark: "dark:text-slate-500",
+    containerDark: "dark:bg-muted/60 dark:border-border",
+    textDark: "dark:text-muted-foreground",
+    iconDark: "dark:text-muted-foreground",
     animate: false,
   },
   normal: {
@@ -263,10 +263,10 @@ export function UrgencyIndicator({
     <span
       className={cn(
         "inline-block w-2 h-2 rounded-full",
-        type === "today" && "bg-red-500 dark:bg-red-400 urgency-pulse-dot",
-        type === "tomorrow" && "bg-amber-500 dark:bg-amber-400",
-        type === "soon" && "bg-blue-500 dark:bg-blue-400",
-        type === "past" && "bg-slate-400 dark:bg-slate-500",
+        type === "today" && "bg-destructive dark:bg-destructive urgency-pulse-dot",
+        type === "tomorrow" && "bg-warning dark:bg-warning",
+        type === "soon" && "bg-info dark:bg-info",
+        type === "past" && "bg-muted-foreground",
         className
       )}
       title={config.label}

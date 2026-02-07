@@ -122,7 +122,7 @@ export function BookingViewTabs({
                     className={cn(
                       "ml-1 font-mono tabular-nums",
                       hasNeedsAction &&
-                        "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                        "bg-warning/15 text-warning dark:text-warning border-warning/20"
                     )}
                   >
                     {count}

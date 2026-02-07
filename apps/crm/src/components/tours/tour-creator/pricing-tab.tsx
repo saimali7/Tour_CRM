@@ -434,7 +434,7 @@ export function PricingTab({ formState, updateForm }: PricingTabProps) {
                           "w-full pl-8 pr-4 py-3 text-lg font-medium border rounded-xl transition-all",
                           "bg-background text-foreground placeholder:text-muted-foreground",
                           "focus:ring-2 focus:ring-primary/20 focus:border-primary",
-                          pricingState.adultPrice ? "border-emerald-500" : "border-input"
+                          pricingState.adultPrice ? "border-success" : "border-input"
                         )}
                       />
                     </div>
@@ -751,18 +751,18 @@ export function PricingTab({ formState, updateForm }: PricingTabProps) {
       <div className={cn(
         "flex items-start gap-3 p-4 rounded-xl border",
         isPricingValid()
-          ? "bg-emerald-500/5 border-emerald-500/20"
+          ? "bg-success/5 border-success/20"
           : "bg-muted/50 border-border"
       )}>
         {isPricingValid() ? (
-          <Check className="h-5 w-5 text-emerald-500 mt-0.5" />
+          <Check className="h-5 w-5 text-success mt-0.5" />
         ) : (
           <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
         )}
         <div>
           <p className={cn(
             "font-medium",
-            isPricingValid() ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"
+            isPricingValid() ? "text-success dark:text-success" : "text-muted-foreground"
           )}>
             {isPricingValid()
               ? `Pricing configured: ${getPreviewPrice()}`

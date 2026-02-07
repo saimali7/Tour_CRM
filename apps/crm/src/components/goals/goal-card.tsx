@@ -53,10 +53,10 @@ export function GoalCard({ orgSlug, onAddGoal }: GoalCardProps) {
   const hasGoals = activeGoals && activeGoals.length > 0;
 
   return (
-    <div className="bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-cyan-500/5 rounded-xl border border-emerald-500/10 p-6">
+    <div className="bg-gradient-to-br from-success/5 via-info/5 to-primary/5 rounded-xl border border-success/10 p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-emerald-600" />
+          <Target className="h-5 w-5 text-success" />
           <h3 className="text-lg font-semibold text-foreground">Goals</h3>
         </div>
         <Button variant="ghost" size="sm" onClick={onAddGoal} className="h-8 gap-1">
@@ -73,11 +73,11 @@ export function GoalCard({ orgSlug, onAddGoal }: GoalCardProps) {
             <p className="text-xs text-muted-foreground">Active</p>
           </div>
           <div className="bg-background/50 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-emerald-600">{summary.onTrack}</p>
+            <p className="text-lg font-bold text-success">{summary.onTrack}</p>
             <p className="text-xs text-muted-foreground">On Track</p>
           </div>
           <div className="bg-background/50 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-orange-600">{summary.offTrack}</p>
+            <p className="text-lg font-bold text-warning">{summary.offTrack}</p>
             <p className="text-xs text-muted-foreground">Needs Attention</p>
           </div>
         </div>
@@ -107,8 +107,8 @@ export function GoalCard({ orgSlug, onAddGoal }: GoalCardProps) {
                     className={cn(
                       "flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full",
                       goal.isOnTrack
-                        ? "bg-emerald-500/10 text-emerald-600"
-                        : "bg-orange-500/10 text-orange-600"
+                        ? "bg-success/10 text-success"
+                        : "bg-warning/10 text-warning"
                     )}
                   >
                     {goal.isOnTrack ? (
@@ -135,7 +135,7 @@ export function GoalCard({ orgSlug, onAddGoal }: GoalCardProps) {
                     <div
                       className={cn(
                         "h-full rounded-full transition-all",
-                        goal.isOnTrack ? "bg-emerald-500" : "bg-orange-500"
+                        goal.isOnTrack ? "bg-success" : "bg-warning"
                       )}
                       style={{ width: `${Math.min(100, goal.progress)}%` }}
                     />
@@ -176,13 +176,13 @@ export function GoalCard({ orgSlug, onAddGoal }: GoalCardProps) {
           <div className="flex items-center gap-4">
             {summary.completed > 0 && (
               <span className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                <CheckCircle className="h-3 w-3 text-success" />
                 {summary.completed} completed
               </span>
             )}
             {summary.missed > 0 && (
               <span className="flex items-center gap-1">
-                <AlertCircle className="h-3 w-3 text-orange-500" />
+                <AlertCircle className="h-3 w-3 text-warning" />
                 {summary.missed} missed
               </span>
             )}

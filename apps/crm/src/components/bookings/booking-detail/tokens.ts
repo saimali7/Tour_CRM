@@ -53,45 +53,45 @@ export const colors = {
   // Booking Status
   status: {
     confirmed: {
-      text: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500",
-      bgMuted: "bg-emerald-50 dark:bg-emerald-950/40",
+      text: "text-success",
+      bg: "bg-success",
+      bgMuted: "bg-success/10",
     },
     pending: {
-      text: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500",
-      bgMuted: "bg-amber-50 dark:bg-amber-950/40",
+      text: "text-warning",
+      bg: "bg-warning",
+      bgMuted: "bg-warning/10",
     },
     cancelled: {
-      text: "text-red-600 dark:text-red-400",
-      bg: "bg-red-500",
-      bgMuted: "bg-red-50 dark:bg-red-950/40",
+      text: "text-destructive",
+      bg: "bg-destructive",
+      bgMuted: "bg-destructive/10",
     },
     completed: {
-      text: "text-slate-600 dark:text-slate-400",
-      bg: "bg-slate-500",
-      bgMuted: "bg-slate-50 dark:bg-slate-800/40",
+      text: "text-muted-foreground",
+      bg: "bg-muted",
+      bgMuted: "bg-muted/60",
     },
     no_show: {
-      text: "text-slate-500",
-      bg: "bg-slate-400",
-      bgMuted: "bg-slate-100 dark:bg-slate-800/40",
+      text: "text-muted-foreground",
+      bg: "bg-muted/80",
+      bgMuted: "bg-muted/60",
     },
   },
 
   // Balance colors
   balance: {
-    due: "text-amber-600 dark:text-amber-400",
-    paid: "text-emerald-600 dark:text-emerald-400",
+    due: "text-warning dark:text-warning",
+    paid: "text-success dark:text-success",
   },
 
   // Action button colors
   actions: {
-    confirm: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/25",
-    complete: "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25",
-    collect: "bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-500/25",
-    refund: "bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-500/25",
-    cancel: "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/25",
+    confirm: "bg-success hover:bg-success text-success-foreground shadow-lg shadow-success/25",
+    complete: "bg-info hover:bg-info text-info-foreground shadow-lg shadow-info/25",
+    collect: "bg-warning hover:bg-warning text-warning-foreground shadow-lg shadow-warning/25",
+    refund: "bg-warning hover:bg-warning text-warning-foreground shadow-lg shadow-warning/25",
+    cancel: "bg-destructive hover:bg-destructive text-destructive-foreground shadow-lg shadow-destructive/25",
   },
 } as const;
 

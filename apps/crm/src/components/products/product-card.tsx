@@ -68,15 +68,15 @@ interface ProductCardProps {
 const STATUS_CONFIG = {
   draft: {
     label: "Draft",
-    className: "bg-amber-500 text-white",
+    className: "bg-warning text-warning-foreground",
   },
   active: {
     label: "Active",
-    className: "bg-emerald-500 text-white",
+    className: "bg-success text-success-foreground",
   },
   archived: {
     label: "Archived",
-    className: "bg-gray-500 text-white",
+    className: "bg-muted text-muted-foreground",
   },
 } as const;
 
@@ -120,37 +120,37 @@ export function ProductCard({
     return (
       <div className="flex items-center gap-4 text-sm">
         {/* Duration */}
-        <div className="flex items-center gap-1.5 text-gray-900 dark:text-gray-100">
-          <Clock className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+        <div className="flex items-center gap-1.5 text-foreground">
+          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="font-medium">{product.tour.durationMinutes} min</span>
         </div>
 
         {/* Upcoming schedules */}
-        <div className="flex items-center gap-1.5 text-gray-900 dark:text-gray-100">
-          <Calendar className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+        <div className="flex items-center gap-1.5 text-foreground">
+          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="font-medium">{stats?.upcomingCount ?? 0} upcoming</span>
         </div>
 
         {/* Capacity utilization */}
         {stats && stats.upcomingCount > 0 && (
           <div className="flex items-center gap-2">
-            <Users className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+            <Users className="h-3.5 w-3.5 text-muted-foreground" />
             <div className="flex items-center gap-1.5">
-              <div className="w-12 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 overflow-hidden">
+              <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
                 <div
                   className={cn(
                     "h-full rounded-full transition-all",
-                    utilizationPercent >= 80 ? "bg-emerald-500" :
-                    utilizationPercent >= 50 ? "bg-blue-500" :
-                    utilizationPercent >= 20 ? "bg-amber-500" : "bg-red-500"
+                    utilizationPercent >= 80 ? "bg-success" :
+                    utilizationPercent >= 50 ? "bg-info" :
+                    utilizationPercent >= 20 ? "bg-warning" : "bg-destructive"
                   )}
                   style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
                 />
               </div>
               <span className={cn(
                 "text-xs font-bold tabular-nums",
-                utilizationPercent >= 80 ? "text-emerald-600 dark:text-emerald-400" :
-                utilizationPercent < 30 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
+                utilizationPercent >= 80 ? "text-success dark:text-success" :
+                utilizationPercent < 30 ? "text-destructive dark:text-destructive" : "text-foreground"
               )}>
                 {utilizationPercent}%
               </span>
@@ -177,7 +177,7 @@ export function ProductCard({
           <div className="min-w-0 flex-1">
             {/* Tour badge + Status row */}
             <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-blue-500 text-white">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide bg-info/10 text-info">
                 <MapPin className="h-3 w-3" />
                 Tour
               </span>
@@ -239,7 +239,7 @@ export function ProductCard({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-foreground hover:bg-accent transition-colors">
+            <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
               <MoreHorizontal className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>

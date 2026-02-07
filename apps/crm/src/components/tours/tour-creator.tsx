@@ -637,7 +637,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                     className={cn(
                       "flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-xs transition-colors",
                       isCompleted
-                        ? "bg-emerald-500/15 text-emerald-600"
+                        ? "bg-success/15 text-success"
                         : isActive
                           ? "bg-primary/15 text-primary"
                           : "bg-muted text-muted-foreground"
@@ -710,7 +710,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                   activeTab === tab.id
                     ? "bg-primary"
                     : tabCompletion[tab.id].complete
-                      ? "bg-emerald-500"
+                      ? "bg-success"
                       : "bg-muted-foreground/30",
                   canNavigateToTab(tab.id) && "cursor-pointer"
                 )}
@@ -762,7 +762,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
               </div>
 
               {!tabCompletion.essentials.complete && (
-                <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-2 rounded-lg">
+                <p className="text-sm text-warning dark:text-warning bg-warning/10 px-3 py-2 rounded-lg">
                   Complete the Essentials tab before saving
                 </p>
               )}

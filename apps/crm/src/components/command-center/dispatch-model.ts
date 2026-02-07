@@ -288,11 +288,16 @@ export function buildCommandCenterViewModel(response: DispatchResponse): Command
       rawSegments: timeline.segments,
       runs: buildRuns(timeline, bookingLookup),
     }))
-    .sort((a, b) =>
-      `${a.guide.firstName} ${a.guide.lastName}`.localeCompare(
+    .sort((a, b) => {
+      const aIsTemp = a.guide.email?.endsWith("@temp-outsourced.local") ?? false;
+      const bIsTemp = b.guide.email?.endsWith("@temp-outsourced.local") ?? false;
+      if (aIsTemp !== bIsTemp) {
+        return aIsTemp ? 1 : -1;
+      }
+      return `${a.guide.firstName} ${a.guide.lastName}`.localeCompare(
         `${b.guide.firstName} ${b.guide.lastName}`
-      )
-    );
+      );
+    });
 
   const groups = buildUnassignedGroups(response.tourRuns, assignedBookingIds);
   const guideLookup = buildGuideLookup(rows, bookingLookup);

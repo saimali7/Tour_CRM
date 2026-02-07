@@ -195,9 +195,9 @@ function CommandCenterContent({
     },
   });
 
-  const addOutsourcedGuideMutation = trpc.commandCenter.addOutsourcedGuideToRun.useMutation({
+  const createTempGuideMutation = trpc.commandCenter.createTempGuide.useMutation({
     onError: (mutationError) => {
-      toast.error("Failed to add outsourced guide", { description: mutationError.message });
+      toast.error("Failed to create temporary guide", { description: mutationError.message });
     },
   });
 
@@ -293,7 +293,7 @@ function CommandCenterContent({
 
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
-  const isMutating = batchMutation.isPending || addOutsourcedGuideMutation.isPending;
+  const isMutating = batchMutation.isPending || createTempGuideMutation.isPending;
   const isReadOnly = dispatchData?.status === "dispatched" || isPastDate;
 
   useEffect(() => {
@@ -483,26 +483,20 @@ function CommandCenterContent({
     [executeOperation, rowsForCanvas, runLookup]
   );
 
-  const handleAddOutsourcedGuideToRun = useCallback(
-    async (tourRunKey: string, draft: { name: string; contact?: string }) => {
-      const result = await addOutsourcedGuideMutation.mutateAsync({
+  const handleCreateTempGuide = useCallback(
+    async (draft: { name: string; phone: string }) => {
+      const result = await createTempGuideMutation.mutateAsync({
         date: dateString,
-        tourRunKey,
-        externalGuideName: draft.name,
-        externalGuideContact: draft.contact,
+        name: draft.name,
+        phone: draft.phone,
       });
 
       await utils.commandCenter.getDispatch.invalidate({ date: dateString });
-      if (result.noop) {
-        toast.message(result.message);
-        announce(result.message);
-        return;
-      }
-
-      toast.success(result.message);
-      announce(result.message);
+      const message = `Added temporary guide ${result.guideName}`;
+      toast.success(message);
+      announce(message);
     },
-    [addOutsourcedGuideMutation, announce, dateString, utils.commandCenter.getDispatch]
+    [announce, createTempGuideMutation, dateString, utils.commandCenter.getDispatch]
   );
 
   const handleMobileNudgeRun = useCallback(
@@ -648,7 +642,7 @@ function CommandCenterContent({
           onGuideClick={handleGuideClick}
           onBookingClick={handleBookingClick}
           onResolveWarning={handleResolveWarning}
-          onAddOutsourcedGuideToRun={handleAddOutsourcedGuideToRun}
+          onCreateTempGuide={handleCreateTempGuide}
           showCurrentTime={isToday(date)}
         />
       </div>

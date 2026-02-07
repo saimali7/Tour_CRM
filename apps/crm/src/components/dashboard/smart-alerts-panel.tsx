@@ -46,22 +46,22 @@ const typeConfig = {
   warning: {
     cardClass: "card-warning",
     icon: AlertTriangle,
-    iconColor: "text-amber-600 dark:text-amber-400",
-    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    iconColor: "text-warning dark:text-warning",
+    badge: "bg-warning/10 text-warning dark:text-warning",
     label: "Needs Attention",
   },
   opportunity: {
     cardClass: "card-info",
     icon: Zap,
-    iconColor: "text-blue-600 dark:text-blue-400",
-    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    iconColor: "text-info dark:text-info",
+    badge: "bg-info/10 text-info dark:text-info",
     label: "Opportunity",
   },
   success: {
     cardClass: "card-success",
     icon: CheckCircle2,
-    iconColor: "text-emerald-600 dark:text-emerald-400",
-    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    iconColor: "text-success dark:text-success",
+    badge: "bg-success/10 text-success dark:text-success",
     label: "On Track",
   },
   info: {
@@ -268,13 +268,13 @@ function AllClearState() {
   return (
     <div className="flex items-center gap-3 rounded-xl card-success px-4 py-4">
       <div className="flex-shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-        <CheckCircle2 className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+        <CheckCircle2 className="h-5 w-5 text-success dark:text-success" />
       </div>
       <div>
-        <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+        <p className="text-sm font-semibold text-success dark:text-success">
           All systems operational
         </p>
-        <p className="text-xs text-emerald-700 dark:text-emerald-400">
+        <p className="text-xs text-success dark:text-success">
           No urgent issues or opportunities requiring attention
         </p>
       </div>

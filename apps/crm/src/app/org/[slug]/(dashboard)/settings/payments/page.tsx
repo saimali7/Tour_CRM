@@ -144,7 +144,7 @@ export default function PaymentsPage() {
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-300",
               saveSuccess
-                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 translate-x-0 opacity-100"
+                ? "bg-success/10 text-success border border-success/20 translate-x-0 opacity-100"
                 : "translate-x-4 opacity-0 pointer-events-none"
             )}
           >
@@ -195,12 +195,12 @@ export default function PaymentsPage() {
               <span className={cn(
                 "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
                 stripeStatus.testMode
-                  ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
-                  : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                  ? "bg-warning/10 text-warning border border-warning/20"
+                  : "bg-success/10 text-success border border-success/20"
               )}>
                 <span className={cn(
                   "h-1.5 w-1.5 rounded-full",
-                  stripeStatus.testMode ? "bg-amber-500" : "bg-emerald-500"
+                  stripeStatus.testMode ? "bg-warning" : "bg-success"
                 )} />
                 {stripeStatus.testMode ? "Test Mode" : "Live"}
               </span>
@@ -211,10 +211,10 @@ export default function PaymentsPage() {
         <div className="p-6">
           {stripeStatus?.configured ? (
             <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+              <div className="p-4 rounded-lg bg-success/5 border border-success/20">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 flex-shrink-0">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10 flex-shrink-0">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Stripe is configured and ready</p>
@@ -262,10 +262,10 @@ export default function PaymentsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
+              <div className="p-4 rounded-lg bg-warning/5 border border-warning/20">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 flex-shrink-0">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10 flex-shrink-0">
+                    <AlertCircle className="h-4 w-4 text-warning" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Stripe not configured</p>
@@ -305,8 +305,8 @@ export default function PaymentsPage() {
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
-                <Wallet className="h-4 w-4 text-violet-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10">
+                <Wallet className="h-4 w-4 text-info" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Payment Methods</h3>
@@ -443,8 +443,8 @@ export default function PaymentsPage() {
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
-                <CreditCard className="h-4 w-4 text-violet-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10">
+                <CreditCard className="h-4 w-4 text-info" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Payment Links</h3>
@@ -538,8 +538,8 @@ export default function PaymentsPage() {
         <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border/60 bg-muted/30">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
-                <RefreshCcw className="h-4 w-4 text-amber-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10">
+                <RefreshCcw className="h-4 w-4 text-warning" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">Refund Settings</h3>
@@ -578,15 +578,15 @@ export default function PaymentsPage() {
               className={cn(
                 "flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all",
                 autoRefundOnCancellation
-                  ? "border-amber-500/30 bg-amber-500/5"
-                  : "border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10"
+                  ? "border-warning/30 bg-warning/5"
+                  : "border-warning/20 bg-warning/5 hover:bg-warning/10"
               )}
             >
               <div className={cn(
                 "mt-0.5 h-4 w-4 rounded border-2 flex items-center justify-center transition-colors",
                 autoRefundOnCancellation
-                  ? "border-amber-500 bg-amber-500"
-                  : "border-amber-400/50"
+                  ? "border-warning bg-warning"
+                  : "border-warning/50"
               )}>
                 {autoRefundOnCancellation && (
                   <svg className="h-2.5 w-2.5 text-white" fill="currentColor" viewBox="0 0 12 12">
@@ -596,7 +596,7 @@ export default function PaymentsPage() {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTriangle className="h-4 w-4 text-warning" />
                   <span className="text-sm font-medium text-foreground">Auto-refund on cancellation</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">

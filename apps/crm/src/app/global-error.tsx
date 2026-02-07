@@ -29,9 +29,9 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
       <body className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
         <div className="flex flex-col items-center justify-center px-4 py-16 text-center max-w-lg">
           <div className="relative mb-8">
-            <div className="absolute inset-0 bg-red-500/20 rounded-full blur-3xl animate-pulse" />
-            <div className="relative rounded-full bg-gradient-to-br from-red-500/30 to-red-500/10 p-8">
-              <AlertOctagon className="h-16 w-16 text-red-400" strokeWidth={1.5} />
+            <div className="absolute inset-0 bg-destructive/20 rounded-full blur-3xl animate-pulse" />
+            <div className="relative rounded-full bg-gradient-to-br from-destructive/30 to-destructive/10 p-8">
+              <AlertOctagon className="h-16 w-16 text-destructive" strokeWidth={1.5} />
             </div>
           </div>
 

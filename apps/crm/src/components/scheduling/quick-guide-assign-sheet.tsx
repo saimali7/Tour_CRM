@@ -76,12 +76,12 @@ function GuideAvatar({
 
   // Generate a consistent color based on the name
   const colors = [
-    "from-violet-500 to-purple-600",
-    "from-blue-500 to-cyan-500",
-    "from-emerald-500 to-teal-500",
-    "from-amber-500 to-orange-500",
-    "from-rose-500 to-pink-500",
-    "from-indigo-500 to-blue-500",
+    "from-primary to-primary/70",
+    "from-info to-info/70",
+    "from-success to-success/70",
+    "from-warning to-warning/70",
+    "from-destructive to-destructive/70",
+    "from-primary to-info/70",
   ];
   const colorIndex = (firstName.charCodeAt(0) + lastName.charCodeAt(0)) % colors.length;
 
@@ -182,7 +182,7 @@ function GuideListItem({
             {guide.firstName} {guide.lastName}
           </span>
           {guide.status === "active" && (
-            <span className="flex-shrink-0 w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="flex-shrink-0 w-2 h-2 rounded-full bg-success" />
           )}
         </div>
         <span className="text-sm text-muted-foreground truncate block">
@@ -400,9 +400,9 @@ export function QuickGuideAssignSheet({
                 : "opacity-0 -translate-y-2 h-0 overflow-hidden"
             )}
           >
-            <div className="p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
+            <div className="p-4 rounded-lg bg-warning/5 border border-warning/20">
               <div className="flex items-start gap-3">
-                <Sparkles className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                <Sparkles className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
                   External guides are freelancers or contractors not in your team roster.
                   They won&apos;t receive system notifications.

@@ -46,11 +46,11 @@ function Confetti() {
   useEffect(() => {
     const colors = [
       "bg-primary",
-      "bg-emerald-500",
-      "bg-amber-500",
-      "bg-rose-500",
-      "bg-violet-500",
-      "bg-cyan-500",
+      "bg-success",
+      "bg-warning",
+      "bg-destructive",
+      "bg-info",
+      "bg-secondary",
     ];
 
     const newPieces = Array.from({ length: 50 }, (_, i) => ({
@@ -174,14 +174,14 @@ export function CompletionStep({ onComplete, onSkipStep }: CompletionStepProps) 
         <div
           className={cn(
             "inline-flex items-center justify-center h-20 w-20 rounded-3xl mb-4",
-            "bg-gradient-to-br from-emerald-500/20 to-emerald-500/5",
+            "bg-gradient-to-br from-success/20 to-success/5",
             "animate-in zoom-in-50 duration-500"
           )}
         >
           <div className="relative">
-            <Sparkles className="h-10 w-10 text-emerald-500" />
+            <Sparkles className="h-10 w-10 text-success" />
             <div className="absolute -top-1 -right-1">
-              <PartyPopper className="h-5 w-5 text-amber-500 animate-bounce" />
+              <PartyPopper className="h-5 w-5 text-warning animate-bounce" />
             </div>
           </div>
         </div>

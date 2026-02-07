@@ -198,9 +198,9 @@ export function TomorrowPreview({
 
       {/* All Clear Message - Compact version */}
       {hasContent && !hasIssues && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success dark:bg-success/30 border border-success dark:border-success">
+          <CheckCircle2 className="h-4 w-4 text-success dark:text-success" />
+          <span className="text-sm font-medium text-success dark:text-success">
             All set for tomorrow
           </span>
         </div>
@@ -234,20 +234,20 @@ function ActionCard({
   const colors = {
     critical: {
       bg: "bg-card",
-      border: "border-red-500/30 dark:border-red-500/20",
-      icon: "text-red-500 dark:text-red-400",
+      border: "border-destructive/30 dark:border-destructive/20",
+      icon: "text-destructive dark:text-destructive",
       text: "text-foreground",
     },
     warning: {
       bg: "bg-card",
-      border: "border-amber-500/30 dark:border-amber-500/20",
-      icon: "text-amber-500 dark:text-amber-400",
+      border: "border-warning/30 dark:border-warning/20",
+      icon: "text-warning dark:text-warning",
       text: "text-foreground",
     },
     info: {
       bg: "bg-card",
-      border: "border-blue-500/30 dark:border-blue-500/20",
-      icon: "text-blue-500 dark:text-blue-400",
+      border: "border-info/30 dark:border-info/20",
+      icon: "text-info dark:text-info",
       text: "text-foreground",
     },
   };

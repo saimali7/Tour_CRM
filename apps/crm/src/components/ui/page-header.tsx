@@ -2,6 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { ChevronRight, Plus, type LucideIcon } from "lucide-react";
 
 // =============================================================================
@@ -24,11 +25,11 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div className={cn("flex items-start justify-between gap-4", className)}>
+    <div className={cn("flex items-start justify-between gap-6", className)}>
       <div className="space-y-1">
-        <h1 className="text-title text-foreground">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
         {description && (
-          <p className="text-body text-muted-foreground">{description}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
         )}
       </div>
       {children && <div className="flex items-center gap-2">{children}</div>}
@@ -56,28 +57,22 @@ export function PageHeaderAction({
   children,
   className,
 }: PageHeaderActionProps) {
-  const classes = cn(
-    "inline-flex items-center gap-2 rounded-lg",
-    "bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
-    "hover:bg-primary/90 transition-colors",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-    className
-  );
-
   if (href) {
     return (
-      <Link href={href as Route} className={classes}>
-        <Icon className="h-4 w-4" />
-        {children}
-      </Link>
+      <Button asChild className={cn("gap-2", className)}>
+        <Link href={href as Route}>
+          <Icon className="h-4 w-4" />
+          {children}
+        </Link>
+      </Button>
     );
   }
 
   return (
-    <button onClick={onClick} className={classes}>
+    <Button onClick={onClick} className={cn("gap-2", className)}>
       <Icon className="h-4 w-4" />
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -99,7 +94,7 @@ interface BreadcrumbsProps {
 export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   return (
     <nav
-      className={cn("flex items-center gap-1 text-sm", className)}
+      className={cn("flex items-center gap-1 text-xs text-muted-foreground", className)}
       aria-label="Breadcrumb"
     >
       {items.map((item, index) => (
@@ -110,7 +105,7 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
           {item.href ? (
             <Link
               href={item.href as Route}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="hover:text-foreground transition-colors"
             >
               {item.label}
             </Link>
@@ -151,19 +146,19 @@ export function DetailPageHeader({
     <div className={cn("space-y-4", className)}>
       <Link
         href={backHref as Route}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         <ChevronRight className="h-4 w-4 rotate-180" />
         {backLabel}
       </Link>
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-6">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-title text-foreground">{title}</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
             {badge}
           </div>
           {subtitle && (
-            <p className="text-body text-muted-foreground">{subtitle}</p>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
           )}
         </div>
         {children && <div className="flex items-center gap-2">{children}</div>}
@@ -199,8 +194,10 @@ export function StatCard({
           <Icon className={cn("h-5 w-5", iconColor)} />
         </div>
         <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-xl font-semibold text-foreground">{value}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-2xl font-semibold text-foreground font-mono tabular-nums">
+            {value}
+          </p>
         </div>
       </div>
     </div>

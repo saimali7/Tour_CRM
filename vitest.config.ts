@@ -9,7 +9,13 @@ export default defineConfig({
     // Include patterns
     include: ["**/*.{test,spec}.{ts,tsx}"],
     // Exclude patterns
-    exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/e2e/**",
+      "**/*.e2e.*",
+    ],
     // Coverage configuration
     coverage: {
       provider: "v8",

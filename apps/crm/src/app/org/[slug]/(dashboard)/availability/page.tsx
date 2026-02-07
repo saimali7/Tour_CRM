@@ -178,7 +178,7 @@ export default function AvailabilityPage() {
               <span><span className="font-medium text-foreground">{totalTourRuns}</span> tour runs</span>
               <span><span className="font-medium text-foreground">{totalBooked}</span>/<span className="text-muted-foreground">{totalCapacity}</span> booked</span>
               {needsGuides > 0 && (
-                <span className="text-amber-600">
+                <span className="text-warning">
                   <span className="font-medium">{needsGuides}</span> need guides
                 </span>
               )}
@@ -336,9 +336,9 @@ export default function AvailabilityPage() {
                                 <div
                                   className={cn(
                                     "h-full rounded-full transition-all",
-                                    isFull ? "bg-emerald-500" :
-                                    utilization >= 70 ? "bg-emerald-500/70" :
-                                    utilization >= 40 ? "bg-amber-500" : "bg-red-400"
+                                    isFull ? "bg-success" :
+                                    utilization >= 70 ? "bg-success/70" :
+                                    utilization >= 40 ? "bg-warning" : "bg-destructive"
                                   )}
                                   style={{ width: `${Math.min(utilization, 100)}%` }}
                                 />
@@ -352,12 +352,12 @@ export default function AvailabilityPage() {
                           {/* Guides */}
                           <div className="flex items-center justify-center gap-1.5">
                             {needsGuide ? (
-                              <span className="flex items-center gap-1 text-sm text-amber-600">
+                              <span className="flex items-center gap-1 text-sm text-warning">
                                 <AlertCircle className="h-4 w-4" />
                                 {tourRun.guidesAssigned}/{tourRun.guidesRequired}
                               </span>
                             ) : (
-                              <span className="flex items-center gap-1 text-sm text-emerald-600">
+                              <span className="flex items-center gap-1 text-sm text-success">
                                 <UserCheck className="h-4 w-4" />
                                 {tourRun.guidesAssigned}/{tourRun.guidesRequired}
                               </span>
@@ -367,12 +367,12 @@ export default function AvailabilityPage() {
                           {/* Status */}
                           <div className="flex justify-center">
                             {isFull ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success">
                                 <CheckCircle2 className="h-3 w-3" />
                                 Full
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info">
                                 Open
                               </span>
                             )}

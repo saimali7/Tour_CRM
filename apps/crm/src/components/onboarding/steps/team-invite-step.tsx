@@ -212,8 +212,8 @@ export function TeamInviteStep({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Header */}
       <div className="text-center pb-2">
-        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 mb-4">
-          <Users className="h-8 w-8 text-blue-500" />
+        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 mb-4">
+          <Users className="h-8 w-8 text-info" />
         </div>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           Invite your team members to help manage tours and bookings. They'll
@@ -232,7 +232,7 @@ export function TeamInviteStep({
               className={cn(
                 "relative rounded-xl border p-4 transition-all",
                 isSent
-                  ? "border-emerald-500/50 bg-emerald-500/5"
+                  ? "border-success/50 bg-success/5"
                   : errors[invite.id]
                     ? "border-destructive/50 bg-destructive/5"
                     : "border-border bg-card/50"
@@ -316,7 +316,7 @@ export function TeamInviteStep({
 
                 {/* Success indicator */}
                 {isSent && (
-                  <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <p className="text-xs text-success flex items-center gap-1">
                     <Mail className="h-3 w-3" />
                     Invite sent
                   </p>

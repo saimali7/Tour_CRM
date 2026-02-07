@@ -154,9 +154,9 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-start gap-4 p-4 bg-slate-500/5 rounded-xl border border-slate-500/10">
-        <div className="p-2 bg-slate-500/10 rounded-lg">
-          <Settings className="h-5 w-5 text-slate-500" />
+      <div className="flex items-start gap-4 p-4 bg-muted/50 rounded-xl border border-border">
+        <div className="p-2 bg-muted rounded-lg">
+          <Settings className="h-5 w-5 text-muted-foreground" />
         </div>
         <div>
           <h2 className="font-semibold text-foreground">Tour Settings</h2>
@@ -169,8 +169,8 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
       {/* Meeting Point Section */}
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/10 rounded-lg">
-            <MapPin className="h-5 w-5 text-blue-500" />
+          <div className="p-2 bg-info/10 rounded-lg">
+            <MapPin className="h-5 w-5 text-info" />
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Meeting Point</h3>
@@ -217,8 +217,8 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
       {/* Cancellation Policy Section */}
       <div className="space-y-6 pt-6 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-500/10 rounded-lg">
-            <Clock className="h-5 w-5 text-amber-500" />
+          <div className="p-2 bg-warning/10 rounded-lg">
+            <Clock className="h-5 w-5 text-warning" />
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Cancellation Policy</h3>
@@ -289,8 +289,8 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
       {/* Booking Window Section */}
       <div className="space-y-6 pt-6 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-violet-500/10 rounded-lg">
-            <CalendarClock className="h-5 w-5 text-violet-500" />
+          <div className="p-2 bg-info/10 rounded-lg">
+            <CalendarClock className="h-5 w-5 text-info" />
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Booking Window</h3>
@@ -431,8 +431,8 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
       {/* SEO Section */}
       <div className="space-y-6 pt-6 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/10 rounded-lg">
-            <Search className="h-5 w-5 text-emerald-500" />
+          <div className="p-2 bg-success/10 rounded-lg">
+            <Search className="h-5 w-5 text-success" />
           </div>
           <div>
             <h3 className="font-semibold text-foreground">SEO Settings</h3>
@@ -516,7 +516,7 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
                 formState.metaTitle.length > 60
                   ? "text-destructive font-medium"
                   : formState.metaTitle.length > 50
-                    ? "text-amber-500"
+                    ? "text-warning"
                     : "text-muted-foreground"
               )}>
                 {formState.metaTitle.length}/60
@@ -564,7 +564,7 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
               <div className="font-medium text-primary truncate">
                 {formState.metaTitle || formState.name || "Tour Name"}
               </div>
-              <div className="text-sm text-emerald-600 truncate">
+              <div className="text-sm text-success truncate">
                 yourdomain.com/tours/{formState.slug || "tour-slug"}
               </div>
               <div className="text-sm text-muted-foreground line-clamp-2">

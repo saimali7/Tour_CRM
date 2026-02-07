@@ -76,11 +76,11 @@ export function WelcomeStep({ onComplete, onSkipStep }: WelcomeStepProps) {
         <div
           className={cn(
             "inline-flex items-center justify-center h-20 w-20 rounded-3xl mb-6",
-            "bg-gradient-to-br from-orange-500/20 via-orange-500/10 to-primary/5",
+            "bg-gradient-to-br from-warning/20 via-warning/10 to-primary/5",
             "animate-in zoom-in-50 duration-500"
           )}
         >
-          <Sparkles className="h-10 w-10 text-orange-500" />
+          <Sparkles className="h-10 w-10 text-warning" />
         </div>
 
         <h2 className="text-2xl font-bold text-foreground mb-2">
@@ -146,7 +146,7 @@ export function WelcomeStep({ onComplete, onSkipStep }: WelcomeStepProps) {
           "animate-in fade-in duration-700 delay-500"
         )}
       >
-        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+        <CheckCircle2 className="h-4 w-4 text-success" />
         <span>Takes about 2-3 minutes</span>
       </div>
 

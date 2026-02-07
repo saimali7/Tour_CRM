@@ -86,7 +86,7 @@ export default function ReviewsPage() {
           <Star
             key={star}
             className={`h-4 w-4 ${
-              star <= rating ? "text-yellow-400 fill-yellow-400" : "text-muted"
+              star <= rating ? "text-warning fill-warning" : "text-muted"
             }`}
           />
         ))}
@@ -150,8 +150,8 @@ export default function ReviewsPage() {
 
           <div className="bg-card rounded-lg border border-border p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-500/10 rounded-lg">
-                <Star className="h-5 w-5 text-yellow-500" />
+              <div className="p-2 bg-warning/10 rounded-lg">
+                <Star className="h-5 w-5 text-warning" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg Rating</p>
@@ -216,7 +216,7 @@ export default function ReviewsPage() {
                 </button>
                 <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-yellow-400 rounded-full"
+                    className="h-full bg-warning rounded-full"
                     style={{ width: `${percentage}%` }}
                   />
                 </div>
@@ -248,7 +248,7 @@ export default function ReviewsPage() {
                     {guide.guideName}
                   </p>
                   <div className="flex items-center gap-1">
-                    <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                    <Star className="h-3 w-3 text-warning fill-warning" />
                     <span className="text-xs text-muted-foreground">
                       {guide.averageRating.toFixed(1)} ({guide.totalReviews})
                     </span>
@@ -352,7 +352,7 @@ export default function ReviewsPage() {
                         {review.guideRating && (
                           <span className="ml-2">
                             ({review.guideRating}
-                            <Star className="inline h-3 w-3 ml-0.5 text-yellow-400 fill-yellow-400" />
+                            <Star className="inline h-3 w-3 ml-0.5 text-warning fill-warning" />
                             )
                           </span>
                         )}

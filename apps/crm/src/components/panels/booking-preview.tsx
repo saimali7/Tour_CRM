@@ -198,7 +198,7 @@ export function BookingPreview({ bookingId }: BookingPreviewProps) {
             value={
               <span className={cn(
                 "tabular-nums",
-                paid > 0 ? "text-emerald-600 dark:text-emerald-400" : ""
+                paid > 0 ? "text-success dark:text-success" : ""
               )}>
                 ${paid.toFixed(2)}
               </span>
@@ -208,7 +208,7 @@ export function BookingPreview({ bookingId }: BookingPreviewProps) {
             <ContextPanelRow
               label="Remaining"
               value={
-                <span className="text-amber-600 dark:text-amber-400 tabular-nums">
+                <span className="text-warning dark:text-warning tabular-nums">
                   ${remaining.toFixed(2)}
                 </span>
               }

@@ -58,7 +58,7 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
         <div className="card-info rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-blue-700 dark:text-blue-400" />
+              <Target className="h-5 w-5 text-info dark:text-info" />
               <h3 className="text-sm font-medium text-muted-foreground">
                 Revenue Forecast
               </h3>
@@ -68,9 +68,9 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
                 className={cn(
                   "text-xs px-2 py-1 rounded-full",
                   forecasting.currentMonth.confidence === "high"
-                    ? "bg-emerald-500/10 text-emerald-600"
+                    ? "bg-success/10 text-success"
                     : forecasting.currentMonth.confidence === "medium"
-                    ? "bg-orange-500/10 text-orange-600"
+                    ? "bg-warning/10 text-warning"
                     : "bg-muted text-muted-foreground"
                 )}
               >
@@ -109,7 +109,7 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all"
+                    className="h-full bg-gradient-to-r from-primary to-info rounded-full transition-all"
                     style={{
                       width: `${
                         (forecasting.currentMonth.daysElapsed /
@@ -143,8 +143,8 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
                       className={cn(
                         "text-sm font-medium flex items-center gap-1",
                         forecasting.comparison.sameMonthLastYear.percentChange >= 0
-                          ? "text-emerald-600"
-                          : "text-red-600"
+                          ? "text-success"
+                          : "text-destructive"
                       )}
                     >
                       {forecasting.comparison.sameMonthLastYear.percentChange >= 0 ? (
@@ -191,7 +191,7 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
         {/* Proactive Insights Card */}
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Lightbulb className="h-5 w-5 text-amber-500" />
+            <Lightbulb className="h-5 w-5 text-warning" />
             <h3 className="text-sm font-medium text-muted-foreground">
               Proactive Insights
             </h3>
@@ -222,13 +222,13 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
                         )}
                       >
                         {insight.type === "warning" && (
-                          <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                          <AlertTriangle className="h-4 w-4 text-warning dark:text-warning" />
                         )}
                         {insight.type === "opportunity" && (
-                          <Lightbulb className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                          <Lightbulb className="h-4 w-4 text-info dark:text-info" />
                         )}
                         {insight.type === "success" && (
-                          <CheckCircle className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                          <CheckCircle className="h-4 w-4 text-success dark:text-success" />
                         )}
                         {insight.type === "info" && (
                           <Target className="h-4 w-4 text-muted-foreground" />
@@ -248,8 +248,8 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
                         <p
                           className={cn(
                             "text-sm font-semibold",
-                            insight.metric.trend === "up" && "text-emerald-600",
-                            insight.metric.trend === "down" && "text-red-600",
+                            insight.metric.trend === "up" && "text-success",
+                            insight.metric.trend === "down" && "text-destructive",
                             !insight.metric.trend && "text-foreground"
                           )}
                         >
@@ -272,7 +272,7 @@ export function IntelligenceSurface({ orgSlug }: IntelligenceSurfaceProps) {
             </div>
           ) : (
             <div className="text-center py-8">
-              <CheckCircle className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
+              <CheckCircle className="h-8 w-8 text-success mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
                 No insights to show at the moment
               </p>

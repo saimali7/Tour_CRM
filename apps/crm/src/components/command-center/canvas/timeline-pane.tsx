@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatTimeDisplay } from "../timeline/timeline-utils";
@@ -48,7 +49,12 @@ interface TimelinePaneProps {
   onRunDragEnd: () => void;
   onRunNudge: (guideId: string, run: CanvasRun, deltaMinutes: number) => void;
   onBackgroundClick: () => void;
+  onAddTempGuideClick: () => void;
 }
+
+const LANE_ROW_MIN_HEIGHT = 80;
+const TEMP_GUIDE_ROW_HEIGHT = 56;
+const TIMELINE_HEADER_HEIGHT = 36;
 
 function shouldShowMarkerLabel(time: string): boolean {
   const hour = Number(time.split(":")[0]);
@@ -96,7 +102,11 @@ export function TimelinePane({
   onRunDragEnd,
   onRunNudge,
   onBackgroundClick,
+  onAddTempGuideClick,
 }: TimelinePaneProps) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [fillerRows, setFillerRows] = useState(0);
+
   const handleBackgroundClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       const target = event.target;
@@ -112,13 +122,34 @@ export function TimelinePane({
       ? { width: `${Math.round(timelineZoom * 100)}%` }
       : undefined;
 
+  useEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return;
+
+    const computeFillerRows = () => {
+      const viewportHeight = node.clientHeight;
+      const fixedHeight = TIMELINE_HEADER_HEIGHT + TEMP_GUIDE_ROW_HEIGHT;
+      const usedHeight = fixedHeight + rows.length * LANE_ROW_MIN_HEIGHT;
+      const remaining = Math.max(0, viewportHeight - usedHeight);
+      const rowCount = Math.ceil(remaining / LANE_ROW_MIN_HEIGHT);
+      setFillerRows(rowCount);
+    };
+
+    computeFillerRows();
+    const observer = new ResizeObserver(computeFillerRows);
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [rows.length, isReadOnly, isMutating]);
+
   return (
     <div
+      ref={viewportRef}
       data-timeline-scroll="true"
-      className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-background/20"
+      className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-background/35"
       onClick={handleBackgroundClick}
     >
-      <div className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+      <div className="sticky top-0 z-10 border-b bg-card/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex h-9">
           <div className="sticky left-0 z-20 w-[180px] shrink-0 border-r bg-card/95 px-2.5 py-2 shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] supports-[backdrop-filter]:bg-card/90 min-[1400px]:w-[188px] 2xl:w-[196px]">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Guides</span>
@@ -129,13 +160,13 @@ export function TimelinePane({
                 key={marker.time}
                 className={cn(
                   "pointer-events-none absolute bottom-0 top-0 border-l",
-                  shouldShowMarkerLabel(marker.time) ? "border-border/45" : "border-border/20"
+                  shouldShowMarkerLabel(marker.time) ? "border-border/28" : "border-border/14"
                 )}
                 style={{ left: `${marker.left}%` }}
               >
                 {shouldShowMarkerLabel(marker.time) &&
                   !shouldHideMarkerForCurrentTime(marker.left, currentTimePercent, showCurrentTime) && (
-                  <span className="pointer-events-none relative z-10 ml-1.5 mt-0.5 inline-flex whitespace-nowrap rounded-sm bg-card/95 px-1 py-0.5 text-[9px] font-medium text-muted-foreground shadow-sm">
+                  <span className="pointer-events-none relative z-10 ml-1.5 mt-0.5 inline-flex whitespace-nowrap rounded-md border border-border/45 bg-card/95 px-1 py-0.5 text-[9px] font-medium text-muted-foreground shadow-sm">
                     {marker.label}
                   </span>
                 )}
@@ -202,6 +233,72 @@ export function TimelinePane({
           />
         );
       })}
+
+      <div className="flex border-b border-dashed">
+        <div className="sticky left-0 z-10 w-[180px] shrink-0 border-r bg-card/92 px-2 py-2 shadow-[8px_0_12px_-12px_hsl(var(--foreground)/0.55)] min-[1400px]:w-[188px] 2xl:w-[196px]">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-full justify-center gap-1.5 border-dashed border-primary/35 bg-primary/[0.04] text-[11px] font-semibold shadow-sm transition-colors hover:border-primary/55 hover:bg-primary/[0.09]"
+            onClick={onAddTempGuideClick}
+            disabled={isReadOnly || isMutating}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Temp Guide
+          </Button>
+          <p className="mt-1 text-center text-[10px] text-muted-foreground">Day-only outsourced lane</p>
+        </div>
+        <div
+          className={cn(
+            "flex min-h-[56px] items-center px-3",
+            timelineZoom > 1 ? "shrink-0" : "flex-1"
+          )}
+          style={timelineZoom > 1 ? { width: `${Math.round(timelineZoom * 100)}%` } : undefined}
+        >
+          <div className="inline-flex max-w-full items-center gap-2 rounded-md border border-dashed border-border/60 bg-card/55 px-3 py-1 text-[11px] text-muted-foreground">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary/75" />
+            <span className="truncate">Add a temp guide lane for today, then drag runs into it as needed.</span>
+          </div>
+        </div>
+      </div>
+
+      {Array.from({ length: fillerRows }).map((_, index) => (
+        <div
+          key={`filler-row-${index}`}
+          className={cn(
+            "flex min-h-[80px] border-b",
+            index % 2 === 0 ? "bg-transparent" : "bg-muted/[0.12]"
+          )}
+        >
+          <div
+            className={cn(
+              "sticky left-0 z-[5] w-[180px] shrink-0 border-r min-[1400px]:w-[188px] 2xl:w-[196px]",
+              index % 2 === 0 ? "bg-card/78" : "bg-card/88"
+            )}
+          />
+          <div
+            className={cn(
+              "relative overflow-hidden bg-background/[0.01]",
+              timelineZoom > 1 ? "shrink-0" : "flex-1"
+            )}
+            style={timelineTrackStyle}
+          >
+            <div className="pointer-events-none absolute inset-0">
+              {markers.map((marker) => (
+                <div
+                  key={`filler-${index}-${marker.time}`}
+                  className={cn(
+                    "absolute bottom-0 top-0 border-l",
+                    shouldShowMarkerLabel(marker.time) ? "border-border/16" : "border-border/8"
+                  )}
+                  style={{ left: `${marker.left}%` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
 
       {/* Floating zoom pill */}
       <div className="sticky bottom-3 z-20 flex justify-end pr-3 pointer-events-none">

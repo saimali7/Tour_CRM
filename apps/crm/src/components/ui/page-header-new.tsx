@@ -46,10 +46,10 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <header className={cn("space-y-1", className)}>
+    <header className={cn("space-y-2", className)}>
       {/* Breadcrumbs */}
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+        <nav className="flex items-center gap-1 text-xs text-muted-foreground">
           {breadcrumbs.map((crumb, index) => (
             <span key={index} className="flex items-center gap-1">
               {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
@@ -73,7 +73,7 @@ export function PageHeader({
         <div className="flex items-center gap-6 min-w-0">
           {/* Title + Description */}
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-foreground truncate">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground truncate">
               {title}
             </h1>
             {description && (
@@ -85,7 +85,7 @@ export function PageHeader({
 
           {/* Inline Stats */}
           {stats && (
-            <div className="hidden sm:flex items-center text-sm text-muted-foreground">
+            <div className="hidden sm:flex items-center text-xs text-muted-foreground font-mono tabular-nums">
               {stats}
             </div>
           )}
@@ -112,14 +112,16 @@ interface StatItemProps {
 export function StatItem({ value, label, variant = "default" }: StatItemProps) {
   const valueColors = {
     default: "text-foreground",
-    success: "text-emerald-600",
-    warning: "text-yellow-600",
-    danger: "text-red-600",
+    success: "text-success",
+    warning: "text-warning",
+    danger: "text-destructive",
   };
 
   return (
     <span>
-      <span className={cn("font-medium", valueColors[variant])}>{value}</span>
+      <span className={cn("font-medium font-mono tabular-nums", valueColors[variant])}>
+        {value}
+      </span>
       {" "}{label}
     </span>
   );
@@ -127,5 +129,5 @@ export function StatItem({ value, label, variant = "default" }: StatItemProps) {
 
 /** Separator for inline stats */
 export function StatSeparator() {
-  return <span className="text-border mx-3">·</span>;
+  return <span className="text-muted-foreground mx-3">·</span>;
 }

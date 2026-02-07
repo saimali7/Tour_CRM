@@ -173,7 +173,7 @@ export function TourQuickView({
           <ul className="text-sm text-muted-foreground space-y-1">
             {tour.includes.slice(0, 4).map((item, index) => (
               <li key={index} className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
+                <span className="text-success">✓</span>
                 {item}
               </li>
             ))}
