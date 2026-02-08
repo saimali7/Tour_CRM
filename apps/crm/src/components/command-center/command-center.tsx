@@ -202,17 +202,24 @@ function CommandCenterContent({
     },
   });
 
-  // Use demo data as fallback when no bookings exist for this date
+  // Inject demo bookings into real response when no real bookings exist
   const effectiveResponse = useMemo(() => {
     if (!dispatchResponse) return null;
     const hasBookings = dispatchResponse.tourRuns.some((run) => run.bookings.length > 0);
     if (hasBookings) return dispatchResponse;
     const demo = getDemoDispatchResponse(date);
-    // Merge real guides into demo data so real guide lanes still appear
-    if (dispatchResponse.timelines.length > 0 && demo.timelines.length > 0) {
-      return { ...demo, timelines: [...demo.timelines, ...dispatchResponse.timelines] };
-    }
-    return demo;
+    if (demo.tourRuns.length === 0) return dispatchResponse;
+    // Merge: keep real guides/timelines, inject demo tour runs + status
+    return {
+      ...dispatchResponse,
+      tourRuns: demo.tourRuns,
+      status: {
+        ...dispatchResponse.status,
+        totalGuests: demo.status.totalGuests,
+        unresolvedWarnings: demo.status.unresolvedWarnings,
+        warnings: demo.status.warnings,
+      },
+    };
   }, [dispatchResponse, date]);
 
   const warnings = useMemo(() => {
