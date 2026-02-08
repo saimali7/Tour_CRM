@@ -202,12 +202,17 @@ function CommandCenterContent({
     },
   });
 
-  // Use demo data as fallback when the real API returns no tour runs and no guides
+  // Use demo data as fallback when no bookings exist for this date
   const effectiveResponse = useMemo(() => {
     if (!dispatchResponse) return null;
-    const hasRealData = dispatchResponse.tourRuns.length > 0 || dispatchResponse.timelines.length > 0;
-    if (hasRealData) return dispatchResponse;
-    return getDemoDispatchResponse(date);
+    const hasBookings = dispatchResponse.tourRuns.some((run) => run.bookings.length > 0);
+    if (hasBookings) return dispatchResponse;
+    const demo = getDemoDispatchResponse(date);
+    // Merge real guides into demo data so real guide lanes still appear
+    if (dispatchResponse.timelines.length > 0 && demo.timelines.length > 0) {
+      return { ...demo, timelines: [...demo.timelines, ...dispatchResponse.timelines] };
+    }
+    return demo;
   }, [dispatchResponse, date]);
 
   const warnings = useMemo(() => {
