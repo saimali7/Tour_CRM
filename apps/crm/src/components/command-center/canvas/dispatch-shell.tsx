@@ -249,18 +249,16 @@ export function DispatchShell({
     for (const row of rows) {
       for (const run of row.runs) {
         let hasVIP = false;
-        let hasFirstTimer = false;
         let hasAccessibility = false;
         let hasChildren = false;
         for (const bookingId of run.bookingIds) {
           const booking = bookingLookup.get(bookingId);
           if (!booking) continue;
           if (booking.specialOccasion) hasVIP = true;
-          if (booking.isFirstTime) hasFirstTimer = true;
           if (booking.accessibilityNeeds) hasAccessibility = true;
           if (booking.childCount && booking.childCount > 0) hasChildren = true;
         }
-        map.set(run.id, { hasVIP, hasFirstTimer, hasAccessibility, hasChildren });
+        map.set(run.id, { hasVIP, hasAccessibility, hasChildren });
       }
     }
     return map;

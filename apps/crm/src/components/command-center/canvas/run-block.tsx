@@ -38,11 +38,22 @@ function tourHue(tourName: string): number {
   return Math.abs(hash) % 360;
 }
 
-const signalDots: Array<{ key: keyof RunSignals; color: string; label: string }> = [
-  { key: "hasVIP", color: "bg-amber-400", label: "VIP" },
-  { key: "hasFirstTimer", color: "bg-blue-400", label: "First-timer" },
-  { key: "hasAccessibility", color: "bg-purple-400", label: "Accessibility" },
-  { key: "hasChildren", color: "bg-emerald-400", label: "Children" },
+const signalIndicators: Array<{
+  key: keyof RunSignals;
+  label: string;
+}> = [
+  {
+    key: "hasVIP",
+    label: "VIP",
+  },
+  {
+    key: "hasAccessibility",
+    label: "Accessibility",
+  },
+  {
+    key: "hasChildren",
+    label: "Children",
+  },
 ];
 
 export function RunBlock({
@@ -66,13 +77,18 @@ export function RunBlock({
   const widthPercent = Math.max(1.8, Math.min(rawWidthPercent, Math.max(1.8, 99.65 - leftPercent)));
   const isCompact = widthPercent < 12;
   const isUltraCompact = widthPercent < 8;
+  const bookingCount = run.bookingIds.length;
+  const bookingDotsToShow = Math.min(bookingCount, isUltraCompact ? 2 : 4);
+  const bookingDotsOverflow = Math.max(bookingCount - bookingDotsToShow, 0);
 
   const hue = useMemo(() => tourHue(run.tourName), [run.tourName]);
 
   const activeSignals = useMemo(() => {
     if (!signals) return [];
-    return signalDots.filter((dot) => signals[dot.key]);
+    return signalIndicators.filter((indicator) => signals[indicator.key]);
   }, [signals]);
+  const signalCount = activeSignals.length;
+  const signalTooltip = activeSignals.map((indicator) => indicator.label).join(", ");
 
   const dragProps: Partial<ButtonHTMLAttributes<HTMLButtonElement>> = canDrag
     ? {
@@ -131,15 +147,30 @@ export function RunBlock({
       <div className="flex h-full min-w-0 flex-col justify-between gap-0.5">
         <div className="flex items-center gap-1">
           <span className="truncate text-[12px] font-semibold leading-snug text-foreground">{run.tourName}</span>
-          {activeSignals.length > 0 && !isUltraCompact && (
-            <span className="flex shrink-0 items-center gap-0.5">
-              {activeSignals.map((dot) => (
+          {bookingCount > 0 && !isUltraCompact && (
+            <span
+              className="flex shrink-0 items-center gap-0.5"
+              title={`${bookingCount} booking${bookingCount === 1 ? "" : "s"}`}
+            >
+              {Array.from({ length: bookingDotsToShow }).map((_, index) => (
                 <span
-                  key={dot.key}
-                  className={cn("h-1.5 w-1.5 rounded-full", dot.color)}
-                  title={dot.label}
+                  key={`booking-dot-${index}`}
+                  className="h-1.5 w-1.5 rounded-full bg-foreground/70"
                 />
               ))}
+              {bookingDotsOverflow > 0 && (
+                <span className="ml-0.5 text-[8px] font-semibold tabular-nums text-foreground/75">
+                  +{bookingDotsOverflow}
+                </span>
+              )}
+            </span>
+          )}
+          {signalCount > 0 && !isUltraCompact && (
+            <span
+              className="ml-0.5 inline-flex h-3 min-w-[0.75rem] shrink-0 items-center justify-center rounded-full bg-warning/35 px-1 text-[8px] font-semibold leading-none text-foreground"
+              title={`Signals: ${signalTooltip}`}
+            >
+              {signalCount}
             </span>
           )}
         </div>

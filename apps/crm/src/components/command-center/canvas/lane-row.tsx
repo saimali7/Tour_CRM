@@ -111,7 +111,7 @@ export function LaneRow({
           <p className="truncate text-[12px] font-semibold leading-tight text-foreground">
             {guideFullName || guideFirstName}
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
             {row.isOutsourced && (
               <span className="inline-flex items-center rounded-full border border-warning/35 bg-warning/15 px-1.5 py-0.5 text-[9px] font-semibold text-warning">
                 {isTempGuide ? "TEMP" : "OUT"}
@@ -123,6 +123,12 @@ export function LaneRow({
                 <span className="truncate">{row.guide.phone}</span>
               </span>
             )}
+            <span
+              className="inline-flex shrink-0 items-center rounded-full border border-border/55 bg-card/65 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-muted-foreground"
+              title={`Vehicle capacity: ${row.vehicleCapacity} seats`}
+            >
+              {row.vehicleCapacity} seats
+            </span>
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums",

@@ -1076,7 +1076,8 @@ export class CommandCenterService extends BaseService {
             eq(guideAssignments.organizationId, this.organizationId),
             inArray(guideAssignments.guideId, guideIds),
             eq(guideAssignments.status, "confirmed"),
-            sql`${bookings.bookingDate}::text = ${dateStr}`
+            sql`${bookings.bookingDate}::text = ${dateStr}`,
+            inArray(bookings.status, ["pending", "confirmed"])
           )
         );
 
@@ -2296,7 +2297,6 @@ export class CommandCenterService extends BaseService {
     const lastName = lastNameParts.join(" ").trim() || "Guide";
 
     const dateKey = this.formatDateKey(input.date);
-    const overrideDateUtc = new Date(`${dateKey}T12:00:00.000Z`);
     const dateSuffix = dateKey.replace(/-/g, "");
     const slug = this.slugify(trimmedName) || "temp-guide";
     const uniqueSuffix = Math.random().toString(36).slice(2, 8);
@@ -2572,6 +2572,7 @@ export class CommandCenterService extends BaseService {
       const guideId = assignment.guideId;
       const booking = assignment.booking;
       if (!guideId || !booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) continue;
+      if (booking.status !== "pending" && booking.status !== "confirmed") continue;
       if (changedBookingIds.has(booking.id)) continue;
       if (this.formatDateKey(booking.bookingDate) !== dateKey) continue;
 
@@ -2674,7 +2675,7 @@ export class CommandCenterService extends BaseService {
               "Dispatch change rejected"
             );
             throw new ValidationError(
-              `time_conflict: ${guide.firstName} ${guide.lastName} has overlapping runs`
+              `time_conflict: ${guide.firstName} ${guide.lastName} has overlapping runs (${current.runKey} ${this.minutesToTime(current.startMinutes)}-${this.minutesToTime(current.endMinutes)} overlaps ${next.runKey} ${this.minutesToTime(next.startMinutes)}-${this.minutesToTime(next.endMinutes)})`
             );
           }
         }

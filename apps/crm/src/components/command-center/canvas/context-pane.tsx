@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarClock, UserRound, ArrowRightLeft, WandSparkles, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { DispatchContextData } from "./canvas-types";
 import type { CanvasRow } from "../dispatch-model";
 import type { GuestCardBooking } from "../guest-card";
@@ -56,6 +57,13 @@ function bookingModeLabel(mode: GuestCardBooking["experienceMode"]): string {
   if (mode === "charter") return "Private";
   if (mode === "book") return "Private";
   return "Shared";
+}
+
+interface RunSignalSummary {
+  key: "vip" | "accessibility" | "children";
+  label: string;
+  count: number;
+  className: string;
 }
 
 export function ContextPane({
@@ -123,6 +131,41 @@ export function ContextPane({
       .map((bookingId) => bookingLookup.get(bookingId))
       .filter((booking): booking is GuestCardBooking => Boolean(booking));
   }, [context.selectedRun, bookingLookup]);
+  const runSignalSummary = useMemo<RunSignalSummary[]>(() => {
+    if (!context.selectedRun) return [];
+
+    const vipCount = selectedRunBookings.filter((booking) => Boolean(booking.specialOccasion)).length;
+    const accessibilityCount = selectedRunBookings.filter((booking) => Boolean(booking.accessibilityNeeds)).length;
+    const childrenCount = selectedRunBookings.filter((booking) => (booking.childCount ?? 0) > 0).length;
+
+    const summary: RunSignalSummary[] = [];
+    if (vipCount > 0) {
+      summary.push({
+        key: "vip",
+        label: "VIP",
+        count: vipCount,
+        className: "border-amber-400/40 bg-amber-500/10 text-amber-300",
+      });
+    }
+    if (accessibilityCount > 0) {
+      summary.push({
+        key: "accessibility",
+        label: "Accessibility",
+        count: accessibilityCount,
+        className: "border-violet-400/40 bg-violet-500/10 text-violet-300",
+      });
+    }
+    if (childrenCount > 0) {
+      summary.push({
+        key: "children",
+        label: "Children",
+        count: childrenCount,
+        className: "border-emerald-400/40 bg-emerald-500/10 text-emerald-300",
+      });
+    }
+
+    return summary;
+  }, [context.selectedRun, selectedRunBookings]);
 
   // If nothing is selected, don't render the pane body
   if (context.selection.type === "none") {
@@ -169,15 +212,33 @@ export function ContextPane({
             </div>
 
             <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Run Signals</p>
+              {runSignalSummary.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {runSignalSummary.map((signal) => (
+                    <span
+                      key={signal.key}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                        signal.className
+                      )}
+                    >
+                      <span>{signal.label}</span>
+                      <span className="tabular-nums opacity-90">({signal.count})</span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No advisory signals on this run.</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Booking Summary</p>
               {selectedRunBookings.length > 0 ? (
                 <div className="max-h-40 space-y-1.5 overflow-y-auto pr-0.5">
                   {selectedRunBookings.map((booking) => {
                     const chips: string[] = [bookingModeLabel(booking.experienceMode)];
-                    if (booking.isFirstTime) chips.push("First-timer");
-                    if (booking.specialOccasion) chips.push("VIP");
-                    if (booking.accessibilityNeeds) chips.push("Accessibility");
-                    if ((booking.childCount ?? 0) > 0) chips.push("Children");
 
                     return (
                       <div key={booking.id} className="rounded-md border bg-muted/20 px-2 py-1.5">
@@ -374,22 +435,6 @@ export function ContextPane({
             </div>
           </section>
         )}
-
-        <section className="rounded-lg border bg-muted/20 p-3">
-          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Signals</p>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Linked guides</span>
-            <span className="font-medium tabular-nums">{context.warningLinkedGuides.size}</span>
-          </div>
-          <div className="mt-1 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Linked runs</span>
-            <span className="font-medium tabular-nums">{context.warningLinkedRunIds.size}</span>
-          </div>
-          <div className="mt-1 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Linked bookings</span>
-            <span className="font-medium tabular-nums">{context.warningLinkedBookingIds.size}</span>
-          </div>
-        </section>
 
         {isReadOnly && (
           <div className="rounded-lg border border-muted-foreground/25 bg-muted/30 p-3 text-xs text-muted-foreground">

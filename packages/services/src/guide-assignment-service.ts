@@ -648,6 +648,7 @@ export class GuideAssignmentService extends BaseService {
     for (const assignment of confirmedAssignments) {
       const booking = assignment.booking;
       if (!booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) continue;
+      if (booking.status !== "pending" && booking.status !== "confirmed") continue;
 
       // Build tour run key for comparison
       const tourRunKey = `${booking.tourId}|${booking.bookingDate.toISOString().split("T")[0]}|${booking.bookingTime}`;
