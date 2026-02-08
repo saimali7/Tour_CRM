@@ -17,6 +17,7 @@ import { DispatchCanvas } from "./dispatch-canvas";
 import { LiveAnnouncerProvider, useLiveAnnouncer } from "./live-announcer";
 import type { DispatchData, CommandCenterProps, DispatchWarning, DispatchSuggestion } from "./types";
 import { buildCommandCenterViewModel, mapStatus, mapWarningType } from "./dispatch-model";
+import { getDemoDispatchResponse } from "./demo-data";
 import type { GuideTimeline } from "./timeline/types";
 
 type BatchChange = RouterInputs["commandCenter"]["batchApplyChanges"]["changes"][number];
@@ -201,15 +202,23 @@ function CommandCenterContent({
     },
   });
 
+  // Use demo data as fallback when the real API returns no tour runs and no guides
+  const effectiveResponse = useMemo(() => {
+    if (!dispatchResponse) return null;
+    const hasRealData = dispatchResponse.tourRuns.length > 0 || dispatchResponse.timelines.length > 0;
+    if (hasRealData) return dispatchResponse;
+    return getDemoDispatchResponse(date);
+  }, [dispatchResponse, date]);
+
   const warnings = useMemo(() => {
-    if (!dispatchResponse) return [];
-    return mapWarnings(dispatchResponse);
-  }, [dispatchResponse]);
+    if (!effectiveResponse) return [];
+    return mapWarnings(effectiveResponse);
+  }, [effectiveResponse]);
 
   const viewModel = useMemo(() => {
-    if (!dispatchResponse) return null;
-    return buildCommandCenterViewModel(dispatchResponse);
-  }, [dispatchResponse]);
+    if (!effectiveResponse) return null;
+    return buildCommandCenterViewModel(effectiveResponse);
+  }, [effectiveResponse]);
 
   const rowsForCanvas = useMemo(() => {
     if (!viewModel) return [];
@@ -232,19 +241,19 @@ function CommandCenterContent({
   }, [viewModel, warnings]);
 
   const dispatchData = useMemo<DispatchData | null>(() => {
-    if (!dispatchResponse) return null;
+    if (!effectiveResponse) return null;
 
     return {
-      status: mapStatus(dispatchResponse.status.status, dispatchResponse.status.unresolvedWarnings),
-      totalGuests: dispatchResponse.status.totalGuests,
-      totalGuides: dispatchResponse.status.totalGuides,
-      totalDriveMinutes: dispatchResponse.status.totalDriveMinutes,
-      efficiencyScore: dispatchResponse.status.efficiencyScore,
-      dispatchedAt: dispatchResponse.status.dispatchedAt ?? undefined,
+      status: mapStatus(effectiveResponse.status.status, effectiveResponse.status.unresolvedWarnings),
+      totalGuests: effectiveResponse.status.totalGuests,
+      totalGuides: effectiveResponse.status.totalGuides,
+      totalDriveMinutes: effectiveResponse.status.totalDriveMinutes,
+      efficiencyScore: effectiveResponse.status.efficiencyScore,
+      dispatchedAt: effectiveResponse.status.dispatchedAt ?? undefined,
       warnings,
       guideTimelines: [],
     };
-  }, [dispatchResponse, warnings]);
+  }, [effectiveResponse, warnings]);
 
   const availableGuides = useMemo(() => {
     if (!viewModel) return [];
@@ -484,11 +493,12 @@ function CommandCenterContent({
   );
 
   const handleCreateTempGuide = useCallback(
-    async (draft: { name: string; phone: string }) => {
+    async (draft: { name: string; phone: string; vehicleCapacity: number }) => {
       const result = await createTempGuideMutation.mutateAsync({
         date: dateString,
         name: draft.name,
         phone: draft.phone,
+        vehicleCapacity: draft.vehicleCapacity,
       });
 
       await utils.commandCenter.getDispatch.invalidate({ date: dateString });
@@ -610,7 +620,7 @@ function CommandCenterContent({
         unassignedCount={unassignedCount}
         warningsCount={warnings.length}
         dispatchedAt={dispatchData.dispatchedAt}
-        tourRuns={dispatchResponse.tourRuns}
+        tourRuns={effectiveResponse!.tourRuns}
         warnings={warnings}
         selectedWarningId={selectedWarningId}
         onSelectWarning={(warningId) => setSelectedWarningId(warningId)}
@@ -649,7 +659,7 @@ function CommandCenterContent({
 
       <MobileHopperSheet
         bookings={viewModel.groups.flatMap((group) => group.bookings)}
-        guideTimelines={mapGuideTimelinesForMobile(dispatchResponse.timelines)}
+        guideTimelines={mapGuideTimelinesForMobile(effectiveResponse!.timelines)}
         assignedRuns={mobileAssignedRuns}
         onAssign={handleMobileAssign}
         onReassignRun={handleMobileReassignRun}
