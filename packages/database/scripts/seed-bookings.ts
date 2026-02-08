@@ -6,10 +6,14 @@
  */
 
 import { config } from "dotenv";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 
-// Load environment variables from .env.local
-config({ path: resolve(process.cwd(), ".env.local") });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables from repo root .env.local
+config({ path: resolve(__dirname, "../../../.env.local") });
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -25,6 +29,13 @@ if (!DATABASE_URL) {
 
 const client = postgres(DATABASE_URL);
 const db = drizzle(client, { schema });
+
+function getOrgSlugArg(): string | null {
+  const arg = process.argv.find((value) => value.startsWith("--org-slug="));
+  if (!arg) return null;
+  const slug = arg.slice("--org-slug=".length).trim();
+  return slug.length > 0 ? slug : null;
+}
 
 // Helper to generate reference number
 function generateRefNumber(): string {
@@ -91,13 +102,26 @@ const timeSlots = ["09:00", "11:00", "14:00", "16:00"];
 async function main() {
   console.log("🌱 Seeding test bookings for guide assignment testing...\n");
 
-  // 1. Find an organization
-  const orgs = await db.select().from(schema.organizations).limit(1);
-  if (orgs.length === 0) {
+  // 1. Find an organization (prefer CLI slug, then demo-tours, then first org)
+  const requestedOrgSlug = getOrgSlugArg();
+  const preferredSlug = requestedOrgSlug ?? "demo-tours";
+  let org = await db.query.organizations.findFirst({
+    where: eq(schema.organizations.slug, preferredSlug),
+  });
+
+  if (!org && requestedOrgSlug) {
+    console.warn(`⚠️  Organization slug "${requestedOrgSlug}" not found. Falling back to first org.`);
+  }
+
+  if (!org) {
+    const orgs = await db.select().from(schema.organizations).limit(1);
+    org = orgs[0];
+  }
+
+  if (!org) {
     console.error("❌ No organizations found. Please create an organization first.");
     process.exit(1);
   }
-  const org = orgs[0]!;
   console.log(`📍 Using organization: ${org.name} (${org.id})`);
 
   // 2. Find existing tours
@@ -135,7 +159,7 @@ async function main() {
   }
 
   // 4. Find or create pickup zones
-  let pickupZones = await db
+  const pickupZones = await db
     .select()
     .from(schema.pickupZones)
     .where(eq(schema.pickupZones.organizationId, org.id));

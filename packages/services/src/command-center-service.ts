@@ -976,7 +976,7 @@ export class CommandCenterService extends BaseService {
           avatarUrl: guide.avatarUrl,
           languages: guide.languages as string[],
         },
-        vehicleCapacity: guide.vehicleCapacity ?? 6, // Use guide's actual capacity
+        vehicleCapacity: Math.max(guide.vehicleCapacity ?? 6, 1),
         baseZone: null,
         qualifiedTours,
         availableFrom: availabilityData.startTime || "07:00",
@@ -2296,6 +2296,7 @@ export class CommandCenterService extends BaseService {
     date: Date | string;
     name: string;
     phone: string;
+    vehicleCapacity: number;
   }): Promise<CreateTempGuideForDateResult> {
     await this.assertNotDispatched(input.date, "Create temporary guide");
 
@@ -2306,6 +2307,9 @@ export class CommandCenterService extends BaseService {
     }
     if (!trimmedPhone) {
       throw new ValidationError("Guide phone is required");
+    }
+    if (!Number.isInteger(input.vehicleCapacity) || input.vehicleCapacity < 1 || input.vehicleCapacity > 99) {
+      throw new ValidationError("Vehicle capacity must be between 1 and 99");
     }
 
     const [firstNameRaw = "", ...lastNameParts] = trimmedName.split(/\s+/);
@@ -2331,7 +2335,7 @@ export class CommandCenterService extends BaseService {
           status: "active",
           isPublic: false,
           notes: `Temporary outsourced guide for ${dateKey}`,
-          vehicleCapacity: 6,
+          vehicleCapacity: input.vehicleCapacity,
         })
         .returning({
           id: guides.id,
@@ -2404,7 +2408,11 @@ export class CommandCenterService extends BaseService {
     });
 
     if (bookingRows.length !== bookingIdList.length) {
-      throw new ValidationError("Some bookings were not found for batch apply");
+      const foundIds = new Set(bookingRows.map((booking) => booking.id));
+      const missingIds = bookingIdList.filter((bookingId) => !foundIds.has(bookingId));
+      const sampleMissing = missingIds.slice(0, 5).join(", ");
+      const suffix = missingIds.length > 5 ? " ..." : "";
+      throw new ValidationError(`Some bookings were not found for batch apply: ${sampleMissing}${suffix}`);
     }
 
     const tourDurationById = new Map<string, number>();
@@ -2632,6 +2640,7 @@ export class CommandCenterService extends BaseService {
     for (const [guideId, entries] of entriesByGuide.entries()) {
       const guide = guideById.get(guideId);
       if (!guide) continue;
+      const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);
 
       const runs = new Map<string, ValidationEntry[]>();
       for (const entry of entries) {
@@ -2641,13 +2650,13 @@ export class CommandCenterService extends BaseService {
 
       for (const [runKey, runEntries] of runs.entries()) {
         const runGuests = runEntries.reduce((sum, entry) => sum + entry.guestCount, 0);
-        if (runGuests > guide.vehicleCapacity) {
+        if (runGuests > guideCapacity) {
           this.logger.warn(
-            { reason: "capacity_exceeded", guideId, runKey, runGuests, vehicleCapacity: guide.vehicleCapacity },
+            { reason: "capacity_exceeded", guideId, runKey, runGuests, vehicleCapacity: guideCapacity },
             "Dispatch change rejected"
           );
           throw new ValidationError(
-            `capacity_exceeded: ${guide.firstName} ${guide.lastName} would exceed capacity (${runGuests}/${guide.vehicleCapacity})`
+            `capacity_exceeded: ${guide.firstName} ${guide.lastName} would exceed capacity (${runGuests}/${guideCapacity})`
           );
         }
 

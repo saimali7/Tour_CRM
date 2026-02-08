@@ -308,9 +308,10 @@ export class GuideAssignmentService extends BaseService {
       throw new NotFoundError("Guide", input.guideId);
     }
 
+    const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);
     const exceedsRunCapacity = await this.wouldExceedRunCapacity({
       guideId: guide.id,
-      vehicleCapacity: guide.vehicleCapacity ?? 0,
+      vehicleCapacity: guideCapacity,
       tourId: booking.tourId,
       bookingDate: booking.bookingDate,
       bookingTime: booking.bookingTime,
@@ -427,9 +428,10 @@ export class GuideAssignmentService extends BaseService {
         throw new ValidationError("Guide not found");
       }
 
+      const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);
       const exceedsRunCapacity = await this.wouldExceedRunCapacity({
         guideId: assignment.guideId,
-        vehicleCapacity: guide.vehicleCapacity ?? 0,
+        vehicleCapacity: guideCapacity,
         tourId: booking.tourId,
         bookingDate: booking.bookingDate,
         bookingTime: booking.bookingTime,

@@ -86,10 +86,17 @@ export class BookingQueryService extends BaseService {
       );
     }
 
-    const orderBy =
-      sort.direction === "asc"
-        ? asc(bookings[sort.field])
-        : desc(bookings[sort.field]);
+    const orderByClauses = (() => {
+      if (sort.field === "bookingDate") {
+        if (sort.direction === "asc") {
+          return [asc(bookings.bookingDate), asc(bookings.bookingTime), desc(bookings.createdAt)] as const;
+        }
+        return [desc(bookings.bookingDate), desc(bookings.bookingTime), desc(bookings.createdAt)] as const;
+      }
+
+      const primarySort = sort.direction === "asc" ? asc(bookings[sort.field]) : desc(bookings[sort.field]);
+      return [primarySort, desc(bookings.createdAt)] as const;
+    })();
 
     const [data, countResult] = await Promise.all([
       this.db
@@ -114,7 +121,7 @@ export class BookingQueryService extends BaseService {
         .leftJoin(customers, eq(bookings.customerId, customers.id))
         .leftJoin(tours, this.core.getTourJoinCondition())
         .where(and(...conditions))
-        .orderBy(orderBy)
+        .orderBy(...orderByClauses)
         .limit(limit)
         .offset(offset),
       this.db

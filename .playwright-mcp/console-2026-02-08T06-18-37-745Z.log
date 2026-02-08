@@ -1,0 +1,112 @@
+[    7125ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://labs.google/fx/projectgenie/api/trpc/general.fetchUserPreferences?input=%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%7D%7D:0
+[    7246ms] [ERROR] TRPCClientError: UNAUTHORIZED
+    at _0x169584.from (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:396933)
+    at https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:406535 @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   61798ms] [WARNING] Dialog is changing from controlled to uncontrolled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component. @ https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:0
+[   61876ms] [WARNING] Dialog is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component. @ https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:0
+[   61894ms] [ERROR] `DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.
+
+If you want to hide the `DialogTitle`, you can wrap it with our VisuallyHidden component.
+
+For more information, see https://radix-ui.com/primitives/docs/components/dialog @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   61894ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:0
+[   62311ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleGetBottleInitSettings:0
+[   62630ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleListBottleWorlds:0
+[   62631ms] [ERROR] Response @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   62633ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   63751ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/500:0
+[   64212ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   64243ms] [ERROR] `DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.
+
+If you want to hide the `DialogTitle`, you can wrap it with our VisuallyHidden component.
+
+For more information, see https://radix-ui.com/primitives/docs/components/dialog @ https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:0
+[   64243ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:0
+[   64445ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   64728ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   76267ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleGetBottleInitSettings:0
+[   76534ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   76936ms] [ERROR] TypeError: Failed to fetch
+    at _0x4ffcee (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:2002547)
+    at _0x189802 (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:2003862)
+    at _0x536eb9 (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:2004101)
+    at _0x1a5c0c (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:2017223)
+    at Object.queryFn (https://labs.google/fx/projectgenie/_next/static/chunks/8888-dfd8e987b5e91625.js:1:8544) @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   76951ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/500:0
+[   77314ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   77646ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   77883ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   81209ms] Unexpected token '<'
+[   81210ms] Unexpected token '<'
+[   81211ms] Unexpected token '<'
+[   81211ms] Unexpected token '<'
+[   81211ms] Unexpected token '<'
+[   81636ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleGetBottleInitSettings:0
+[   81784ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleListBottleWorlds:0
+[   81784ms] [ERROR] Response @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   82266ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   82879ms] [ERROR] TRPCClientError: Failed to fetch
+    at _0x169584.from (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:397046)
+    at https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:401187 @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   82880ms] [ERROR] TRPCClientError: Failed to fetch
+    at _0x169584.from (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:397046)
+    at https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:401187 @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   82880ms] [ERROR] logging event error TRPCClientError: Failed to fetch
+    at _0x169584.from (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:397046)
+    at https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:401187 @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   82887ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/500:0
+[   83340ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   83605ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   84133ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   87577ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleGetBottleInitSettings:0
+[   87833ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   88363ms] [ERROR] TypeError: Failed to fetch
+    at _0x4ffcee (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:2002547)
+    at _0x189802 (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:2003862)
+    at _0x536eb9 (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:2004101)
+    at _0x1a5c0c (https://labs.google/fx/projectgenie/_next/static/chunks/pages/_app-113f19f9d53fab06.js:1:2017223)
+    at Object.queryFn (https://labs.google/fx/projectgenie/_next/static/chunks/8888-dfd8e987b5e91625.js:1:8544) @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   88375ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/500:0
+[   88845ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   89083ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   89371ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   93058ms] Unexpected token '<'
+[   93070ms] Unexpected token '<'
+[   93316ms] Unexpected token '<'
+[   93374ms] Unexpected token '<'
+[   93627ms] Unexpected token '<'
+[   98809ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleGetBottleInitSettings:0
+[   98997ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleListBottleWorlds:0
+[   98997ms] [ERROR] Response @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[   99072ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[   99551ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/500:0
+[  100383ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  100626ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  100904ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  113845ms] Unexpected token '<'
+[  114379ms] Unexpected token '<'
+[  114399ms] Unexpected token '<'
+[  114407ms] Unexpected token '<'
+[  114417ms] Unexpected token '<'
+[  114541ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleGetBottleInitSettings:0
+[  114604ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleListBottleWorlds:0
+[  114604ms] [ERROR] Response @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[  114813ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  115357ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/500:0
+[  115826ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  116142ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  116379ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  133392ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleGetBottleInitSettings:0
+[  133632ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://aisandbox-pa.googleapis.com/v1:bottleListBottleWorlds:0
+[  133633ms] [ERROR] Response @ https://labs.google/fx/projectgenie/_next/static/chunks/7592-5fbab02f5aac0ddc.js:0
+[  133699ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  134130ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/500:0
+[  134532ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  134763ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  135513ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://labs.google/fx/projectgenie/_next/data/8taCdbxwUtKQuM62tGGDd/en/500.json:0
+[  136483ms] Unexpected token '<'
+[  136488ms] Unexpected token '<'
+[  136488ms] Unexpected token '<'
+[  136863ms] Unexpected token '<'
+[  136866ms] Unexpected token '<'
+[  142377ms] [WARNING] Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://www.youtube.com') does not match the recipient window's origin ('https://about.google'). @ https://www.gstatic.com/marketing-cms/reviewed-scripts/youtube/www-widgetapi.js:0

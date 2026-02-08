@@ -27,7 +27,7 @@ const paginationSchema = z.object({
 });
 
 const sortSchema = z.object({
-  field: z.enum(["createdAt", "total", "referenceNumber"]).default("createdAt"),
+  field: z.enum(["createdAt", "total", "referenceNumber", "bookingDate"]).default("createdAt"),
   direction: z.enum(["asc", "desc"]).default("desc"),
 });
 

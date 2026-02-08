@@ -31,7 +31,7 @@ export interface BookingFilters {
   search?: string;
 }
 
-export type BookingSortField = "createdAt" | "total" | "referenceNumber";
+export type BookingSortField = "createdAt" | "total" | "referenceNumber" | "bookingDate";
 
 // ============================================================================
 // Booking With Relations

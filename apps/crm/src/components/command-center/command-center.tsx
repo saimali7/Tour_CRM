@@ -17,7 +17,6 @@ import { DispatchCanvas } from "./dispatch-canvas";
 import { LiveAnnouncerProvider, useLiveAnnouncer } from "./live-announcer";
 import type { DispatchData, CommandCenterProps, DispatchWarning, DispatchSuggestion } from "./types";
 import { buildCommandCenterViewModel, mapStatus, mapWarningType } from "./dispatch-model";
-import { getDemoDispatchResponse } from "./demo-data";
 import type { GuideTimeline } from "./timeline/types";
 
 type BatchChange = RouterInputs["commandCenter"]["batchApplyChanges"]["changes"][number];
@@ -191,7 +190,16 @@ function CommandCenterContent({
   });
 
   const batchMutation = trpc.commandCenter.batchApplyChanges.useMutation({
-    onError: (mutationError) => {
+    onError: async (mutationError) => {
+      const isStaleBookingError = mutationError.message.includes("not found for batch apply");
+      if (isStaleBookingError) {
+        await utils.commandCenter.getDispatch.invalidate({ date: dateString });
+        toast.error("Assignments refreshed", {
+          description:
+            "Some bookings changed during editing. The board has been reloaded with the latest data.",
+        });
+        return;
+      }
       toast.error("Assignment update failed", { description: mutationError.message });
     },
   });
@@ -202,25 +210,7 @@ function CommandCenterContent({
     },
   });
 
-  // Inject demo bookings into real response when no real bookings exist
-  const effectiveResponse = useMemo(() => {
-    if (!dispatchResponse) return null;
-    const hasBookings = dispatchResponse.tourRuns.some((run) => run.bookings.length > 0);
-    if (hasBookings) return dispatchResponse;
-    const demo = getDemoDispatchResponse(date);
-    if (demo.tourRuns.length === 0) return dispatchResponse;
-    // Merge: keep real guides/timelines, inject demo tour runs + status
-    return {
-      ...dispatchResponse,
-      tourRuns: demo.tourRuns,
-      status: {
-        ...dispatchResponse.status,
-        totalGuests: demo.status.totalGuests,
-        unresolvedWarnings: demo.status.unresolvedWarnings,
-        warnings: demo.status.warnings,
-      },
-    };
-  }, [dispatchResponse, date]);
+  const effectiveResponse = dispatchResponse ?? null;
 
   const warnings = useMemo(() => {
     if (!effectiveResponse) return [];
@@ -460,6 +450,8 @@ function CommandCenterContent({
 
   const handleMobileReassignRun = useCallback(
     async (runId: string, fromGuideId: string, toGuideId: string) => {
+      if (fromGuideId === toGuideId) return;
+
       const source = runLookup.get(runId);
       if (!source) return;
 
@@ -470,8 +462,22 @@ function CommandCenterContent({
         return;
       }
 
+      const incomingIsCharter = source.run.bookingIds.some(
+        (bookingId) => viewModel?.bookingLookup.get(bookingId)?.experienceMode === "charter"
+      );
+      const sameSlotRuns = targetRow.runs.filter(
+        (run) => run.startTime === source.run.startTime && run.id !== source.run.id
+      );
+      const slotHasCharter = sameSlotRuns.some((run) =>
+        run.bookingIds.some((bookingId) => viewModel?.bookingLookup.get(bookingId)?.experienceMode === "charter")
+      );
+      if (incomingIsCharter || slotHasCharter) {
+        toast.error("Charter tours require an exclusive guide timeslot");
+        return;
+      }
+
       const projectedGuests = targetRow.runs
-        .filter((run) => run.startTime === source.run.startTime)
+        .filter((run) => run.startTime === source.run.startTime && run.id !== source.run.id)
         .reduce((sum, run) => sum + run.guestCount, 0) + source.run.guestCount;
       if (projectedGuests > targetRow.vehicleCapacity) {
         toast.error(
@@ -501,7 +507,7 @@ function CommandCenterContent({
       };
       await executeOperation(operation);
     },
-    [executeOperation, rowsForCanvas, runLookup]
+    [executeOperation, rowsForCanvas, runLookup, viewModel]
   );
 
   const handleCreateTempGuide = useCallback(

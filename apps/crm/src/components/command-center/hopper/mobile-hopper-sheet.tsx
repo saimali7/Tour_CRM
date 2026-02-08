@@ -59,7 +59,7 @@ interface MobileHopperSheetProps {
 
 interface GuideOptionProps {
   guide: GuideInfo;
-  currentGuests: number;
+  slotGuests: number;
   vehicleCapacity: number;
   timelineIndex: number;
   isSelected: boolean;
@@ -155,14 +155,14 @@ function MobileBookingCard({
 
 function GuideOption({
   guide,
-  currentGuests,
+  slotGuests,
   vehicleCapacity,
   isSelected,
   onSelect,
   bookingGuestCount,
 }: GuideOptionProps) {
-  const willExceedCapacity = currentGuests + bookingGuestCount > vehicleCapacity;
-  const capacityPercent = Math.min(100, (currentGuests / Math.max(vehicleCapacity, 1)) * 100);
+  const willExceedCapacity = slotGuests + bookingGuestCount > vehicleCapacity;
+  const capacityPercent = Math.min(100, (slotGuests / Math.max(vehicleCapacity, 1)) * 100);
 
   const initials = `${guide.firstName[0] || ""}${guide.lastName[0] || ""}`.toUpperCase();
 
@@ -201,7 +201,7 @@ function GuideOption({
             />
           </div>
           <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-            {currentGuests}/{vehicleCapacity}
+            {slotGuests}/{vehicleCapacity}
           </span>
         </div>
       </div>
@@ -363,11 +363,19 @@ export function MobileHopperSheet({
   const guideOptions = useMemo(() => {
     return guideTimelines.map((timeline, index) => ({
       guide: timeline.guide,
-      currentGuests: timeline.totalGuests,
       vehicleCapacity: timeline.guide.vehicleCapacity,
       timelineIndex: index,
     }));
   }, [guideTimelines]);
+
+  const slotGuestsByGuideAndTime = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const run of assignedRuns) {
+      const key = `${run.guideId}|${run.startTime}`;
+      totals.set(key, (totals.get(key) ?? 0) + run.guestCount);
+    }
+    return totals;
+  }, [assignedRuns]);
 
   const guideOptionLabels = useMemo(
     () =>
@@ -418,7 +426,11 @@ export function MobileHopperSheet({
       const candidates = guideOptions
         .map((option) => ({
           ...option,
-          projectedGuests: option.currentGuests + booking.guestCount,
+          slotGuests: slotGuestsByGuideAndTime.get(`${option.guide.id}|${booking.tourTime}`) ?? 0,
+        }))
+        .map((option) => ({
+          ...option,
+          projectedGuests: option.slotGuests + booking.guestCount,
         }))
         .filter((option) => option.projectedGuests <= option.vehicleCapacity)
         .sort((a, b) => a.vehicleCapacity - a.projectedGuests - (b.vehicleCapacity - b.projectedGuests));
@@ -434,7 +446,7 @@ export function MobileHopperSheet({
         setIsSubmitting(false);
       }
     },
-    [guideOptions, onAssign]
+    [guideOptions, onAssign, slotGuestsByGuideAndTime]
   );
 
   const handleRunNudge = useCallback(
@@ -602,7 +614,7 @@ export function MobileHopperSheet({
                       <GuideOption
                         key={option.guide.id}
                         guide={option.guide}
-                        currentGuests={option.currentGuests}
+                        slotGuests={slotGuestsByGuideAndTime.get(`${option.guide.id}|${selectedBooking.tourTime}`) ?? 0}
                         vehicleCapacity={option.vehicleCapacity}
                         timelineIndex={option.timelineIndex}
                         isSelected={selectedGuideId === option.guide.id}

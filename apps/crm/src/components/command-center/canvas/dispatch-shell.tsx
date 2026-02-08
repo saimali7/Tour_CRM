@@ -62,7 +62,7 @@ interface DispatchShellProps {
   onGuideClick: (guideId: string) => void;
   onBookingClick: (bookingId: string) => void;
   onResolveWarning: (warningId: string, suggestionId: string) => void;
-  onCreateTempGuide: (draft: { name: string; phone: string }) => Promise<void>;
+  onCreateTempGuide: (draft: { name: string; phone: string; vehicleCapacity: number }) => Promise<void>;
   showCurrentTime: boolean;
 }
 
@@ -157,6 +157,14 @@ function warningLinksForRun(run: CanvasRun, warningRunKeys: Set<string>, warning
   return run.bookingIds.some((bookingId) => warningBookingIds.has(bookingId));
 }
 
+function parseVehicleCapacity(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 99) return null;
+  return parsed;
+}
+
 export function DispatchShell({
   rows,
   groups,
@@ -196,6 +204,8 @@ export function DispatchShell({
   const [isAddTempGuideOpen, setIsAddTempGuideOpen] = useState(false);
   const [tempGuideName, setTempGuideName] = useState("");
   const [tempGuidePhone, setTempGuidePhone] = useState("");
+  const [tempGuideVehicleCapacity, setTempGuideVehicleCapacity] = useState("6");
+  const parsedTempGuideVehicleCapacity = parseVehicleCapacity(tempGuideVehicleCapacity);
 
   const markers = useMemo(() => hourMarkers(), []);
 
@@ -845,6 +855,8 @@ export function DispatchShell({
 
   const handleMoveRun = useCallback(
     async (guideId: string, runId: string, targetGuideId: string) => {
+      if (guideId === targetGuideId) return;
+
       const selected = runLookup.get(runId);
       const targetRow = rowLookup.get(targetGuideId);
       if (!selected || !targetRow) return;
@@ -947,16 +959,22 @@ export function DispatchShell({
     if (!isEditing || isReadOnly || isMutating) return;
     const name = tempGuideName.trim();
     const phone = tempGuidePhone.trim();
+    const vehicleCapacity = parseVehicleCapacity(tempGuideVehicleCapacity);
     if (!name || !phone) {
       toast.error("Name and phone are required");
       return;
     }
+    if (vehicleCapacity === null) {
+      toast.error("Vehicle capacity must be a whole number between 1 and 99");
+      return;
+    }
 
-    await onCreateTempGuide({ name, phone });
+    await onCreateTempGuide({ name, phone, vehicleCapacity });
     setTempGuideName("");
     setTempGuidePhone("");
+    setTempGuideVehicleCapacity("6");
     setIsAddTempGuideOpen(false);
-  }, [isEditing, isMutating, isReadOnly, onCreateTempGuide, tempGuideName, tempGuidePhone]);
+  }, [isEditing, isMutating, isReadOnly, onCreateTempGuide, tempGuideName, tempGuidePhone, tempGuideVehicleCapacity]);
 
   const autoScrollTimeline = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     const scrollContainer = event.currentTarget.closest("[data-timeline-scroll='true']");
@@ -1226,6 +1244,22 @@ export function DispatchShell({
                 disabled={isMutating}
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="temp-guide-vehicle-capacity">
+                Vehicle Capacity
+              </label>
+              <Input
+                id="temp-guide-vehicle-capacity"
+                type="number"
+                min={1}
+                max={99}
+                step={1}
+                value={tempGuideVehicleCapacity}
+                onChange={(event) => setTempGuideVehicleCapacity(event.target.value)}
+                placeholder="6"
+                disabled={isMutating}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1239,7 +1273,12 @@ export function DispatchShell({
             <Button
               type="button"
               onClick={() => void handleCreateTempGuideSubmit()}
-              disabled={isMutating || tempGuideName.trim().length === 0 || tempGuidePhone.trim().length === 0}
+              disabled={
+                isMutating ||
+                tempGuideName.trim().length === 0 ||
+                tempGuidePhone.trim().length === 0 ||
+                parsedTempGuideVehicleCapacity === null
+              }
             >
               Add Guide
             </Button>

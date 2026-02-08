@@ -22,7 +22,7 @@ interface DispatchCanvasProps {
   onGuideClick: (guideId: string) => void;
   onBookingClick: (bookingId: string) => void;
   onResolveWarning: (warningId: string, suggestionId: string) => void;
-  onCreateTempGuide: (draft: { name: string; phone: string }) => Promise<void>;
+  onCreateTempGuide: (draft: { name: string; phone: string; vehicleCapacity: number }) => Promise<void>;
   showCurrentTime: boolean;
 }
 

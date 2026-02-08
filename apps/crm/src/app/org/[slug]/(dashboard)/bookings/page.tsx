@@ -68,6 +68,7 @@ import { BookingPlanner } from "@/components/availability/booking-planner";
 type BookingView = "needs-action" | "all" | "find-availability";
 type StatusFilter = "all" | "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 type PaymentFilter = "all" | "pending" | "partial" | "paid" | "refunded" | "failed";
+type SourceFilter = "all" | "manual" | "website" | "api" | "phone" | "walk_in";
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -85,6 +86,15 @@ const PAYMENT_OPTIONS: { value: PaymentFilter; label: string }[] = [
   { value: "paid", label: "Paid" },
   { value: "refunded", label: "Refunded" },
   { value: "failed", label: "Failed" },
+];
+
+const SOURCE_OPTIONS: { value: SourceFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "manual", label: "Manual" },
+  { value: "website", label: "Website" },
+  { value: "phone", label: "Phone" },
+  { value: "walk_in", label: "Walk-in" },
+  { value: "api", label: "API" },
 ];
 
 export default function BookingsPage() {
@@ -186,12 +196,18 @@ interface AllBookingsViewProps {
 
 type QuickDateFilter = "all" | "today" | "tomorrow" | "this-week";
 
+const DEFAULT_STATUS_FILTER: StatusFilter = "all";
+const DEFAULT_PAYMENT_FILTER: PaymentFilter = "all";
+const DEFAULT_SOURCE_FILTER: SourceFilter = "all";
+const DEFAULT_QUICK_DATE_FILTER: QuickDateFilter = "today";
+
 function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllBookingsViewProps) {
   const router = useRouter();
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
-  const [quickDateFilter, setQuickDateFilter] = useState<QuickDateFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(DEFAULT_STATUS_FILTER);
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>(DEFAULT_PAYMENT_FILTER);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(DEFAULT_SOURCE_FILTER);
+  const [quickDateFilter, setQuickDateFilter] = useState<QuickDateFilter>(DEFAULT_QUICK_DATE_FILTER);
   const [search, setSearch] = useState("");
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
@@ -212,29 +228,45 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
     switch (quickDateFilter) {
       case "today":
         return { from: startOfToday, to: endOfToday };
-      case "tomorrow":
+      case "tomorrow": {
         const startOfTomorrow = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
         const endOfTomorrow = new Date(startOfTomorrow.getTime() + 24 * 60 * 60 * 1000 - 1);
         return { from: startOfTomorrow, to: endOfTomorrow };
-      case "this-week":
+      }
+      case "this-week": {
         const endOfWeek = new Date(startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000);
         return { from: startOfToday, to: endOfWeek };
+      }
       default:
         return undefined;
     }
   }, [quickDateFilter]);
 
-  const hasActiveFilters = statusFilter !== "all" || paymentFilter !== "all" || search !== "" || quickDateFilter !== "all";
+  const hasActiveFilters =
+    statusFilter !== DEFAULT_STATUS_FILTER ||
+    paymentFilter !== DEFAULT_PAYMENT_FILTER ||
+    sourceFilter !== DEFAULT_SOURCE_FILTER ||
+    search !== "" ||
+    quickDateFilter !== DEFAULT_QUICK_DATE_FILTER;
+
+  const listSort = useMemo<{ field: "createdAt" | "bookingDate"; direction: "asc" | "desc" }>(
+    () =>
+      quickDateFilter === "all"
+        ? ({ field: "createdAt", direction: "desc" as const })
+        : ({ field: "bookingDate", direction: "asc" as const }),
+    [quickDateFilter]
+  );
 
   const { data, isLoading, error } = trpc.booking.list.useQuery({
     pagination: { page, limit: 20 },
     filters: {
       status: statusFilter === "all" ? undefined : statusFilter,
       paymentStatus: paymentFilter === "all" ? undefined : paymentFilter,
+      source: sourceFilter === "all" ? undefined : sourceFilter,
       search: search || undefined,
       bookingDateRange,
     },
-    sort: { field: "createdAt", direction: "desc" },
+    sort: listSort,
   });
 
   const { data: stats } = trpc.booking.getStats.useQuery({});
@@ -534,6 +566,32 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           })}
         </div>
 
+        <span className="text-xs text-muted-foreground">
+          {quickDateFilter === "all" ? "Sorted by newest bookings" : "Sorted by tour date/time"}
+        </span>
+
+        {/* Source Filter */}
+        <select
+          value={sourceFilter}
+          onChange={(e) => {
+            setSourceFilter(e.target.value as SourceFilter);
+            setPage(1);
+          }}
+          aria-label="Filter by source"
+          className={cn(
+            "h-9 px-2.5 text-xs rounded-lg border transition-colors",
+            sourceFilter !== "all"
+              ? "border-primary bg-primary/5 text-foreground"
+              : "border-input bg-background text-muted-foreground"
+          )}
+        >
+          {SOURCE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.value === "all" ? "Source" : opt.label}
+            </option>
+          ))}
+        </select>
+
         {/* Status Filter */}
         <select
           value={statusFilter}
@@ -583,9 +641,10 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           <button
             onClick={() => {
               setSearch("");
-              setStatusFilter("all");
-              setPaymentFilter("all");
-              setQuickDateFilter("all");
+              setStatusFilter(DEFAULT_STATUS_FILTER);
+              setPaymentFilter(DEFAULT_PAYMENT_FILTER);
+              setSourceFilter(DEFAULT_SOURCE_FILTER);
+              setQuickDateFilter(DEFAULT_QUICK_DATE_FILTER);
               setPage(1);
             }}
             className="h-9 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"

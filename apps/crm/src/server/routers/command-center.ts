@@ -117,6 +117,7 @@ const createTempGuideInputSchema = z.object({
   ]),
   name: z.string().min(1),
   phone: z.string().min(1),
+  vehicleCapacity: z.number().int().min(1).max(99),
 });
 
 // =============================================================================
@@ -721,6 +722,7 @@ export const commandCenterRouter = createRouter({
           date: input.date,
           name: input.name,
           phone: input.phone,
+          vehicleCapacity: input.vehicleCapacity,
         });
       } catch (error) {
         throw new TRPCError({

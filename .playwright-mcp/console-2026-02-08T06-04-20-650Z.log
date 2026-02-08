@@ -1,0 +1,4 @@
+[  439922ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/trpc/commandCenter.batchApplyChanges?batch=1:0
+[  441604ms] TRPCClientError: Batch apply failed: Some bookings were not found for batch apply
+    at TRPCClientError.from (http://localhost:3000/_next/static/chunks/93288_%40trpc_client_dist_3da78f8a._.js:241:48)
+    at http://localhost:3000/_next/static/chunks/93288_%40trpc_client_dist_3da78f8a._.js:787:384
