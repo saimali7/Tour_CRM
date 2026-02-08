@@ -34,44 +34,62 @@ interface OperationRecord {
 function mapWarnings(response: DispatchResponse): DispatchWarning[] {
   const serviceWarnings = response.status.warnings ?? [];
   const unresolved = serviceWarnings.filter((warning) => !warning.resolved);
+  const bookingLookup = new Map(
+    response.tourRuns.flatMap((run) => run.bookings.map((booking) => [booking.id, booking] as const))
+  );
+  const runLookup = new Map(response.tourRuns.map((run) => [run.key, run] as const));
 
   if (unresolved.length > 0) {
-    return unresolved.map((warning) => ({
-      id: warning.id,
-      type: mapWarningType(warning.type),
-      message: warning.message,
-      bookingId: warning.bookingId,
-      tourRunKey: warning.tourRunKey,
-      suggestions: (warning.resolutions ?? []).map((resolution) => ({
-        id: resolution.id,
-        label: resolution.label,
-        guideId: resolution.guideId,
-        impact: resolution.impactMinutes ? `+${resolution.impactMinutes}m` : undefined,
-        action: resolution.action as DispatchSuggestion["action"] | undefined,
-      })),
-    }));
+    return unresolved.map((warning) => {
+      const booking = warning.bookingId ? bookingLookup.get(warning.bookingId) : null;
+      const run = warning.tourRunKey ? runLookup.get(warning.tourRunKey) : null;
+
+      return {
+        id: warning.id,
+        type: mapWarningType(warning.type),
+        message: warning.message,
+        bookingId: warning.bookingId,
+        tourRunKey: warning.tourRunKey,
+        guestName: booking?.customerName ?? undefined,
+        guestCount: booking?.totalParticipants ?? run?.totalGuests ?? undefined,
+        suggestions: (warning.resolutions ?? []).map((resolution) => ({
+          id: resolution.id,
+          label: resolution.label,
+          guideId: resolution.guideId,
+          impact: resolution.impactMinutes ? `+${resolution.impactMinutes}m` : undefined,
+          action: resolution.action as DispatchSuggestion["action"] | undefined,
+        })),
+      };
+    });
   }
 
   // Fallback warnings when status warnings are empty but tour runs still need staffing.
   const fallback: DispatchWarning[] = [];
-  for (const run of response.tourRuns) {
-    if (run.status === "unassigned") {
-      fallback.push({
-        id: `warning_${run.key}_unassigned`,
+    for (const run of response.tourRuns) {
+      if (run.status === "unassigned") {
+        fallback.push({
+          id: `warning_${run.key}_unassigned`,
         type: "no_guide",
         message: `${run.tour?.name ?? "Tour"} at ${run.time} has no guide assigned`,
         tourRunKey: run.key,
+        guestCount: run.totalGuests,
         suggestions: [],
       });
-    } else if (run.status === "partial") {
-      fallback.push({
-        id: `warning_${run.key}_partial`,
-        type: "capacity",
-        message: `${run.tour?.name ?? "Tour"} at ${run.time} needs ${run.guidesNeeded - run.guidesAssigned} more guide(s)`,
-        tourRunKey: run.key,
-        suggestions: [],
-      });
-    }
+      } else if (run.status === "partial") {
+        const unassignedBookings = Math.max((run.totalBookings ?? run.bookings.length) - (run.bookingsAssigned ?? 0), 0);
+        const missingGuides = Math.max(run.guidesNeeded - run.guidesAssigned, 0);
+        fallback.push({
+          id: `warning_${run.key}_partial`,
+          type: "capacity",
+          message:
+            unassignedBookings > 0
+              ? `${run.tour?.name ?? "Tour"} at ${run.time} has ${unassignedBookings} unassigned booking${unassignedBookings === 1 ? "" : "s"}`
+              : `${run.tour?.name ?? "Tour"} at ${run.time} needs ${missingGuides} more guide${missingGuides === 1 ? "" : "s"}`,
+          tourRunKey: run.key,
+          guestCount: run.totalGuests,
+          suggestions: [],
+        });
+      }
   }
 
   return fallback;
@@ -262,11 +280,29 @@ function CommandCenterContent({
     return viewModel.rows
       .filter((row) => !row.isOutsourced)
       .map((row) => ({
-      id: row.guide.id,
-      name: `${row.guide.firstName} ${row.guide.lastName}`.trim(),
-      vehicleCapacity: row.vehicleCapacity,
-      currentGuests: row.totalGuests,
-    }));
+        id: row.guide.id,
+        name: `${row.guide.firstName} ${row.guide.lastName}`.trim(),
+        vehicleCapacity: row.vehicleCapacity,
+        currentGuests: row.totalGuests,
+        slotGuestsByRunKey: row.runs.reduce<Record<string, number>>((acc, run) => {
+          acc[run.tourRunKey] = (acc[run.tourRunKey] ?? 0) + run.guestCount;
+          return acc;
+        }, {}),
+        slotGuestsByTime: row.runs.reduce<Record<string, number>>((acc, run) => {
+          acc[run.startTime] = (acc[run.startTime] ?? 0) + run.guestCount;
+          return acc;
+        }, {}),
+        slotHasExclusiveByTime: row.runs.reduce<Record<string, boolean>>((acc, run) => {
+          const hasExclusive = run.bookingIds.some((bookingId) => {
+            const mode = viewModel.bookingLookup.get(bookingId)?.experienceMode;
+            return mode === "charter" || mode === "book";
+          });
+          if (hasExclusive) {
+            acc[run.startTime] = true;
+          }
+          return acc;
+        }, {}),
+      }));
   }, [viewModel]);
 
   const unassignedCount = useMemo(
@@ -462,17 +498,21 @@ function CommandCenterContent({
         return;
       }
 
-      const incomingIsCharter = source.run.bookingIds.some(
-        (bookingId) => viewModel?.bookingLookup.get(bookingId)?.experienceMode === "charter"
-      );
+      const incomingIsExclusive = source.run.bookingIds.some((bookingId) => {
+        const mode = viewModel?.bookingLookup.get(bookingId)?.experienceMode;
+        return mode === "charter" || mode === "book";
+      });
       const sameSlotRuns = targetRow.runs.filter(
         (run) => run.startTime === source.run.startTime && run.id !== source.run.id
       );
-      const slotHasCharter = sameSlotRuns.some((run) =>
-        run.bookingIds.some((bookingId) => viewModel?.bookingLookup.get(bookingId)?.experienceMode === "charter")
+      const slotHasExclusive = sameSlotRuns.some((run) =>
+        run.bookingIds.some((bookingId) => {
+          const mode = viewModel?.bookingLookup.get(bookingId)?.experienceMode;
+          return mode === "charter" || mode === "book";
+        })
       );
-      if (incomingIsCharter || slotHasCharter) {
-        toast.error("Charter tours require an exclusive guide timeslot");
+      if (incomingIsExclusive || slotHasExclusive) {
+        toast.error("Private/charter tours require an exclusive guide timeslot");
         return;
       }
 

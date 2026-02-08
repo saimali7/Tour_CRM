@@ -37,8 +37,6 @@ import type {
 import {
   getTravelTime,
   getMostCommonZone,
-  findNearestZone,
-  groupBookingsByZone,
 } from "./travel-matrix";
 
 // =============================================================================
@@ -91,7 +89,7 @@ const LONG_DRIVE_TIME_THRESHOLD = 45;
 export async function optimizeDispatch(
   input: OptimizationInput
 ): Promise<OptimizationOutput> {
-  const { date, tourRuns, availableGuides, travelMatrix, organizationId } = input;
+  const { tourRuns, availableGuides, travelMatrix } = input;
 
   // Initialize tracking structures
   const guideSchedules = initializeGuideSchedules(availableGuides);
@@ -194,6 +192,7 @@ function processTourRun(
 ): ProposedAssignment[] {
   const assignments: ProposedAssignment[] = [];
   const tourRunId = `${tourRun.tourId}|${formatDateKey(tourRun.date)}|${tourRun.time}`;
+  const incomingHasExclusive = tourRun.bookings.some((booking) => booking.isPrivate === true);
 
   // Step 1: Calculate tour run time window
   const tourStartTime = parseTourStartTime(tourRun.date, tourRun.time);
@@ -202,6 +201,8 @@ function processTourRun(
   // Step 2: Find qualified and available guides
   const candidates = findQualifiedGuides(
     tourRun,
+    tourRunId,
+    incomingHasExclusive,
     allGuides,
     guideSchedules,
     tourStartTime,
@@ -259,6 +260,24 @@ function processTourRun(
     guidesToAssign.map((g) => g.guide),
     tourRun.guestsPerGuide
   );
+  const assignedBookingIds = new Set(
+    Array.from(bookingDistribution.values())
+      .flat()
+      .map((booking) => booking.id)
+  );
+  for (const booking of tourRun.bookings) {
+    if (assignedBookingIds.has(booking.id)) continue;
+    warnings.push(createWarning({
+      type: "unassigned_booking",
+      severity: "critical",
+      message: `Booking ${booking.referenceNumber} for ${tourRun.tourName} could not be assigned`,
+      tourRunId,
+      bookingId: booking.id,
+      suggestedResolutions: [
+        { id: `ext_${booking.id}`, type: "add_external_guide", label: "Add External Guide" },
+      ],
+    }));
+  }
 
   // Step 6: For each guide, calculate pickup sequence and times
   let isFirstGuide = true;
@@ -289,7 +308,7 @@ function processTourRun(
       const booking = orderedBookings.find((b) => b.id === pickup.bookingId)!;
       const confidence = determineConfidence(score, pickup.driveMinutes);
 
-      assignments.push({
+      const proposedAssignment: ProposedAssignment = {
         bookingId: pickup.bookingId,
         guideId: guide.id,
         pickupOrder: pickup.order,
@@ -299,7 +318,10 @@ function processTourRun(
         scoreBreakdown,
         tourRunId,
         isLeadGuide: isFirstGuide,
-      });
+      };
+
+      assignments.push(proposedAssignment);
+      schedule.assignments.push(proposedAssignment);
 
       // Add warning for long drive times
       if (pickup.driveMinutes > LONG_DRIVE_TIME_THRESHOLD) {
@@ -335,6 +357,8 @@ function processTourRun(
  */
 function findQualifiedGuides(
   tourRun: TourRunInput,
+  tourRunId: string,
+  incomingHasExclusive: boolean,
   allGuides: AvailableGuide[],
   guideSchedules: Map<string, GuideSchedule>,
   tourStartTime: Date,
@@ -353,7 +377,7 @@ function findQualifiedGuides(
 
     // Check for time conflicts
     const schedule = guideSchedules.get(guide.id);
-    if (schedule && hasConflict(schedule, tourStartTime, tourEndTime)) {
+    if (schedule && hasConflict(schedule, tourStartTime, tourEndTime, tourRunId, incomingHasExclusive)) {
       return false;
     }
 
@@ -383,6 +407,11 @@ function isWithinAvailabilityWindow(
   startTime: Date,
   endTime: Date
 ): boolean {
+  if (Array.isArray(guide.availabilityWindows) && guide.availabilityWindows.length > 0) {
+    return guide.availabilityWindows.some(
+      (window) => startTime >= window.start && endTime <= window.end
+    );
+  }
   return startTime >= guide.availableFrom && endTime <= guide.availableTo;
 }
 
@@ -392,12 +421,21 @@ function isWithinAvailabilityWindow(
 function hasConflict(
   schedule: GuideSchedule,
   startTime: Date,
-  endTime: Date
+  endTime: Date,
+  tourRunId: string,
+  incomingHasExclusive: boolean
 ): boolean {
   // Check existing assignments from the guide's current assignments
   for (const entry of schedule.guide.currentAssignments) {
     // Time overlap: startA < endB AND endA > startB
     if (entry.startsAt < endTime && entry.endsAt > startTime) {
+      // Same run continuation is allowed for shared runs.
+      if (entry.id === tourRunId) {
+        if (entry.isExclusive || incomingHasExclusive) {
+          return true;
+        }
+        continue;
+      }
       return true;
     }
   }
@@ -529,6 +567,8 @@ function distributeBookings(
 ): Map<string, BookingInput[]> {
   const distribution = new Map<string, BookingInput[]>();
   const guideCapacity = new Map<string, number>();
+  const guideHasExclusive = new Set<string>();
+  const guideHasShared = new Set<string>();
 
   // Initialize
   for (const guide of guides) {
@@ -537,18 +577,38 @@ function distributeBookings(
   }
 
   // Sort bookings by participant count (descending) - assign larger bookings first
-  const sortedBookings = [...bookings].sort(
-    (a, b) => b.participantCount - a.participantCount
-  );
+  const sortedBookings = [...bookings].sort((a, b) => {
+    const aExclusive = a.isPrivate === true;
+    const bExclusive = b.isPrivate === true;
+    if (aExclusive !== bExclusive) {
+      return aExclusive ? -1 : 1;
+    }
+    return b.participantCount - a.participantCount;
+  });
 
   // Assign each booking
   for (const booking of sortedBookings) {
+    const bookingIsExclusive = booking.isPrivate === true;
+
     // Find guide with enough remaining capacity
     let bestGuide: string | null = null;
     let bestRemainingCapacity = -1;
 
     for (const guide of guides) {
+      if (guideHasExclusive.has(guide.id)) {
+        continue;
+      }
+      if (bookingIsExclusive && guideHasShared.has(guide.id)) {
+        continue;
+      }
       const remaining = guideCapacity.get(guide.id)!;
+      if (bookingIsExclusive) {
+        if (remaining > bestRemainingCapacity) {
+          bestGuide = guide.id;
+          bestRemainingCapacity = remaining;
+        }
+        continue;
+      }
       if (remaining >= booking.participantCount && remaining > bestRemainingCapacity) {
         bestGuide = guide.id;
         bestRemainingCapacity = remaining;
@@ -556,8 +616,11 @@ function distributeBookings(
     }
 
     // If no guide has enough capacity, find one with most remaining (will be over capacity)
-    if (!bestGuide) {
+    if (!bestGuide && !bookingIsExclusive) {
       for (const guide of guides) {
+        if (guideHasExclusive.has(guide.id)) {
+          continue;
+        }
         const remaining = guideCapacity.get(guide.id)!;
         if (remaining > bestRemainingCapacity) {
           bestGuide = guide.id;
@@ -568,10 +631,16 @@ function distributeBookings(
 
     if (bestGuide) {
       distribution.get(bestGuide)!.push(booking);
-      guideCapacity.set(
-        bestGuide,
-        guideCapacity.get(bestGuide)! - booking.participantCount
-      );
+      if (bookingIsExclusive) {
+        guideHasExclusive.add(bestGuide);
+        guideCapacity.set(bestGuide, 0);
+      } else {
+        guideHasShared.add(bestGuide);
+        guideCapacity.set(
+          bestGuide,
+          guideCapacity.get(bestGuide)! - booking.participantCount
+        );
+      }
     }
   }
 

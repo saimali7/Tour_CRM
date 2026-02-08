@@ -312,6 +312,15 @@ export const commandCenterRouter = createRouter({
         await services.commandCenter.manualAssign(input.bookingId, input.guideId);
         return { success: true };
       } catch (error) {
+        // Handle ValidationError specifically
+        if (error instanceof Error && error.name === "ValidationError") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+            cause: error,
+          });
+        }
+
         // Handle NotFoundError specifically
         if (error instanceof Error && error.name === "NotFoundError") {
           throw new TRPCError({
@@ -466,14 +475,11 @@ export const commandCenterRouter = createRouter({
 
   /**
    * Apply guide reassignments (bulk update from adjust mode)
-   * Moves bookings from one guide to another
+   * Moves bookings from one guide to another.
    *
-   * Pre-validation:
-   * 1. Revalidate guide availability for target guides
-   * 2. Check for time conflicts with drive buffer
-   *
-   * All changes are applied atomically - if any fail validation,
-   * the entire operation is rejected.
+   * This now delegates to `batchApplyChanges` so all capacity,
+   * overlap, availability, and charter-exclusivity validation runs
+   * through a single canonical dispatch engine.
    */
   applyReassignments: adminProcedure
     .input(z.object({
@@ -486,150 +492,39 @@ export const commandCenterRouter = createRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const services = getServices(ctx);
-
-      // =========================================================================
-      // PHASE 1: Pre-validation (fail fast before any changes)
-      // =========================================================================
-
-      // Get unique target guide IDs
-      const targetGuideIds = [...new Set(input.changes.map(c => c.toGuideId))];
-
-      // Revalidate guide availability
-      const availableGuides = await services.commandCenter.getAvailableGuides(input.date);
-      const availableGuideIds = new Set(availableGuides.map(g => g.guide.id));
-
-      const unavailableGuides = targetGuideIds.filter(id => !availableGuideIds.has(id));
-      if (unavailableGuides.length > 0) {
-        // Get guide names for better error message
-        const unavailableGuideNames = availableGuides
-          .filter(g => unavailableGuides.includes(g.guide.id))
-          .map(g => `${g.guide.firstName} ${g.guide.lastName}`)
-          .join(", ");
-
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: `Guide availability changed: ${unavailableGuideNames || unavailableGuides.join(", ")} no longer available for ${input.date.toLocaleDateString()}`,
-        });
-      }
-
-      // Check capacity constraints
-      const timelines = await services.commandCenter.getGuideTimelines(input.date);
-      const guideCapacityMap = new Map<string, { current: number; capacity: number; name: string }>();
-
-      for (const timeline of timelines) {
-        guideCapacityMap.set(timeline.guide.id, {
-          current: timeline.totalGuests,
-          capacity: timeline.vehicleCapacity,
-          name: `${timeline.guide.firstName} ${timeline.guide.lastName}`,
-        });
-      }
-
-      // Fetch booking details to get actual guest counts
-      const bookingIds = input.changes.map(c => c.bookingId);
-      const bookingGuestCounts = new Map<string, number>();
-
-      for (const bookingId of bookingIds) {
-        try {
-          const booking = await services.booking.getById(bookingId);
-          bookingGuestCounts.set(bookingId, booking.totalParticipants);
-        } catch {
-          // If booking not found, use 1 as fallback
-          bookingGuestCounts.set(bookingId, 1);
-        }
-      }
-
-      // Calculate new guest counts after all changes using actual booking data
-      const guestChanges = new Map<string, number>(); // guideId -> delta
-
-      for (const change of input.changes) {
-        const guestCount = bookingGuestCounts.get(change.bookingId) ?? 1;
-
-        if (change.fromGuideId) {
-          guestChanges.set(
-            change.fromGuideId,
-            (guestChanges.get(change.fromGuideId) || 0) - guestCount
-          );
-        }
-        guestChanges.set(
-          change.toGuideId,
-          (guestChanges.get(change.toGuideId) || 0) + guestCount
-        );
-      }
-
-      // =========================================================================
-      // PHASE 2: Apply all changes atomically
-      // =========================================================================
-
-      const results: Array<{
-        bookingId: string;
-        success: boolean;
-        error?: string;
-      }> = [];
-
-      // Track applied changes for potential rollback
-      const appliedChanges: Array<{
-        bookingId: string;
-        originalGuideId: string | null;
-        newGuideId: string;
-      }> = [];
-
       try {
-        // Process each change sequentially to maintain consistency
-        for (const change of input.changes) {
-          // If there's a current guide, unassign first
-          if (change.fromGuideId) {
-            await services.commandCenter.unassign(change.bookingId);
-          }
-
-          // Assign to the new guide
-          await services.commandCenter.manualAssign(change.bookingId, change.toGuideId);
-
-          appliedChanges.push({
-            bookingId: change.bookingId,
-            originalGuideId: change.fromGuideId,
-            newGuideId: change.toGuideId,
-          });
-
-          results.push({
-            bookingId: change.bookingId,
-            success: true,
-          });
-        }
+        // Delegate to the same batch engine used by adjust-mode apply.
+        const batchChanges = input.changes.map((change) =>
+          change.fromGuideId
+            ? {
+                type: "reassign" as const,
+                bookingIds: [change.bookingId],
+                fromGuideId: change.fromGuideId,
+                toGuideId: change.toGuideId,
+              }
+            : {
+                type: "assign" as const,
+                bookingId: change.bookingId,
+                toGuideId: change.toGuideId,
+              }
+        );
+        const result = await services.commandCenter.batchApplyChanges(input.date, batchChanges);
 
         return {
-          success: true,
-          applied: results.length,
+          success: result.success,
+          applied: result.applied,
           failed: 0,
-          results,
+          results: input.changes.map((change) => ({
+            bookingId: change.bookingId,
+            success: true,
+          })),
         };
       } catch (error) {
-        // Rollback applied changes on failure
-        for (const applied of appliedChanges.reverse()) {
-          try {
-            // Unassign from new guide
-            await services.commandCenter.unassign(applied.bookingId);
-
-            // Re-assign to original guide if there was one
-            if (applied.originalGuideId) {
-              await services.commandCenter.manualAssign(
-                applied.bookingId,
-                applied.originalGuideId
-              );
-            }
-          } catch (rollbackError) {
-            // Log rollback failure but continue
-            console.error(
-              `Failed to rollback booking ${applied.bookingId}:`,
-              rollbackError
-            );
-          }
-        }
-
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error
-            ? `Assignment failed: ${error.message}. All changes have been rolled back.`
-            : "Assignment failed. All changes have been rolled back.",
+            ? `Assignment failed: ${error.message}`
+            : "Assignment failed.",
           cause: error,
         });
       }

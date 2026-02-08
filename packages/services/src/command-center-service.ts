@@ -14,12 +14,10 @@
  * - Dispatch notifications to guides
  */
 
-import { eq, and, gte, lte, inArray, sql, asc, desc } from "drizzle-orm";
+import { eq, and, inArray, sql, asc, desc } from "drizzle-orm";
 import {
   tours,
   bookings,
-  customers,
-  bookingParticipants,
   guideAssignments,
   dispatchStatus,
   guides,
@@ -110,6 +108,8 @@ export interface TourRun {
   date: string;
   time: string;
   bookings: BookingWithCustomer[];
+  totalBookings: number;
+  bookingsAssigned: number;
   totalGuests: number;
   guidesNeeded: number;
   guidesAssigned: number;
@@ -173,6 +173,10 @@ export interface AvailableGuide {
   vehicleCapacity: number;
   baseZone: string | null;
   qualifiedTours: string[];
+  availabilitySlots: Array<{
+    startTime: string;
+    endTime: string;
+  }>;
   availableFrom: string;
   availableTo: string;
   currentAssignments: CurrentAssignment[];
@@ -647,7 +651,7 @@ export class CommandCenterService extends BaseService {
     existing?: DispatchStatusRow | null
   ): Promise<DispatchStatusRow> {
     const dateKey = this.formatDateKey(date);
-    const dispatchDate = new Date(dateKey);
+    const dispatchDate = this.parseDateKey(dateKey);
 
     if (existing) {
       const [updated] = await this.db
@@ -826,9 +830,22 @@ export class CommandCenterService extends BaseService {
         });
       }
 
-      // Calculate guides needed
-      const guestsPerGuide = tour.guestsPerGuide || 6;
-      const guidesNeeded = Math.ceil(totalGuests / guestsPerGuide);
+      // Calculate guides needed by run-slot model:
+      // - private/charter ("book"/"charter") bookings are exclusive (1 guide each)
+      // - shared bookings consume guestsPerGuide capacity pool
+      const guestsPerGuide = Math.max(tour.guestsPerGuide || 6, 1);
+      const exclusiveBookings = runBookings.reduce((count, booking) => {
+        const mode = (booking.pricingSnapshot as { experienceMode?: "join" | "book" | "charter" } | null)?.experienceMode;
+        return mode === "book" || mode === "charter" ? count + 1 : count;
+      }, 0);
+      const sharedGuests = runBookings.reduce((sum, booking) => {
+        const mode = (booking.pricingSnapshot as { experienceMode?: "join" | "book" | "charter" } | null)?.experienceMode;
+        if (mode === "book" || mode === "charter") {
+          return sum;
+        }
+        return sum + (booking.totalParticipants ?? 0);
+      }, 0);
+      const guidesNeeded = exclusiveBookings + (sharedGuests > 0 ? Math.ceil(sharedGuests / guestsPerGuide) : 0);
 
       // Get assignments for this tour run
       const bookingIds = runBookings.map((b) => b.id);
@@ -842,15 +859,26 @@ export class CommandCenterService extends BaseService {
             with: {
               guide: true,
             },
+            orderBy: (assignments, { desc }) => [desc(assignments.assignedAt)],
           })
         : [];
 
       validateGuideAssignmentWithRelationsArray(assignmentsRaw, "CommandCenterService.getTourRuns.assignments");
       const assignments = assignmentsRaw as unknown as GuideAssignmentWithRelations[];
 
+      // Keep latest confirmed assignment per booking as canonical.
+      const assignmentsByBooking = new Map<string, GuideAssignmentWithRelations>();
+      for (const assignment of assignments) {
+        if (!assignmentsByBooking.has(assignment.bookingId)) {
+          assignmentsByBooking.set(assignment.bookingId, assignment);
+        }
+      }
+      const latestAssignments = Array.from(assignmentsByBooking.values());
+      const assignedBookingIds = new Set(latestAssignments.map((assignment) => assignment.bookingId));
+
       // Build unique guides list
       const guidesMap = new Map<string, GuideAssignmentInfo>();
-      for (const assignment of assignments) {
+      for (const assignment of latestAssignments) {
         const guideKey = assignment.guideId || `outsourced:${assignment.outsourcedGuideName}`;
         if (!guidesMap.has(guideKey)) {
           guidesMap.set(guideKey, {
@@ -872,12 +900,14 @@ export class CommandCenterService extends BaseService {
       }
 
       const guidesAssigned = guidesMap.size;
+      const bookingsAssigned = assignedBookingIds.size;
+      const totalBookings = runBookings.length;
 
       // Determine status
       let status: TourRun["status"] = "unassigned";
-      if (guidesAssigned === 0) {
+      if (bookingsAssigned === 0) {
         status = "unassigned";
-      } else if (guidesAssigned < guidesNeeded) {
+      } else if (bookingsAssigned < totalBookings || guidesAssigned < guidesNeeded) {
         status = "partial";
       } else if (guidesAssigned === guidesNeeded) {
         status = "assigned";
@@ -900,6 +930,8 @@ export class CommandCenterService extends BaseService {
         date: dateStr,
         time: time!,
         bookings: bookingsWithCustomer,
+        totalBookings,
+        bookingsAssigned,
         totalGuests,
         guidesNeeded,
         guidesAssigned,
@@ -979,8 +1011,12 @@ export class CommandCenterService extends BaseService {
         vehicleCapacity: Math.max(guide.vehicleCapacity ?? 6, 1),
         baseZone: null,
         qualifiedTours,
-        availableFrom: availabilityData.startTime || "07:00",
-        availableTo: availabilityData.endTime || "22:00",
+        availabilitySlots: availabilityData.slots,
+        availableFrom: availabilityData.startTime || availabilityData.slots[0]?.startTime || "07:00",
+        availableTo:
+          availabilityData.endTime ||
+          availabilityData.slots[availabilityData.slots.length - 1]?.endTime ||
+          "22:00",
         currentAssignments,
       });
     }
@@ -995,8 +1031,18 @@ export class CommandCenterService extends BaseService {
   private async batchCheckGuideAvailability(
     guideIds: string[],
     date: Date | string
-  ): Promise<Map<string, { isAvailable: boolean; startTime: string | null; endTime: string | null }>> {
-    const result = new Map<string, { isAvailable: boolean; startTime: string | null; endTime: string | null }>();
+  ): Promise<Map<string, {
+    isAvailable: boolean;
+    startTime: string | null;
+    endTime: string | null;
+    slots: Array<{ startTime: string; endTime: string }>;
+  }>> {
+    const result = new Map<string, {
+      isAvailable: boolean;
+      startTime: string | null;
+      endTime: string | null;
+      slots: Array<{ startTime: string; endTime: string }>;
+    }>();
     const dateStr = this.formatDateKey(date);
     const dayOfWeek = getDayOfWeek(date);
 
@@ -1034,33 +1080,49 @@ export class CommandCenterService extends BaseService {
         overrideMap.set(override.guideId, override);
       }
 
-      // Build weekly availability lookup (first slot per guide)
-      const weeklyMap = new Map<string, typeof weeklyResult[0]>();
+      // Build weekly availability lookup (all available slots per guide)
+      const weeklyMap = new Map<string, Array<{ startTime: string; endTime: string }>>();
       for (const slot of weeklyResult) {
-        // Only keep first slot per guide (earliest time)
-        if (!weeklyMap.has(slot.guideId)) {
-          weeklyMap.set(slot.guideId, slot);
-        }
+        if (!slot.isAvailable) continue;
+        if (!weeklyMap.has(slot.guideId)) weeklyMap.set(slot.guideId, []);
+        weeklyMap.get(slot.guideId)!.push({ startTime: slot.startTime, endTime: slot.endTime });
       }
 
       // Process each guide
       for (const guideId of guideIds) {
         const override = overrideMap.get(guideId);
-        const weekly = weeklyMap.get(guideId);
+        const weeklySlots = this.normalizeAvailabilitySlots(weeklyMap.get(guideId) ?? []);
+
+        if (override?.isAvailable === false) {
+          result.set(guideId, {
+            isAvailable: false,
+            startTime: null,
+            endTime: null,
+            slots: [],
+          });
+          continue;
+        }
 
         if (override) {
-          // Override takes precedence
+          // Override takes precedence. If it doesn't define custom hours, reuse weekly slots.
+          const overrideSlots = override.startTime && override.endTime
+            ? [{ startTime: override.startTime, endTime: override.endTime }]
+            : weeklySlots;
+          const slots = this.normalizeAvailabilitySlots(
+            overrideSlots.length > 0 ? overrideSlots : [{ startTime: "07:00", endTime: "22:00" }]
+          );
           result.set(guideId, {
-            isAvailable: override.isAvailable,
-            startTime: override.startTime,
-            endTime: override.endTime,
+            isAvailable: slots.length > 0,
+            startTime: slots[0]?.startTime ?? null,
+            endTime: slots[slots.length - 1]?.endTime ?? null,
+            slots,
           });
-        } else if (weekly) {
-          // Use weekly pattern
+        } else if (weeklySlots.length > 0) {
           result.set(guideId, {
-            isAvailable: weekly.isAvailable,
-            startTime: weekly.startTime,
-            endTime: weekly.endTime,
+            isAvailable: true,
+            startTime: weeklySlots[0]?.startTime ?? null,
+            endTime: weeklySlots[weeklySlots.length - 1]?.endTime ?? null,
+            slots: weeklySlots,
           });
         } else {
           // No availability data - default to unavailable
@@ -1068,6 +1130,7 @@ export class CommandCenterService extends BaseService {
             isAvailable: false,
             startTime: null,
             endTime: null,
+            slots: [],
           });
         }
       }
@@ -1075,7 +1138,7 @@ export class CommandCenterService extends BaseService {
       this.logger.error({ err: error, guideIds }, "Failed to batch check guide availability");
       // Fallback: mark all as unavailable
       for (const guideId of guideIds) {
-        result.set(guideId, { isAvailable: false, startTime: null, endTime: null });
+        result.set(guideId, { isAvailable: false, startTime: null, endTime: null, slots: [] });
       }
     }
 
@@ -1513,20 +1576,46 @@ export class CommandCenterService extends BaseService {
     ]);
 
     const bookingIds = tourRuns.flatMap((run) => run.bookings.map((booking) => booking.id));
-    const existingAssignments = bookingIds.length > 0
-      ? await this.db.query.guideAssignments.findMany({
-          columns: {
-            bookingId: true,
-          },
-          where: and(
-            eq(guideAssignments.organizationId, this.organizationId),
-            inArray(guideAssignments.bookingId, bookingIds),
-            eq(guideAssignments.status, "confirmed")
-          ),
-        })
+    const existingAssignmentRows = bookingIds.length > 0
+      ? await this.db
+          .select({
+            bookingId: guideAssignments.bookingId,
+            guideId: guideAssignments.guideId,
+            assignedAt: guideAssignments.assignedAt,
+            tourId: bookings.tourId,
+            bookingTime: bookings.bookingTime,
+            pricingSnapshot: bookings.pricingSnapshot,
+          })
+          .from(guideAssignments)
+          .innerJoin(bookings, eq(guideAssignments.bookingId, bookings.id))
+          .where(
+            and(
+              eq(guideAssignments.organizationId, this.organizationId),
+              inArray(guideAssignments.bookingId, bookingIds),
+              eq(guideAssignments.status, "confirmed")
+            )
+          )
+          .orderBy(desc(guideAssignments.assignedAt))
       : [];
 
-    const assignedBookingIds = new Set(existingAssignments.map((assignment) => assignment.bookingId));
+    const latestExistingAssignments = new Map<
+      string,
+      {
+        bookingId: string;
+        guideId: string | null;
+        assignedAt: Date;
+        tourId: string | null;
+        bookingTime: string | null;
+        pricingSnapshot: unknown;
+      }
+    >();
+    for (const row of existingAssignmentRows) {
+      if (!latestExistingAssignments.has(row.bookingId)) {
+        latestExistingAssignments.set(row.bookingId, row);
+      }
+    }
+
+    const assignedBookingIds = new Set(latestExistingAssignments.keys());
 
     const tourRunInputs = tourRuns
       .map((run) => {
@@ -1537,7 +1626,16 @@ export class CommandCenterService extends BaseService {
 
         const totalGuests = unassignedBookings.reduce((sum, booking) => sum + booking.totalParticipants, 0);
         const guestsPerGuide = run.tour.guestsPerGuide ?? 6;
-        const guidesNeeded = totalGuests > 0 ? Math.ceil(totalGuests / guestsPerGuide) : 0;
+        const exclusiveBookings = unassignedBookings.filter(
+          (booking) => booking.experienceMode === "charter" || booking.experienceMode === "book"
+        ).length;
+        const sharedGuests = unassignedBookings.reduce((sum, booking) => {
+          if (booking.experienceMode === "charter" || booking.experienceMode === "book") {
+            return sum;
+          }
+          return sum + booking.totalParticipants;
+        }, 0);
+        const guidesNeeded = exclusiveBookings + (sharedGuests > 0 ? Math.ceil(sharedGuests / guestsPerGuide) : 0);
 
         if (guidesNeeded === 0) {
           return null;
@@ -1579,7 +1677,7 @@ export class CommandCenterService extends BaseService {
             pickupLocation: booking.pickupLocation ?? undefined,
             customerName: booking.customerName,
             specialRequests: booking.specialRequests ?? undefined,
-            isPrivate: booking.experienceMode ? booking.experienceMode !== "join" : undefined,
+            isPrivate: booking.experienceMode === "charter" || booking.experienceMode === "book",
           })),
         };
       })
@@ -1607,6 +1705,7 @@ export class CommandCenterService extends BaseService {
       id: string;
       startsAt: Date;
       endsAt: Date;
+      isExclusive: boolean;
       endZoneId?: string;
     }>>();
 
@@ -1617,21 +1716,48 @@ export class CommandCenterService extends BaseService {
       return result;
     };
 
-    for (const run of tourRuns) {
-      const runStart = buildDateTime(run.time);
-      const runEnd = new Date(runStart.getTime() + (run.tour.durationMinutes || 60) * 60 * 1000);
-
-      for (const guide of run.assignedGuides) {
-        if (!guide.guideId) continue;
-        if (!guideScheduleEntries.has(guide.guideId)) {
-          guideScheduleEntries.set(guide.guideId, []);
-        }
-        guideScheduleEntries.get(guide.guideId)!.push({
-          id: run.key,
-          startsAt: runStart,
-          endsAt: runEnd,
+    const runDurationByKey = new Map<string, number>(
+      tourRuns.map((run) => [run.key, run.tour.durationMinutes || 60])
+    );
+    const existingScheduleByGuideRun = new Map<string, {
+      guideId: string;
+      runKey: string;
+      startsAt: Date;
+      endsAt: Date;
+      isExclusive: boolean;
+    }>();
+    for (const row of latestExistingAssignments.values()) {
+      if (!row.guideId || !row.tourId || !row.bookingTime) continue;
+      const runKey = createTourRunKey(row.tourId, dateKey, row.bookingTime);
+      const runDuration = runDurationByKey.get(runKey) ?? 60;
+      const startsAt = buildDateTime(row.bookingTime);
+      const endsAt = new Date(startsAt.getTime() + runDuration * 60 * 1000);
+      const mode = this.extractExperienceMode(row.pricingSnapshot);
+      const isExclusive = mode === "book" || mode === "charter";
+      const mergeKey = `${row.guideId}|${runKey}`;
+      const existing = existingScheduleByGuideRun.get(mergeKey);
+      if (existing) {
+        existing.isExclusive = existing.isExclusive || isExclusive;
+      } else {
+        existingScheduleByGuideRun.set(mergeKey, {
+          guideId: row.guideId,
+          runKey,
+          startsAt,
+          endsAt,
+          isExclusive,
         });
       }
+    }
+    for (const entry of existingScheduleByGuideRun.values()) {
+      if (!guideScheduleEntries.has(entry.guideId)) {
+        guideScheduleEntries.set(entry.guideId, []);
+      }
+      guideScheduleEntries.get(entry.guideId)!.push({
+        id: entry.runKey,
+        startsAt: entry.startsAt,
+        endsAt: entry.endsAt,
+        isExclusive: entry.isExclusive,
+      });
     }
 
     const availableGuideInputs = availableGuides.map((guide) => ({
@@ -1644,6 +1770,10 @@ export class CommandCenterService extends BaseService {
       primaryTourIds: [],
       availableFrom: buildDateTime(guide.availableFrom),
       availableTo: buildDateTime(guide.availableTo),
+      availabilityWindows: guide.availabilitySlots.map((slot) => ({
+        start: buildDateTime(slot.startTime),
+        end: buildDateTime(slot.endTime),
+      })),
       currentAssignments: guideScheduleEntries.get(guide.guide.id) ?? [],
     }));
 
@@ -1656,6 +1786,7 @@ export class CommandCenterService extends BaseService {
     });
 
     const warnings = this.mapOptimizationWarnings(optimizationResult.warnings);
+    const assignmentFailureWarnings: Warning[] = [];
     const assignments: OptimizedAssignment[] = [];
 
     for (const proposed of optimizationResult.assignments) {
@@ -1692,8 +1823,22 @@ export class CommandCenterService extends BaseService {
           calculatedPickupTime: proposed.calculatedPickupTime,
           driveTimeMinutes: proposed.driveTimeMinutes,
         });
-      } catch {
-        // Assignment might already exist, skip
+      } catch (error) {
+        // Keep failed optimizer assignments visible to dispatch operators.
+        const reason = error instanceof Error ? error.message : "Unknown assignment error";
+        this.logger.warn(
+          { bookingId: proposed.bookingId, guideId: proposed.guideId, tourRunKey: proposed.tourRunId, err: error },
+          "Optimizer assignment failed"
+        );
+        assignmentFailureWarnings.push({
+          id: `assign_fail_${proposed.bookingId}_${assignmentFailureWarnings.length + 1}`,
+          type: "no_available_guide",
+          tourRunKey: proposed.tourRunId,
+          bookingId: proposed.bookingId,
+          message: `Could not assign booking ${proposed.bookingId}: ${reason}`,
+          resolutions: [],
+          resolved: false,
+        });
       }
     }
 
@@ -1721,19 +1866,21 @@ export class CommandCenterService extends BaseService {
     const efficiency = optimizationResult.efficiency;
     const totalDriveMinutes = optimizationResult.totalDriveMinutes;
 
+    const allWarnings = [...warnings, ...assignmentFailureWarnings];
+
     // Update dispatch status
     await this.applyDispatchStatusUpdate(date, {
-      status: warnings.length > 0 ? "optimized" : "ready",
+      status: allWarnings.length > 0 ? "optimized" : "ready",
       optimizedAt: new Date(),
       efficiencyScore: efficiency.toString(),
       totalDriveMinutes,
-      warnings,
-      unresolvedWarnings: warnings.length,
+      warnings: allWarnings,
+      unresolvedWarnings: allWarnings.length,
     });
 
     return {
       assignments,
-      warnings,
+      warnings: allWarnings,
       efficiency,
       totalDriveMinutes,
     };
@@ -1928,13 +2075,6 @@ export class CommandCenterService extends BaseService {
 
     // If bookingId is provided, assign to that specific booking
     if (resolution.bookingId) {
-      await this.guideAssignmentService.assignGuideToBooking(
-        resolution.bookingId,
-        resolution.guideId,
-        { autoConfirm: true }
-      );
-
-      // Get the booking to invalidate cache
       const booking = await this.db.query.bookings.findFirst({
         where: and(
           eq(bookings.id, resolution.bookingId),
@@ -1942,9 +2082,17 @@ export class CommandCenterService extends BaseService {
         ),
       });
 
-      if (booking?.bookingDate) {
-        await this.refreshDispatchStatus(booking.bookingDate);
+      if (!booking?.bookingDate) {
+        throw new ValidationError(`Booking ${resolution.bookingId} not found or missing booking date`);
       }
+
+      await this.batchApplyChanges(booking.bookingDate, [
+        {
+          type: "assign",
+          bookingId: resolution.bookingId,
+          toGuideId: resolution.guideId,
+        },
+      ]);
 
       this.logger.info(`Resolved warning ${warningId}: assigned guide ${resolution.guideId} to booking ${resolution.bookingId}`);
       return;
@@ -1969,31 +2117,17 @@ export class CommandCenterService extends BaseService {
         throw new ValidationError(`No bookings found for tour run: ${resolution.tourRunKey}`);
       }
 
-      // Assign guide to each booking (skip if already assigned)
-      let assignedCount = 0;
-      for (const booking of tourRunBookings) {
-        try {
-          await this.guideAssignmentService.assignGuideToBooking(
-            booking.id,
-            resolution.guideId,
-            { autoConfirm: true }
-          );
-          assignedCount++;
-        } catch (error) {
-          // Skip if already assigned (ConflictError)
-          if (error instanceof ConflictError) {
-            this.logger.debug(`Guide already assigned to booking ${booking.id}, skipping`);
-            continue;
-          }
-          throw error;
-        }
-      }
-
-      // Refresh dispatch status for the date
       const date = new Date(dateStr);
-      await this.refreshDispatchStatus(date);
+      await this.batchApplyChanges(
+        date,
+        tourRunBookings.map((booking) => ({
+          type: "assign" as const,
+          bookingId: booking.id,
+          toGuideId: resolution.guideId!,
+        }))
+      );
 
-      this.logger.info(`Resolved warning ${warningId}: assigned guide ${resolution.guideId} to ${assignedCount} bookings in tour run ${resolution.tourRunKey}`);
+      this.logger.info(`Resolved warning ${warningId}: assigned guide ${resolution.guideId} to ${tourRunBookings.length} bookings in tour run ${resolution.tourRunKey}`);
       return;
     }
 
@@ -2391,8 +2525,7 @@ export class CommandCenterService extends BaseService {
       for (const bookingId of change.bookingIds) {
         changedBookingIds.add(bookingId);
       }
-      if (change.type === "unassign") {
-      } else if (change.type === "reassign") {
+      if (change.type === "reassign") {
         involvedGuideIds.add(change.toGuideId);
       } else if (change.type === "time-shift") {
         involvedGuideIds.add(change.guideId);
@@ -2586,8 +2719,11 @@ export class CommandCenterService extends BaseService {
       startMinutes: number;
       endMinutes: number;
       guestCount: number;
-      isCharter: boolean;
+      isExclusive: boolean;
     };
+
+    const isExclusiveExperienceMode = (mode: BookingWithCustomer["experienceMode"]): boolean =>
+      mode === "charter" || mode === "book";
 
     const entriesByGuide = new Map<string, ValidationEntry[]>();
     const pushEntry = (guideId: string, entry: ValidationEntry) => {
@@ -2614,7 +2750,7 @@ export class CommandCenterService extends BaseService {
         startMinutes,
         endMinutes,
         guestCount: booking.totalParticipants ?? 0,
-        isCharter: this.extractExperienceMode(booking.pricingSnapshot) === "charter",
+        isExclusive: isExclusiveExperienceMode(this.extractExperienceMode(booking.pricingSnapshot)),
       });
     }
 
@@ -2633,14 +2769,61 @@ export class CommandCenterService extends BaseService {
         startMinutes,
         endMinutes,
         guestCount: state.guestCount,
-        isCharter: state.experienceMode === "charter",
+        isExclusive: isExclusiveExperienceMode(state.experienceMode),
       });
     }
+
+    const availabilityByGuide = guideIdList.length > 0
+      ? await this.batchCheckGuideAvailability(guideIdList, dateKey)
+      : new Map<
+          string,
+          {
+            isAvailable: boolean;
+            startTime: string | null;
+            endTime: string | null;
+            slots: Array<{ startTime: string; endTime: string }>;
+          }
+        >();
 
     for (const [guideId, entries] of entriesByGuide.entries()) {
       const guide = guideById.get(guideId);
       if (!guide) continue;
       const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);
+      const availability = availabilityByGuide.get(guideId);
+
+      if (!availability?.isAvailable || availability.slots.length === 0) {
+        this.logger.warn(
+          { reason: "availability_conflict", guideId, date: dateKey },
+          "Dispatch change rejected"
+        );
+        throw new ValidationError(
+          `availability_conflict: ${guide.firstName} ${guide.lastName} is unavailable on ${dateKey}`
+        );
+      }
+
+      for (const entry of entries) {
+        const fitsAvailability = availability.slots.some((slot) => {
+          const slotStart = this.parseTimeToMinutes(slot.startTime);
+          const slotEnd = this.parseTimeToMinutes(slot.endTime);
+          return entry.startMinutes >= slotStart && entry.endMinutes <= slotEnd;
+        });
+
+        if (!fitsAvailability) {
+          this.logger.warn(
+            {
+              reason: "availability_conflict",
+              guideId,
+              bookingId: entry.bookingId,
+              startMinutes: entry.startMinutes,
+              endMinutes: entry.endMinutes,
+            },
+            "Dispatch change rejected"
+          );
+          throw new ValidationError(
+            `availability_conflict: ${guide.firstName} ${guide.lastName} has no available slot for this run`
+          );
+        }
+      }
 
       const runs = new Map<string, ValidationEntry[]>();
       for (const entry of entries) {
@@ -2660,13 +2843,13 @@ export class CommandCenterService extends BaseService {
           );
         }
 
-        if (runEntries.some((entry) => entry.isCharter) && runEntries.length > 1) {
+        if (runEntries.some((entry) => entry.isExclusive) && runEntries.length > 1) {
           this.logger.warn(
             { reason: "charter_exclusive", guideId, runKey },
             "Dispatch change rejected"
           );
           throw new ValidationError(
-            `charter_exclusive: ${guide.firstName} ${guide.lastName} cannot stack charter bookings in the same slot`
+            `charter_exclusive: ${guide.firstName} ${guide.lastName} cannot stack private/charter bookings in the same slot`
           );
         }
       }
@@ -2678,13 +2861,13 @@ export class CommandCenterService extends BaseService {
       }
 
       for (const [slotKey, slotEntries] of slots.entries()) {
-        if (slotEntries.some((entry) => entry.isCharter) && slotEntries.length > 1) {
+        if (slotEntries.some((entry) => entry.isExclusive) && slotEntries.length > 1) {
           this.logger.warn(
             { reason: "charter_exclusive", guideId, slotKey },
             "Dispatch change rejected"
           );
           throw new ValidationError(
-            `charter_exclusive: ${guide.firstName} ${guide.lastName} cannot share slot ${slotKey.split("|")[1]} with a charter booking`
+            `charter_exclusive: ${guide.firstName} ${guide.lastName} cannot share slot ${slotKey.split("|")[1]} with a private/charter booking`
           );
         }
       }
@@ -2884,15 +3067,19 @@ export class CommandCenterService extends BaseService {
       guideId
     );
 
-    // Create assignment (auto-confirm for manual assignments)
-    await this.guideAssignmentService.assignGuideToBooking(bookingId, guideId, {
-      autoConfirm: true,
-    });
-
-    // Refresh dispatch status for the booking date
-    if (booking.bookingDate) {
-      await this.refreshDispatchStatus(booking.bookingDate);
+    if (!booking.bookingDate) {
+      throw new ValidationError(`Booking ${bookingId} is missing booking date`);
     }
+
+    // Route through canonical batch engine so manual assignment uses the same
+    // capacity, overlap, availability-slot, and exclusivity validation.
+    await this.batchApplyChanges(booking.bookingDate, [
+      {
+        type: "assign",
+        bookingId,
+        toGuideId: guideId,
+      },
+    ]);
   }
 
   /**
@@ -3038,7 +3225,6 @@ export class CommandCenterService extends BaseService {
     }
 
     const tourRuns = await this.getTourRuns(date);
-    const guidesNotified: string[] = [];
     const errors: Array<{ guideId: string; error: string }> = [];
 
     // Collect all unique guides
@@ -3292,7 +3478,7 @@ export class CommandCenterService extends BaseService {
    */
   private calculateConfidence(
     run: TourRun,
-    assignment: GuideAssignmentInfo
+    _assignment: GuideAssignmentInfo
   ): TimelineSegment["confidence"] {
     // Check staffing level
     if (run.status === "unassigned") return "problem";
@@ -3338,6 +3524,57 @@ export class CommandCenterService extends BaseService {
       throw new ValidationError(`Invalid time format: ${time}`);
     }
     return hour * 60 + minute;
+  }
+
+  private minutesToTime(totalMinutes: number): string {
+    const safeMinutes = Math.max(0, totalMinutes);
+    const hour = Math.floor(safeMinutes / 60);
+    const minute = safeMinutes % 60;
+    return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+  }
+
+  private normalizeAvailabilitySlots(
+    slots: Array<{ startTime: string; endTime: string }>
+  ): Array<{ startTime: string; endTime: string }> {
+    const parsed = slots
+      .map((slot) => {
+        try {
+          const startMinutes = this.parseTimeToMinutes(slot.startTime);
+          const endMinutes = this.parseTimeToMinutes(slot.endTime);
+          if (endMinutes <= startMinutes) return null;
+          return {
+            startMinutes,
+            endMinutes,
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((slot): slot is { startMinutes: number; endMinutes: number } => Boolean(slot))
+      .sort((a, b) => a.startMinutes - b.startMinutes);
+
+    if (parsed.length === 0) {
+      return [];
+    }
+
+    const merged: Array<{ startMinutes: number; endMinutes: number }> = [];
+    for (const slot of parsed) {
+      const previous = merged[merged.length - 1];
+      if (!previous) {
+        merged.push({ ...slot });
+        continue;
+      }
+      if (slot.startMinutes <= previous.endMinutes) {
+        previous.endMinutes = Math.max(previous.endMinutes, slot.endMinutes);
+        continue;
+      }
+      merged.push({ ...slot });
+    }
+
+    return merged.map((slot) => ({
+      startTime: this.minutesToTime(slot.startMinutes),
+      endTime: this.minutesToTime(slot.endMinutes),
+    }));
   }
 
   private isValidCommandCenterTime(time: string): boolean {

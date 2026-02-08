@@ -249,13 +249,14 @@ export function DispatchShell({
     for (const row of rows) {
       for (const run of row.runs) {
         let hasVIP = false;
-        const hasFirstTimer = false;
+        let hasFirstTimer = false;
         let hasAccessibility = false;
         let hasChildren = false;
         for (const bookingId of run.bookingIds) {
           const booking = bookingLookup.get(bookingId);
           if (!booking) continue;
           if (booking.specialOccasion) hasVIP = true;
+          if (booking.isFirstTime) hasFirstTimer = true;
           if (booking.accessibilityNeeds) hasAccessibility = true;
           if (booking.childCount && booking.childCount > 0) hasChildren = true;
         }
@@ -330,8 +331,8 @@ export function DispatchShell({
     const term = filterState.search.trim().toLowerCase();
 
     const base = groups.filter((group) => {
-      if (!filterState.includeCharters && group.isCharter) return false;
-      if (!filterState.includeJoinRuns && !group.isCharter) return false;
+      if (!filterState.includeCharters && group.isPrivate) return false;
+      if (!filterState.includeJoinRuns && !group.isPrivate) return false;
 
       if (!term) return true;
       if (group.tourName.toLowerCase().includes(term)) return true;
@@ -479,12 +480,12 @@ export function DispatchShell({
 
   const projectedGuestsForRow = useCallback(
     (row: CanvasRow): number => {
-      if (!dragPayload) return row.totalGuests;
-      if (row.isOutsourced) return row.totalGuests;
+      if (!dragPayload) return 0;
+      if (row.isOutsourced) return 0;
 
       if (dragPayload.source === "hopper") {
         const incomingStartTime = bookingLookup.get(dragPayload.bookingIds[0] ?? "")?.tourTime;
-        if (!incomingStartTime) return row.totalGuests;
+        if (!incomingStartTime) return 0;
         const baseGuests = slotGuestCount(row, incomingStartTime);
         return baseGuests + dragPayload.guestCount;
       }
@@ -494,7 +495,7 @@ export function DispatchShell({
           ? dragPreview.startTime
           : dragPayload.startTime;
 
-      if (!targetStartTime) return row.totalGuests;
+      if (!targetStartTime) return 0;
       if (dragPayload.sourceGuideId === row.guide.id) {
         return slotGuestCount(row, targetStartTime, dragPayload.runId) + dragPayload.guestCount;
       }
@@ -518,17 +519,21 @@ export function DispatchShell({
       ignoreRunId?: string
     ): boolean => {
       if (!startTime) return false;
-      const incomingIsCharter = bookingIds.some(
-        (bookingId) => bookingLookup.get(bookingId)?.experienceMode === "charter"
-      );
+      const incomingIsExclusive = bookingIds.some((bookingId) => {
+        const mode = bookingLookup.get(bookingId)?.experienceMode;
+        return mode === "charter" || mode === "book";
+      });
       const sameSlotRuns = targetRow.runs.filter(
         (run) => run.startTime === startTime && (!ignoreRunId || run.id !== ignoreRunId)
       );
       if (sameSlotRuns.length === 0) return false;
-      const slotHasCharter = sameSlotRuns.some((run) =>
-        run.bookingIds.some((bookingId) => bookingLookup.get(bookingId)?.experienceMode === "charter")
+      const slotHasExclusive = sameSlotRuns.some((run) =>
+        run.bookingIds.some((bookingId) => {
+          const mode = bookingLookup.get(bookingId)?.experienceMode;
+          return mode === "charter" || mode === "book";
+        })
       );
-      return incomingIsCharter || slotHasCharter;
+      return incomingIsExclusive || slotHasExclusive;
     },
     [bookingLookup]
   );
@@ -544,7 +549,7 @@ export function DispatchShell({
       const incomingStartTime = bookingLookup.get(bookingIds[0] ?? "")?.tourTime;
 
       if (violatesCharterSlotRule(targetRow, bookingIds, incomingStartTime)) {
-        toast.error("Charter tours require an exclusive guide timeslot");
+        toast.error("Private/charter tours require an exclusive guide timeslot");
         return;
       }
 
@@ -717,30 +722,34 @@ export function DispatchShell({
           ? bookingLookup.get(dragPayload.bookingIds[0] ?? "")?.tourTime
           : undefined;
       const dropStart = dropStartTime ?? dragPayload.startTime ?? inferredHopperStart;
-      const projectedGuests = dropStart
-        ? slotGuestCount(targetRow, dropStart, dragPayload.sourceGuideId === targetGuideId ? dragPayload.runId : undefined) + dragPayload.guestCount
-        : targetRow.totalGuests + (dragPayload.sourceGuideId === targetGuideId ? 0 : dragPayload.guestCount);
-
-      if (projectedGuests > targetRow.vehicleCapacity) {
-        toast.error(
-          `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed slot capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
-        );
-        resetDrag();
-        return;
-      }
-
-      if (
-        dragPayload.source === "guide" &&
-        violatesCharterSlotRule(targetRow, dragPayload.bookingIds, dropStart, dragPayload.runId)
-      ) {
-        toast.error("Charter tours require an exclusive guide timeslot");
-        resetDrag();
-        return;
-      }
 
       try {
         if (dragPayload.source === "hopper") {
           await assignBookingIdsToGuide(dragPayload.bookingIds, targetGuideId);
+          return;
+        }
+
+        if (!dropStart) {
+          toast.error("Unable to determine booking start time for this move");
+          return;
+        }
+
+        const projectedGuests =
+          slotGuestCount(
+            targetRow,
+            dropStart,
+            dragPayload.sourceGuideId === targetGuideId ? dragPayload.runId : undefined
+          ) + dragPayload.guestCount;
+
+        if (projectedGuests > targetRow.vehicleCapacity) {
+          toast.error(
+            `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed slot capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
+          );
+          return;
+        }
+
+        if (violatesCharterSlotRule(targetRow, dragPayload.bookingIds, dropStart, dragPayload.runId)) {
+          toast.error("Private/charter tours require an exclusive guide timeslot");
           return;
         }
 
@@ -866,7 +875,7 @@ export function DispatchShell({
       }
 
       if (violatesCharterSlotRule(targetRow, selected.run.bookingIds, selected.run.startTime, selected.run.id)) {
-        toast.error("Charter tours require an exclusive guide timeslot");
+        toast.error("Private/charter tours require an exclusive guide timeslot");
         return;
       }
 
@@ -1195,6 +1204,7 @@ export function DispatchShell({
                 <ContextPane
                   context={contextData}
                   rows={rows}
+                  bookingLookup={bookingLookup}
                   warningsCount={warnings.length}
                   unassignedGroupsCount={groups.length}
                   isEditing={isEditing}

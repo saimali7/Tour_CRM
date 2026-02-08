@@ -6,8 +6,6 @@
  * to optimize guide dispatch for tour operations.
  */
 
-import type { Tour, Guide, Booking } from "@tour/database";
-
 // =============================================================================
 // INPUT TYPES
 // =============================================================================
@@ -89,6 +87,11 @@ export interface AvailableGuide {
   availableFrom: Date;
   /** Availability window end */
   availableTo: Date;
+  /** Optional explicit availability windows for split shifts */
+  availabilityWindows?: Array<{
+    start: Date;
+    end: Date;
+  }>;
   /** Current assignments (for conflict detection) */
   currentAssignments: GuideScheduleEntry[];
 }
@@ -103,6 +106,8 @@ export interface GuideScheduleEntry {
   startsAt: Date;
   /** End time */
   endsAt: Date;
+  /** Whether this assignment is exclusive (private/charter) */
+  isExclusive?: boolean;
   /** Zone ID (for travel time calculation) */
   endZoneId?: string;
 }

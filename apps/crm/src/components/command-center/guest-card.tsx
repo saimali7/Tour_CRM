@@ -50,6 +50,7 @@ export interface GuestCardBooking {
   total?: string | null;
   currency?: string | null;
   experienceMode?: "join" | "book" | "charter" | null;
+  isFirstTime?: boolean;
 }
 
 export interface GuestCardProps {

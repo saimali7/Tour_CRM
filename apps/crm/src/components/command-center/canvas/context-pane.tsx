@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import type { DispatchContextData } from "./canvas-types";
 import type { CanvasRow } from "../dispatch-model";
+import type { GuestCardBooking } from "../guest-card";
 
 interface ContextPaneProps {
   context: DispatchContextData;
   rows: CanvasRow[];
+  bookingLookup: Map<string, GuestCardBooking>;
   warningsCount: number;
   unassignedGroupsCount: number;
   isEditing: boolean;
@@ -50,9 +52,16 @@ function panelTitle(selection: DispatchContextData["selection"]): string {
   }
 }
 
+function bookingModeLabel(mode: GuestCardBooking["experienceMode"]): string {
+  if (mode === "charter") return "Charter";
+  if (mode === "book") return "Private";
+  return "Shared";
+}
+
 export function ContextPane({
   context,
   rows,
+  bookingLookup,
   warningsCount: _warningsCount,
   unassignedGroupsCount: _unassignedGroupsCount,
   isEditing,
@@ -108,6 +117,12 @@ export function ContextPane({
   );
 
   const selectedWarning = context.selectedWarning;
+  const selectedRunBookings = useMemo(() => {
+    if (!context.selectedRun) return [];
+    return context.selectedRun.run.bookingIds
+      .map((bookingId) => bookingLookup.get(bookingId))
+      .filter((booking): booking is GuestCardBooking => Boolean(booking));
+  }, [context.selectedRun, bookingLookup]);
 
   // If nothing is selected, don't render the pane body
   if (context.selection.type === "none") {
@@ -128,7 +143,7 @@ export function ContextPane({
               <p className="text-sm font-semibold text-foreground">
                 {context.selectedGuide.guide.firstName} {context.selectedGuide.guide.lastName}
               </p>
-              <p className="text-xs text-muted-foreground">{context.selectedGuide.totalGuests}/{context.selectedGuide.vehicleCapacity} guests</p>
+              <p className="text-xs text-muted-foreground">{context.selectedGuide.totalGuests} guests today</p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-md bg-muted/30 px-2.5 py-1.5">
@@ -151,6 +166,34 @@ export function ContextPane({
               <p className="text-xs text-muted-foreground">
                 {context.selectedRun.run.displayStartLabel} - {context.selectedRun.run.displayEndLabel} &middot; {context.selectedRun.run.guestCount} guests
               </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Booking Summary</p>
+              {selectedRunBookings.length > 0 ? (
+                <div className="max-h-40 space-y-1.5 overflow-y-auto pr-0.5">
+                  {selectedRunBookings.map((booking) => {
+                    const chips: string[] = [bookingModeLabel(booking.experienceMode)];
+                    if (booking.isFirstTime) chips.push("First-timer");
+                    if (booking.specialOccasion) chips.push("VIP");
+                    if (booking.accessibilityNeeds) chips.push("Accessibility");
+                    if ((booking.childCount ?? 0) > 0) chips.push("Children");
+
+                    return (
+                      <div key={booking.id} className="rounded-md border bg-muted/20 px-2 py-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-xs font-medium text-foreground">{booking.referenceNumber}</p>
+                          <p className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{booking.guestCount} guests</p>
+                        </div>
+                        <p className="truncate text-[11px] text-muted-foreground">{booking.customerName}</p>
+                        <p className="truncate text-[10px] text-muted-foreground">{chips.join(" · ")}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No booking details available for this run.</p>
+              )}
             </div>
 
             <div className="space-y-1.5">
