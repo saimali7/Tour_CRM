@@ -6,6 +6,14 @@ import { formatInTimeZone } from "date-fns-tz";
 
 const log = createServiceLogger("dispatch");
 
+function parseDateKey(dateKey: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    return new Date(dateKey);
+  }
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year || 0, (month || 1) - 1, day || 1);
+}
+
 /**
  * Dispatch Notifications
  *
@@ -25,6 +33,7 @@ export const sendDispatchNotifications = inngest.createFunction(
   { event: "dispatch.completed" },
   async ({ event, step }) => {
     const { organizationId, dispatchDate, dispatchedBy } = event.data;
+    const dispatchDateValue = parseDateKey(dispatchDate);
 
     // Step 1: Get organization details
     const org = await step.run("get-organization", async () => {
@@ -45,7 +54,7 @@ export const sendDispatchNotifications = inngest.createFunction(
     const dispatchData = await step.run("get-dispatch-data", async () => {
       const services = createServices({ organizationId });
       const timelines = await services.commandCenter.getGuideTimelines(
-        new Date(dispatchDate)
+        dispatchDateValue
       );
       return timelines;
     });
@@ -101,7 +110,7 @@ export const sendDispatchNotifications = inngest.createFunction(
 
           // Format the date for display
           const dateString = formatInTimeZone(
-            new Date(dispatchDate),
+            dispatchDateValue,
             timezone,
             "EEEE, MMMM d, yyyy"
           );

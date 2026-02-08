@@ -238,7 +238,7 @@ export function GuidePreviewActions({ guideId }: { guideId: string }) {
           View
         </Button>
       </Link>
-      <Link href={`/org/${slug}/guides/${guideId}/edit` as Route} className="flex-1">
+      <Link href={`/org/${slug}/guides/${guideId}?tab=details` as Route} className="flex-1">
         <Button variant="default" size="sm" className="w-full">
           <Edit className="h-4 w-4 mr-1.5" />
           Edit

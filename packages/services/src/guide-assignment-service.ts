@@ -56,6 +56,10 @@ function parseExperienceMode(pricingSnapshot: unknown): ExperienceMode {
   return null;
 }
 
+function isExclusiveExperienceMode(mode: ExperienceMode | undefined): boolean {
+  return mode === "charter" || mode === "book";
+}
+
 /**
  * Guide Assignment Service
  * Manages the assignment workflow of guides to bookings
@@ -648,15 +652,15 @@ export class GuideAssignmentService extends BaseService {
       // Build tour run key for comparison
       const tourRunKey = `${booking.tourId}|${booking.bookingDate.toISOString().split("T")[0]}|${booking.bookingTime}`;
 
-      // Same run is usually allowed (shared tours), but charter blocks the slot.
+      // Same run is usually allowed (shared tours), but private/charter blocks the slot.
       if (tourRunKey === excludeTourRunKey) {
         if (excludeTourRun.bookingId && booking.id === excludeTourRun.bookingId) {
           continue;
         }
         const existingMode = parseExperienceMode(booking.pricingSnapshot);
-        const incomingIsCharter = excludeTourRun.experienceMode === "charter";
-        const existingIsCharter = existingMode === "charter";
-        if (incomingIsCharter || existingIsCharter) {
+        const incomingIsExclusive = isExclusiveExperienceMode(excludeTourRun.experienceMode);
+        const existingIsExclusive = isExclusiveExperienceMode(existingMode);
+        if (incomingIsExclusive || existingIsExclusive) {
           return true;
         }
         continue;

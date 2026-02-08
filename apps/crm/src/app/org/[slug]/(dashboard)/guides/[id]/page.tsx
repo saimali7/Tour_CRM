@@ -1,46 +1,66 @@
 "use client";
 
-import { trpc } from "@/lib/trpc";
-import {
-  ArrowLeft,
-  Edit,
-  Mail,
-  Phone,
-  Calendar,
-  Clock,
-  Globe,
-  Shield,
-  AlertCircle,
-  User,
-  FileText,
-  Award,
-  Settings,
-  MapPin,
-  Star,
-} from "lucide-react";
-import Link from "next/link";
-import type { Route } from "next";
-import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { GuideAvailability } from "@/components/guides/guide-availability";
+import { trpc } from "@/lib/trpc";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
+import { LayoutDashboard, FileText, Calendar } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { GuidePageHeader } from "@/components/guides/guide-page-header";
+import { GuideOverviewTab } from "@/components/guides/guide-overview-tab";
+import { GuideDetailsTab } from "@/components/guides/guide-details-tab";
+import { GuideAssignmentsTab } from "@/components/guides/guide-assignments-tab";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { toast } from "sonner";
+
+type TabValue = "overview" | "details" | "assignments";
 
 export default function GuideDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
   const guideId = params.id as string;
-  const [activeTab, setActiveTab] = useState<"assignments" | "notes" | "availability">("assignments");
 
+  const initialTab = (searchParams.get("tab") as TabValue) || "overview";
+  const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const utils = trpc.useUtils();
   const { data: guide, isLoading, error } = trpc.guide.getByIdWithStats.useQuery({
     id: guideId,
   });
 
-  const { data: assignments } = trpc.guideAssignment.getAssignmentsForGuide.useQuery({
-    guideId,
+  const deleteMutation = trpc.guide.delete.useMutation({
+    onSuccess: () => {
+      utils.guide.list.invalidate();
+      toast.success("Guide deleted");
+      router.push(`/org/${slug}/guides` as Route);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete guide");
+    },
   });
 
-  // Fetch guide ratings from reviews
-  const { data: guideRatings } = trpc.review.guideRatings.useQuery();
+  const handleTabChange = (value: string) => {
+    const newTab = value as TabValue;
+    setActiveTab(newTab);
+    const url = new URL(window.location.href);
+    if (newTab === "overview") {
+      url.searchParams.delete("tab");
+    } else {
+      url.searchParams.set("tab", newTab);
+    }
+    router.replace((url.pathname + url.search) as Route, { scroll: false });
+  };
+
+  const handleDetailsSave = () => {
+    utils.guide.getByIdWithStats.invalidate({ id: guideId });
+    setActiveTab("overview");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("tab");
+    router.replace((url.pathname + url.search) as Route, { scroll: false });
+  };
 
   if (isLoading) {
     return (
@@ -66,517 +86,74 @@ export default function GuideDetailPage() {
     );
   }
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(date));
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-success/10 text-success";
-      case "inactive":
-        return "bg-muted text-muted-foreground";
-      case "on_leave":
-        return "bg-warning/10 text-warning";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const upcomingAssignments = assignments?.filter(
-    (a) => a.booking?.bookingDate && new Date(a.booking.bookingDate) > new Date()
-  ) || [];
-
-  const pastAssignments = assignments?.filter(
-    (a) => !a.booking?.bookingDate || new Date(a.booking.bookingDate) <= new Date()
-  ) || [];
-
-  // Get this guide's rating from the ratings data
-  const thisGuideRating = guideRatings?.find((r) => r.guideId === guideId);
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-accent rounded-lg transition-colors"
+      <GuidePageHeader
+        guide={{
+          id: guide.id,
+          firstName: guide.firstName,
+          lastName: guide.lastName,
+          avatarUrl: guide.avatarUrl,
+          status: guide.status,
+          createdAt: guide.createdAt,
+        }}
+        orgSlug={slug}
+        onDelete={() => setShowDeleteModal(true)}
+        isLoading={deleteMutation.isPending}
+      />
+
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+        <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b border-border rounded-none">
+          <TabsTrigger
+            value="overview"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
           >
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-              {guide.avatarUrl ? (
-                <img
-                  src={guide.avatarUrl}
-                  alt={`${guide.firstName} ${guide.lastName}`}
-                  className="w-14 h-14 rounded-full object-cover"
-                />
-              ) : (
-                <span className="text-primary font-semibold text-xl">
-                  {guide.firstName?.charAt(0) ?? ""}
-                  {guide.lastName?.charAt(0) ?? ""}
-                </span>
-              )}
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                {guide.firstName} {guide.lastName}
-              </h1>
-              <p className="text-muted-foreground mt-1">Guide since {formatDate(guide.createdAt)}</p>
-            </div>
-          </div>
-        </div>
+            <LayoutDashboard className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="details"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <FileText className="h-4 w-4" />
+            Details
+          </TabsTrigger>
+          <TabsTrigger
+            value="assignments"
+            className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none bg-transparent px-4 py-3"
+          >
+            <Calendar className="h-4 w-4" />
+            Assignments
+          </TabsTrigger>
+        </TabsList>
 
-        <Link
-          href={`/org/${slug}/guides/${guide.id}/edit` as Route}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Edit className="h-4 w-4" />
-          Edit Guide
-        </Link>
-      </div>
+        <TabsContent value="overview">
+          <GuideOverviewTab guide={guide} />
+        </TabsContent>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-warning/10 rounded-lg">
-              <Star className="h-5 w-5 text-warning" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Rating</p>
-              {thisGuideRating ? (
-                <div className="flex items-center gap-1">
-                  <p className="text-xl font-semibold text-foreground">
-                    {thisGuideRating.averageRating.toFixed(1)}
-                  </p>
-                  <span className="text-sm text-muted-foreground">
-                    ({thisGuideRating.totalReviews})
-                  </span>
-                </div>
-              ) : (
-                <p className="text-xl font-semibold text-muted-foreground">-</p>
-              )}
-            </div>
-          </div>
-        </div>
+        <TabsContent value="details">
+          <GuideDetailsTab
+            guideId={guideId}
+            guide={guide}
+            onSuccess={handleDetailsSave}
+          />
+        </TabsContent>
 
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-info/10 rounded-lg">
-              <Calendar className="h-5 w-5 text-info" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Assignments</p>
-              <p className="text-xl font-semibold text-foreground">
-                {guide.totalAssignments ?? 0}
-              </p>
-            </div>
-          </div>
-        </div>
+        <TabsContent value="assignments">
+          <GuideAssignmentsTab guideId={guideId} orgSlug={slug} />
+        </TabsContent>
+      </Tabs>
 
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-success/10 rounded-lg">
-              <Clock className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Upcoming</p>
-              <p className="text-xl font-semibold text-foreground">
-                {guide.upcomingAssignments ?? 0}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Globe className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Languages</p>
-              <p className="text-xl font-semibold text-foreground">
-                {guide.languages?.length ?? 0}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-muted rounded-lg">
-              <User className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Status</p>
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                  guide.status
-                )}`}
-              >
-                {guide.status === "on_leave"
-                  ? "On Leave"
-                  : guide.status.charAt(0).toUpperCase() + guide.status.slice(1)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Contact Info */}
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Contact Information</h2>
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-sm text-muted-foreground">Email</p>
-                <a
-                  href={`mailto:${guide.email}`}
-                  className="text-foreground hover:text-primary"
-                >
-                  {guide.email}
-                </a>
-              </div>
-            </div>
-
-            {guide.phone && (
-              <div className="flex items-start gap-3">
-                <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <a
-                    href={`tel:${guide.phone}`}
-                    className="text-foreground hover:text-primary"
-                  >
-                    {guide.phone}
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {guide.emergencyContactName && (
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Emergency Contact</p>
-                  <p className="text-foreground">{guide.emergencyContactName}</p>
-                  {guide.emergencyContactPhone && (
-                    <a
-                      href={`tel:${guide.emergencyContactPhone}`}
-                      className="text-foreground hover:text-primary text-sm"
-                    >
-                      {guide.emergencyContactPhone}
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Bio */}
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Bio</h2>
-          <div className="space-y-4">
-            {guide.bio ? (
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Full Bio</p>
-                <p className="text-foreground whitespace-pre-wrap">{guide.bio}</p>
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No bio available</p>
-            )}
-
-            {guide.shortBio && (
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Short Bio</p>
-                <p className="text-foreground">{guide.shortBio}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Qualifications */}
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Qualifications</h2>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Languages</p>
-              {guide.languages && guide.languages.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {guide.languages.map((lang) => (
-                    <span
-                      key={lang}
-                      className="inline-flex items-center px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                    >
-                      {lang.toUpperCase()}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground">No languages specified</p>
-              )}
-            </div>
-
-            {guide.certifications && guide.certifications.length > 0 && (
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Certifications</p>
-                <div className="flex flex-wrap gap-2">
-                  {guide.certifications.map((cert) => (
-                    <span
-                      key={cert}
-                      className="inline-flex items-center px-3 py-1 bg-success/10 text-success rounded-full text-sm"
-                    >
-                      <Award className="h-3 w-3 mr-1" />
-                      {cert}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Settings Card */}
-      <div className="bg-card rounded-lg border border-border p-6">
-        <h2 className="text-lg font-semibold text-foreground mb-4">Settings</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Status</p>
-            <span
-              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                guide.status
-              )}`}
-            >
-              {guide.status === "on_leave"
-                ? "On Leave"
-                : guide.status.charAt(0).toUpperCase() + guide.status.slice(1)}
-            </span>
-          </div>
-
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Public Profile</p>
-            <p className="text-foreground">{guide.isPublic ? "Yes" : "No"}</p>
-          </div>
-
-          {guide.availabilityNotes && (
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Availability Notes</p>
-              <p className="text-foreground">{guide.availabilityNotes}</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Tabbed Section: Schedules, Availability & Notes */}
-      <div className="bg-card rounded-lg border border-border">
-        {/* Tab Headers */}
-        <div className="border-b border-border">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setActiveTab("assignments")}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "assignments"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Assignments ({assignments?.length ?? 0})
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab("availability")}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "availability"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Availability
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab("notes")}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "notes"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Notes
-              </div>
-            </button>
-          </nav>
-        </div>
-
-        {/* Tab Content */}
-        <div className="p-6">
-          {/* Assignments Tab */}
-          {activeTab === "assignments" && (
-            <>
-              {assignments && assignments.length > 0 ? (
-                <div className="space-y-6">
-                  {/* Upcoming Assignments */}
-                  {upcomingAssignments.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground mb-3">
-                        Upcoming Assignments
-                      </h3>
-                      <div className="divide-y divide-border">
-                        {upcomingAssignments.map((assignment) => (
-                          <div
-                            key={assignment.id}
-                            className="py-4 flex items-center justify-between"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Link
-                                    href={`/org/${slug}/bookings/${assignment.bookingId}` as Route}
-                                    className="font-medium text-foreground hover:text-primary"
-                                  >
-                                    {assignment.booking?.tour?.name || "Unknown Tour"}
-                                  </Link>
-                                  <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                      assignment.status === "confirmed" ? "bg-success/10 text-success" :
-                                      assignment.status === "pending" ? "bg-warning/10 text-warning" :
-                                      "bg-muted text-muted-foreground"
-                                    }`}
-                                  >
-                                    {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                                  <Clock className="h-4 w-4" />
-                                  {assignment.booking?.bookingDate ? formatDate(new Date(assignment.booking.bookingDate)) : "No date"}
-                                  {assignment.booking?.bookingTime && ` at ${assignment.booking.bookingTime}`}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <p className="text-sm text-muted-foreground">
-                                  {assignment.booking?.totalParticipants ?? 0} guests
-                                </p>
-                              </div>
-                              <Link
-                                href={`/org/${slug}/bookings/${assignment.bookingId}` as Route}
-                                className="text-primary hover:underline text-sm"
-                              >
-                                View
-                              </Link>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Past Assignments */}
-                  {pastAssignments.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground mb-3">
-                        Past Assignments
-                      </h3>
-                      <div className="divide-y divide-border">
-                        {pastAssignments.map((assignment) => (
-                          <div
-                            key={assignment.id}
-                            className="py-4 flex items-center justify-between opacity-60"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Link
-                                    href={`/org/${slug}/bookings/${assignment.bookingId}` as Route}
-                                    className="font-medium text-foreground hover:text-primary"
-                                  >
-                                    {assignment.booking?.tour?.name || "Unknown Tour"}
-                                  </Link>
-                                  <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                      assignment.status === "confirmed" ? "bg-success/10 text-success" :
-                                      assignment.status === "pending" ? "bg-warning/10 text-warning" :
-                                      "bg-muted text-muted-foreground"
-                                    }`}
-                                  >
-                                    {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                                  <Clock className="h-4 w-4" />
-                                  {assignment.booking?.bookingDate ? formatDate(new Date(assignment.booking.bookingDate)) : "No date"}
-                                  {assignment.booking?.bookingTime && ` at ${assignment.booking.bookingTime}`}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <p className="text-sm text-muted-foreground">
-                                  {assignment.booking?.totalParticipants ?? 0} guests
-                                </p>
-                              </div>
-                              <Link
-                                href={`/org/${slug}/bookings/${assignment.bookingId}` as Route}
-                                className="text-primary hover:underline text-sm"
-                              >
-                                View
-                              </Link>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Calendar className="mx-auto h-12 w-12 text-muted-foreground/40" />
-                  <p className="mt-4 text-muted-foreground">No assignments yet</p>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Availability Tab */}
-          {activeTab === "availability" && (
-            <GuideAvailability guideId={guideId} />
-          )}
-
-          {/* Notes Tab */}
-          {activeTab === "notes" && (
-            <>
-              {guide.notes ? (
-                <div className="bg-muted rounded-lg border border-border p-4">
-                  <p className="text-foreground whitespace-pre-wrap">{guide.notes}</p>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <FileText className="mx-auto h-12 w-12 text-muted-foreground/40" />
-                  <p className="mt-4 text-muted-foreground">No internal notes</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      <ConfirmModal
+        open={showDeleteModal}
+        onOpenChange={setShowDeleteModal}
+        title="Delete Guide"
+        description="Are you sure you want to delete this guide? This action cannot be undone. All associated assignments will also be removed."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteMutation.mutate({ id: guideId })}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

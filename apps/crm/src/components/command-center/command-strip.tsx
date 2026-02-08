@@ -56,6 +56,9 @@ interface CommandStripProps {
     name: string;
     vehicleCapacity: number;
     currentGuests: number;
+    slotGuestsByRunKey?: Record<string, number>;
+    slotGuestsByTime?: Record<string, number>;
+    slotHasExclusiveByTime?: Record<string, boolean>;
   }>;
   dispatchedAt?: Date;
   tourRuns?: Array<{

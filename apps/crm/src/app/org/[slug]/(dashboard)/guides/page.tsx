@@ -195,7 +195,7 @@ export default function GuidesPage() {
     getItemId: (guide) => guide.id,
     onOpen: (guide) => router.push(`/org/${slug}/guides/${guide.id}` as Route),
     onSelect: (guide) => selection.toggleItem(guide.id),
-    onEdit: (guide) => router.push(`/org/${slug}/guides/${guide.id}/edit` as Route),
+    onEdit: (guide) => router.push(`/org/${slug}/guides/${guide.id}?tab=details` as Route),
     onDelete: (guide) => handleDelete(guide.id),
     enabled: !isLoading && guides.length > 0,
   });
@@ -627,7 +627,7 @@ export default function GuidesPage() {
                             <Eye className="h-4 w-4" />
                           </ActionButton>
                         </Link>
-                        <Link href={`/org/${slug}/guides/${guide.id}/edit` as Route}>
+                        <Link href={`/org/${slug}/guides/${guide.id}?tab=details` as Route}>
                           <ActionButton tooltip="Edit guide">
                             <Edit className="h-4 w-4" />
                           </ActionButton>

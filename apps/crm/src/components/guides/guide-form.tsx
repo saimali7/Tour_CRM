@@ -18,7 +18,6 @@ interface GuideFormProps {
     shortBio: string | null;
     languages: string[] | null;
     certifications: string[] | null;
-    availabilityNotes: string | null;
     emergencyContactName: string | null;
     emergencyContactPhone: string | null;
     status: "active" | "inactive" | "on_leave";
@@ -26,6 +25,11 @@ interface GuideFormProps {
     notes: string | null;
   };
   onCancel?: () => void;
+  onSuccess?: () => void;
+  /** HTML form id — allows external buttons to trigger submit via form="id" */
+  formId?: string;
+  /** Hide built-in action buttons (cancel/submit) when the parent provides its own */
+  hideActions?: boolean;
 }
 
 const LANGUAGE_OPTIONS = [
@@ -41,7 +45,7 @@ const LANGUAGE_OPTIONS = [
   { code: "ar", name: "Arabic" },
 ];
 
-export function GuideForm({ guide, onCancel }: GuideFormProps) {
+export function GuideForm({ guide, onCancel, onSuccess, formId, hideActions }: GuideFormProps) {
   const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
@@ -56,7 +60,6 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
     shortBio: guide?.shortBio ?? "",
     languages: guide?.languages ?? ["en"],
     certifications: guide?.certifications ?? [],
-    availabilityNotes: guide?.availabilityNotes ?? "",
     emergencyContactName: guide?.emergencyContactName ?? "",
     emergencyContactPhone: guide?.emergencyContactPhone ?? "",
     status: guide?.status ?? "active",
@@ -72,7 +75,11 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
     onSuccess: (newGuide) => {
       utils.guide.list.invalidate();
       toast.success("Guide created successfully");
-      router.push(`/org/${slug}/guides/${newGuide.id}` as Route);
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push(`/org/${slug}/guides/${newGuide.id}` as Route);
+      }
     },
     onError: (error) => {
       toast.error(error.message || "Failed to create guide");
@@ -83,8 +90,13 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
     onSuccess: () => {
       utils.guide.list.invalidate();
       utils.guide.getById.invalidate({ id: guide?.id });
+      utils.guide.getByIdWithStats.invalidate({ id: guide?.id });
       toast.success("Guide updated successfully");
-      router.push(`/org/${slug}/guides/${guide?.id}` as Route);
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push(`/org/${slug}/guides/${guide?.id}` as Route);
+      }
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update guide");
@@ -106,7 +118,6 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
       shortBio: formData.shortBio || undefined,
       languages: formData.languages.length > 0 ? formData.languages : undefined,
       certifications: formData.certifications.length > 0 ? formData.certifications : undefined,
-      availabilityNotes: formData.availabilityNotes || undefined,
       emergencyContactName: formData.emergencyContactName || undefined,
       emergencyContactPhone: formData.emergencyContactPhone || undefined,
       status: formData.status as "active" | "inactive" | "on_leave",
@@ -163,7 +174,7 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form id={formId} onSubmit={handleSubmit} className="space-y-8">
       {error && (
         <div className="rounded-lg border status-cancelled p-4">
           <p className="text-sm">{error.message}</p>
@@ -397,21 +408,6 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
           </div>
         </div>
 
-        {/* Availability Notes */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">
-            Availability Notes
-          </label>
-          <textarea
-            value={formData.availabilityNotes}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, availabilityNotes: e.target.value }))
-            }
-            rows={3}
-            className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
-            placeholder="E.g., Available weekends only, Prefers morning tours, etc."
-          />
-        </div>
       </div>
 
       {/* Settings */}
@@ -481,31 +477,33 @@ export function GuideForm({ guide, onCancel }: GuideFormProps) {
       </div>
 
       {/* Submit */}
-      <div className="flex items-center justify-end gap-4">
-        <button
-          type="button"
-          onClick={() => {
-            if (onCancel) {
-              onCancel();
-            } else if (isEditing && guide) {
-              router.push(`/org/${slug}/guides/${guide.id}` as Route);
-            } else {
-              router.push(`/org/${slug}/guides` as Route);
-            }
-          }}
-          className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
-        >
-          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          {isEditing ? "Update Guide" : "Create Guide"}
-        </button>
-      </div>
+      {!hideActions && (
+        <div className="flex items-center justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (onCancel) {
+                onCancel();
+              } else if (isEditing && guide) {
+                router.push(`/org/${slug}/guides/${guide.id}` as Route);
+              } else {
+                router.push(`/org/${slug}/guides` as Route);
+              }
+            }}
+            className="px-4 py-2 text-foreground hover:bg-accent rounded-lg"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="inline-flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+          >
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isEditing ? "Update Guide" : "Create Guide"}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

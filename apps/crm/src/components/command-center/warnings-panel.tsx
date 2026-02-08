@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { DispatchWarning, DispatchSuggestion } from "./types";
+import { formatTimeDisplay } from "./timeline/timeline-utils";
 
 // =============================================================================
 // TYPES
@@ -37,6 +38,9 @@ interface WarningsPanelProps {
     name: string;
     vehicleCapacity: number;
     currentGuests: number;
+    slotGuestsByRunKey?: Record<string, number>;
+    slotGuestsByTime?: Record<string, number>;
+    slotHasExclusiveByTime?: Record<string, boolean>;
   }>;
   /** Whether to start collapsed */
   defaultCollapsed?: boolean;
@@ -83,6 +87,12 @@ function pluralize(count: number, singular: string, plural?: string): string {
   return count === 1 ? singular : plural ?? `${singular}s`;
 }
 
+function extractRunTime(tourRunKey: string | undefined): string | null {
+  if (!tourRunKey) return null;
+  const parts = tourRunKey.split("|");
+  return parts[2] ?? null;
+}
+
 // =============================================================================
 // COMPACT WARNING ITEM
 // =============================================================================
@@ -114,19 +124,48 @@ function CompactWarning({
 
     // Auto-generate suggestions for no_guide warnings
     if (warning.type === "no_guide" && availableGuides.length > 0) {
-      const guestsNeeded = warning.guestCount || 1;
+      const guestsNeeded = Math.max(warning.guestCount || 1, 1);
+      const targetRunKey = warning.tourRunKey;
+      const targetTime = extractRunTime(targetRunKey);
 
-      // Filter to guides with enough remaining capacity
-      const suitableGuides = availableGuides.filter(
-        (guide) => guide.vehicleCapacity - guide.currentGuests >= guestsNeeded
-      );
+      const suitableGuides = availableGuides
+        .map((guide) => {
+          const slotGuestsFromRun = targetRunKey
+            ? (guide.slotGuestsByRunKey?.[targetRunKey] ?? 0)
+            : 0;
+          const slotGuestsFromTime = targetTime
+            ? (guide.slotGuestsByTime?.[targetTime] ?? 0)
+            : 0;
+          const slotGuests = targetRunKey ? slotGuestsFromRun : slotGuestsFromTime;
+          const hasExclusiveRunInSlot = targetTime
+            ? Boolean(guide.slotHasExclusiveByTime?.[targetTime])
+            : false;
+
+          return {
+            guide,
+            slotGuests,
+            hasExclusiveRunInSlot,
+            remainingSeats: guide.vehicleCapacity - slotGuests,
+          };
+        })
+        .filter((candidate) => {
+          if (candidate.hasExclusiveRunInSlot) return false;
+          return candidate.remainingSeats >= guestsNeeded;
+        })
+        .sort(
+          (a, b) =>
+            a.remainingSeats - b.remainingSeats ||
+            a.guide.name.localeCompare(b.guide.name)
+        );
 
       return suitableGuides.slice(0, 3).map(
         (guide): DispatchSuggestion => ({
-          id: `quick_assign_${guide.id}`,
-          label: guide.name,
-          description: `${guide.currentGuests}/${guide.vehicleCapacity} seats`,
-          guideId: guide.id,
+          id: `quick_assign_${guide.guide.id}`,
+          label: guide.guide.name,
+          description: targetTime
+            ? `${guide.slotGuests}/${guide.guide.vehicleCapacity} seats at ${formatTimeDisplay(targetTime)}`
+            : `${guide.guide.currentGuests}/${guide.guide.vehicleCapacity} assigned today`,
+          guideId: guide.guide.id,
           impact: undefined,
           action: "assign_guide",
         })

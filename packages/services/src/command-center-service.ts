@@ -14,15 +14,13 @@
  * - Dispatch notifications to guides
  */
 
-import { eq, and, inArray, sql, asc, desc } from "drizzle-orm";
+import { eq, and, inArray, sql, desc } from "drizzle-orm";
 import {
   tours,
   bookings,
   guideAssignments,
   dispatchStatus,
   guides,
-  guideAvailability,
-  guideAvailabilityOverrides,
   tourGuideQualifications,
   type Tour,
   type Booking,
@@ -36,11 +34,10 @@ import {
 import { BaseService } from "./base-service";
 import { NotFoundError, ValidationError, ConflictError } from "./types";
 import { GuideAssignmentService } from "./guide-assignment-service";
-import { GuideAvailabilityService } from "./guide-availability-service";
 import { TourGuideQualificationService } from "./tour-guide-qualification-service";
 import { PickupAssignmentService } from "./pickup-assignment-service";
 import { createServiceLogger } from "./lib/logger";
-import { createTourRunKey, parseTourRunKey, formatDateForKey, getDayOfWeek } from "./lib/tour-run-utils";
+import { createTourRunKey, parseTourRunKey, formatDateForKey } from "./lib/tour-run-utils";
 import { requireEntity } from "./lib/validation-helpers";
 import {
   optimizeDispatch,
@@ -173,12 +170,6 @@ export interface AvailableGuide {
   vehicleCapacity: number;
   baseZone: string | null;
   qualifiedTours: string[];
-  availabilitySlots: Array<{
-    startTime: string;
-    endTime: string;
-  }>;
-  availableFrom: string;
-  availableTo: string;
   currentAssignments: CurrentAssignment[];
 }
 
@@ -371,7 +362,6 @@ export interface CreateTempGuideForDateResult {
  */
 export class CommandCenterService extends BaseService {
   private guideAssignmentService: GuideAssignmentService;
-  private guideAvailabilityService: GuideAvailabilityService;
   private tourGuideQualificationService: TourGuideQualificationService;
   private pickupAssignmentService: PickupAssignmentService;
   private logger: ReturnType<typeof createServiceLogger>;
@@ -379,7 +369,6 @@ export class CommandCenterService extends BaseService {
   constructor(ctx: { organizationId: string; userId?: string }) {
     super(ctx);
     this.guideAssignmentService = new GuideAssignmentService(ctx);
-    this.guideAvailabilityService = new GuideAvailabilityService(ctx);
     this.tourGuideQualificationService = new TourGuideQualificationService(ctx);
     this.pickupAssignmentService = new PickupAssignmentService(ctx);
     this.logger = createServiceLogger("command-center", ctx.organizationId);
@@ -969,33 +958,20 @@ export class CommandCenterService extends BaseService {
 
     const guideIds = allGuides.map((g) => g.id);
 
-    // Batch fetch all data in parallel (fixes N+1)
+    // Batch fetch qualifications and assignments in parallel
     const [
-      availabilityResults,
       allQualifications,
       allAssignments,
     ] = await Promise.all([
-      // Check availability for all guides in parallel
-      this.batchCheckGuideAvailability(guideIds, date),
-      // Get qualifications for all guides at once
       this.batchGetGuideQualifications(guideIds),
-      // Get assignments for all guides at once
       this.batchGetGuideAssignmentsForDate(guideIds, date),
     ]);
 
+    // All active guides are considered available (no availability slot system)
     const availableGuides: AvailableGuide[] = [];
 
     for (const guide of allGuides) {
-      // Check if guide is available on this date
-      const availabilityData = availabilityResults.get(guide.id);
-      if (!availabilityData?.isAvailable) {
-        continue;
-      }
-
-      // Get qualified tours from batch result
       const qualifiedTours = allQualifications.get(guide.id) ?? [];
-
-      // Get current assignments from batch result
       const currentAssignments = allAssignments.get(guide.id) ?? [];
 
       availableGuides.push({
@@ -1011,138 +987,11 @@ export class CommandCenterService extends BaseService {
         vehicleCapacity: Math.max(guide.vehicleCapacity ?? 6, 1),
         baseZone: null,
         qualifiedTours,
-        availabilitySlots: availabilityData.slots,
-        availableFrom: availabilityData.startTime || availabilityData.slots[0]?.startTime || "07:00",
-        availableTo:
-          availabilityData.endTime ||
-          availabilityData.slots[availabilityData.slots.length - 1]?.endTime ||
-          "22:00",
         currentAssignments,
       });
     }
 
     return availableGuides;
-  }
-
-  /**
-   * Batch check availability for multiple guides on a date
-   * Returns Map of guideId -> { isAvailable, startTime, endTime }
-   */
-  private async batchCheckGuideAvailability(
-    guideIds: string[],
-    date: Date | string
-  ): Promise<Map<string, {
-    isAvailable: boolean;
-    startTime: string | null;
-    endTime: string | null;
-    slots: Array<{ startTime: string; endTime: string }>;
-  }>> {
-    const result = new Map<string, {
-      isAvailable: boolean;
-      startTime: string | null;
-      endTime: string | null;
-      slots: Array<{ startTime: string; endTime: string }>;
-    }>();
-    const dateStr = this.formatDateKey(date);
-    const dayOfWeek = getDayOfWeek(date);
-
-    try {
-      // Fetch overrides and weekly availability in parallel
-      const [overridesResult, weeklyResult] = await Promise.all([
-        // Get all overrides for this date and these guides
-        this.db
-          .select()
-          .from(guideAvailabilityOverrides)
-          .where(
-            and(
-              eq(guideAvailabilityOverrides.organizationId, this.organizationId),
-              inArray(guideAvailabilityOverrides.guideId, guideIds),
-              sql`DATE(${guideAvailabilityOverrides.date}) = ${dateStr}::DATE`
-            )
-          ),
-        // Get weekly availability for this day for all guides
-        this.db
-          .select()
-          .from(guideAvailability)
-          .where(
-            and(
-              eq(guideAvailability.organizationId, this.organizationId),
-              inArray(guideAvailability.guideId, guideIds),
-              eq(guideAvailability.dayOfWeek, dayOfWeek)
-            )
-          )
-          .orderBy(asc(guideAvailability.startTime)),
-      ]);
-
-      // Build override lookup
-      const overrideMap = new Map<string, typeof overridesResult[0]>();
-      for (const override of overridesResult) {
-        overrideMap.set(override.guideId, override);
-      }
-
-      // Build weekly availability lookup (all available slots per guide)
-      const weeklyMap = new Map<string, Array<{ startTime: string; endTime: string }>>();
-      for (const slot of weeklyResult) {
-        if (!slot.isAvailable) continue;
-        if (!weeklyMap.has(slot.guideId)) weeklyMap.set(slot.guideId, []);
-        weeklyMap.get(slot.guideId)!.push({ startTime: slot.startTime, endTime: slot.endTime });
-      }
-
-      // Process each guide
-      for (const guideId of guideIds) {
-        const override = overrideMap.get(guideId);
-        const weeklySlots = this.normalizeAvailabilitySlots(weeklyMap.get(guideId) ?? []);
-
-        if (override?.isAvailable === false) {
-          result.set(guideId, {
-            isAvailable: false,
-            startTime: null,
-            endTime: null,
-            slots: [],
-          });
-          continue;
-        }
-
-        if (override) {
-          // Override takes precedence. If it doesn't define custom hours, reuse weekly slots.
-          const overrideSlots = override.startTime && override.endTime
-            ? [{ startTime: override.startTime, endTime: override.endTime }]
-            : weeklySlots;
-          const slots = this.normalizeAvailabilitySlots(
-            overrideSlots.length > 0 ? overrideSlots : [{ startTime: "07:00", endTime: "22:00" }]
-          );
-          result.set(guideId, {
-            isAvailable: slots.length > 0,
-            startTime: slots[0]?.startTime ?? null,
-            endTime: slots[slots.length - 1]?.endTime ?? null,
-            slots,
-          });
-        } else if (weeklySlots.length > 0) {
-          result.set(guideId, {
-            isAvailable: true,
-            startTime: weeklySlots[0]?.startTime ?? null,
-            endTime: weeklySlots[weeklySlots.length - 1]?.endTime ?? null,
-            slots: weeklySlots,
-          });
-        } else {
-          // No availability data - default to unavailable
-          result.set(guideId, {
-            isAvailable: false,
-            startTime: null,
-            endTime: null,
-            slots: [],
-          });
-        }
-      }
-    } catch (error) {
-      this.logger.error({ err: error, guideIds }, "Failed to batch check guide availability");
-      // Fallback: mark all as unavailable
-      for (const guideId of guideIds) {
-        result.set(guideId, { isAvailable: false, startTime: null, endTime: null, slots: [] });
-      }
-    }
-
-    return result;
   }
 
   /**
@@ -1341,7 +1190,9 @@ export class CommandCenterService extends BaseService {
       assignedRuns.sort((a, b) => a.time.localeCompare(b.time));
 
       // Build timeline segments
-      let lastEndTime = availableGuide.availableFrom;
+      const GUIDE_DAY_START = "00:00";
+      const GUIDE_DAY_END = "23:59";
+      let lastEndTime = GUIDE_DAY_START;
       let lastSegmentWasWork = false;
       const guidePickups = pickupsByGuide.get(availableGuide.guide.id) ?? [];
 
@@ -1513,13 +1364,13 @@ export class CommandCenterService extends BaseService {
       }
 
       // Add final idle segment if needed
-      if (lastEndTime < availableGuide.availableTo) {
-        const idleDuration = this.timeDifferenceMinutes(lastEndTime, availableGuide.availableTo);
+      if (lastEndTime < GUIDE_DAY_END) {
+        const idleDuration = this.timeDifferenceMinutes(lastEndTime, GUIDE_DAY_END);
         if (idleDuration > 0) {
           segments.push({
             type: "idle",
             startTime: lastEndTime,
-            endTime: availableGuide.availableTo,
+            endTime: GUIDE_DAY_END,
             durationMinutes: idleDuration,
             confidence: "optimal",
           });
@@ -1531,10 +1382,7 @@ export class CommandCenterService extends BaseService {
         .filter((s) => s.type === "tour" || s.type === "pickup" || s.type === "drive")
         .reduce((sum, s) => sum + s.durationMinutes, 0);
 
-      const totalAvailableMinutes = this.timeDifferenceMinutes(
-        availableGuide.availableFrom,
-        availableGuide.availableTo
-      );
+      const totalAvailableMinutes = this.timeDifferenceMinutes(GUIDE_DAY_START, GUIDE_DAY_END);
 
       const utilization = totalAvailableMinutes > 0
         ? Math.round((totalWorkMinutes / totalAvailableMinutes) * 100)
@@ -1768,12 +1616,9 @@ export class CommandCenterService extends BaseService {
       languages: guide.guide.languages ?? [],
       qualifiedTourIds: guide.qualifiedTours,
       primaryTourIds: [],
-      availableFrom: buildDateTime(guide.availableFrom),
-      availableTo: buildDateTime(guide.availableTo),
-      availabilityWindows: guide.availabilitySlots.map((slot) => ({
-        start: buildDateTime(slot.startTime),
-        end: buildDateTime(slot.endTime),
-      })),
+      availableFrom: buildDateTime("00:00"),
+      availableTo: buildDateTime("23:59"),
+      availabilityWindows: [{ start: buildDateTime("00:00"), end: buildDateTime("23:59") }],
       currentAssignments: guideScheduleEntries.get(guide.guide.id) ?? [],
     }));
 
@@ -2481,16 +2326,6 @@ export class CommandCenterService extends BaseService {
         throw new ValidationError("Failed to create temporary guide");
       }
 
-      await tx.insert(guideAvailabilityOverrides).values({
-        organizationId: this.organizationId,
-        guideId: createdGuide.id,
-        date: overrideDateUtc,
-        isAvailable: true,
-        startTime: "06:00",
-        endTime: "24:00",
-        reason: `Temporary outsourced guide for ${dateKey}`,
-      });
-
       return createdGuide;
     });
 
@@ -2773,57 +2608,10 @@ export class CommandCenterService extends BaseService {
       });
     }
 
-    const availabilityByGuide = guideIdList.length > 0
-      ? await this.batchCheckGuideAvailability(guideIdList, dateKey)
-      : new Map<
-          string,
-          {
-            isAvailable: boolean;
-            startTime: string | null;
-            endTime: string | null;
-            slots: Array<{ startTime: string; endTime: string }>;
-          }
-        >();
-
     for (const [guideId, entries] of entriesByGuide.entries()) {
       const guide = guideById.get(guideId);
       if (!guide) continue;
       const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);
-      const availability = availabilityByGuide.get(guideId);
-
-      if (!availability?.isAvailable || availability.slots.length === 0) {
-        this.logger.warn(
-          { reason: "availability_conflict", guideId, date: dateKey },
-          "Dispatch change rejected"
-        );
-        throw new ValidationError(
-          `availability_conflict: ${guide.firstName} ${guide.lastName} is unavailable on ${dateKey}`
-        );
-      }
-
-      for (const entry of entries) {
-        const fitsAvailability = availability.slots.some((slot) => {
-          const slotStart = this.parseTimeToMinutes(slot.startTime);
-          const slotEnd = this.parseTimeToMinutes(slot.endTime);
-          return entry.startMinutes >= slotStart && entry.endMinutes <= slotEnd;
-        });
-
-        if (!fitsAvailability) {
-          this.logger.warn(
-            {
-              reason: "availability_conflict",
-              guideId,
-              bookingId: entry.bookingId,
-              startMinutes: entry.startMinutes,
-              endMinutes: entry.endMinutes,
-            },
-            "Dispatch change rejected"
-          );
-          throw new ValidationError(
-            `availability_conflict: ${guide.firstName} ${guide.lastName} has no available slot for this run`
-          );
-        }
-      }
 
       const runs = new Map<string, ValidationEntry[]>();
       for (const entry of entries) {

@@ -17,13 +17,11 @@ import { trpc } from "@/lib/trpc";
 interface GuideQuickViewProps {
   guideId: string;
   orgSlug: string;
-  onViewAvailability?: () => void;
 }
 
 export function GuideQuickView({
   guideId,
   orgSlug,
-  onViewAvailability,
 }: GuideQuickViewProps) {
   const { data: guide, isLoading, error } = trpc.guide.getByIdWithStats.useQuery({ id: guideId });
 
@@ -211,12 +209,6 @@ export function GuideQuickView({
 
       {/* Actions */}
       <div className="flex gap-2 pt-2">
-        {onViewAvailability && (
-          <Button onClick={onViewAvailability} variant="outline" className="flex-1">
-            <Calendar className="mr-2 h-4 w-4" />
-            Availability
-          </Button>
-        )}
         <Link href={`/org/${orgSlug}/guides/${guide.id}`} className="flex-1">
           <Button variant="outline" className="w-full">
             <ExternalLink className="mr-2 h-4 w-4" />
