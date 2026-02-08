@@ -1,13 +1,31 @@
 "use client";
 
-import { useMemo, type CSSProperties } from "react";
-import { Search, GripVertical, ChevronDown, ChevronUp, WandSparkles, Clock3 } from "lucide-react";
+import { useMemo } from "react";
+import {
+  Search,
+  ChevronDown,
+  ChevronRight,
+  WandSparkles,
+  Check,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { CanvasRow, HopperGroup } from "../dispatch-model";
+import type { HopperBooking } from "../hopper/hopper-card";
 import type { QueueFilterState, QueueSortMode, DragPayload } from "./canvas-types";
+
+// =============================================================================
+// TYPES
+// =============================================================================
 
 interface QueuePaneProps {
   groups: HopperGroup[];
@@ -32,19 +50,32 @@ interface QueuePaneProps {
   onAssignToGuide: (bookingIds: string[], guideId: string) => Promise<void>;
 }
 
-function groupLabel(group: HopperGroup): string {
-  if (group.isCharter) {
-    return "Charter";
-  }
-  return `${group.totalBookings} bookings`;
-}
+// =============================================================================
+// HELPERS
+// =============================================================================
 
-function tourHue(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+const ZONE_COLORS: Record<string, string> = {
+  jbr: "#8B5CF6",
+  marina: "#0EA5E9",
+  downtown: "#F97316",
+  palm: "#10B981",
+  business: "#3B82F6",
+  airport: "#64748B",
+  beach: "#06B6D4",
+  creek: "#14B8A6",
+  old: "#EAB308",
+  jumeirah: "#EC4899",
+};
+
+function getZoneColor(zone: HopperBooking["pickupZone"]): string {
+  if (zone?.color) return zone.color;
+  if (zone?.name) {
+    const nameLower = zone.name.toLowerCase();
+    for (const [key, color] of Object.entries(ZONE_COLORS)) {
+      if (nameLower.includes(key)) return color;
+    }
   }
-  return Math.abs(hash) % 360;
+  return "#6B7280";
 }
 
 function parseTourHour(tourTime: string): number | null {
@@ -57,53 +88,33 @@ function parseTourHour(tourTime: string): number | null {
     if (period === "AM") return hour === 12 ? 0 : hour;
     return hour === 12 ? 12 : hour + 12;
   }
-
   const hhmmMatch = value.match(/^(\d{1,2}):(\d{2})$/);
   if (hhmmMatch) {
     const hour = Number(hhmmMatch[1]);
     if (Number.isNaN(hour)) return null;
     return Math.max(0, Math.min(23, hour));
   }
-
   return null;
 }
 
-type TimeBand = "early" | "morning" | "midday" | "afternoon" | "evening" | "night";
-
-function getTimeBand(tourTime: string): TimeBand {
+function getHourLabel(tourTime: string): string {
   const hour = parseTourHour(tourTime);
-  if (hour === null) return "midday";
-  if (hour < 8) return "early";
-  if (hour < 11) return "morning";
-  if (hour < 14) return "midday";
-  if (hour < 17) return "afternoon";
-  if (hour < 20) return "evening";
-  return "night";
+  if (hour === null) return "";
+  if (hour === 0) return "12 AM";
+  if (hour < 12) return `${hour} AM`;
+  if (hour === 12) return "12 PM";
+  return `${hour - 12} PM`;
 }
-
-const timeBandClass: Record<TimeBand, string> = {
-  early: "border-cyan-500/35 bg-cyan-500/12 text-cyan-700 dark:text-cyan-300",
-  morning: "border-emerald-500/35 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-  midday: "border-sky-500/35 bg-sky-500/12 text-sky-700 dark:text-sky-300",
-  afternoon: "border-amber-500/35 bg-amber-500/12 text-amber-700 dark:text-amber-300",
-  evening: "border-violet-500/35 bg-violet-500/12 text-violet-700 dark:text-violet-300",
-  night: "border-indigo-500/35 bg-indigo-500/12 text-indigo-700 dark:text-indigo-300",
-};
-
-const timeBandLabel: Record<TimeBand, string> = {
-  early: "Early",
-  morning: "Morning",
-  midday: "Midday",
-  afternoon: "Afternoon",
-  evening: "Evening",
-  night: "Night",
-};
 
 const sortOptions: Array<{ mode: QueueSortMode; label: string }> = [
   { mode: "time", label: "Time" },
   { mode: "tour", label: "Tour" },
   { mode: "guests", label: "Size" },
 ];
+
+// =============================================================================
+// QUEUE PANE
+// =============================================================================
 
 export function QueuePane({
   groups,
@@ -128,296 +139,414 @@ export function QueuePane({
   onAssignToGuide,
 }: QueuePaneProps) {
   const canEdit = isEditing && !isReadOnly && !isMutating;
-  const assignableRows = useMemo(
-    () => rows.filter((row) => !row.isOutsourced),
-    [rows]
+  const assignableRows = useMemo(() => rows.filter((row) => !row.isOutsourced), [rows]);
+
+  const totalQueueGuests = useMemo(
+    () => groups.reduce((sum, group) => sum + group.totalGuests, 0),
+    [groups],
   );
 
+  // Derive time divider positions: indices where the hour changes
+  const hourDividers = useMemo(() => {
+    const dividers = new Map<number, string>();
+    let lastHour: number | null = null;
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i];
+      if (!group) continue;
+      const hour = parseTourHour(group.tourTime);
+      if (hour !== null && hour !== lastHour) {
+        dividers.set(i, getHourLabel(group.tourTime));
+        lastHour = hour;
+      }
+    }
+    return dividers;
+  }, [groups]);
+
   return (
-    <div
+    <aside
       className={cn(
-        "relative z-40 hidden min-h-0 w-[200px] shrink-0 overflow-x-hidden border-r bg-card/85 xl:w-[208px] 2xl:w-[216px] lg:flex lg:flex-col",
-        hopperDropActive && "bg-primary/[0.08]"
+        "relative z-40 hidden min-h-0 w-[260px] shrink-0 overflow-hidden border-r bg-card/90 xl:w-[276px] 2xl:w-[292px] lg:flex lg:flex-col",
+        hopperDropActive && "bg-primary/5",
       )}
       onDragOver={onHopperDragOver}
       onDragLeave={onHopperDragLeave}
       onDrop={onHopperDrop}
     >
-      {/* Compact header: search + sort pills + filter toggles */}
-      <div className="space-y-1.5 border-b bg-card/95 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+      {/* ── Header ── */}
+      <header className="space-y-2 border-b bg-card/95 px-2.5 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+        {/* Row 1: Search with inline guest count */}
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={filterState.search}
             onChange={(event) =>
-              onFilterStateChange({
-                ...filterState,
-                search: event.target.value,
-              })
+              onFilterStateChange({ ...filterState, search: event.target.value })
             }
-            placeholder="Search..."
-            className="h-8 pl-7 text-xs"
+            placeholder="Search bookings..."
+            className="h-8 pl-8 pr-16 text-xs"
           />
+          {groups.length > 0 && (
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+              <Users className="mr-0.5 inline h-3 w-3" />
+              {totalQueueGuests}
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1">
-          {sortOptions.map((option) => (
+        {/* Row 2: Sort + Filter toggles */}
+        <div className="grid grid-cols-[1fr_auto] gap-1.5">
+          <div className="grid grid-cols-3 gap-0.5 rounded-md border border-border bg-muted/30 p-0.5">
+            {sortOptions.map((option) => (
+              <button
+                key={option.mode}
+                type="button"
+                className={cn(
+                  "focus-ring rounded px-1.5 py-1 text-[11px] font-medium transition-colors",
+                  sortMode === option.mode
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => onSortModeChange(option.mode)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-0.5 rounded-md border border-border bg-muted/30 p-0.5">
             <button
-              key={option.mode}
               type="button"
               className={cn(
-                "h-6 flex-1 rounded-md px-1 text-[10px] font-medium transition-colors",
-                sortMode === option.mode
-                  ? "bg-secondary text-secondary-foreground"
-                  : "text-muted-foreground hover:bg-muted/50"
+                "focus-ring rounded px-1.5 py-1 text-[11px] font-medium transition-colors",
+                filterState.includeJoinRuns
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
               )}
-              onClick={() => onSortModeChange(option.mode)}
+              onClick={() =>
+                onFilterStateChange({ ...filterState, includeJoinRuns: !filterState.includeJoinRuns })
+              }
+              title="Toggle shared runs"
             >
-              {option.label}
+              S
             </button>
-          ))}
-
-          <span className="mx-0.5 h-4 w-px bg-border" />
-
-          <button
-            type="button"
-            className={cn(
-              "h-6 rounded-md px-1.5 text-[10px] font-medium transition-colors",
-              filterState.includeJoinRuns
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground/60 line-through"
-            )}
-            onClick={() =>
-              onFilterStateChange({
-                ...filterState,
-                includeJoinRuns: !filterState.includeJoinRuns,
-              })
-            }
-            title="Toggle shared tours"
-          >
-            S
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "h-6 rounded-md px-1.5 text-[10px] font-medium transition-colors",
-              filterState.includeCharters
-                ? "bg-secondary text-secondary-foreground"
-                : "text-muted-foreground/60 line-through"
-            )}
-            onClick={() =>
-              onFilterStateChange({
-                ...filterState,
-                includeCharters: !filterState.includeCharters,
-              })
-            }
-            title="Toggle charter tours"
-          >
-            C
-          </button>
+            <button
+              type="button"
+              className={cn(
+                "focus-ring rounded px-1.5 py-1 text-[11px] font-medium transition-colors",
+                filterState.includeCharters
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() =>
+                onFilterStateChange({ ...filterState, includeCharters: !filterState.includeCharters })
+              }
+              title="Toggle private charters"
+            >
+              C
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Queue groups */}
-      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-2">
-        {groups.length === 0 && (
-          <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-            All assigned
+      {/* ── Scrollable content ── */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        {groups.length === 0 ? (
+          /* ── Empty state ── */
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/10">
+              <Check className="h-5 w-5 text-success" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">All assigned</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                No bookings waiting in queue
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {groups.map((group, index) => {
+              const dividerLabel = hourDividers.get(index);
+              return (
+                <div key={group.id}>
+                  {/* ── Time divider ── */}
+                  {dividerLabel && (
+                    <div className="flex items-center gap-2 px-1 py-1.5">
+                      <div className="h-px flex-1 bg-border" />
+                      <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+                        {dividerLabel}
+                      </span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                  )}
+
+                  {/* ── Group card ── */}
+                  <GroupCard
+                    group={group}
+                    isExpanded={expandedGroups.has(group.id)}
+                    canEdit={canEdit}
+                    assignableRows={assignableRows}
+                    onToggle={() => onToggleGroup(group.id)}
+                    onBookingClick={onBookingClick}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onAssignBestFit={onAssignBestFit}
+                    onAssignToGuide={onAssignToGuide}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
-
-        {groups.map((group) => {
-          const isExpanded = expandedGroups.has(group.id);
-          const hue = tourHue(`${group.tourName}|${group.tourTime}`);
-          const accentColor = `hsl(${hue} 78% 52%)`;
-          const accentTint = `hsl(${hue} 82% 52% / 0.10)`;
-          const band = getTimeBand(group.tourTime);
-          const cardStyle: CSSProperties = {
-            backgroundImage: `linear-gradient(90deg, ${accentTint} 0%, transparent 45%)`,
-          };
-          return (
-            <div
-              key={group.id}
-              className={cn(
-                "group relative overflow-hidden rounded-lg border bg-card shadow-sm transition-colors duration-150",
-                group.isCharter && "border-warning/45",
-                canEdit && "hover:border-primary/35 hover:shadow-md"
-              )}
-              style={cardStyle}
-              draggable={canEdit}
-              onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", group.id);
-                onDragStart({
-                  source: "hopper",
-                  sourceGuideId: null,
-                  bookingIds: group.bookings.map((booking) => booking.id),
-                  guestCount: group.totalGuests,
-                });
-              }}
-              onDragEnd={onDragEnd}
-            >
-              <span
-                className={cn(
-                  "absolute inset-y-0 left-0 w-1",
-                  group.isCharter ? "bg-warning" : ""
-                )}
-                style={!group.isCharter ? { backgroundColor: accentColor } : undefined}
-              />
-
-              <div className="px-2 py-2 pl-3">
-                <button
-                  type="button"
-                  className="flex min-w-0 w-full items-start gap-1.5 text-left"
-                  onClick={() => onToggleGroup(group.id)}
-                >
-                  <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-start justify-between gap-1">
-                      <div className="min-w-0 flex flex-1 items-start gap-1.5">
-                        <span
-                          className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: accentColor }}
-                          aria-hidden="true"
-                        />
-                        <span
-                          className="min-w-0 flex-1 line-clamp-2 text-[13px] font-semibold leading-tight"
-                          title={group.tourName}
-                        >
-                          {group.tourName}
-                        </span>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={cn("h-5 shrink-0 rounded-full px-1.5 text-[10px] tabular-nums", timeBandClass[band])}
-                      >
-                        <Clock3 className="mr-0.5 h-2.5 w-2.5" />
-                        {group.tourTime}
-                      </Badge>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <span className={cn("inline-flex items-center rounded-full border px-1.5 py-0.5 font-medium", timeBandClass[band])}>
-                        {timeBandLabel[band]}
-                      </span>
-                      <span>{groupLabel(group)}</span>
-                      <span className="text-muted-foreground/60">&middot;</span>
-                      <span className="tabular-nums">{group.totalGuests}p</span>
-                      {group.isCharter && (
-                        <Badge
-                          variant="outline"
-                          className="h-4 shrink-0 rounded-full border-warning/40 bg-warning/10 px-1 text-[9px] text-warning"
-                        >
-                          Charter
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  )}
-                </button>
-
-                {canEdit && (
-                  <div className="mt-1.5 flex justify-end opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-6 gap-1 rounded-full px-2 text-[10px]"
-                      onClick={() =>
-                        void onAssignBestFit(group.bookings.map((booking) => booking.id), group.tourName)
-                      }
-                    >
-                      <WandSparkles className="h-2.5 w-2.5" />
-                      Best Fit
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {isExpanded && (
-                <div
-                  className="space-y-1 border-t bg-muted/20 px-2 py-1.5 pl-3"
-                  style={{ borderTopColor: `${accentColor}55` }}
-                >
-                  {group.bookings.map((booking) => (
-                    <div
-                      key={booking.id}
-                      className="flex flex-col gap-1.5 rounded-md border bg-card/80 px-2 py-1 transition-colors hover:border-primary/25 hover:bg-card"
-                    >
-                      <button
-                        type="button"
-                        className="flex min-w-0 flex-1 items-center justify-between gap-1.5 text-left"
-                        onClick={() => onBookingClick(booking.id)}
-                        draggable={canEdit}
-                        onDragStart={(event) => {
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", booking.id);
-                          onDragStart({
-                            source: "hopper",
-                            sourceGuideId: null,
-                            bookingIds: [booking.id],
-                            guestCount: booking.guestCount,
-                          });
-                        }}
-                        onDragEnd={onDragEnd}
-                      >
-                        <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-foreground" title={booking.customerName}>
-                            {booking.customerName}
-                          </p>
-                          <p className="truncate text-[10px] text-muted-foreground">
-                            {booking.referenceNumber}
-                            {booking.pickupZone?.name ? ` \u00B7 ${booking.pickupZone.name}` : ""}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="h-4 shrink-0 rounded-full px-1 text-[9px] tabular-nums">
-                          {booking.guestCount}p
-                        </Badge>
-                      </button>
-
-                      {canEdit && (
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 rounded-full px-1.5 text-[10px]"
-                            onClick={() => void onAssignBestFit([booking.id], booking.customerName)}
-                          >
-                            Best
-                          </Button>
-                          <select
-                            aria-label={`Assign ${booking.customerName}`}
-                            className="h-6 min-w-[4.5rem] rounded-full border bg-background px-1.5 text-[10px] text-foreground"
-                            defaultValue=""
-                            onClick={(event) => event.stopPropagation()}
-                            onChange={(event) => {
-                              const targetGuideId = event.target.value;
-                              event.currentTarget.value = "";
-                              if (!targetGuideId) return;
-                              void onAssignToGuide([booking.id], targetGuideId);
-                            }}
-                          >
-                            <option value="">Assign</option>
-                            {assignableRows.map((row) => (
-                              <option key={`${booking.id}_${row.guide.id}`} value={row.guide.id}>
-                                {row.guide.firstName}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
       </div>
+    </aside>
+  );
+}
+
+// =============================================================================
+// GROUP CARD
+// =============================================================================
+
+interface GroupCardProps {
+  group: HopperGroup;
+  isExpanded: boolean;
+  canEdit: boolean;
+  assignableRows: CanvasRow[];
+  onToggle: () => void;
+  onBookingClick: (bookingId: string) => void;
+  onDragStart: (payload: DragPayload) => void;
+  onDragEnd: () => void;
+  onAssignBestFit: (bookingIds: string[], contextLabel: string) => Promise<void>;
+  onAssignToGuide: (bookingIds: string[], guideId: string) => Promise<void>;
+}
+
+function GroupCard({
+  group,
+  isExpanded,
+  canEdit,
+  assignableRows,
+  onToggle,
+  onBookingClick,
+  onDragStart,
+  onDragEnd,
+  onAssignBestFit,
+  onAssignToGuide,
+}: GroupCardProps) {
+  const accentClass = group.isCharter ? "border-l-warning" : "border-l-info";
+
+  return (
+    <article
+      className={cn(
+        "rounded-md border border-border border-l-[3px] bg-card transition-all duration-150",
+        accentClass,
+        canEdit && "hover:border-primary/30",
+      )}
+      draggable={canEdit}
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", group.id);
+        onDragStart({
+          source: "hopper",
+          sourceGuideId: null,
+          bookingIds: group.bookings.map((b) => b.id),
+          guestCount: group.totalGuests,
+        });
+      }}
+      onDragEnd={onDragEnd}
+    >
+      {/* ── Group header row ── */}
+      <button
+        type="button"
+        className="focus-ring flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left"
+        onClick={onToggle}
+        aria-expanded={isExpanded}
+      >
+        <span className="w-[38px] shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+          {group.tourTime}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground" title={group.tourName}>
+          {group.tourName}
+        </span>
+        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+          {group.totalGuests}g&thinsp;&middot;&thinsp;{group.totalBookings}b
+        </span>
+        <span
+          className={cn(
+            "shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none",
+            group.isCharter
+              ? "bg-warning/10 text-warning"
+              : "bg-info/10 text-info",
+          )}
+        >
+          {group.isCharter ? "C" : "S"}
+        </span>
+        {isExpanded ? (
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+
+      {/* ── Expanded bookings ── */}
+      {isExpanded && (
+        <div className="border-t border-border px-1.5 pb-1.5 pt-1">
+          {/* Auto-assign all */}
+          {canEdit && group.bookings.length > 1 && (
+            <button
+              type="button"
+              className="focus-ring mb-1 flex w-full items-center justify-center gap-1 rounded py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() =>
+                void onAssignBestFit(
+                  group.bookings.map((b) => b.id),
+                  group.tourName,
+                )
+              }
+            >
+              <WandSparkles className="h-3 w-3" />
+              Auto-assign all
+            </button>
+          )}
+
+          {group.bookings.map((booking) => (
+            <BookingRow
+              key={booking.id}
+              booking={booking}
+              canEdit={canEdit}
+              assignableRows={assignableRows}
+              onBookingClick={onBookingClick}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              onAssignBestFit={onAssignBestFit}
+              onAssignToGuide={onAssignToGuide}
+            />
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+// =============================================================================
+// BOOKING ROW
+// =============================================================================
+
+interface BookingRowProps {
+  booking: HopperBooking;
+  canEdit: boolean;
+  assignableRows: CanvasRow[];
+  onBookingClick: (bookingId: string) => void;
+  onDragStart: (payload: DragPayload) => void;
+  onDragEnd: () => void;
+  onAssignBestFit: (bookingIds: string[], contextLabel: string) => Promise<void>;
+  onAssignToGuide: (bookingIds: string[], guideId: string) => Promise<void>;
+}
+
+function BookingRow({
+  booking,
+  canEdit,
+  assignableRows,
+  onBookingClick,
+  onDragStart,
+  onDragEnd,
+  onAssignBestFit,
+  onAssignToGuide,
+}: BookingRowProps) {
+  const zoneColor = getZoneColor(booking.pickupZone);
+
+  return (
+    <div
+      className="group/row flex min-w-0 items-center gap-1.5 rounded px-1 py-[3px] transition-colors hover:bg-muted/50"
+      draggable={canEdit}
+      onDragStart={(event) => {
+        event.stopPropagation();
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", booking.id);
+        onDragStart({
+          source: "hopper",
+          sourceGuideId: null,
+          bookingIds: [booking.id],
+          guestCount: booking.guestCount,
+        });
+      }}
+      onDragEnd={onDragEnd}
+    >
+      {/* Zone dot */}
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: zoneColor }}
+        title={booking.pickupZone?.name ?? "No zone"}
+      />
+
+      {/* Customer name - clickable */}
+      <button
+        type="button"
+        className="focus-ring min-w-0 flex-1 truncate rounded text-left text-xs font-medium text-foreground"
+        onClick={() => onBookingClick(booking.id)}
+        title={booking.customerName}
+      >
+        {booking.customerName}
+      </button>
+
+      {/* Zone name */}
+      {booking.pickupZone && (
+        <span
+          className="hidden shrink-0 text-[10px] font-medium xl:inline"
+          style={{ color: zoneColor }}
+        >
+          {booking.pickupZone.name}
+        </span>
+      )}
+
+      {/* Guest count */}
+      <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+        {booking.guestCount}g
+      </span>
+
+      {/* Actions - visible on hover / focus-within */}
+      {canEdit && (
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100">
+          {/* Best Fit */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 text-muted-foreground hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              void onAssignBestFit([booking.id], booking.customerName);
+            }}
+            title="Best Fit"
+          >
+            <WandSparkles className="h-3 w-3" />
+          </Button>
+
+          {/* Assign to guide dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                onClick={(e) => e.stopPropagation()}
+                title="Assign to guide"
+              >
+                <UserRound className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[10rem]">
+              {assignableRows.map((row) => (
+                <DropdownMenuItem
+                  key={row.guide.id}
+                  onClick={() => void onAssignToGuide([booking.id], row.guide.id)}
+                >
+                  {`${row.guide.firstName} ${row.guide.lastName}`.trim()}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
     </div>
   );
 }

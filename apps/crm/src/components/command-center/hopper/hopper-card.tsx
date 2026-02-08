@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Baby, Star, Cake, Accessibility, Users, MapPin, Lock, Sparkles } from "lucide-react";
+import { Baby, Star, Cake, Accessibility, Users, Lock, Sparkles } from "lucide-react";
 
 // =============================================================================
 // TYPES
@@ -149,7 +149,7 @@ export function HopperCard({
         }
       }}
       className={cn(
-        "group relative flex items-start gap-2 rounded-lg border bg-card p-2.5 transition-all duration-150",
+        "group relative flex items-center gap-2 rounded-lg border bg-card px-2.5 py-2 transition-all duration-150",
         isPendingAssignment
           ? "opacity-50 cursor-not-allowed pointer-events-none border-success/30 bg-success/5"
           : isClickMode
@@ -165,7 +165,7 @@ export function HopperCard({
     >
       {/* Zone color bar */}
       <div
-        className="w-1 h-10 rounded-full shrink-0"
+        className="w-0.5 self-stretch rounded-full shrink-0"
         style={{ backgroundColor: zoneColor }}
       />
 
@@ -177,52 +177,44 @@ export function HopperCard({
             {booking.customerName}
           </span>
           {isPrivate && (
-            <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning dark:text-warning">
+            <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-warning/10 px-1 py-0.5 text-[9px] font-semibold text-warning dark:text-warning">
               <Lock className="h-2.5 w-2.5" />
-              {booking.experienceMode === "charter" ? "Charter" : "Private"}
+              {booking.experienceMode === "charter" ? "C" : "P"}
             </span>
           )}
         </div>
 
-        {/* Special indicators - wrapped below name to prevent clipping */}
-        {hasSpecialIndicators && (
-          <div className="flex flex-wrap items-center gap-1">
-            {booking.isFirstTimer && (
-              <span className="inline-flex items-center gap-0.5 rounded bg-success/10 px-1 py-0.5 text-[10px] font-medium text-success dark:text-success">
-                <Sparkles className="h-2.5 w-2.5" />
-                NEW
-              </span>
-            )}
-            {booking.isVIP && (
-              <Star className="h-3 w-3 text-warning" />
-            )}
-            {booking.specialOccasion && (
-              <Cake className="h-3 w-3 text-primary" />
-            )}
-            {booking.accessibilityNeeds && (
-              <Accessibility className="h-3 w-3 text-info" />
-            )}
-            {(booking.childCount > 0 || booking.infantCount > 0) && (
-              <Baby className="h-3 w-3 text-info" />
-            )}
-          </div>
-        )}
-
-        {/* Zone row */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        {/* Zone + special indicators row */}
+        <div className="flex flex-wrap items-center gap-1">
           {booking.pickupZone ? (
             <span
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
-              style={{
-                backgroundColor: `${zoneColor}15`,
-                color: zoneColor,
-              }}
+              className="text-[11px] font-medium"
+              style={{ color: zoneColor }}
             >
-              <MapPin className="h-2.5 w-2.5" />
               {booking.pickupZone.name}
             </span>
           ) : (
             <span className="text-[11px] text-muted-foreground">No zone</span>
+          )}
+
+          {hasSpecialIndicators && (
+            <>
+              {booking.isFirstTimer && (
+                <Sparkles className="h-2.5 w-2.5 text-success" />
+              )}
+              {booking.isVIP && (
+                <Star className="h-2.5 w-2.5 text-warning" />
+              )}
+              {booking.specialOccasion && (
+                <Cake className="h-2.5 w-2.5 text-primary" />
+              )}
+              {booking.accessibilityNeeds && (
+                <Accessibility className="h-2.5 w-2.5 text-info" />
+              )}
+              {(booking.childCount > 0 || booking.infantCount > 0) && (
+                <Baby className="h-2.5 w-2.5 text-info" />
+              )}
+            </>
           )}
 
           {isPendingAssignment && (
@@ -233,15 +225,10 @@ export function HopperCard({
         </div>
       </div>
 
-      {/* Guest count - prominent on right */}
-      <div
-        className={cn(
-          "flex items-center gap-1 px-2 py-1.5 rounded-md shrink-0",
-          "bg-primary/10 text-primary"
-        )}
-      >
-        <Users className="h-3.5 w-3.5" />
-        <span className="text-sm font-bold tabular-nums">{booking.guestCount}</span>
+      {/* Guest count */}
+      <div className="flex items-center gap-0.5 shrink-0 text-primary">
+        <Users className="h-3 w-3" />
+        <span className="text-xs font-bold tabular-nums">{booking.guestCount}</span>
       </div>
     </div>
   );
