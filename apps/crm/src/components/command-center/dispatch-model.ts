@@ -44,7 +44,6 @@ export interface HopperGroup {
   totalGuests: number;
   totalBookings: number;
   isPrivate: boolean;
-  isCharter: boolean;
   bookings: HopperBooking[];
 }
 
@@ -244,9 +243,8 @@ function buildUnassignedGroups(
     if (unassignedBookings.length === 0) continue;
 
     for (const booking of unassignedBookings) {
-      const isCharter = booking.experienceMode === "charter";
-      const isExclusive = isCharter || booking.experienceMode === "book";
-      const groupId = isExclusive ? `exclusive_${booking.id}` : `run_${run.key}`;
+      const isPrivate = booking.experienceMode === "charter" || booking.experienceMode === "book";
+      const groupId = isPrivate ? `exclusive_${booking.id}` : `run_${run.key}`;
 
       if (!groups.has(groupId)) {
         groups.set(groupId, {
@@ -256,8 +254,7 @@ function buildUnassignedGroups(
           tourTime: run.time,
           totalGuests: 0,
           totalBookings: 0,
-          isPrivate: isExclusive,
-          isCharter,
+          isPrivate,
           bookings: [],
         });
       }

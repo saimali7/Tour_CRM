@@ -179,7 +179,7 @@ export function HopperCard({
           {isPrivate && (
             <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-warning/10 px-1 py-0.5 text-[9px] font-semibold text-warning dark:text-warning">
               <Lock className="h-2.5 w-2.5" />
-              {booking.experienceMode === "charter" ? "C" : "P"}
+              P
             </span>
           )}
         </div>

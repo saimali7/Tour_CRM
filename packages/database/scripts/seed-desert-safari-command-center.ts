@@ -1,9 +1,9 @@
 /**
  * Deterministic command-center seed for Demo Tours.
  *
- * Creates exactly 7 Desert Safari bookings on one date:
- * - 5 shared ("join")
- * - 2 private ("charter")
+ * Creates exactly 10 Desert Safari bookings on one date:
+ * - 7 shared ("join")
+ * - 3 private ("charter")
  *
  * Existing bookings on the target date are removed first so the canvas only
  * shows this focused dataset.
@@ -16,7 +16,7 @@
 import { config } from "dotenv";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../src/schema";
@@ -54,7 +54,8 @@ function formatDateLocal(date: Date): string {
 function parseTargetDate(value: string | null): Date {
   if (!value) {
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Use UTC noon to avoid timezone-shift issues with PostgreSQL date columns
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0));
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error(`Invalid --date value "${value}". Use YYYY-MM-DD.`);
@@ -63,7 +64,8 @@ function parseTargetDate(value: string | null): Date {
   const year = Number(yearRaw);
   const month = Number(monthRaw);
   const day = Number(dayRaw);
-  return new Date(year, month - 1, day);
+  // Use UTC noon so the date doesn't shift when PostgreSQL converts to UTC
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 }
 
 async function ensureTour(orgId: string, currency: string) {
@@ -160,6 +162,9 @@ async function ensureCustomers(orgId: string) {
     { firstName: "Carlos", lastName: "Garcia", email: "dispatch.ds.05@example.com", phone: "+1-555-700-0105" },
     { firstName: "Wei", lastName: "Chen", email: "dispatch.ds.06@example.com", phone: "+1-555-700-0106" },
     { firstName: "Klaus", lastName: "Muller", email: "dispatch.ds.07@example.com", phone: "+1-555-700-0107" },
+    { firstName: "Aisha", lastName: "Al-Rashid", email: "dispatch.ds.08@example.com", phone: "+1-555-700-0108" },
+    { firstName: "Liam", lastName: "O'Connor", email: "dispatch.ds.09@example.com", phone: "+1-555-700-0109" },
+    { firstName: "Priya", lastName: "Sharma", email: "dispatch.ds.10@example.com", phone: "+1-555-700-0110" },
   ];
 
   const customers: Array<typeof schema.customers.$inferSelect> = [];
@@ -188,10 +193,11 @@ async function ensureCustomers(orgId: string) {
 }
 
 async function clearDateBookings(orgId: string, targetDate: Date) {
+  const dateStr = formatDateLocal(targetDate);
   const bookingRows = await db
     .select({ id: schema.bookings.id })
     .from(schema.bookings)
-    .where(and(eq(schema.bookings.organizationId, orgId), eq(schema.bookings.bookingDate, targetDate)));
+    .where(and(eq(schema.bookings.organizationId, orgId), sql`${schema.bookings.bookingDate}::text = ${dateStr}`));
 
   if (bookingRows.length === 0) return 0;
   const bookingIds = bookingRows.map((row) => row.id);
@@ -250,6 +256,9 @@ async function main() {
     { time: "14:00", mode: "join" as const, adults: 2, children: 1, customerIndex: 4, zone: downtown, ref: "005", name: "Business Bay Promenade" },
     { time: "16:00", mode: "join" as const, adults: 4, children: 0, customerIndex: 5, zone: palm, ref: "006", name: "Palm Beach Club" },
     { time: "18:00", mode: "charter" as const, adults: 2, children: 1, customerIndex: 6, zone: marina, ref: "007", name: "Marina Private Villa" },
+    { time: "14:00", mode: "charter" as const, adults: 6, children: 2, customerIndex: 7, zone: palm, ref: "008", name: "Palm Royal Penthouse" },
+    { time: "09:00", mode: "join" as const, adults: 2, children: 0, customerIndex: 8, zone: palm, ref: "009", name: "Palm Gateway Plaza" },
+    { time: "09:00", mode: "join" as const, adults: 2, children: 0, customerIndex: 9, zone: marina, ref: "010", name: "Marina Walk Entrance" },
   ];
 
   let sharedCount = 0;
@@ -304,7 +313,7 @@ async function main() {
     }
   }
 
-  console.log(`✅ Created 7 bookings on ${dateKey}`);
+  console.log(`✅ Created ${sharedCount + privateCount} bookings on ${dateKey}`);
   console.log(`   Shared: ${sharedCount}`);
   console.log(`   Private: ${privateCount}`);
   console.log(`   Tour: ${tour.name} (${tour.slug})`);

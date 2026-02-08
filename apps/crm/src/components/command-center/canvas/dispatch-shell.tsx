@@ -74,7 +74,7 @@ interface Marker {
 
 function hourMarkers(): Marker[] {
   const markers: Marker[] = [];
-  for (let hour = TIMELINE_START_HOUR; hour <= TIMELINE_END_HOUR; hour += 1) {
+  for (let hour = TIMELINE_START_HOUR; hour < TIMELINE_END_HOUR; hour += 1) {
     const time = `${hour.toString().padStart(2, "0")}:00`;
     markers.push({
       time,
@@ -188,7 +188,7 @@ export function DispatchShell({
   const [filterState, setFilterState] = useState<QueueFilterState>({
     search: "",
     includeJoinRuns: true,
-    includeCharters: true,
+    includePrivate: true,
   });
   const [sortMode, setSortMode] = useState<QueueSortMode>("time");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -331,7 +331,7 @@ export function DispatchShell({
     const term = filterState.search.trim().toLowerCase();
 
     const base = groups.filter((group) => {
-      if (!filterState.includeCharters && group.isPrivate) return false;
+      if (!filterState.includePrivate && group.isPrivate) return false;
       if (!filterState.includeJoinRuns && !group.isPrivate) return false;
 
       if (!term) return true;
@@ -511,7 +511,7 @@ export function DispatchShell({
     [onApplyOperation]
   );
 
-  const violatesCharterSlotRule = useCallback(
+  const violatesPrivateSlotRule = useCallback(
     (
       targetRow: CanvasRow,
       bookingIds: string[],
@@ -548,8 +548,8 @@ export function DispatchShell({
       }
       const incomingStartTime = bookingLookup.get(bookingIds[0] ?? "")?.tourTime;
 
-      if (violatesCharterSlotRule(targetRow, bookingIds, incomingStartTime)) {
-        toast.error("Private/charter tours require an exclusive guide timeslot");
+      if (violatesPrivateSlotRule(targetRow, bookingIds, incomingStartTime)) {
+        toast.error("Private tours require an exclusive guide timeslot");
         return;
       }
 
@@ -617,7 +617,7 @@ export function DispatchShell({
           `Assigned ${changes.length} booking${changes.length === 1 ? "" : "s"} to ${targetRow.guide.firstName} ${targetRow.guide.lastName}`,
       });
     },
-    [bookingAssignments, bookingLookup, executeOperation, rowLookup, slotGuestCount, violatesCharterSlotRule]
+    [bookingAssignments, bookingLookup, executeOperation, rowLookup, slotGuestCount, violatesPrivateSlotRule]
   );
 
   const assignBestFit = useCallback(
@@ -748,8 +748,8 @@ export function DispatchShell({
           return;
         }
 
-        if (violatesCharterSlotRule(targetRow, dragPayload.bookingIds, dropStart, dragPayload.runId)) {
-          toast.error("Private/charter tours require an exclusive guide timeslot");
+        if (violatesPrivateSlotRule(targetRow, dragPayload.bookingIds, dropStart, dragPayload.runId)) {
+          toast.error("Private tours require an exclusive guide timeslot");
           return;
         }
 
@@ -803,7 +803,7 @@ export function DispatchShell({
         resetDrag();
       }
     },
-    [assignBookingIdsToGuide, bookingLookup, dragPayload, executeOperation, resetDrag, rowLookup, slotGuestCount, violatesCharterSlotRule]
+    [assignBookingIdsToGuide, bookingLookup, dragPayload, executeOperation, resetDrag, rowLookup, slotGuestCount, violatesPrivateSlotRule]
   );
 
   const executeDropToHopper = useCallback(async () => {
@@ -874,8 +874,8 @@ export function DispatchShell({
         return;
       }
 
-      if (violatesCharterSlotRule(targetRow, selected.run.bookingIds, selected.run.startTime, selected.run.id)) {
-        toast.error("Private/charter tours require an exclusive guide timeslot");
+      if (violatesPrivateSlotRule(targetRow, selected.run.bookingIds, selected.run.startTime, selected.run.id)) {
+        toast.error("Private tours require an exclusive guide timeslot");
         return;
       }
 
@@ -907,7 +907,7 @@ export function DispatchShell({
         description: `Moved ${selected.run.tourName} to ${targetRow.guide.firstName} ${targetRow.guide.lastName}`,
       });
     },
-    [executeOperation, rowLookup, runLookup, slotGuestCount, violatesCharterSlotRule]
+    [executeOperation, rowLookup, runLookup, slotGuestCount, violatesPrivateSlotRule]
   );
 
   const handleRescheduleRun = useCallback(

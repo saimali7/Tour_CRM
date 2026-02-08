@@ -53,7 +53,7 @@ function panelTitle(selection: DispatchContextData["selection"]): string {
 }
 
 function bookingModeLabel(mode: GuestCardBooking["experienceMode"]): string {
-  if (mode === "charter") return "Charter";
+  if (mode === "charter") return "Private";
   if (mode === "book") return "Private";
   return "Shared";
 }

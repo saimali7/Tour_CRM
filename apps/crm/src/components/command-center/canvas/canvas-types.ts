@@ -35,7 +35,7 @@ export type QueueSortMode = "time" | "tour" | "guests";
 export interface QueueFilterState {
   search: string;
   includeJoinRuns: boolean;
-  includeCharters: boolean;
+  includePrivate: boolean;
 }
 
 export type LanePressureLevel = "low" | "medium" | "high" | "critical";

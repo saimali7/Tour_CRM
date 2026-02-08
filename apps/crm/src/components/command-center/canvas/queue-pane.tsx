@@ -233,16 +233,16 @@ export function QueuePane({
               type="button"
               className={cn(
                 "focus-ring rounded px-1.5 py-1 text-[11px] font-medium transition-colors",
-                filterState.includeCharters
+                filterState.includePrivate
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() =>
-                onFilterStateChange({ ...filterState, includeCharters: !filterState.includeCharters })
+                onFilterStateChange({ ...filterState, includePrivate: !filterState.includePrivate })
               }
-              title="Toggle private charters"
+              title="Toggle private tours"
             >
-              C
+              P
             </button>
           </div>
         </div>
@@ -332,7 +332,7 @@ function GroupCard({
   onAssignBestFit,
   onAssignToGuide,
 }: GroupCardProps) {
-  const accentClass = group.isCharter ? "border-l-warning" : "border-l-info";
+  const accentClass = group.isPrivate ? "border-l-warning" : "border-l-info";
 
   return (
     <article
@@ -368,17 +368,17 @@ function GroupCard({
           {group.tourName}
         </span>
         <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-          {group.totalGuests}g&thinsp;&middot;&thinsp;{group.totalBookings}b
+          {group.totalGuests} pax
         </span>
         <span
-          className={cn(
-            "shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none",
-            group.isCharter
-              ? "bg-warning/10 text-warning"
-              : "bg-info/10 text-info",
-          )}
-        >
-          {group.isCharter ? "C" : "S"}
+            className={cn(
+              "shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none",
+              group.isPrivate
+                ? "bg-warning/10 text-warning"
+                : "bg-info/10 text-info",
+            )}
+          >
+          {group.isPrivate ? "P" : "S"}
         </span>
         {isExpanded ? (
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
@@ -499,7 +499,7 @@ function BookingRow({
 
       {/* Guest count */}
       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-        {booking.guestCount}g
+        {booking.guestCount} pax
       </span>
 
       {/* Actions - visible on hover / focus-within */}

@@ -49,7 +49,7 @@ const capacityColor: Record<LanePressureLevel, string> = {
 function shouldShowMarkerLabel(time: string): boolean {
   const hour = Number(time.split(":")[0]);
   if (Number.isNaN(hour)) return true;
-  if (hour === 6 || hour === 24) return true;
+  if (hour === 6) return true;
   return hour % 2 === 0;
 }
 
@@ -130,7 +130,7 @@ export function LaneRow({
               )}
             >
               <Users className="h-2.5 w-2.5" />
-              {row.totalGuests}/{row.vehicleCapacity}
+              {row.totalGuests} today
             </span>
             <span className="text-[9px] text-muted-foreground/75 tabular-nums">
               {row.runs.length} {row.runs.length === 1 ? "run" : "runs"}

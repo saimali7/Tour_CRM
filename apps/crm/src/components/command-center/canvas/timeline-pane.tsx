@@ -59,7 +59,7 @@ const TIMELINE_HEADER_HEIGHT = 36;
 function shouldShowMarkerLabel(time: string): boolean {
   const hour = Number(time.split(":")[0]);
   if (Number.isNaN(hour)) return true;
-  if (hour === 6 || hour === 24) return true;
+  if (hour === 6) return true;
   return hour % 2 === 0;
 }
 

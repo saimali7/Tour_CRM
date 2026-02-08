@@ -512,7 +512,7 @@ function CommandCenterContent({
         })
       );
       if (incomingIsExclusive || slotHasExclusive) {
-        toast.error("Private/charter tours require an exclusive guide timeslot");
+        toast.error("Private tours require an exclusive guide timeslot");
         return;
       }
 
