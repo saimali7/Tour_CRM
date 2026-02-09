@@ -254,7 +254,42 @@ export const getOrgContext = cache(async (orgSlug: string): Promise<OrgContext> 
   }
 
   // Verify user has access to this organization - cached
-  const membership = await getCachedMembership(org.id, user.id);
+  let membership = await getCachedMembership(org.id, user.id);
+
+  // Fallback to uncached lookup to avoid stale negative cache entries
+  if (!membership) {
+    membership = await db.query.organizationMembers.findFirst({
+      where: and(
+        eq(organizationMembers.organizationId, org.id),
+        eq(organizationMembers.userId, user.id),
+        eq(organizationMembers.status, "active")
+      ),
+    });
+  }
+
+  // If user has a pending invite, auto-activate it on first access
+  if (!membership) {
+    const invitedMembership = await db.query.organizationMembers.findFirst({
+      where: and(
+        eq(organizationMembers.organizationId, org.id),
+        eq(organizationMembers.userId, user.id),
+        eq(organizationMembers.status, "invited")
+      ),
+    });
+
+    if (invitedMembership) {
+      const [activatedMembership] = await db
+        .update(organizationMembers)
+        .set({
+          status: "active",
+          updatedAt: new Date(),
+        })
+        .where(eq(organizationMembers.id, invitedMembership.id))
+        .returning();
+
+      membership = activatedMembership ?? null;
+    }
+  }
 
   if (!membership) {
     // Check if user is super admin

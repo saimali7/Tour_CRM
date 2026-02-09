@@ -55,10 +55,10 @@ export const sendTeamInviteEmail = inngest.createFunction(
       logoUrl: org.logoUrl ?? undefined,
     };
 
-    // Build accept URL - links to sign in page with org context
-    // After signing in/up, the user will be redirected to the org dashboard
+    // Build accept URL - links to invite acceptance route
+    // Middleware will require auth and then return here to activate membership
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const acceptUrl = `${baseUrl}/sign-in?redirect=/org/${org.slug}`;
+    const acceptUrl = `${baseUrl}/invite/${org.slug}`;
 
     // Send the email
     const result = await step.run("send-email", async () => {

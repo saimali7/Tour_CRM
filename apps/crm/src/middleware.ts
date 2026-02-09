@@ -23,6 +23,7 @@ async function clerkAuth(req: NextRequest, event: NextFetchEvent) {
   const isPublicRoute = createRouteMatcher([
     "/sign-in(.*)",
     "/sign-up(.*)",
+    "/invite(.*)",
     "/api/webhooks(.*)",
     "/api/trpc(.*)",
     "/api/health(.*)",
