@@ -72,7 +72,7 @@ RUN --mount=type=cache,id=turbo,target=/app/.turbo \
     pnpm --filter @tour/crm build
 
 # =============================================================================
-# Runner stage - Production runtime (minimal)
+# Runner stage - Production runtime (with startup migrations)
 # =============================================================================
 FROM base AS runner
 WORKDIR /app
@@ -89,10 +89,27 @@ COPY --from=builder /app/apps/crm/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/crm/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/crm/.next/static ./apps/crm/.next/static
 
+# Copy database package + migration tooling
+COPY --from=builder /app/packages/database ./packages/database
+COPY --from=builder /app/node_modules ./node_modules
+
+# Create startup script that runs migrations before launching Next.js
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'set -e' >> /app/start.sh && \
+    echo 'echo "=== Running database migrations ==="' >> /app/start.sh && \
+    echo 'cd /app/packages/database' >> /app/start.sh && \
+    echo 'if [ -n "$DIRECT_URL" ]; then export DATABASE_URL="$DIRECT_URL"; fi' >> /app/start.sh && \
+    echo 'echo "Using migration connection: $(test -n \"$DIRECT_URL\" && echo DIRECT_URL || echo DATABASE_URL)"' >> /app/start.sh && \
+    echo 'npx drizzle-kit migrate 2>&1 && echo "=== Migrations complete ===" || { echo "=== Migration FAILED ==="; exit 1; }' >> /app/start.sh && \
+    echo 'cd /app' >> /app/start.sh && \
+    echo 'echo "=== Starting application ==="' >> /app/start.sh && \
+    echo 'exec node apps/crm/server.js' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
 USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "apps/crm/server.js"]
+CMD ["/app/start.sh"]

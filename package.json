@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "build:prod": "turbo build && pnpm db:push",
+    "build:prod": "turbo build && pnpm db:migrate",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

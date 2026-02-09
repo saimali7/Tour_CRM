@@ -87,6 +87,7 @@ pnpm build                # Production build
 pnpm typecheck            # TypeScript validation
 pnpm lint                 # ESLint
 pnpm db:push              # Push schema changes
+pnpm db:migrate           # Apply versioned SQL migrations
 pnpm db:studio            # Drizzle Studio GUI
 ```
 

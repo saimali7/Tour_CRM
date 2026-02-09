@@ -25,9 +25,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run database migrations
-        run: pnpm db:push
+        run: |
+          export DATABASE_URL="${DIRECT_URL:-$DATABASE_URL}"
+          pnpm db:migrate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
       - name: Trigger Coolify Deploy
         run: |
