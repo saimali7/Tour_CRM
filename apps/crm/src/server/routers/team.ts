@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
-import { db, eq, and } from "@tour/database";
+import { db, eq, and, ilike } from "@tour/database";
 import { organizationMembers, users } from "@tour/database/schema";
 import type { OrganizationRole } from "@tour/database";
 import { inngest } from "@/inngest/client";
 import { createServiceLogger } from "@tour/services";
+import { normalizeEmail } from "@/lib/email";
 
 const log = createServiceLogger("team");
 
@@ -81,9 +82,11 @@ export const teamRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const normalizedInviteEmail = normalizeEmail(input.email);
+
       // Check if user already exists
       let user = await db.query.users.findFirst({
-        where: eq(users.email, input.email),
+        where: ilike(users.email, normalizedInviteEmail),
       });
 
       // If user doesn't exist, create a placeholder (will be updated on Clerk sync)
@@ -92,7 +95,7 @@ export const teamRouter = createRouter({
           .insert(users)
           .values({
             clerkId: `pending_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-            email: input.email,
+            email: normalizedInviteEmail,
             firstName: input.firstName,
             lastName: input.lastName,
           })
@@ -159,7 +162,7 @@ export const teamRouter = createRouter({
           data: {
             organizationId: ctx.orgContext.organizationId,
             membershipId: membership.id,
-            inviteeEmail: input.email,
+            inviteeEmail: normalizedInviteEmail,
             inviteeName: input.firstName
               ? `${input.firstName} ${input.lastName || ""}`.trim()
               : undefined,

@@ -1,9 +1,10 @@
-import { db, eq, and } from "@tour/database";
+import { db, eq, and, ilike, inArray } from "@tour/database";
 import { users, organizationMembers, organizations } from "@tour/database/schema";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
 import { authLogger, UnauthorizedError, NotFoundError, ForbiddenError } from "@tour/services";
+import { normalizeEmail } from "@/lib/email";
 
 /**
  * Authentication configuration
@@ -73,6 +74,10 @@ export const getCurrentUser = cache(async () => {
   if (!clerkUser) {
     return null;
   }
+  const primaryEmail = normalizeEmail(clerkUser.emailAddresses[0]?.emailAddress ?? "");
+  if (!primaryEmail) {
+    return null;
+  }
 
   // Use upsert to handle race conditions where multiple requests
   // try to create the same user simultaneously
@@ -81,7 +86,7 @@ export const getCurrentUser = cache(async () => {
       .insert(users)
       .values({
         clerkId: userId,
-        email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+        email: primaryEmail,
         firstName: clerkUser.firstName,
         lastName: clerkUser.lastName,
         avatarUrl: clerkUser.imageUrl,
@@ -89,7 +94,7 @@ export const getCurrentUser = cache(async () => {
       .onConflictDoUpdate({
         target: users.clerkId,
         set: {
-          email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+          email: primaryEmail,
           firstName: clerkUser.firstName,
           lastName: clerkUser.lastName,
           avatarUrl: clerkUser.imageUrl,
@@ -104,12 +109,12 @@ export const getCurrentUser = cache(async () => {
     // may already exist with this email (e.g., from a different Clerk account).
     // Fall back to looking up by email instead.
     authLogger.warn(
-      { err: error, clerkId: userId, email: clerkUser.emailAddresses[0]?.emailAddress },
+      { err: error, clerkId: userId, email: primaryEmail },
       "Failed to upsert user, attempting email-based lookup"
     );
 
     const existingByEmail = await db.query.users.findFirst({
-      where: eq(users.email, clerkUser.emailAddresses[0]?.emailAddress ?? ""),
+      where: ilike(users.email, primaryEmail),
     });
 
     if (existingByEmail) {
@@ -119,6 +124,7 @@ export const getCurrentUser = cache(async () => {
           .update(users)
           .set({
             clerkId: userId,
+            email: primaryEmail,
             firstName: clerkUser.firstName,
             lastName: clerkUser.lastName,
             avatarUrl: clerkUser.imageUrl,
@@ -183,6 +189,83 @@ const getCachedMembership = unstable_cache(
   ["membership"],
   { revalidate: 300, tags: ["membership"] }
 );
+
+async function ensureActiveMembership(
+  orgId: string,
+  user: typeof users.$inferSelect
+): Promise<typeof organizationMembers.$inferSelect | undefined> {
+  const directMembership = await db.query.organizationMembers.findFirst({
+    where: and(
+      eq(organizationMembers.organizationId, orgId),
+      eq(organizationMembers.userId, user.id)
+    ),
+  });
+
+  if (directMembership) {
+    if (directMembership.status === "active") {
+      return directMembership;
+    }
+
+    if (directMembership.status === "invited") {
+      const [activatedMembership] = await db
+        .update(organizationMembers)
+        .set({
+          status: "active",
+          updatedAt: new Date(),
+        })
+        .where(eq(organizationMembers.id, directMembership.id))
+        .returning();
+
+      return activatedMembership ?? undefined;
+    }
+
+    return undefined;
+  }
+
+  const emailMatchedMembership = await db
+    .select({ membership: organizationMembers })
+    .from(organizationMembers)
+    .innerJoin(users, eq(organizationMembers.userId, users.id))
+    .where(
+      and(
+        eq(organizationMembers.organizationId, orgId),
+        inArray(organizationMembers.status, ["active", "invited"]),
+        ilike(users.email, normalizeEmail(user.email))
+      )
+    )
+    .limit(1)
+    .then((rows) => rows[0]?.membership);
+
+  if (!emailMatchedMembership || emailMatchedMembership.userId === user.id) {
+    return undefined;
+  }
+
+  try {
+    const [claimedMembership] = await db
+      .update(organizationMembers)
+      .set({
+        userId: user.id,
+        status: "active",
+        updatedAt: new Date(),
+      })
+      .where(eq(organizationMembers.id, emailMatchedMembership.id))
+      .returning();
+
+    return claimedMembership ?? undefined;
+  } catch (error) {
+    authLogger.warn(
+      {
+        err: error,
+        orgId,
+        userId: user.id,
+        userEmail: user.email,
+      },
+      "Failed to claim membership by email"
+    );
+
+    return undefined;
+  }
+}
 
 /**
  * Get organization context for a given org slug
@@ -269,26 +352,7 @@ export const getOrgContext = cache(async (orgSlug: string): Promise<OrgContext> 
 
   // If user has a pending invite, auto-activate it on first access
   if (!membership) {
-    const invitedMembership = await db.query.organizationMembers.findFirst({
-      where: and(
-        eq(organizationMembers.organizationId, org.id),
-        eq(organizationMembers.userId, user.id),
-        eq(organizationMembers.status, "invited")
-      ),
-    });
-
-    if (invitedMembership) {
-      const [activatedMembership] = await db
-        .update(organizationMembers)
-        .set({
-          status: "active",
-          updatedAt: new Date(),
-        })
-        .where(eq(organizationMembers.id, invitedMembership.id))
-        .returning();
-
-      membership = activatedMembership ?? null;
-    }
+    membership = await ensureActiveMembership(org.id, user);
   }
 
   if (!membership) {

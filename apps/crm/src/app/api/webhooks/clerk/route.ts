@@ -1,10 +1,11 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
-import { WebhookEvent } from "@clerk/nextjs/server";
+import type { WebhookEvent } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
-import { db, eq } from "@tour/database";
+import { db, eq, ilike } from "@tour/database";
 import { users } from "@tour/database/schema";
 import { webhookLogger } from "@tour/services";
+import { normalizeEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   // Get the webhook secret from environment variables
@@ -120,11 +121,38 @@ async function handleUserCreated(data: WebhookEvent["data"]) {
     phone_numbers?: Array<{ phone_number: string }>;
   };
 
-  const primaryEmail = email_addresses?.[0]?.email_address;
+  const primaryEmailRaw = email_addresses?.[0]?.email_address;
+  const primaryEmail = primaryEmailRaw ? normalizeEmail(primaryEmailRaw) : null;
 
   if (!primaryEmail) {
     webhookLogger.error({ clerkUserId: id }, "User created without email address");
     return;
+  }
+
+  // Re-link invited placeholder users (or case-variant email rows) to this Clerk account
+  const existingByEmail = await db.query.users.findFirst({
+    where: ilike(users.email, primaryEmail),
+  });
+
+  if (existingByEmail && existingByEmail.clerkId !== id) {
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        clerkId: id,
+        email: primaryEmail,
+        firstName: first_name,
+        lastName: last_name,
+        avatarUrl: image_url,
+        phone: phone_numbers?.[0]?.phone_number,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, existingByEmail.id))
+      .returning();
+
+    if (updatedUser) {
+      webhookLogger.info({ userId: updatedUser.id, clerkUserId: id }, "Linked existing user to Clerk");
+      return;
+    }
   }
 
   // Upsert user (handles race conditions and duplicate webhooks)
@@ -173,7 +201,8 @@ async function handleUserUpdated(data: WebhookEvent["data"]) {
     phone_numbers?: Array<{ phone_number: string }>;
   };
 
-  const primaryEmail = email_addresses?.[0]?.email_address;
+  const primaryEmailRaw = email_addresses?.[0]?.email_address;
+  const primaryEmail = primaryEmailRaw ? normalizeEmail(primaryEmailRaw) : null;
 
   // Find the user in our database
   const existingUser = await db.query.users.findFirst({
