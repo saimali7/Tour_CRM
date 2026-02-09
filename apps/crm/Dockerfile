@@ -58,7 +58,7 @@ ENV SKIP_ENV_VALIDATION=true
 
 RUN --mount=type=cache,id=turbo,target=/app/.turbo \
     --mount=type=cache,id=next,target=/app/apps/crm/.next/cache \
-    pnpm --filter @tour/crm build
+    pnpm --filter @tour/crm exec next build --webpack --debug
 
 # =============================================================================
 # Runner stage - Production image with migrations

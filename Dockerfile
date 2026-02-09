@@ -69,7 +69,7 @@ ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
 # Build with turbo cache mount for faster rebuilds
 RUN --mount=type=cache,id=turbo,target=/app/.turbo \
     --mount=type=cache,id=next,target=/app/apps/crm/.next/cache \
-    pnpm --filter @tour/crm build
+    pnpm --filter @tour/crm exec next build --webpack --debug
 
 # =============================================================================
 # Runner stage - Production runtime (with startup migrations)
