@@ -29,6 +29,13 @@
       "when": 1770625646032,
       "tag": "0003_add-command-center-schema",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770626156650,
+      "tag": "0004_patch-bookings-dispatch-columns",
+      "breakpoints": true
     }
   ]
 }
