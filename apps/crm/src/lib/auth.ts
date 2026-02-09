@@ -76,28 +76,69 @@ export const getCurrentUser = cache(async () => {
 
   // Use upsert to handle race conditions where multiple requests
   // try to create the same user simultaneously
-  const [newUser] = await db
-    .insert(users)
-    .values({
-      clerkId: userId,
-      email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
-      firstName: clerkUser.firstName,
-      lastName: clerkUser.lastName,
-      avatarUrl: clerkUser.imageUrl,
-    })
-    .onConflictDoUpdate({
-      target: users.clerkId,
-      set: {
+  try {
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        clerkId: userId,
         email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
         firstName: clerkUser.firstName,
         lastName: clerkUser.lastName,
         avatarUrl: clerkUser.imageUrl,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
+      })
+      .onConflictDoUpdate({
+        target: users.clerkId,
+        set: {
+          email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+          firstName: clerkUser.firstName,
+          lastName: clerkUser.lastName,
+          avatarUrl: clerkUser.imageUrl,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
 
-  return newUser;
+    return newUser;
+  } catch (error) {
+    // Handle email unique constraint violation — another user record
+    // may already exist with this email (e.g., from a different Clerk account).
+    // Fall back to looking up by email instead.
+    authLogger.warn(
+      { err: error, clerkId: userId, email: clerkUser.emailAddresses[0]?.emailAddress },
+      "Failed to upsert user, attempting email-based lookup"
+    );
+
+    const existingByEmail = await db.query.users.findFirst({
+      where: eq(users.email, clerkUser.emailAddresses[0]?.emailAddress ?? ""),
+    });
+
+    if (existingByEmail) {
+      // Update the existing record to link to the new Clerk account
+      try {
+        const [updated] = await db
+          .update(users)
+          .set({
+            clerkId: userId,
+            firstName: clerkUser.firstName,
+            lastName: clerkUser.lastName,
+            avatarUrl: clerkUser.imageUrl,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, existingByEmail.id))
+          .returning();
+        return updated;
+      } catch (updateError) {
+        authLogger.error(
+          { err: updateError, userId: existingByEmail.id },
+          "Failed to update existing user with new Clerk ID"
+        );
+        return existingByEmail;
+      }
+    }
+
+    // If we still can't find the user, re-throw the original error
+    throw error;
+  }
 });
 
 /**

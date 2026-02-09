@@ -59,14 +59,20 @@ export default async function HomePage() {
   }
 
   // Get user's organizations (or first org in dev mode)
-  let orgs = await getUserOrganizations();
+  let orgs: Awaited<ReturnType<typeof getUserOrganizations>> = [];
+  try {
+    orgs = await getUserOrganizations();
 
-  // In dev mode, if no orgs from getUserOrganizations, get first org directly
-  if (!ENABLE_CLERK && orgs.length === 0) {
-    const firstOrg = await db.query.organizations.findFirst();
-    if (firstOrg) {
-      orgs = [firstOrg];
+    // In dev mode, if no orgs from getUserOrganizations, get first org directly
+    if (!ENABLE_CLERK && orgs.length === 0) {
+      const firstOrg = await db.query.organizations.findFirst();
+      if (firstOrg) {
+        orgs = [firstOrg];
+      }
     }
+  } catch (error) {
+    console.error("Failed to load organizations:", error);
+    // Fall through to show onboarding/no-org state
   }
 
   // If user has exactly one org, redirect to it
