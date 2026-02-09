@@ -45,7 +45,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
     return { from, to };
   }, [searchDate, flexDays]);
 
-  // Search for availability using tourRun.list
+  // Search tour runs using tourRun.list
   const { data: tourRunsResult, isLoading, error, refetch } = trpc.tourRun.list.useQuery(
     {
       dateFrom: dateRange.from,
@@ -54,7 +54,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
     { enabled: hasSearched }
   );
 
-  // Filter and transform tour runs to availability results
+  // Filter and transform tour runs for booking results
   const results = useMemo(() => {
     if (!tourRunsResult?.tourRuns) return [];
 
@@ -116,7 +116,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
       <div className="rounded-lg border border-border bg-card p-6">
         <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <Search className="h-5 w-5" />
-          Find Availability
+          Find Tour Runs
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -215,7 +215,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
                 ? "Searching..."
                 : results?.length
                 ? `${results.length} Available Slots`
-                : "No Availability Found"}
+                : "No Tour Runs Found"}
             </h3>
             {results && results.length > 0 && (
               <span className="text-sm text-muted-foreground">
@@ -254,7 +254,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
             <div className="rounded-lg border border-border bg-card p-8 text-center">
               <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground mb-2">
-                No tours available for {participants} guest{participants !== 1 ? "s" : ""} on this date
+                No active tour runs fit {participants} guest{participants !== 1 ? "s" : ""} on this date
               </p>
               <p className="text-sm text-muted-foreground">
                 Try adjusting your date, party size, or flexibility

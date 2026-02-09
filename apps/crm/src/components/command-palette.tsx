@@ -20,7 +20,6 @@ import {
   Clock,
   Zap,
   UserPlus,
-  CalendarPlus,
   Hash,
   Mail,
   Phone,
@@ -94,7 +93,7 @@ const entityConfig: Record<
   },
   schedule: {
     icon: Calendar,
-    label: "Schedules",
+    label: "Tour Runs",
     iconClass: "text-warning dark:text-warning",
     bgClass: "bg-warning/10 dark:bg-warning/20",
   },
@@ -190,14 +189,6 @@ const quickActions: QuickAction[] = [
     description: "Add a new tour",
     iconBg: "bg-info/10 dark:bg-info/20",
     iconColor: "text-info dark:text-info",
-  },
-  {
-    name: "New Schedule",
-    action: "new-schedule",
-    icon: CalendarPlus,
-    description: "Schedule a departure",
-    iconBg: "bg-warning/10 dark:bg-warning/20",
-    iconColor: "text-warning dark:text-warning",
   },
 ];
 
@@ -327,9 +318,6 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
       case "new-tour":
         navigate(`${basePath}/tours/new`);
         break;
-      case "new-schedule":
-        navigate(`${basePath}/availability/new`);
-        break;
     }
   };
 
@@ -338,7 +326,7 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
       booking: `${basePath}/bookings/${id}`,
       customer: `${basePath}/customers/${id}`,
       tour: `${basePath}/tours/${id}`,
-      schedule: `${basePath}/availability/${id}`,
+      schedule: `${basePath}/command-center`,
       guide: `${basePath}/guides/${id}`,
     };
     return paths[type];

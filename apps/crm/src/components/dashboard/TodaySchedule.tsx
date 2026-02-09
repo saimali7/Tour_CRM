@@ -56,6 +56,11 @@ export function TodaySchedule({ schedule, orgSlug }: TodayScheduleProps) {
           const utilization = item.capacity > 0 ? (item.bookedParticipants / item.capacity) * 100 : 0;
           const isFull = utilization >= 100;
           const isLow = utilization < 30;
+          const isoDate = item.startsAt ? (new Date(item.startsAt).toISOString().split("T")[0] ?? "") : "";
+          const dateParam = isoDate
+            ? `?date=${isoDate}`
+            : "";
+          const commandCenterHref = `/org/${orgSlug}/command-center${dateParam}`;
 
           return (
             <div
@@ -70,7 +75,7 @@ export function TodaySchedule({ schedule, orgSlug }: TodayScheduleProps) {
               {/* Tour Info + Capacity */}
               <div className="flex-1 min-w-0">
                 <Link
-                  href={`/org/${orgSlug}/availability/${item.scheduleId}`}
+                  href={commandCenterHref}
                   className="font-medium text-foreground hover:text-primary transition-colors"
                 >
                   {item.tourName}
@@ -139,7 +144,7 @@ export function TodaySchedule({ schedule, orgSlug }: TodayScheduleProps) {
               {/* Quick Actions */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 <Link
-                  href={`/org/${orgSlug}/availability/${item.scheduleId}`}
+                  href={commandCenterHref}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                   title="View Manifest"
                 >
@@ -147,7 +152,7 @@ export function TodaySchedule({ schedule, orgSlug }: TodayScheduleProps) {
                   <span className="hidden sm:inline">Manifest</span>
                 </Link>
                 <Link
-                  href={`/org/${orgSlug}/availability/${item.scheduleId}`}
+                  href={commandCenterHref}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors"
                   title="View Details"
                 >

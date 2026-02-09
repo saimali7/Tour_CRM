@@ -194,7 +194,7 @@ export function TimelinePane({
 
       {rows.length === 0 && (
         <div className="m-8 rounded-xl border border-dashed p-8 text-sm text-muted-foreground">
-          No available guides for this date. Add guide availability to start dispatching.
+          No active guides for this date. Add guides to start dispatching.
         </div>
       )}
 

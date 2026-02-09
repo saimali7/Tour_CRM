@@ -25,7 +25,7 @@ import type { ServiceContext } from "../types";
 import { NotFoundError, ValidationError, ServiceError } from "../types";
 import { createServiceLogger } from "../lib/logger";
 import { TourAvailabilityService } from "../tour-availability-service";
-import { BookingCore } from "./booking-core";
+import type { BookingCore } from "./booking-core";
 import { BookingQueryService } from "./booking-query-service";
 import type {
   CreateBookingInput,
@@ -116,11 +116,13 @@ export class BookingCommandService extends BaseService {
 
     if (!availability.available) {
       const reasons: Record<string, string> = {
-        blackout: "Tour is not operating on this date (blackout)",
         not_operating: "Tour does not operate on this date",
         sold_out: "This tour is sold out",
-        insufficient_capacity: `Not enough availability. Only ${availability.spotsRemaining} spots remaining.`,
+        insufficient_capacity: `Not enough spots. Only ${availability.spotsRemaining} spots remaining.`,
         past_date: "Cannot book a date in the past",
+        tour_inactive: "This tour is not active and cannot be booked",
+        same_day_booking_disabled: "Same-day booking is disabled for this tour",
+        same_day_cutoff_passed: "Same-day booking cutoff has passed for this tour",
       };
       throw new ValidationError(
         reasons[availability.reason || ""] || "Slot is not available"
@@ -266,8 +268,19 @@ export class BookingCommandService extends BaseService {
         });
 
         if (!availability.available) {
+          const reasons: Record<string, string> = {
+            not_operating: "Tour does not operate on this date",
+            sold_out: "This tour is sold out",
+            insufficient_capacity: `Not enough spots. Only ${availability.spotsRemaining} additional spots remaining.`,
+            past_date: "Cannot update participants for a date in the past",
+            tour_inactive: "This tour is not active and cannot be booked",
+            same_day_booking_disabled:
+              "Same-day booking is disabled for this tour",
+            same_day_cutoff_passed:
+              "Same-day booking cutoff has passed for this tour",
+          };
           throw new ValidationError(
-            `Not enough availability. Only ${availability.spotsRemaining} additional spots remaining.`
+            reasons[availability.reason || ""] || "Slot is not available"
           );
         }
       }
@@ -506,11 +519,13 @@ export class BookingCommandService extends BaseService {
 
     if (!availability.available) {
       const reasons: Record<string, string> = {
-        blackout: "Tour is not operating on this date (blackout)",
         not_operating: "Tour does not operate on this date",
         sold_out: "This tour is sold out",
-        insufficient_capacity: `Not enough availability. Only ${availability.spotsRemaining} spots remaining.`,
+        insufficient_capacity: `Not enough spots. Only ${availability.spotsRemaining} spots remaining.`,
         past_date: "Cannot reschedule to a date in the past",
+        tour_inactive: "This tour is not active and cannot be booked",
+        same_day_booking_disabled: "Same-day booking is disabled for this tour",
+        same_day_cutoff_passed: "Same-day booking cutoff has passed for this tour",
       };
       throw new ValidationError(
         reasons[availability.reason || ""] || "Slot is not available"

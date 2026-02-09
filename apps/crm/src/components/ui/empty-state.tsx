@@ -460,14 +460,14 @@ export function NoSchedulesEmpty({ orgSlug }: { orgSlug: string }) {
   return (
     <EmptyState
       illustration="calendar"
-      title="Open your calendar for bookings"
-      description="Create schedules to set when tours run and how many guests can join. Your availability powers your booking engine."
+      title="Start taking bookings"
+      description="Active tours can be booked immediately. Add tours and publish them to create upcoming tour runs."
       action={{
-        label: "Create First Schedule",
-        href: `/org/${orgSlug}/availability/new`,
+        label: "Create First Tour",
+        href: `/org/${orgSlug}/tours/new`,
       }}
       showTip
-      tipText="Schedules control when you're open for business"
+      tipText="Publishing a tour makes it bookable"
     />
   );
 }
@@ -477,7 +477,7 @@ export function NoGuidesEmpty({ orgSlug }: { orgSlug: string }) {
     <EmptyState
       illustration="guide"
       title="Add your tour guides"
-      description="Bring your team onboard. Assign guides to tours, track availability, and manage assignments effortlessly."
+      description="Bring your team onboard. Assign guides to tours and manage dispatch effortlessly."
       action={{
         label: "Add First Guide",
         href: `/org/${orgSlug}/guides/new`,

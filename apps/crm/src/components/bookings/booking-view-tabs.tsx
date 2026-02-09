@@ -26,7 +26,7 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   { id: "all", label: "All Bookings", shortcut: "1" },
   { id: "needs-action", label: "Needs Action", shortcut: "2" },
-  { id: "find-availability", label: "Find Availability", shortcut: "3" },
+  { id: "find-availability", label: "Find Tours", shortcut: "3" },
 ];
 
 export function BookingViewTabs({

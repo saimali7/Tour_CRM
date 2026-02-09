@@ -6,7 +6,7 @@
  * dynamically from availability windows, departure times, and bookings.
  */
 
-import { eq, and, gte, lte, or, inArray, sql, count, sum, isNull, lt } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 import {
   tours,
   tourAvailabilityWindows,
@@ -43,7 +43,14 @@ export interface SlotAvailabilityResult {
   spotsRemaining: number;
   maxCapacity: number;
   bookedCount: number;
-  reason?: "blackout" | "not_operating" | "sold_out" | "insufficient_capacity" | "past_date";
+  reason?:
+    | "not_operating"
+    | "sold_out"
+    | "insufficient_capacity"
+    | "past_date"
+    | "tour_inactive"
+    | "same_day_booking_disabled"
+    | "same_day_cutoff_passed";
 }
 
 export interface DateSlot {
@@ -170,62 +177,41 @@ export class TourAvailabilityService extends BaseService {
 
     const maxCapacity = tour.maxParticipants;
 
-    // 2. Check if date is in the past
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (date < today) {
+    // 2. Active tours are the source-of-truth for bookability.
+    if (tour.status !== "active") {
       return {
         available: false,
         spotsRemaining: 0,
         maxCapacity,
         bookedCount: 0,
-        reason: "past_date",
+        reason: "tour_inactive",
       };
     }
 
-    // 3. Check if tour operates on this date
-    const operates = await this.isTourOperatingOnDate(tourId, date);
-    if (!operates.operating) {
+    // 3. Enforce date-level booking rules for real bookings.
+    // Capacity-only checks pass requestedSpots=0 and should not be blocked.
+    const bookingRestrictionReason =
+      requestedSpots > 0 ? this.getDayBookingRestrictionReason(tour, date) : null;
+    if (bookingRestrictionReason) {
       return {
         available: false,
         spotsRemaining: 0,
-        maxCapacity: operates.maxCapacity ?? maxCapacity,
+        maxCapacity,
         bookedCount: 0,
-        reason: operates.reason === "blackout" ? "blackout" : "not_operating",
+        reason: bookingRestrictionReason,
       };
     }
 
-    // 4. Check if this departure time is valid
-    const departureTime = await this.db.query.tourDepartureTimes.findFirst({
-      where: and(
-        eq(tourDepartureTimes.tourId, tourId),
-        eq(tourDepartureTimes.organizationId, this.organizationId),
-        eq(tourDepartureTimes.time, time),
-        eq(tourDepartureTimes.isActive, true)
-      ),
-    });
-
-    if (!departureTime) {
-      return {
-        available: false,
-        spotsRemaining: 0,
-        maxCapacity: operates.maxCapacity ?? maxCapacity,
-        bookedCount: 0,
-        reason: "not_operating",
-      };
-    }
-
-    // 5. Get booked count for this slot (optionally excluding a booking being rescheduled)
+    // 4. Get booked count for this slot (optionally excluding a booking being rescheduled)
     const bookedCount = await this.getBookedCountForSlot(tourId, date, time, excludeBookingId);
-    const effectiveCapacity = operates.maxCapacity ?? maxCapacity;
-    const spotsRemaining = effectiveCapacity - bookedCount;
+    const spotsRemaining = maxCapacity - bookedCount;
 
-    // 6. Check if enough spots available
+    // 5. Check if enough spots available
     if (spotsRemaining < requestedSpots) {
       return {
         available: false,
         spotsRemaining,
-        maxCapacity: effectiveCapacity,
+        maxCapacity,
         bookedCount,
         reason: spotsRemaining <= 0 ? "sold_out" : "insufficient_capacity",
       };
@@ -234,7 +220,7 @@ export class TourAvailabilityService extends BaseService {
     return {
       available: true,
       spotsRemaining,
-      maxCapacity: effectiveCapacity,
+      maxCapacity,
       bookedCount,
     };
   }
@@ -282,57 +268,24 @@ export class TourAvailabilityService extends BaseService {
    */
   async isTourOperatingOnDate(
     tourId: string,
-    date: Date
+    _date: Date
   ): Promise<{
     operating: boolean;
-    reason?: "blackout" | "no_window" | "wrong_day";
+    reason?: "not_active";
     maxCapacity?: number;
     priceOverride?: string;
   }> {
-    // 1. Check for blackout date
-    const blackout = await this.db.query.tourBlackoutDates.findFirst({
-      where: and(
-        eq(tourBlackoutDates.tourId, tourId),
-        eq(tourBlackoutDates.organizationId, this.organizationId),
-        sql`${tourBlackoutDates.date}::text = ${this.formatDateForDb(date)}`
-      ),
+    const tour = await this.db.query.tours.findFirst({
+      where: and(eq(tours.id, tourId), eq(tours.organizationId, this.organizationId)),
     });
 
-    if (blackout) {
-      return { operating: false, reason: "blackout" };
-    }
-
-    // 2. Check for active availability window that covers this date
-    const dayOfWeek = date.getDay(); // 0-6
-    const dateStr = this.formatDateForDb(date);
-
-    const windows = await this.db.query.tourAvailabilityWindows.findMany({
-      where: and(
-        eq(tourAvailabilityWindows.tourId, tourId),
-        eq(tourAvailabilityWindows.organizationId, this.organizationId),
-        eq(tourAvailabilityWindows.isActive, true),
-        lte(tourAvailabilityWindows.startDate, date),
-        or(
-          isNull(tourAvailabilityWindows.endDate),
-          gte(tourAvailabilityWindows.endDate, date)
-        )
-      ),
-    });
-
-    // Find a window that includes this day of week
-    const matchingWindow = windows.find((w) => {
-      const days = w.daysOfWeek as number[];
-      return days.includes(dayOfWeek);
-    });
-
-    if (!matchingWindow) {
-      return { operating: false, reason: windows.length > 0 ? "wrong_day" : "no_window" };
+    if (!tour || tour.status !== "active") {
+      return { operating: false, reason: "not_active" };
     }
 
     return {
       operating: true,
-      maxCapacity: matchingWindow.maxParticipantsOverride ?? undefined,
-      priceOverride: matchingWindow.priceOverride ?? undefined,
+      maxCapacity: tour.maxParticipants,
     };
   }
 
@@ -357,95 +310,53 @@ export class TourAvailabilityService extends BaseService {
       throw new NotFoundError("Tour", tourId);
     }
 
-    // 2. Get all departure times for this tour
-    const departureTimes = await this.db.query.tourDepartureTimes.findMany({
-      where: and(
-        eq(tourDepartureTimes.tourId, tourId),
-        eq(tourDepartureTimes.organizationId, this.organizationId),
-        eq(tourDepartureTimes.isActive, true)
-      ),
-      orderBy: (t, { asc }) => [asc(t.sortOrder), asc(t.time)],
-    });
+    if (tour.status !== "active") {
+      return {
+        tourId,
+        tourName: tour.name,
+        year,
+        month,
+        dates: [],
+        operatingDays: [],
+      };
+    }
 
-    // 3. Get all availability windows for this tour
-    const windows = await this.db.query.tourAvailabilityWindows.findMany({
-      where: and(
-        eq(tourAvailabilityWindows.tourId, tourId),
-        eq(tourAvailabilityWindows.organizationId, this.organizationId),
-        eq(tourAvailabilityWindows.isActive, true)
-      ),
-    });
+    // 2. Get departure times (with fallback defaults)
+    const departureTimes = await this.getDepartureTimesForTour(tourId);
 
-    // 4. Get blackout dates for this month
+    // 3. Date range for this month
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0);
 
-    const blackouts = await this.db.query.tourBlackoutDates.findMany({
-      where: and(
-        eq(tourBlackoutDates.tourId, tourId),
-        eq(tourBlackoutDates.organizationId, this.organizationId),
-        gte(tourBlackoutDates.date, startOfMonth),
-        lte(tourBlackoutDates.date, endOfMonth)
-      ),
-    });
-
-    const blackoutMap = new Map(blackouts.map((b) => [this.formatDateForDb(b.date), b.reason]));
-
-    // 5. Get all bookings for this month to calculate booked counts
+    // 4. Get all bookings for this month to calculate booked counts
     const bookingCounts = await this.getBookingCountsForDateRange(
       tourId,
       startOfMonth,
       endOfMonth
     );
 
-    // 6. Build the operating days from windows
-    const operatingDays = new Set<number>();
-    for (const window of windows) {
-      const days = window.daysOfWeek as number[];
-      days.forEach((d) => operatingDays.add(d));
-    }
+    // 5. Active tours are bookable any day.
+    const operatingDays = [0, 1, 2, 3, 4, 5, 6];
 
-    // 7. Generate dates for the month
+    // 6. Generate dates for the month
     const dates: AvailableDate[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
     for (let day = 1; day <= endOfMonth.getDate(); day++) {
       const date = new Date(year, month - 1, day);
       const dateStr = this.formatDateForDb(date);
-      const dayOfWeek = date.getDay();
 
       // Skip past dates
-      if (date < today) {
+      const dayRestrictionReason = this.getDayBookingRestrictionReason(tour, date);
+      if (dayRestrictionReason === "past_date") {
         continue;
       }
 
-      // Check blackout
-      const isBlackedOut = blackoutMap.has(dateStr);
-      if (isBlackedOut) {
-        dates.push({
-          date: dateStr,
-          slots: [],
-          isBlackedOut: true,
-          blackoutReason: blackoutMap.get(dateStr) ?? undefined,
-        });
-        continue;
-      }
-
-      // Check if tour operates on this day
-      const matchingWindow = windows.find((w) => {
-        const days = w.daysOfWeek as number[];
-        const startDateOk = w.startDate <= date;
-        const endDateOk = !w.endDate || w.endDate >= date;
-        return days.includes(dayOfWeek) && startDateOk && endDateOk;
-      });
-
-      if (!matchingWindow) {
-        continue; // Tour doesn't operate this day
-      }
+      const sameDayBlocked =
+        dayRestrictionReason === "same_day_booking_disabled" ||
+        dayRestrictionReason === "same_day_cutoff_passed";
 
       // Build slots for each departure time
-      const maxCapacity = matchingWindow.maxParticipantsOverride ?? tour.maxParticipants;
+      const maxCapacity = tour.maxParticipants;
       const slots: DateSlot[] = [];
 
       for (const dt of departureTimes) {
@@ -459,8 +370,8 @@ export class TourAvailabilityService extends BaseService {
           spotsRemaining,
           maxCapacity,
           bookedCount,
-          available: spotsRemaining > 0,
-          almostFull: spotsRemaining > 0 && spotsRemaining <= 3,
+          available: !sameDayBlocked && spotsRemaining > 0,
+          almostFull: !sameDayBlocked && spotsRemaining > 0 && spotsRemaining <= 3,
         });
       }
 
@@ -477,7 +388,7 @@ export class TourAvailabilityService extends BaseService {
       year,
       month,
       dates,
-      operatingDays: Array.from(operatingDays),
+      operatingDays,
     };
   }
 
@@ -529,7 +440,7 @@ export class TourAvailabilityService extends BaseService {
     tourIds?: string[]
   ): Promise<CapacityHeatmapEntry[]> {
     // 1. Get tours
-    let toursQuery = this.db.query.tours.findMany({
+    const toursQuery = this.db.query.tours.findMany({
       where: and(
         eq(tours.organizationId, this.organizationId),
         eq(tours.status, "active")
@@ -541,7 +452,8 @@ export class TourAvailabilityService extends BaseService {
       tourList = await this.db.query.tours.findMany({
         where: and(
           eq(tours.organizationId, this.organizationId),
-          inArray(tours.id, tourIds)
+          inArray(tours.id, tourIds),
+          eq(tours.status, "active")
         ),
       });
     } else {
@@ -552,7 +464,6 @@ export class TourAvailabilityService extends BaseService {
       return [];
     }
 
-    const tourMap = new Map(tourList.map((t) => [t.id, t]));
     const tourIdList = tourList.map((t) => t.id);
 
     // 2. Get all departure times for these tours
@@ -571,23 +482,14 @@ export class TourAvailabilityService extends BaseService {
       departureTimesByTour.set(dt.tourId, existing);
     }
 
-    // 3. Get availability windows for these tours
-    const windows = await this.db.query.tourAvailabilityWindows.findMany({
-      where: and(
-        eq(tourAvailabilityWindows.organizationId, this.organizationId),
-        inArray(tourAvailabilityWindows.tourId, tourIdList),
-        eq(tourAvailabilityWindows.isActive, true)
-      ),
-    });
-
-    const windowsByTour = new Map<string, TourAvailabilityWindow[]>();
-    for (const w of windows) {
-      const existing = windowsByTour.get(w.tourId) ?? [];
-      existing.push(w);
-      windowsByTour.set(w.tourId, existing);
+    // Add fallback times for tours with no configured departures.
+    for (const tour of tourList) {
+      if (!departureTimesByTour.has(tour.id)) {
+        departureTimesByTour.set(tour.id, this.getDefaultDepartureTimes(tour.id));
+      }
     }
 
-    // 4. Get all bookings in the date range
+    // 3. Get all bookings in the date range
     const bookingCounts = await this.db
       .select({
         tourId: bookings.tourId,
@@ -615,48 +517,15 @@ export class TourAvailabilityService extends BaseService {
       }
     }
 
-    // 5. Get blackout dates
-    const blackouts = await this.db.query.tourBlackoutDates.findMany({
-      where: and(
-        eq(tourBlackoutDates.organizationId, this.organizationId),
-        inArray(tourBlackoutDates.tourId, tourIdList),
-        gte(tourBlackoutDates.date, dateRange.start),
-        lte(tourBlackoutDates.date, dateRange.end)
-      ),
-    });
-
-    const blackoutSet = new Set(
-      blackouts.map((b) => `${b.tourId}|${this.formatDateForDb(b.date)}`)
-    );
-
-    // 6. Build heatmap entries
+    // 4. Build heatmap entries
     const entries: CapacityHeatmapEntry[] = [];
     const current = new Date(dateRange.start);
 
     while (current <= dateRange.end) {
       const dateStr = this.formatDateForDb(current);
-      const dayOfWeek = current.getDay();
 
       for (const tour of tourList) {
-        // Check blackout
-        if (blackoutSet.has(`${tour.id}|${dateStr}`)) {
-          continue;
-        }
-
-        // Check if tour operates on this day
-        const tourWindows = windowsByTour.get(tour.id) ?? [];
-        const matchingWindow = tourWindows.find((w) => {
-          const days = w.daysOfWeek as number[];
-          const startDateOk = w.startDate <= current;
-          const endDateOk = !w.endDate || w.endDate >= current;
-          return days.includes(dayOfWeek) && startDateOk && endDateOk;
-        });
-
-        if (!matchingWindow) {
-          continue;
-        }
-
-        const maxCapacity = matchingWindow.maxParticipantsOverride ?? tour.maxParticipants;
+        const maxCapacity = tour.maxParticipants;
         const tourDepartures = departureTimesByTour.get(tour.id) ?? [];
 
         for (const dt of tourDepartures) {
@@ -838,13 +707,19 @@ export class TourAvailabilityService extends BaseService {
   }
 
   async getDepartureTimesForTour(tourId: string): Promise<TourDepartureTime[]> {
-    return this.db.query.tourDepartureTimes.findMany({
+    const configured = await this.db.query.tourDepartureTimes.findMany({
       where: and(
         eq(tourDepartureTimes.tourId, tourId),
         eq(tourDepartureTimes.organizationId, this.organizationId)
       ),
       orderBy: (t, { asc }) => [asc(t.sortOrder), asc(t.time)],
     });
+
+    if (configured.length > 0) {
+      return configured;
+    }
+
+    return this.getDefaultDepartureTimes(tourId);
   }
 
   // ===========================================================================
@@ -931,5 +806,98 @@ export class TourAvailabilityService extends BaseService {
 
   private formatDateForDb(date: Date): string {
     return date.toISOString().split("T")[0]!;
+  }
+
+  private getDayBookingRestrictionReason(
+    tour: Pick<Tour, "allowSameDayBooking" | "sameDayCutoffTime">,
+    date: Date
+  ): SlotAvailabilityResult["reason"] | null {
+    const today = this.formatDateForDb(new Date());
+    const requestedDate = this.formatDateForDb(date);
+
+    if (requestedDate < today) {
+      return "past_date";
+    }
+
+    if (requestedDate !== today) {
+      return null;
+    }
+
+    if (tour.allowSameDayBooking === false) {
+      return "same_day_booking_disabled";
+    }
+
+    if (
+      tour.sameDayCutoffTime &&
+      this.hasTimeReachedOrPassed(tour.sameDayCutoffTime)
+    ) {
+      return "same_day_cutoff_passed";
+    }
+
+    return null;
+  }
+
+  private hasTimeReachedOrPassed(time: string): boolean {
+    if (!/^\d{2}:\d{2}$/.test(time)) {
+      return false;
+    }
+
+    const [hoursPart, minutesPart] = time.split(":");
+    const cutoffHours = Number(hoursPart);
+    const cutoffMinutes = Number(minutesPart);
+    if (
+      !Number.isInteger(cutoffHours) ||
+      !Number.isInteger(cutoffMinutes) ||
+      cutoffHours < 0 ||
+      cutoffHours > 23 ||
+      cutoffMinutes < 0 ||
+      cutoffMinutes > 59
+    ) {
+      return false;
+    }
+
+    const now = new Date();
+    const nowTotalMinutes = now.getHours() * 60 + now.getMinutes();
+    const cutoffTotalMinutes = cutoffHours * 60 + cutoffMinutes;
+    return nowTotalMinutes >= cutoffTotalMinutes;
+  }
+
+  private getDefaultDepartureTimes(tourId: string): TourDepartureTime[] {
+    const now = new Date();
+    return [
+      {
+        id: `default-${tourId}-0900`,
+        organizationId: this.organizationId,
+        tourId,
+        time: "09:00",
+        label: "Morning",
+        isActive: true,
+        sortOrder: 0,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: `default-${tourId}-1300`,
+        organizationId: this.organizationId,
+        tourId,
+        time: "13:00",
+        label: "Afternoon",
+        isActive: true,
+        sortOrder: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: `default-${tourId}-1700`,
+        organizationId: this.organizationId,
+        tourId,
+        time: "17:00",
+        label: "Evening",
+        isActive: true,
+        sortOrder: 2,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
   }
 }

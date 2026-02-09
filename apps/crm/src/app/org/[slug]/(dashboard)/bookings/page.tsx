@@ -167,7 +167,7 @@ export default function BookingsPage() {
       {activeView === "find-availability" && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Search for available tour slots to help customers find the perfect time.
+            Search active tour runs and pick the best departure time for the customer.
           </p>
           <BookingPlanner orgSlug={slug} />
         </div>

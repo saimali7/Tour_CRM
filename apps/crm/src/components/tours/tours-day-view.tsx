@@ -205,7 +205,7 @@ export function ToursDayView({ orgSlug, selectedDate }: ToursDayViewProps) {
                 return (
                   <Link
                     key={`${tourRun.tourId}-${tourRun.date}-${tourRun.time}`}
-                    href={`/org/${orgSlug}/availability/${tourRun.tourId}?date=${tourRun.date}&time=${encodeURIComponent(tourRun.time)}` as Route}
+                    href={`/org/${orgSlug}/command-center?date=${tourRun.date}` as Route}
                     className="group rounded-lg border border-border bg-card p-4 hover:border-primary/50 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between gap-4">

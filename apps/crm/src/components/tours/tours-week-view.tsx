@@ -222,7 +222,7 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
                     return (
                       <Link
                         key={`${tourRun.tourId}-${tourRun.date}-${tourRun.time}`}
-                        href={`/org/${orgSlug}/availability/${tourRun.tourId}?date=${tourRun.date}&time=${encodeURIComponent(tourRun.time)}` as Route}
+                        href={`/org/${orgSlug}/command-center?date=${tourRun.date}` as Route}
                         className={cn(
                           "block rounded p-2 text-xs hover:ring-1 hover:ring-primary/50 transition-all",
                           percentage >= 100 ? "bg-destructive/10" : percentage >= 80 ? "bg-warning/10" : "bg-muted/50"

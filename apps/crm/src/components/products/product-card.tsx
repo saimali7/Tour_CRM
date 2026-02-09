@@ -14,7 +14,6 @@ import {
   Users,
   Clock,
   MapPin,
-  CalendarPlus,
   Check,
 } from "lucide-react";
 import {
@@ -219,23 +218,13 @@ export function ProductCard({
 
       {/* Card Actions */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border bg-muted/30">
-        {product.tour ? (
-          <Link
-            href={`/org/${orgSlug}/tours/${product.tour.id}/schedules/new` as Route}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-          >
-            <CalendarPlus className="h-4 w-4 text-primary" />
-            Add Schedule
-          </Link>
-        ) : (
-          <Link
-            href={detailUrl}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-          >
-            <Eye className="h-4 w-4 text-primary" />
-            View Details
-          </Link>
-        )}
+        <Link
+          href={detailUrl}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+        >
+          <Eye className="h-4 w-4 text-primary" />
+          View Details
+        </Link>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
