@@ -29,6 +29,10 @@ export interface TourFormData {
   meetingPointDetails: string;
   cancellationPolicy: string;
   cancellationHours: number;
+  minimumNoticeHours: number;
+  maximumAdvanceDays: number;
+  allowSameDayBooking: boolean;
+  sameDayCutoffTime: string;
   metaTitle: string;
   metaDescription: string;
 }
@@ -93,6 +97,10 @@ export function TourForm({
     meetingPointDetails: "",
     cancellationPolicy: "",
     cancellationHours: 24,
+    minimumNoticeHours: 2,
+    maximumAdvanceDays: 90,
+    allowSameDayBooking: true,
+    sameDayCutoffTime: "12:00",
     metaTitle: "",
     metaDescription: "",
   };
@@ -172,6 +180,12 @@ export function TourForm({
       meetingPointDetails: formData.meetingPointDetails || undefined,
       cancellationPolicy: formData.cancellationPolicy || undefined,
       cancellationHours: formData.cancellationHours,
+      minimumNoticeHours: formData.minimumNoticeHours,
+      maximumAdvanceDays: formData.maximumAdvanceDays,
+      allowSameDayBooking: formData.allowSameDayBooking,
+      sameDayCutoffTime: formData.allowSameDayBooking
+        ? formData.sameDayCutoffTime || undefined
+        : undefined,
       metaTitle: formData.metaTitle || undefined,
       metaDescription: formData.metaDescription || undefined,
     };
@@ -765,6 +779,104 @@ export function TourForm({
               placeholder="Describe your cancellation policy..."
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Minimum Notice (hours)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="720"
+              value={formData.minimumNoticeHours}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  minimumNoticeHours: parseInt(e.target.value, 10) || 0,
+                }))
+              }
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Only used when same-day booking is disabled
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Max Advance Booking (days)
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="3650"
+              value={formData.maximumAdvanceDays}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  maximumAdvanceDays: parseInt(e.target.value, 10) || 90,
+                }))
+              }
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground">
+                Allow Same-Day Booking
+              </label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Enable bookings for today and control a daily cutoff time
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={formData.allowSameDayBooking}
+              onClick={() =>
+                setFormData((prev) => ({
+                  ...prev,
+                  allowSameDayBooking: !prev.allowSameDayBooking,
+                }))
+              }
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                formData.allowSameDayBooking ? "bg-primary" : "bg-muted"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  formData.allowSameDayBooking ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {formData.allowSameDayBooking && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">
+                Same-Day Booking Cutoff Time
+              </label>
+              <input
+                type="time"
+                value={formData.sameDayCutoffTime}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    sameDayCutoffTime: e.target.value,
+                  }))
+                }
+                className="w-full md:w-64 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Bookings for today are allowed only before this time
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

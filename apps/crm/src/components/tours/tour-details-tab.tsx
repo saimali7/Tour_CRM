@@ -26,6 +26,10 @@ interface TourDetailsTabProps {
     meetingPointDetails: string | null;
     cancellationPolicy: string | null;
     cancellationHours: number | null;
+    minimumNoticeHours: number | null;
+    maximumAdvanceDays: number | null;
+    allowSameDayBooking: boolean | null;
+    sameDayCutoffTime: string | null;
     metaTitle: string | null;
     metaDescription: string | null;
   };
@@ -55,6 +59,10 @@ export function TourDetailsTab({ tourId, tour, onSuccess }: TourDetailsTabProps)
     meetingPointDetails: tour.meetingPointDetails ?? "",
     cancellationPolicy: tour.cancellationPolicy ?? "",
     cancellationHours: tour.cancellationHours ?? 24,
+    minimumNoticeHours: tour.minimumNoticeHours ?? 2,
+    maximumAdvanceDays: tour.maximumAdvanceDays ?? 90,
+    allowSameDayBooking: tour.allowSameDayBooking ?? true,
+    sameDayCutoffTime: tour.sameDayCutoffTime ?? "12:00",
     metaTitle: tour.metaTitle ?? "",
     metaDescription: tour.metaDescription ?? "",
   };
