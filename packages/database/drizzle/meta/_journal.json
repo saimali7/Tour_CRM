@@ -36,6 +36,13 @@
       "when": 1770626156650,
       "tag": "0004_patch-bookings-dispatch-columns",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770626609551,
+      "tag": "0005_patch-guides-dispatch-columns",
+      "breakpoints": true
     }
   ]
 }
