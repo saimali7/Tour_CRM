@@ -88,6 +88,7 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'cd /app/packages/database' >> /app/start.sh && \
     echo 'if [ -n "$DIRECT_URL" ]; then export DATABASE_URL="$DIRECT_URL"; fi' >> /app/start.sh && \
     echo 'echo "Using migration connection: $(test -n \"$DIRECT_URL\" && echo DIRECT_URL || echo DATABASE_URL)"' >> /app/start.sh && \
+    echo 'node ./scripts/baseline-migrations.mjs' >> /app/start.sh && \
     echo 'npx drizzle-kit migrate 2>&1 && echo "=== Migrations complete ===" || { echo "=== Migration FAILED ==="; exit 1; }' >> /app/start.sh && \
     echo 'cd /app' >> /app/start.sh && \
     echo 'echo "=== Starting application ==="' >> /app/start.sh && \

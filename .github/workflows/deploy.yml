@@ -27,6 +27,7 @@ jobs:
       - name: Run database migrations
         run: |
           export DATABASE_URL="${DIRECT_URL:-$DATABASE_URL}"
+          pnpm --filter @tour/database db:baseline
           pnpm db:migrate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

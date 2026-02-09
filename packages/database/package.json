@@ -16,6 +16,7 @@
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
+    "db:baseline": "node scripts/baseline-migrations.mjs",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/seed/index.ts",
     "db:add-member": "tsx src/seed/add-member.ts",
