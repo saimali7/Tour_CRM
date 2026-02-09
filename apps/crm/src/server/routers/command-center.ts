@@ -120,6 +120,17 @@ const createTempGuideInputSchema = z.object({
   vehicleCapacity: z.number().int().min(1).max(99),
 });
 
+const commandCenterDateSchema = z.union([
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+  z.string().datetime().transform((val) => val.split("T")[0]!),
+  z.date().transform((val) => {
+    const year = val.getUTCFullYear();
+    const month = String(val.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(val.getUTCDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }),
+]);
+
 // =============================================================================
 // ROUTER
 // =============================================================================
@@ -483,7 +494,7 @@ export const commandCenterRouter = createRouter({
    */
   applyReassignments: adminProcedure
     .input(z.object({
-      date: z.coerce.date(),
+      date: commandCenterDateSchema,
       changes: z.array(z.object({
         bookingId: z.string(),
         fromGuideId: z.string().nullable(),
@@ -537,7 +548,7 @@ export const commandCenterRouter = createRouter({
    */
   batchApplyChanges: adminProcedure
     .input(z.object({
-      date: z.coerce.date(),
+      date: commandCenterDateSchema,
       changes: z.array(z.discriminatedUnion("type", [
         // Assign: from hopper to guide
         z.object({
