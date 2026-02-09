@@ -2350,6 +2350,7 @@ export class CommandCenterService extends BaseService {
     const dateKey = this.formatDateKey(date);
     const changedBookingIds = new Set<string>();
     const involvedGuideIds = new Set<string>();
+    const qualificationCheckBookingIds = new Set<string>();
 
     for (const change of changes) {
       if (change.type === "assign") {
@@ -2474,6 +2475,7 @@ export class CommandCenterService extends BaseService {
         const state = working.get(change.bookingId);
         if (!state) throw new ValidationError(`Booking ${change.bookingId} not found in working set`);
         state.assignedGuideId = change.toGuideId;
+        qualificationCheckBookingIds.add(change.bookingId);
         continue;
       }
 
@@ -2491,6 +2493,7 @@ export class CommandCenterService extends BaseService {
           const state = working.get(bookingId);
           if (!state) throw new ValidationError(`Booking ${bookingId} not found in working set`);
           state.assignedGuideId = change.toGuideId;
+          qualificationCheckBookingIds.add(bookingId);
         }
         continue;
       }
@@ -2526,6 +2529,60 @@ export class CommandCenterService extends BaseService {
     const missingGuides = guideIdList.filter((guideId) => !guideById.has(guideId));
     if (missingGuides.length > 0) {
       throw new ValidationError(`Guide not found: ${missingGuides.join(", ")}`);
+    }
+
+    const requiredQualificationPairs = [...qualificationCheckBookingIds]
+      .map((bookingId) => working.get(bookingId))
+      .filter(
+        (
+          state
+        ): state is {
+          bookingId: string;
+          tourId: string;
+          bookingDate: Date;
+          bookingDateKey: string;
+          bookingTime: string;
+          durationMinutes: number;
+          guestCount: number;
+          experienceMode: BookingWithCustomer["experienceMode"];
+          assignedGuideId: string | null;
+        } => Boolean(state?.assignedGuideId)
+      )
+      .map((state) => ({
+        bookingId: state.bookingId,
+        guideId: state.assignedGuideId!,
+        tourId: state.tourId,
+      }));
+
+    if (requiredQualificationPairs.length > 0) {
+      const qualificationGuideIds = [...new Set(requiredQualificationPairs.map((pair) => pair.guideId))];
+      const qualificationTourIds = [...new Set(requiredQualificationPairs.map((pair) => pair.tourId))];
+      const qualificationRows = await this.db
+        .select({
+          guideId: tourGuideQualifications.guideId,
+          tourId: tourGuideQualifications.tourId,
+        })
+        .from(tourGuideQualifications)
+        .where(
+          and(
+            eq(tourGuideQualifications.organizationId, this.organizationId),
+            inArray(tourGuideQualifications.guideId, qualificationGuideIds),
+            inArray(tourGuideQualifications.tourId, qualificationTourIds)
+          )
+        );
+
+      const qualifiedPairs = new Set(
+        qualificationRows.map((row) => `${row.guideId}|${row.tourId}`)
+      );
+
+      for (const pair of requiredQualificationPairs) {
+        if (qualifiedPairs.has(`${pair.guideId}|${pair.tourId}`)) continue;
+        const guide = guideById.get(pair.guideId);
+        const guideName = guide ? `${guide.firstName} ${guide.lastName}`.trim() : pair.guideId;
+        throw new ValidationError(
+          `no_qualified_guide: ${guideName} is not qualified for tour ${pair.tourId}`
+        );
+      }
     }
 
     const existingGuideAssignments = guideIdList.length > 0

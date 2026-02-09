@@ -44,7 +44,9 @@ export interface GuestCardBooking {
   dietaryRequirements?: string | null;
   accessibilityNeeds?: string | null;
   tourName: string;
+  tourRunKey: string;
   tourTime: string;
+  tourDurationMinutes: number;
   status: string;
   paymentStatus: string;
   total?: string | null;

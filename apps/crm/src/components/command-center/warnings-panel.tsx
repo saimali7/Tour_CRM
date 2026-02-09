@@ -41,6 +41,17 @@ interface WarningsPanelProps {
     slotGuestsByRunKey?: Record<string, number>;
     slotGuestsByTime?: Record<string, number>;
     slotHasExclusiveByTime?: Record<string, boolean>;
+    runWindows?: Array<{
+      tourRunKey: string;
+      startTime: string;
+      durationMinutes: number;
+    }>;
+  }>;
+  /** Optional run metadata for overlap-aware quick suggestions */
+  tourRuns?: Array<{
+    key: string;
+    time: string;
+    tour?: { durationMinutes?: number } | null;
   }>;
   /** Whether to start collapsed */
   defaultCollapsed?: boolean;
@@ -93,6 +104,27 @@ function extractRunTime(tourRunKey: string | undefined): string | null {
   return parts[2] ?? null;
 }
 
+function parseMinutes(time: string): number {
+  const [hoursPart, minutesPart] = time.split(":");
+  const hours = Number(hoursPart);
+  const minutes = Number(minutesPart);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return 0;
+  return hours * 60 + minutes;
+}
+
+function overlaps(
+  startA: string,
+  durationMinutesA: number,
+  startB: string,
+  durationMinutesB: number
+): boolean {
+  const startAMinutes = parseMinutes(startA);
+  const startBMinutes = parseMinutes(startB);
+  const endAMinutes = startAMinutes + Math.max(durationMinutesA, 1);
+  const endBMinutes = startBMinutes + Math.max(durationMinutesB, 1);
+  return startAMinutes < endBMinutes && endAMinutes > startBMinutes;
+}
+
 // =============================================================================
 // COMPACT WARNING ITEM
 // =============================================================================
@@ -101,6 +133,7 @@ interface CompactWarningProps {
   warning: DispatchWarning;
   onResolve: (suggestionId: string) => void;
   availableGuides?: WarningsPanelProps["availableGuides"];
+  tourRuns?: WarningsPanelProps["tourRuns"];
   isExpanded: boolean;
   isSelected: boolean;
   onToggle: () => void;
@@ -111,12 +144,17 @@ function CompactWarning({
   warning,
   onResolve,
   availableGuides = [],
+  tourRuns = [],
   isExpanded,
   isSelected,
   onToggle,
   onSelect,
 }: CompactWarningProps) {
   const config = warningTypeConfig[warning.type];
+  const tourRunByKey = useMemo(
+    () => new Map((tourRuns ?? []).map((run) => [run.key, run])),
+    [tourRuns]
+  );
 
   // Generate quick-assign suggestions if we have available guides and no existing suggestions
   const suggestions = useMemo(() => {
@@ -124,9 +162,11 @@ function CompactWarning({
 
     // Auto-generate suggestions for no_guide warnings
     if (warning.type === "no_guide" && availableGuides.length > 0) {
+      const runMeta = warning.tourRunKey ? tourRunByKey.get(warning.tourRunKey) : undefined;
       const guestsNeeded = Math.max(warning.guestCount || 1, 1);
-      const targetRunKey = warning.tourRunKey;
-      const targetTime = extractRunTime(targetRunKey);
+      const targetRunKey = warning.tourRunKey ?? null;
+      const targetTime = runMeta?.time ?? extractRunTime(targetRunKey ?? undefined);
+      const targetDurationMinutes = runMeta?.tour?.durationMinutes ?? 60;
 
       const suitableGuides = availableGuides
         .map((guide) => {
@@ -140,16 +180,29 @@ function CompactWarning({
           const hasExclusiveRunInSlot = targetTime
             ? Boolean(guide.slotHasExclusiveByTime?.[targetTime])
             : false;
+          const hasOverlapConflict = targetTime
+            ? (guide.runWindows ?? []).some((runWindow) => {
+                if (targetRunKey && runWindow.tourRunKey === targetRunKey) return false;
+                return overlaps(
+                  runWindow.startTime,
+                  runWindow.durationMinutes,
+                  targetTime,
+                  targetDurationMinutes
+                );
+              })
+            : false;
 
           return {
             guide,
             slotGuests,
             hasExclusiveRunInSlot,
+            hasOverlapConflict,
             remainingSeats: guide.vehicleCapacity - slotGuests,
           };
         })
         .filter((candidate) => {
           if (candidate.hasExclusiveRunInSlot) return false;
+          if (candidate.hasOverlapConflict) return false;
           return candidate.remainingSeats >= guestsNeeded;
         })
         .sort(
@@ -173,7 +226,7 @@ function CompactWarning({
     }
 
     return [];
-  }, [warning, availableGuides]);
+  }, [availableGuides, tourRunByKey, warning]);
 
   const hasSuggestions = suggestions.length > 0;
 
@@ -278,6 +331,7 @@ interface InlineWarningsProps {
   selectedWarningId?: string | null;
   onSelectWarning?: (warningId: string) => void;
   availableGuides?: WarningsPanelProps["availableGuides"];
+  tourRuns?: WarningsPanelProps["tourRuns"];
 }
 
 function InlineWarnings({
@@ -286,6 +340,7 @@ function InlineWarnings({
   selectedWarningId,
   onSelectWarning,
   availableGuides = [],
+  tourRuns = [],
 }: InlineWarningsProps) {
   const [expandedWarnings, setExpandedWarnings] = useState<Set<string>>(
     new Set()
@@ -314,6 +369,7 @@ function InlineWarnings({
           warning={warning}
           onResolve={(suggestionId) => onResolve(warning.id, suggestionId)}
           availableGuides={availableGuides}
+          tourRuns={tourRuns}
           isExpanded={expandedWarnings.has(warning.id)}
           isSelected={selectedWarningId === warning.id}
           onToggle={() => toggleWarning(warning.id)}
@@ -340,6 +396,7 @@ export function WarningsPanel({
   selectedWarningId,
   onSelectWarning,
   availableGuides = [],
+  tourRuns = [],
   defaultCollapsed = false,
   inline = false,
 }: WarningsPanelProps) {
@@ -385,6 +442,7 @@ export function WarningsPanel({
         selectedWarningId={selectedWarningId}
         onSelectWarning={onSelectWarning}
         availableGuides={availableGuides}
+        tourRuns={tourRuns}
       />
     );
   }
@@ -459,6 +517,7 @@ export function WarningsPanel({
               warning={warning}
               onResolve={(suggestionId) => onResolve(warning.id, suggestionId)}
               availableGuides={availableGuides}
+              tourRuns={tourRuns}
               isExpanded={expandedWarnings.has(warning.id)}
               isSelected={selectedWarningId === warning.id}
               onToggle={() => toggleWarning(warning.id)}

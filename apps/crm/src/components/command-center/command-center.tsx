@@ -302,6 +302,11 @@ function CommandCenterContent({
           }
           return acc;
         }, {}),
+        runWindows: row.runs.map((run) => ({
+          tourRunKey: run.tourRunKey,
+          startTime: run.startTime,
+          durationMinutes: run.durationMinutes,
+        })),
       }));
   }, [viewModel]);
 

@@ -59,6 +59,11 @@ interface CommandStripProps {
     slotGuestsByRunKey?: Record<string, number>;
     slotGuestsByTime?: Record<string, number>;
     slotHasExclusiveByTime?: Record<string, boolean>;
+    runWindows?: Array<{
+      tourRunKey: string;
+      startTime: string;
+      durationMinutes: number;
+    }>;
   }>;
   dispatchedAt?: Date;
   tourRuns?: Array<{
@@ -66,7 +71,7 @@ interface CommandStripProps {
     date: string;
     time: string;
     totalGuests: number;
-    tour?: { id: string; name: string } | null;
+    tour?: { id: string; name: string; durationMinutes?: number } | null;
   }>;
   onOptimize: () => void;
   onDispatch: () => void;
@@ -254,6 +259,7 @@ export function CommandStrip({
                   selectedWarningId={selectedWarningId}
                   onSelectWarning={onSelectWarning}
                   availableGuides={availableGuides}
+                  tourRuns={tourRuns}
                 />
               </PopoverContent>
             </Popover>

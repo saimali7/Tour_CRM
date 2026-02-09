@@ -4,6 +4,7 @@ import {
   bookings,
   guides,
   tours,
+  tourGuideQualifications,
   type GuideAssignment,
   type GuideAssignmentStatus,
   type Booking,
@@ -312,6 +313,21 @@ export class GuideAssignmentService extends BaseService {
       throw new NotFoundError("Guide", input.guideId);
     }
 
+    const qualification = await this.db.query.tourGuideQualifications.findFirst({
+      where: and(
+        eq(tourGuideQualifications.organizationId, this.organizationId),
+        eq(tourGuideQualifications.guideId, input.guideId),
+        eq(tourGuideQualifications.tourId, booking.tourId)
+      ),
+      columns: {
+        id: true,
+      },
+    });
+
+    if (!qualification) {
+      throw new ConflictError("Guide is not qualified for this tour");
+    }
+
     const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);
     const exceedsRunCapacity = await this.wouldExceedRunCapacity({
       guideId: guide.id,
@@ -430,6 +446,21 @@ export class GuideAssignmentService extends BaseService {
 
       if (!guide) {
         throw new ValidationError("Guide not found");
+      }
+
+      const qualification = await this.db.query.tourGuideQualifications.findFirst({
+        where: and(
+          eq(tourGuideQualifications.organizationId, this.organizationId),
+          eq(tourGuideQualifications.guideId, assignment.guideId),
+          eq(tourGuideQualifications.tourId, booking.tourId)
+        ),
+        columns: {
+          id: true,
+        },
+      });
+
+      if (!qualification) {
+        throw new ConflictError("Guide is not qualified for this tour");
       }
 
       const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);

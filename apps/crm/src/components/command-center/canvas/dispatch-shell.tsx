@@ -165,6 +165,32 @@ function parseVehicleCapacity(value: string): number | null {
   return parsed;
 }
 
+function intervalsOverlap(
+  startA: string,
+  durationMinutesA: number,
+  startB: string,
+  durationMinutesB: number
+): boolean {
+  const startAMinutes = parseMinutes(startA);
+  const startBMinutes = parseMinutes(startB);
+  const endAMinutes = startAMinutes + Math.max(durationMinutesA, 1);
+  const endBMinutes = startBMinutes + Math.max(durationMinutesB, 1);
+  return startAMinutes < endBMinutes && endAMinutes > startBMinutes;
+}
+
+function retimeRunKey(runKey: string | undefined, newStartTime: string | undefined): string | null {
+  if (!runKey || !newStartTime) return null;
+  const [tourId, date] = runKey.split("|");
+  if (!tourId || !date) return null;
+  return `${tourId}|${date}|${newStartTime}`;
+}
+
+interface IncomingRunMetadata {
+  startTime: string;
+  durationMinutes: number;
+  runKey: string | null;
+}
+
 export function DispatchShell({
   rows,
   groups,
@@ -476,13 +502,50 @@ export function DispatchShell({
     []
   );
 
+  const bookingRunMetadataForIds = useCallback(
+    (bookingIds: string[]): IncomingRunMetadata | null => {
+      const firstBookingId = bookingIds[0];
+      if (!firstBookingId) return null;
+      const firstBooking = bookingLookup.get(firstBookingId);
+      if (!firstBooking) return null;
+
+      return {
+        startTime: firstBooking.tourTime,
+        durationMinutes: Math.max(firstBooking.tourDurationMinutes ?? 60, 1),
+        runKey: firstBooking.tourRunKey ?? null,
+      };
+    },
+    [bookingLookup]
+  );
+
+  const hasRunOverlapConflict = useCallback(
+    (
+      targetRow: CanvasRow,
+      incomingRun: IncomingRunMetadata,
+      options?: {
+        ignoreRunId?: string;
+      }
+    ): boolean =>
+      targetRow.runs.some((run) => {
+        if (options?.ignoreRunId && run.id === options.ignoreRunId) return false;
+        if (incomingRun.runKey && run.tourRunKey === incomingRun.runKey) return false;
+        return intervalsOverlap(
+          run.startTime,
+          run.durationMinutes,
+          incomingRun.startTime,
+          incomingRun.durationMinutes
+        );
+      }),
+    []
+  );
+
   const projectedGuestsForRow = useCallback(
     (row: CanvasRow): number => {
       if (!dragPayload) return 0;
       if (row.isOutsourced) return 0;
 
       if (dragPayload.source === "hopper") {
-        const incomingStartTime = bookingLookup.get(dragPayload.bookingIds[0] ?? "")?.tourTime;
+        const incomingStartTime = bookingRunMetadataForIds(dragPayload.bookingIds)?.startTime;
         if (!incomingStartTime) return 0;
         const baseGuests = slotGuestCount(row, incomingStartTime);
         return baseGuests + dragPayload.guestCount;
@@ -499,7 +562,7 @@ export function DispatchShell({
       }
       return slotGuestCount(row, targetStartTime) + dragPayload.guestCount;
     },
-    [bookingLookup, dragPayload, dragPreview, slotGuestCount]
+    [bookingRunMetadataForIds, dragPayload, dragPreview, slotGuestCount]
   );
 
   const executeOperation = useCallback(
@@ -544,21 +607,31 @@ export function DispatchShell({
         toast.error("Cannot assign directly to an outsourced lane");
         return;
       }
-      const incomingStartTime = bookingLookup.get(bookingIds[0] ?? "")?.tourTime;
+      const incomingRun = bookingRunMetadataForIds(bookingIds);
+      if (!incomingRun) {
+        toast.error("Unable to determine booking run details for assignment");
+        return;
+      }
+      const incomingStartTime = incomingRun.startTime;
+
+      if (hasRunOverlapConflict(targetRow, incomingRun)) {
+        toast.error("Guide has overlapping runs during this time window");
+        return;
+      }
 
       if (violatesPrivateSlotRule(targetRow, bookingIds, incomingStartTime)) {
         toast.error("Private tours require an exclusive guide timeslot");
         return;
       }
 
-      if (!incomingStartTime) {
-        toast.error("Unable to determine booking start time for assignment");
-        return;
-      }
-
       const deltaGuests = bookingIds.reduce((sum, bookingId) => {
         const assignment = bookingAssignments.get(bookingId);
-        if (assignment?.guideId === targetGuideId && assignment.run.startTime === incomingStartTime) return sum;
+        if (
+          assignment?.guideId === targetGuideId &&
+          assignment.run.tourRunKey === incomingRun.runKey
+        ) {
+          return sum;
+        }
         return sum + (bookingLookup.get(bookingId)?.guestCount ?? 0);
       }, 0);
 
@@ -615,23 +688,46 @@ export function DispatchShell({
           `Assigned ${changes.length} booking${changes.length === 1 ? "" : "s"} to ${targetRow.guide.firstName} ${targetRow.guide.lastName}`,
       });
     },
-    [bookingAssignments, bookingLookup, executeOperation, rowLookup, slotGuestCount, violatesPrivateSlotRule]
+    [
+      bookingAssignments,
+      bookingLookup,
+      bookingRunMetadataForIds,
+      executeOperation,
+      hasRunOverlapConflict,
+      rowLookup,
+      slotGuestCount,
+      violatesPrivateSlotRule,
+    ]
   );
 
   const assignBestFit = useCallback(
     async (bookingIds: string[], label: string) => {
-      const incomingStartTime = bookingLookup.get(bookingIds[0] ?? "")?.tourTime;
-      if (!incomingStartTime) {
-        toast.error("Unable to determine booking start time for best fit");
+      const incomingRun = bookingRunMetadataForIds(bookingIds);
+      if (!incomingRun) {
+        toast.error("Unable to determine booking run details for best fit");
         return;
       }
+      const incomingStartTime = incomingRun.startTime;
 
       const candidates = rows
         .filter((row) => !row.isOutsourced)
         .map((row) => {
+          if (hasRunOverlapConflict(row, incomingRun)) {
+            return null;
+          }
+
+          if (violatesPrivateSlotRule(row, bookingIds, incomingStartTime)) {
+            return null;
+          }
+
           const deltaGuests = bookingIds.reduce((sum, bookingId) => {
             const assignment = bookingAssignments.get(bookingId);
-            if (assignment?.guideId === row.guide.id && assignment.run.startTime === incomingStartTime) return sum;
+            if (
+              assignment?.guideId === row.guide.id &&
+              assignment.run.tourRunKey === incomingRun.runKey
+            ) {
+              return sum;
+            }
             return sum + (bookingLookup.get(bookingId)?.guestCount ?? 0);
           }, 0);
 
@@ -642,6 +738,11 @@ export function DispatchShell({
             remainingSeats: row.vehicleCapacity - projectedGuests,
           };
         })
+        .filter((candidate): candidate is {
+          row: CanvasRow;
+          projectedGuests: number;
+          remainingSeats: number;
+        } => Boolean(candidate))
         .filter((candidate) => candidate.projectedGuests <= candidate.row.vehicleCapacity)
         .sort((a, b) => a.remainingSeats - b.remainingSeats || b.row.utilization - a.row.utilization);
 
@@ -657,7 +758,16 @@ export function DispatchShell({
         `Assigned ${label} to ${best.row.guide.firstName} ${best.row.guide.lastName}`
       );
     },
-    [assignBookingIdsToGuide, bookingAssignments, bookingLookup, rows, slotGuestCount]
+    [
+      assignBookingIdsToGuide,
+      bookingAssignments,
+      bookingLookup,
+      bookingRunMetadataForIds,
+      hasRunOverlapConflict,
+      rows,
+      slotGuestCount,
+      violatesPrivateSlotRule,
+    ]
   );
 
   const executeDropToGuide = useCallback(
@@ -684,11 +794,42 @@ export function DispatchShell({
             )
           : dragPayload.startTime;
 
+      const inferredHopperRun = dragPayload.source === "hopper"
+        ? bookingRunMetadataForIds(dragPayload.bookingIds)
+        : null;
+      const inferredHopperStart = inferredHopperRun?.startTime;
+      const dropStart = dropStartTime ?? dragPayload.startTime ?? inferredHopperStart;
+
       if (dragPayload.source === "guide" && dragPayload.sourceGuideId === targetGuideId) {
         try {
-          if (!dragPayload.startTime || !dropStartTime) return;
+          if (!dragPayload.startTime || !dropStartTime || !dragPayload.durationMinutes) return;
 
           if (dropStartTime === dragPayload.startTime) return;
+
+          const runKeyAtDrop = retimeRunKey(dragPayload.runKey, dropStartTime);
+          const incomingRun: IncomingRunMetadata = {
+            startTime: dropStartTime,
+            durationMinutes: dragPayload.durationMinutes,
+            runKey: runKeyAtDrop,
+          };
+
+          if (hasRunOverlapConflict(targetRow, incomingRun, { ignoreRunId: dragPayload.runId })) {
+            toast.error("Guide has overlapping runs during this time window");
+            return;
+          }
+
+          const projectedGuests = slotGuestCount(targetRow, dropStartTime, dragPayload.runId) + dragPayload.guestCount;
+          if (projectedGuests > targetRow.vehicleCapacity) {
+            toast.error(
+              `${targetRow.guide.firstName} ${targetRow.guide.lastName} would exceed slot capacity (${projectedGuests}/${targetRow.vehicleCapacity})`
+            );
+            return;
+          }
+
+          if (violatesPrivateSlotRule(targetRow, dragPayload.bookingIds, dropStartTime, dragPayload.runId)) {
+            toast.error("Private tours require an exclusive guide timeslot");
+            return;
+          }
 
           await executeOperation({
             changes: [
@@ -715,12 +856,6 @@ export function DispatchShell({
         return;
       }
 
-      const inferredHopperStart =
-        dragPayload.source === "hopper"
-          ? bookingLookup.get(dragPayload.bookingIds[0] ?? "")?.tourTime
-          : undefined;
-      const dropStart = dropStartTime ?? dragPayload.startTime ?? inferredHopperStart;
-
       try {
         if (dragPayload.source === "hopper") {
           await assignBookingIdsToGuide(dragPayload.bookingIds, targetGuideId);
@@ -729,6 +864,30 @@ export function DispatchShell({
 
         if (!dropStart) {
           toast.error("Unable to determine booking start time for this move");
+          return;
+        }
+
+        const incomingDuration = dragPayload.durationMinutes ?? inferredHopperRun?.durationMinutes;
+        if (!incomingDuration) {
+          toast.error("Unable to determine run duration for this move");
+          return;
+        }
+        const incomingRunKey =
+          dragPayload.runKey
+            ? retimeRunKey(dragPayload.runKey, dropStart)
+            : retimeRunKey(inferredHopperRun?.runKey ?? undefined, dropStart);
+        const incomingRun: IncomingRunMetadata = {
+          startTime: dropStart,
+          durationMinutes: incomingDuration,
+          runKey: incomingRunKey,
+        };
+
+        if (
+          hasRunOverlapConflict(targetRow, incomingRun, {
+            ignoreRunId: dragPayload.sourceGuideId === targetGuideId ? dragPayload.runId : undefined,
+          })
+        ) {
+          toast.error("Guide has overlapping runs during this time window");
           return;
         }
 
@@ -801,7 +960,17 @@ export function DispatchShell({
         resetDrag();
       }
     },
-    [assignBookingIdsToGuide, bookingLookup, dragPayload, executeOperation, resetDrag, rowLookup, slotGuestCount, violatesPrivateSlotRule]
+    [
+      assignBookingIdsToGuide,
+      bookingRunMetadataForIds,
+      dragPayload,
+      executeOperation,
+      hasRunOverlapConflict,
+      resetDrag,
+      rowLookup,
+      slotGuestCount,
+      violatesPrivateSlotRule,
+    ]
   );
 
   const executeDropToHopper = useCallback(async () => {
@@ -872,6 +1041,17 @@ export function DispatchShell({
         return;
       }
 
+      if (
+        hasRunOverlapConflict(targetRow, {
+          startTime: selected.run.startTime,
+          durationMinutes: selected.run.durationMinutes,
+          runKey: selected.run.tourRunKey,
+        })
+      ) {
+        toast.error("Guide has overlapping runs during this time window");
+        return;
+      }
+
       if (violatesPrivateSlotRule(targetRow, selected.run.bookingIds, selected.run.startTime, selected.run.id)) {
         toast.error("Private tours require an exclusive guide timeslot");
         return;
@@ -905,7 +1085,7 @@ export function DispatchShell({
         description: `Moved ${selected.run.tourName} to ${targetRow.guide.firstName} ${targetRow.guide.lastName}`,
       });
     },
-    [executeOperation, rowLookup, runLookup, slotGuestCount, violatesPrivateSlotRule]
+    [executeOperation, hasRunOverlapConflict, rowLookup, runLookup, slotGuestCount, violatesPrivateSlotRule]
   );
 
   const handleRescheduleRun = useCallback(
@@ -914,6 +1094,37 @@ export function DispatchShell({
       if (!selected) return;
       const newStartTime = normalizeStartTime(newStartTimeInput, selected.run.durationMinutes);
       if (newStartTime === selected.run.startTime) return;
+
+      const row = rowLookup.get(guideId);
+      if (!row) return;
+
+      if (
+        hasRunOverlapConflict(
+          row,
+          {
+            startTime: newStartTime,
+            durationMinutes: selected.run.durationMinutes,
+            runKey: retimeRunKey(selected.run.tourRunKey, newStartTime),
+          },
+          { ignoreRunId: selected.run.id }
+        )
+      ) {
+        toast.error("Guide has overlapping runs during this time window");
+        return;
+      }
+
+      if (violatesPrivateSlotRule(row, selected.run.bookingIds, newStartTime, selected.run.id)) {
+        toast.error("Private tours require an exclusive guide timeslot");
+        return;
+      }
+
+      const projectedGuests = slotGuestCount(row, newStartTime, selected.run.id) + selected.run.guestCount;
+      if (projectedGuests > row.vehicleCapacity) {
+        toast.error(
+          `${row.guide.firstName} ${row.guide.lastName} would exceed slot capacity (${projectedGuests}/${row.vehicleCapacity})`
+        );
+        return;
+      }
 
       await executeOperation({
         changes: [
@@ -935,7 +1146,7 @@ export function DispatchShell({
         description: `Rescheduled ${selected.run.tourName} to ${formatTimeLabel(newStartTime)}`,
       });
     },
-    [executeOperation, runLookup]
+    [executeOperation, hasRunOverlapConflict, rowLookup, runLookup, slotGuestCount, violatesPrivateSlotRule]
   );
 
   const handleReturnRunToQueue = useCallback(
@@ -1095,7 +1306,7 @@ export function DispatchShell({
           />
         )}
 
-        <div className="relative z-0 min-w-0 flex-1">
+        <div className="relative z-0 min-h-0 min-w-0 flex-1">
           <TimelinePane
             rows={rows}
             markers={markers}
@@ -1183,6 +1394,7 @@ export function DispatchShell({
                 bookingIds: [...run.bookingIds],
                 guestCount: run.guestCount,
                 runId: run.id,
+                runKey: run.tourRunKey,
                 tourName: run.tourName,
                 startTime: run.startTime,
                 durationMinutes: run.durationMinutes,

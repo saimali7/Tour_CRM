@@ -146,7 +146,7 @@ export function TimelinePane({
     <div
       ref={viewportRef}
       data-timeline-scroll="true"
-      className="relative min-h-0 min-w-0 flex-1 overflow-auto bg-background/35"
+      className="relative h-full min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain bg-background/35"
       onClick={handleBackgroundClick}
     >
       <div className="sticky top-0 z-10 border-b bg-card/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80">

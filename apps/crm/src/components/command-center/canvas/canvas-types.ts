@@ -17,6 +17,7 @@ export interface DragPayload {
   bookingIds: string[];
   guestCount: number;
   runId?: string;
+  runKey?: string;
   tourName?: string;
   startTime?: string;
   durationMinutes?: number;
