@@ -14,6 +14,7 @@ export * from "./payments";
 
 // Phase 2: Communications & Customer engagement
 export * from "./communications";
+export * from "./notifications";
 
 // Phase 3: Guide Operations
 export * from "./guide-operations";

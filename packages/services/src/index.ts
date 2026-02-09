@@ -26,6 +26,7 @@ import { PricingCalculationService } from "./pricing-calculation-service";
 import { AnalyticsService } from "./analytics-service";
 import { DashboardService } from "./dashboard-service";
 import { CustomerIntelligenceService } from "./customer-intelligence-service";
+import { NotificationService } from "./notification-service";
 // High-Impact Features
 import { ReviewService } from "./review-service";
 import { PaymentService } from "./payment-service";
@@ -76,6 +77,7 @@ export interface Services {
   analytics: AnalyticsService;
   dashboard: DashboardService;
   customerIntelligence: CustomerIntelligenceService;
+  notification: NotificationService;
   // High-Impact Features
   review: ReviewService;
   payment: PaymentService;
@@ -138,6 +140,7 @@ export function createServices(ctx: ServiceContext): Services {
     analytics: new AnalyticsService(ctx),
     dashboard: new DashboardService(ctx),
     customerIntelligence: new CustomerIntelligenceService(ctx),
+    notification: new NotificationService(ctx),
     // High-Impact Features
     review: new ReviewService(ctx),
     payment: new PaymentService(ctx),
@@ -200,6 +203,7 @@ export { PricingCalculationService } from "./pricing-calculation-service";
 export { AnalyticsService } from "./analytics-service";
 export { DashboardService } from "./dashboard-service";
 export { CustomerIntelligenceService } from "./customer-intelligence-service";
+export { NotificationService } from "./notification-service";
 // High-Impact Features
 export { ReviewService } from "./review-service";
 export { PaymentService } from "./payment-service";

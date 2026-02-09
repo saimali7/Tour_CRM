@@ -43,6 +43,13 @@
       "when": 1770626609551,
       "tag": "0005_patch-guides-dispatch-columns",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770663613684,
+      "tag": "0006_add-notification-center",
+      "breakpoints": true
     }
   ]
 }

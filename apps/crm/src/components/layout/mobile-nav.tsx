@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard,
-  Calendar,
-  ClipboardList,
-  MapPin,
-  Users,
+  House,
+  CalendarDays,
+  Ticket,
+  Map,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react';
 import type { Route } from 'next';
@@ -21,11 +21,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { name: 'Home', href: '', icon: LayoutDashboard },
-  { name: 'Calendar', href: '/calendar', icon: Calendar },
-  { name: 'Bookings', href: '/bookings', icon: ClipboardList },
-  { name: 'Tours', href: '/tours', icon: MapPin },
-  { name: 'Customers', href: '/customers', icon: Users },
+  { name: 'Home', href: '', icon: House },
+  { name: 'Calendar', href: '/calendar', icon: CalendarDays },
+  { name: 'Bookings', href: '/bookings', icon: Ticket },
+  { name: 'Tours', href: '/tours', icon: Map },
+  { name: 'Customers', href: '/customers', icon: UserRound },
 ];
 
 interface MobileNavProps {

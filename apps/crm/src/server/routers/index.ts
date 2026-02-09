@@ -26,6 +26,7 @@ import { analyticsRouter } from "./analytics";
 import { dashboardRouter } from "./dashboard";
 import { customerIntelligenceRouter } from "./customer-intelligence";
 import { reportsRouter } from "./reports";
+import { notificationRouter } from "./notification";
 // Phase 6 routers
 import { searchRouter } from "./search";
 // High-Impact Features
@@ -78,6 +79,7 @@ export const appRouter = createRouter({
   dashboard: dashboardRouter,
   customerIntelligence: customerIntelligenceRouter,
   reports: reportsRouter,
+  notification: notificationRouter,
   // Phase 6 routers
   search: searchRouter,
   // High-Impact Features

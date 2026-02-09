@@ -11,7 +11,7 @@ interface DashboardShellProps {
 /**
  * DashboardShell
  *
- * Client-side wrapper for the main content area that responds to context panel state.
+ * Client-side wrapper for dashboard chrome that responds to context panel state.
  * Provides smooth push behavior on larger screens when the context panel is open.
  *
  * Layout behavior:
@@ -33,15 +33,7 @@ export function DashboardShell({ children, mobileHeader }: DashboardShellProps) 
     >
       {/* Mobile header slot */}
       {mobileHeader}
-
-      {/* Page content */}
-      <main
-        id="main-content"
-        className="flex-1 flex flex-col min-h-0 overflow-auto p-4 md:p-6 mobile-content-padding"
-        tabIndex={-1}
-      >
-        {children}
-      </main>
+      {children}
     </div>
   );
 }

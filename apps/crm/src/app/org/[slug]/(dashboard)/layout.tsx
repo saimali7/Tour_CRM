@@ -75,7 +75,7 @@ export default async function DashboardLayout({
   params,
 }: DashboardLayoutProps) {
   const { slug } = await params;
-  const { organization, role } = await getOrgContext(slug);
+  const { organization } = await getOrgContext(slug);
 
   return (
     <DashboardProviders orgSlug={slug}>
@@ -96,7 +96,13 @@ export default async function DashboardLayout({
         <DashboardShell
           mobileHeader={<MobileHeader organization={organization} slug={slug} />}
         >
-          {children}
+          <main
+            id="main-content"
+            className="flex-1 flex flex-col min-h-0 overflow-auto p-4 md:p-6 mobile-content-padding"
+            tabIndex={-1}
+          >
+            {children}
+          </main>
         </DashboardShell>
 
         {/* Mobile bottom navigation */}

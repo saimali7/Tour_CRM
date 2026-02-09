@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
-  Send,
-  Calendar,
-  ClipboardList,
-  MapPin,
-  Users,
-  Flag,
-  BarChart3,
+  House,
+  Radar,
+  CalendarDays,
+  Ticket,
+  Map,
+  UserRound,
+  UserCheck,
+  ChartLine,
   Settings,
   Search,
   type LucideIcon,
@@ -31,14 +31,15 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { name: "Dashboard", href: "", icon: LayoutDashboard, shortcut: "1" },
-  { name: "Dispatch", href: "/command-center", icon: Send, shortcut: "2" },
-  { name: "Calendar", href: "/calendar", icon: Calendar, shortcut: "3" },
-  { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "4" },
-  { name: "Tours", href: "/tours", icon: MapPin, shortcut: "5" },
-  { name: "Customers", href: "/customers", icon: Users, shortcut: "6" },
-  { name: "Guides", href: "/guides", icon: Flag, shortcut: "7" },
-  { name: "Analytics", href: "/analytics", icon: BarChart3, shortcut: "8" },
+  // Keep icon metaphors concrete and domain-specific for faster recognition.
+  { name: "Dashboard", href: "", icon: House, shortcut: "1" },
+  { name: "Dispatch", href: "/command-center", icon: Radar, shortcut: "2" },
+  { name: "Calendar", href: "/calendar", icon: CalendarDays, shortcut: "3" },
+  { name: "Bookings", href: "/bookings", icon: Ticket, shortcut: "4" },
+  { name: "Tours", href: "/tours", icon: Map, shortcut: "5" },
+  { name: "Customers", href: "/customers", icon: UserRound, shortcut: "6" },
+  { name: "Guides", href: "/guides", icon: UserCheck, shortcut: "7" },
+  { name: "Analytics", href: "/analytics", icon: ChartLine, shortcut: "8" },
 ];
 
 interface NavRailProps {
@@ -123,7 +124,7 @@ export function NavRail({ orgSlug, orgName, userButton }: NavRailProps) {
 
         {/* Main Navigation */}
         <nav className="flex-1 flex flex-col items-center gap-1 py-2 overflow-y-auto">
-          {navItems.map((item, index) => {
+          {navItems.map((item) => {
             const itemPath = `${basePath}${item.href}` as Route;
             const isActive =
               item.href === ""

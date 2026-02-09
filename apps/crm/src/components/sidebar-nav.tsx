@@ -9,10 +9,10 @@ import {
   ClipboardList,
   MapPin,
   Users,
-  UsersRound,
+  UserCheck,
   TrendingUp,
   Settings,
-  LucideIcon,
+  type LucideIcon,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
@@ -44,7 +44,7 @@ const navItems: NavItem[] = [
   { name: "Bookings", href: "/bookings", icon: ClipboardList, shortcut: "3" },
   { name: "Tours", href: "/tours", icon: MapPin, shortcut: "4" },
   { name: "Customers", href: "/customers", icon: Users, shortcut: "5" },
-  { name: "Team", href: "/guides", icon: UsersRound, shortcut: "6" },
+  { name: "Guides", href: "/guides", icon: UserCheck, shortcut: "6" },
   { name: "Insights", href: "/analytics", icon: TrendingUp, shortcut: "7" },
 ];
 
@@ -91,9 +91,6 @@ export function SidebarNav({ orgSlug }: SidebarNavProps) {
               item.href === ""
                 ? pathname === basePath
                 : pathname === itemPath || pathname.startsWith(`${itemPath}/`);
-
-            // First 3 items are primary (daily ops), rest are secondary
-            const isPrimary = index < 3;
 
             const linkContent = (
               <Link

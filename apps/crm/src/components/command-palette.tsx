@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   BarChart3,
   Settings,
+  UserCheck,
   ArrowRight,
   Sparkles,
   Clock,
@@ -98,7 +99,7 @@ const entityConfig: Record<
     bgClass: "bg-warning/10 dark:bg-warning/20",
   },
   guide: {
-    icon: Users,
+    icon: UserCheck,
     label: "Guides",
     iconClass: "text-primary",
     bgClass: "bg-primary/10",
@@ -144,7 +145,7 @@ const navigationItems: NavigationItem[] = [
   {
     name: "Guides",
     href: "/guides",
-    icon: User,
+    icon: UserCheck,
     shortcut: "6",
     description: "Guide management",
   },
@@ -239,11 +240,20 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [isMounted, setIsMounted] = React.useState(false);
+  const [modKey, setModKey] = React.useState("Ctrl");
   const debouncedSearch = useDebounce(search, 200);
   const { openQuickBooking } = useQuickBookingContext();
 
   React.useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.platform.toUpperCase().includes("MAC")) {
+      setModKey("Cmd");
+      return;
+    }
+    setModKey("Ctrl");
   }, []);
 
   // Search query
@@ -372,11 +382,6 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
         item.description.toLowerCase().includes(lowerSearch)
     );
   }, [search]);
-
-  const isMac =
-    typeof navigator !== "undefined" &&
-    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-  const modKey = isMac ? "Cmd" : "Ctrl";
 
   return (
     <>

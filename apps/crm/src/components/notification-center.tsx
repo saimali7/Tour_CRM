@@ -1,157 +1,164 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useMemo, useState, useEffect } from "react";
+import { formatDistanceToNow, isToday } from "date-fns";
+import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { trpc } from "@/lib/trpc";
-import { formatDistanceToNow } from "date-fns";
 import {
   Bell,
-  Calendar,
-  Users,
   AlertTriangle,
-  Check,
-  Clock,
-  UserCircle,
+  CheckCircle2,
+  Info,
   X,
+  CheckCheck,
+  Archive,
   ChevronRight,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
-interface Notification {
+type NotificationItem = {
   id: string;
-  type: "warning" | "info" | "success" | "critical";
+  severity: "critical" | "warning" | "info" | "success";
   title: string;
-  description: string;
-  timestamp: Date;
-  read: boolean;
-  actionUrl?: string;
-  actionLabel?: string;
-}
+  body: string;
+  actionLabel: string | null;
+  actionUrl: string | null;
+  occurredAt: Date;
+  readAt: Date | null;
+};
 
 export function NotificationCenter() {
   const router = useRouter();
-  const params = useParams();
-  const slug = params.slug as string;
+  const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
   const [isMounted, setIsMounted] = useState(false);
 
-  // Prevent hydration mismatch with Radix Popover random IDs
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Get operations data to generate notifications
-  const { data: operationsData } = trpc.dashboard.getOperationsDashboard.useQuery(undefined, {
-    refetchInterval: 60000,
+  const inboxQueryInput = useMemo(
+    () => ({
+      page: 1,
+      limit: 25,
+      unreadOnly: activeTab === "unread",
+    }),
+    [activeTab]
+  );
+
+  const {
+    data: inbox,
+    isLoading,
+    isFetching,
+  } = trpc.notification.list.useQuery(inboxQueryInput, {
+    enabled: isMounted,
+    refetchInterval: 30000,
   });
 
-  // Generate notifications from operations data
-  const notifications: Notification[] = useMemo(() => {
-    if (!operationsData) return [];
-
-    const items: Notification[] = [];
-    const now = new Date();
-
-    // Unassigned guides (critical)
-    operationsData.upcomingSchedules
-      .filter((s) => s.hasUnconfirmedGuide)
-      .forEach((schedule) => {
-        items.push({
-          id: `unassigned-${schedule.scheduleId}`,
-          type: "critical",
-          title: "No guide assigned",
-          description: `${schedule.tourName} - ${new Date(schedule.startsAt).toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          })}`,
-          timestamp: new Date(schedule.startsAt),
-          read: false,
-          actionUrl: `/org/${slug}/calendar`,
-          actionLabel: "View Calendar",
-        });
-      });
-
-    // Tours starting soon (info)
-    operationsData.upcomingSchedules
-      .filter((s) => {
-        const hoursAway = (new Date(s.startsAt).getTime() - now.getTime()) / (1000 * 60 * 60);
-        return hoursAway > 0 && hoursAway <= 2 && s.bookedCount > 0 && !s.hasUnconfirmedGuide;
-      })
-      .forEach((schedule) => {
-        const minutesAway = Math.round((new Date(schedule.startsAt).getTime() - now.getTime()) / (1000 * 60));
-        items.push({
-          id: `starting-soon-${schedule.scheduleId}`,
-          type: "info",
-          title: `Starting in ${minutesAway} min`,
-          description: `${schedule.tourName} - ${schedule.bookedCount} guests`,
-          timestamp: new Date(schedule.startsAt),
-          read: false,
-          actionUrl: `/org/${slug}/calendar`,
-          actionLabel: "View Details",
-        });
-      });
-
-    // Low capacity warnings
-    operationsData.upcomingSchedules
-      .filter((s) => {
-        const utilization = s.maxParticipants > 0 ? (s.bookedCount / s.maxParticipants) * 100 : 0;
-        const daysAway = Math.ceil((new Date(s.startsAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        return utilization < 30 && daysAway > 2 && !s.hasUnconfirmedGuide;
-      })
-      .slice(0, 3)
-      .forEach((schedule) => {
-        items.push({
-          id: `low-capacity-${schedule.scheduleId}`,
-          type: "warning",
-          title: "Low bookings",
-          description: `${schedule.tourName} - ${schedule.bookedCount}/${schedule.maxParticipants} booked`,
-          timestamp: new Date(schedule.startsAt),
-          read: false,
-          actionUrl: `/org/${slug}/calendar`,
-          actionLabel: "View Schedule",
-        });
-      });
-
-    return items.filter((n) => !dismissedIds.has(n.id));
-  }, [operationsData, slug, dismissedIds]);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const handleDismiss = (id: string) => {
-    setDismissedIds((prev) => new Set(prev).add(id));
+  const refreshInbox = async () => {
+    await utils.notification.list.invalidate();
   };
 
-  const handleNotificationClick = (notification: Notification) => {
+  const markReadMutation = trpc.notification.markRead.useMutation({
+    onSuccess: () => {
+      void refreshInbox();
+    },
+  });
+
+  const markAllReadMutation = trpc.notification.markAllRead.useMutation({
+    onSuccess: () => {
+      void refreshInbox();
+    },
+  });
+
+  const archiveMutation = trpc.notification.archive.useMutation({
+    onSuccess: () => {
+      void refreshInbox();
+    },
+  });
+
+  const archiveAllReadMutation = trpc.notification.archiveAllRead.useMutation({
+    onSuccess: () => {
+      void refreshInbox();
+    },
+  });
+
+  const notifications = useMemo(
+    () => (inbox?.data ?? []) as NotificationItem[],
+    [inbox?.data]
+  );
+  const unreadCount = inbox?.unreadCount ?? 0;
+  const mutationBusy =
+    markReadMutation.isPending ||
+    markAllReadMutation.isPending ||
+    archiveMutation.isPending ||
+    archiveAllReadMutation.isPending;
+
+  const sections = useMemo(() => {
+    const today: NotificationItem[] = [];
+    const earlier: NotificationItem[] = [];
+
+    for (const notification of notifications) {
+      if (isToday(new Date(notification.occurredAt))) {
+        today.push(notification);
+      } else {
+        earlier.push(notification);
+      }
+    }
+
+    return [
+      { label: "Today", items: today },
+      { label: "Earlier", items: earlier },
+    ].filter((section) => section.items.length > 0);
+  }, [notifications]);
+
+  const handleNotificationClick = (notification: NotificationItem) => {
+    if (!notification.readAt) {
+      markReadMutation.mutate({ ids: [notification.id] });
+    }
+
     if (notification.actionUrl) {
       router.push(notification.actionUrl as Route);
       setOpen(false);
     }
   };
 
-  const getIcon = (type: Notification["type"]) => {
-    switch (type) {
+  const handleDismiss = (id: string) => {
+    archiveMutation.mutate({ ids: [id] });
+  };
+
+  const renderSeverityIcon = (severity: NotificationItem["severity"]) => {
+    switch (severity) {
       case "critical":
         return <AlertTriangle className="h-4 w-4 text-destructive" />;
       case "warning":
         return <AlertTriangle className="h-4 w-4 text-warning" />;
       case "success":
-        return <Check className="h-4 w-4 text-success" />;
+        return <CheckCircle2 className="h-4 w-4 text-success" />;
       case "info":
       default:
-        return <Clock className="h-4 w-4 text-info" />;
+        return <Info className="h-4 w-4 text-info" />;
     }
   };
 
-  // Render a placeholder button during SSR/initial mount to prevent hydration mismatch
+  const renderSeverityBadge = (severity: NotificationItem["severity"]) => {
+    if (severity === "critical") return <Badge variant="destructive">Critical</Badge>;
+    if (severity === "warning") return <Badge variant="warning">Warning</Badge>;
+    if (severity === "success") return <Badge variant="success">Success</Badge>;
+    return <Badge variant="outline">Info</Badge>;
+  };
+
   if (!isMounted) {
     return (
       <Button
@@ -172,138 +179,171 @@ export function NotificationCenter() {
           variant="ghost"
           size="icon"
           className="relative h-9 w-9"
-          aria-label={unreadCount > 0 ? `${unreadCount} notifications` : "Notifications"}
+          aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-white">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
+
       <PopoverContent
-        className="w-80 p-0"
         align="end"
         sideOffset={8}
+        className="w-[420px] p-0 border-border/70 shadow-xl"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border p-3">
-          <h3 className="font-semibold">Notifications</h3>
-          {notifications.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs h-7"
-              onClick={() => setDismissedIds(new Set(notifications.map((n) => n.id)))}
-            >
-              Clear all
-            </Button>
-          )}
+        <div className="border-b border-border/70 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold tracking-tight">Inbox</h3>
+              {unreadCount > 0 && (
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                  {unreadCount} unread
+                </Badge>
+              )}
+              {isFetching && (
+                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={unreadCount === 0 || mutationBusy}
+                onClick={() => markAllReadMutation.mutate()}
+              >
+                <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                Mark all read
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={mutationBusy}
+                onClick={() => archiveAllReadMutation.mutate()}
+              >
+                <Archive className="h-3.5 w-3.5 mr-1" />
+                Clear read
+              </Button>
+            </div>
+          </div>
+
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as "all" | "unread")}
+            className="mt-3"
+          >
+            <TabsList className="h-8 w-full grid grid-cols-2">
+              <TabsTrigger value="all" className="text-xs h-6">
+                All
+              </TabsTrigger>
+              <TabsTrigger value="unread" className="text-xs h-6">
+                Unread
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        {/* Notification list */}
-        <div className="max-h-[400px] overflow-y-auto">
-          {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Bell className="h-8 w-8 text-muted-foreground mb-2 opacity-50" />
-              <p className="text-sm text-muted-foreground">All caught up!</p>
-              <p className="text-xs text-muted-foreground mt-1">No new notifications</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={cn(
-                    "p-3 hover:bg-muted/50 cursor-pointer transition-colors relative group",
-                    notification.type === "critical" && "bg-destructive/5"
-                  )}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDismiss(notification.id);
-                    }}
-                    className="absolute top-2 right-2 p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity"
-                    aria-label="Dismiss notification"
-                  >
-                    <X className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                  <div className="flex gap-3 pr-6">
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getIcon(notification.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {notification.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {notification.description}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(notification.timestamp, { addSuffix: true })}
-                        </span>
-                        {notification.actionLabel && (
-                          <span className="text-xs text-primary flex items-center gap-0.5">
-                            {notification.actionLabel}
-                            <ChevronRight className="h-3 w-3" />
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+        <ScrollArea className="h-[420px]">
+          {isLoading ? (
+            <div className="space-y-2 p-3">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="rounded-lg border border-border/60 p-3 animate-pulse">
+                  <div className="h-3 w-2/3 bg-muted rounded" />
+                  <div className="mt-2 h-3 w-full bg-muted rounded" />
+                  <div className="mt-2 h-3 w-1/3 bg-muted rounded" />
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          ) : notifications.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center px-6">
+              <div className="h-11 w-11 rounded-xl border border-border/70 bg-muted/30 flex items-center justify-center">
+                <Bell className="h-5 w-5 text-muted-foreground/70" />
+              </div>
+              <p className="mt-3 text-sm font-medium text-foreground">No notifications</p>
+              <p className="mt-1 text-xs text-muted-foreground max-w-[240px]">
+                You are up to date. New operational events will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 space-y-4">
+              {sections.map((section) => (
+                <section key={section.label}>
+                  <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                    {section.label}
+                  </p>
+                  <div className="space-y-2">
+                    {section.items.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={cn(
+                          "group relative rounded-xl border border-border/70 bg-card/50 p-3 transition-colors",
+                          "hover:border-border hover:bg-muted/30",
+                          !notification.readAt && "border-primary/30 bg-primary/5"
+                        )}
+                      >
+                        <button
+                          className="w-full text-left"
+                          onClick={() => handleNotificationClick(notification)}
+                        >
+                          <div className="flex items-start gap-3 pr-6">
+                            <div className="mt-0.5 shrink-0">
+                              {renderSeverityIcon(notification.severity)}
+                            </div>
 
-        {/* Footer */}
-        {notifications.length > 0 && (
-          <div className="border-t border-border p-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-xs"
-              onClick={() => {
-                router.push(`/org/${slug}` as Route);
-                setOpen(false);
-              }}
-            >
-              View all on Today page
-            </Button>
-          </div>
-        )}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium text-foreground leading-tight">
+                                  {notification.title}
+                                </p>
+                                {renderSeverityBadge(notification.severity)}
+                              </div>
+
+                              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                {notification.body}
+                              </p>
+
+                              <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                                <span>
+                                  {formatDistanceToNow(new Date(notification.occurredAt), {
+                                    addSuffix: true,
+                                  })}
+                                </span>
+                                {notification.actionLabel && (
+                                  <span className="inline-flex items-center gap-1 text-primary font-medium">
+                                    {notification.actionLabel}
+                                    <ChevronRight className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+
+                        <button
+                          className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground/70 opacity-0 transition hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                          aria-label="Dismiss notification"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDismiss(notification.id);
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
       </PopoverContent>
     </Popover>
-  );
-}
-
-// Compact version for collapsed sidebar
-export function NotificationBell() {
-  const params = useParams();
-  const slug = params.slug as string;
-
-  const { data: operationsData } = trpc.dashboard.getOperationsDashboard.useQuery(undefined, {
-    refetchInterval: 60000,
-  });
-
-  const unreadCount = useMemo(() => {
-    if (!operationsData) return 0;
-    return operationsData.upcomingSchedules.filter((s) => s.hasUnconfirmedGuide).length;
-  }, [operationsData]);
-
-  return (
-    <div className="relative">
-      <Bell className="h-4 w-4" />
-      {unreadCount > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-medium text-white">
-          {unreadCount > 9 ? "+" : unreadCount}
-        </span>
-      )}
-    </div>
   );
 }
