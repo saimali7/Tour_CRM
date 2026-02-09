@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Users, CheckCircle2, AlertCircle, Eye, FileText, UserPlus } from "lucide-react";
 import Link from "next/link";
+import type { Route } from "next";
 import { QuickAssignGuideModal } from "./QuickAssignGuideModal";
 
 interface TodayScheduleItem {
@@ -60,7 +61,7 @@ export function TodaySchedule({ schedule, orgSlug }: TodayScheduleProps) {
           const dateParam = isoDate
             ? `?date=${isoDate}`
             : "";
-          const commandCenterHref = `/org/${orgSlug}/command-center${dateParam}`;
+          const commandCenterHref = `/org/${orgSlug}/command-center${dateParam}` as Route;
 
           return (
             <div
