@@ -44,6 +44,7 @@ export const sendDispatchNotifications = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };

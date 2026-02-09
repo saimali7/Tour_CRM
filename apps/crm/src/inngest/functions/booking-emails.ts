@@ -58,6 +58,7 @@ export const sendBookingCreatedEmail = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };
@@ -127,6 +128,7 @@ export const sendBookingConfirmationEmail = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };
@@ -195,6 +197,7 @@ export const sendBookingCancellationEmail = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };
@@ -261,6 +264,7 @@ export const sendBookingRescheduleEmail = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };
@@ -334,6 +338,7 @@ export const sendBookingReminderEmail = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };
@@ -405,6 +410,7 @@ export const sendRefundProcessedEmail = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };

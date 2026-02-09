@@ -1,13 +1,21 @@
-import { logger, ServiceError } from "@tour/services";
+import { createServices, logger, ServiceError } from "@tour/services";
 import { generateGuideMagicLink } from "./guide-auth";
 
 // Dynamic email sending using fetch to avoid build-time dependency
-async function sendEmail(to: string, subject: string, html: string, fromName: string): Promise<{ id?: string; error?: { message: string } }> {
+async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  fromName: string,
+  fromEmail?: string
+): Promise<{ id?: string; error?: { message: string } }> {
   try {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       throw new ServiceError("RESEND_API_KEY environment variable must be set", "CONFIG_MISSING", 503);
     }
+
+    const senderEmail = fromEmail || "onboarding@resend.dev";
 
     // Use fetch API to call Resend directly
     const response = await fetch("https://api.resend.com/emails", {
@@ -17,7 +25,7 @@ async function sendEmail(to: string, subject: string, html: string, fromName: st
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `${fromName} <noreply@updates.example.com>`,
+        from: `${fromName} <${senderEmail}>`,
         to,
         subject,
         html,
@@ -119,12 +127,17 @@ export async function sendGuideMagicLink(
     // Generate the magic link
     const magicLink = await generateGuideMagicLink(guideId, organizationId, appUrl);
 
+    // Get organization sender email from General Settings
+    const services = createServices({ organizationId });
+    const organization = await services.organization.get();
+
     // Send email using Resend API
     const { id, error } = await sendEmail(
       guideEmail,
       "Your Guide Portal Access Link",
       generateMagicLinkEmailHtml(guideName, magicLink, organizationName),
-      organizationName
+      organizationName,
+      organization.fromEmail ?? undefined
     );
 
     if (error) {

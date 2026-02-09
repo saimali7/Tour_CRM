@@ -560,6 +560,7 @@ export const bookingRouter = createRouter({
       const emailService = createEmailService({
         name: organization.name,
         email: organization.email,
+        fromEmail: organization.fromEmail ?? undefined,
         phone: organization.phone ?? undefined,
         logoUrl: organization.logoUrl ?? undefined,
       });

@@ -40,6 +40,7 @@ export const sendReviewRequestEmail = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };
@@ -119,6 +120,7 @@ export const sendReviewReminderEmail = inngest.createFunction(
     const orgConfig: OrganizationEmailConfig = {
       name: org.name,
       email: org.email,
+      fromEmail: org.fromEmail ?? undefined,
       phone: org.phone ?? undefined,
       logoUrl: org.logoUrl ?? undefined,
     };
