@@ -682,7 +682,7 @@ export class CommandCenterService extends BaseService {
    */
   private mapDispatchStatusRow(row: DispatchStatusRow): DispatchStatus {
     return {
-      date: this.formatDateKey(row.dispatchDate),
+      date: this.formatDbDateKey(row.dispatchDate),
       status: row.status as DispatchStatusType,
       optimizedAt: row.optimizedAt ?? null,
       dispatchedAt: row.dispatchedAt ?? null,
@@ -1815,7 +1815,7 @@ export class CommandCenterService extends BaseService {
       });
 
       if (booking?.bookingDate) {
-        return this.formatDateKey(booking.bookingDate);
+        return this.formatDbDateKey(booking.bookingDate);
       }
     }
 
@@ -2424,7 +2424,7 @@ export class CommandCenterService extends BaseService {
       if (!booking.tourId || !booking.bookingDate || !booking.bookingTime) {
         throw new ValidationError(`Booking ${booking.id} is missing tour/date/time`);
       }
-      const bookingDateKey = this.formatDateKey(booking.bookingDate);
+      const bookingDateKey = this.formatDbDateKey(booking.bookingDate);
       if (bookingDateKey !== dateKey) {
         throw new ValidationError(`Booking ${booking.id} does not belong to ${dateKey}`);
       }
@@ -2631,7 +2631,7 @@ export class CommandCenterService extends BaseService {
       if (!guideId || !booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) continue;
       if (booking.status !== "pending" && booking.status !== "confirmed") continue;
       if (changedBookingIds.has(booking.id)) continue;
-      if (this.formatDateKey(booking.bookingDate) !== dateKey) continue;
+      if (this.formatDbDateKey(booking.bookingDate) !== dateKey) continue;
 
       const durationMinutes = tourDurationById.get(booking.tourId) ?? 60;
       const startMinutes = this.parseTimeToMinutes(booking.bookingTime);
@@ -3241,6 +3241,15 @@ export class CommandCenterService extends BaseService {
   }
 
   /**
+   * Normalize DATE columns loaded from Postgres to YYYY-MM-DD.
+   * Drizzle `date(..., { mode: "date" })` maps via `new Date("YYYY-MM-DD")`,
+   * so using UTC date parts preserves the stored calendar date across timezones.
+   */
+  private formatDbDateKey(date: Date): string {
+    return date.toISOString().split("T")[0]!;
+  }
+
+  /**
    * Parse YYYY-MM-DD into a local Date (midnight).
    */
   private parseDateKey(dateKey: string): Date {
@@ -3486,7 +3495,7 @@ export class CommandCenterService extends BaseService {
       const booking = assignment.booking;
       const name = assignment.outsourcedGuideName?.trim();
       if (!name || !booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) continue;
-      if (this.formatDateKey(booking.bookingDate) !== dateKey) continue;
+      if (this.formatDbDateKey(booking.bookingDate) !== dateKey) continue;
 
       const key = `${name}::${assignment.outsourcedGuideContact ?? ""}`;
       if (!grouped.has(key)) {
