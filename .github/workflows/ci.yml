@@ -12,11 +12,48 @@ concurrency:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '9'
+  PNPM_VERSION: '10'
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
 jobs:
+  schema-guard:
+    name: Schema Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure schema changes include migration files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            if [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              echo "Initial push detected, skipping schema guard."
+              exit 0
+            fi
+          fi
+
+          CHANGED_FILES="$(git diff --name-only "$BASE" "$HEAD")"
+          echo "$CHANGED_FILES"
+
+          if echo "$CHANGED_FILES" | grep -q '^packages/database/src/schema/'; then
+            if ! echo "$CHANGED_FILES" | grep -q '^packages/database/drizzle/'; then
+              echo "Schema files changed without corresponding migration files in packages/database/drizzle."
+              exit 1
+            fi
+          fi
+
+          echo "Schema guard passed."
+
   # ============================================
   # QUALITY CHECKS (runs in parallel)
   # ============================================
@@ -68,7 +105,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck]
+    needs: [schema-guard, lint, typecheck]
     steps:
       - uses: actions/checkout@v4
 
