@@ -721,7 +721,7 @@ export function CommandPalette({ orgSlug }: CommandPaletteProps) {
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground/50">
             <Sparkles className="h-3 w-3" />
-            <span>Tour CRM</span>
+            <span>Manifest</span>
           </div>
         </div>
       </CommandDialog>

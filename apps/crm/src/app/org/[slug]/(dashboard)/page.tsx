@@ -307,7 +307,7 @@ export default function DashboardPage() {
           {/* Desktop button */}
           <button
             onClick={() => openQuickBooking()}
-            className="hidden sm:inline-flex items-center gap-2 h-8 px-3 text-sm font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97]"
+            className="hidden sm:inline-flex items-center gap-2 h-8 px-3 text-sm font-semibold rounded-lg bg-brand text-brand-foreground hover:bg-brand/90 transition-all active:scale-[0.97]"
           >
             <Zap className="h-3.5 w-3.5" />
             Quick Book
@@ -315,7 +315,7 @@ export default function DashboardPage() {
           {/* Mobile button */}
           <button
             onClick={() => openQuickBooking()}
-            className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97]"
+            className="sm:hidden inline-flex items-center justify-center h-9 w-9 rounded-lg bg-brand text-brand-foreground hover:bg-brand/90 transition-all active:scale-[0.97]"
             aria-label="Quick book"
           >
             <Zap className="h-4 w-4" />

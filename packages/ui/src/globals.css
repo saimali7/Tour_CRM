@@ -27,6 +27,10 @@
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
 
+  /* Brand Accent - Sunset Orange */
+  --color-brand: hsl(var(--brand));
+  --color-brand-foreground: hsl(var(--brand-foreground));
+
   /* Semantic Colors */
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
@@ -203,6 +207,10 @@
   --info: 217 91% 60%;               /* #3B82F6 */
   --info-foreground: 0 0% 100%;
 
+  /* Brand Accent - Sunset Orange */
+  --brand: 20 90% 52%;               /* #F05A28 - warm sunset orange */
+  --brand-foreground: 0 0% 100%;     /* White text on brand */
+
   /* Borders & Inputs */
   --border: 220 13% 91%;             /* #E5E7EB (gray-200) */
   --input: 220 13% 91%;
@@ -214,54 +222,60 @@
 
 /* =============================================================================
    CSS VARIABLES - Dark Theme
-   Inspired by Linear, Vercel, and Raycast - deep blacks with subtle elevation
+   Premium dark — subtle blue-indigo tint for depth and cohesion
+   Inspired by Linear, Vercel, and Raycast
    =============================================================================*/
 
 .dark {
-  /* True black background - Linear/Vercel style */
-  --background: 0 0% 3.5%;             /* #090909 - true dark */
-  --foreground: 0 0% 93%;              /* #ededed - slightly softer white */
+  /* Deep blue-black base — 4% sat at hue 225 is felt, never seen */
+  --background: 225 4% 3.5%;
+  --foreground: 210 5% 94%;             /* Cool crisp white (94% avoids OLED glow) */
 
-  /* Elevated surfaces - subtle layering system */
-  --card: 0 0% 5.5%;                   /* #0e0e0e - cards lift off background */
-  --card-foreground: 0 0% 93%;
+  /* Elevated surfaces — 3% gap between bg and card for reliable separation */
+  --card: 225 4% 6.5%;
+  --card-foreground: 210 5% 94%;
 
-  --popover: 0 0% 7%;                  /* #121212 - popovers above cards */
-  --popover-foreground: 0 0% 95%;
+  /* Floating layers — highest chromatic weight (5% sat) feels "lit from within" */
+  --popover: 225 5% 8%;
+  --popover-foreground: 210 5% 95%;
 
-  /* Primary - vibrant but not harsh */
-  --primary: 217 91% 60%;              /* #3b82f6 - blue */
+  /* Primary — confident blue, not electric */
+  --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;
 
-  /* Secondary surfaces - subtle distinction */
-  --secondary: 0 0% 9%;                /* #171717 */
-  --secondary-foreground: 0 0% 90%;
+  /* Secondary surfaces */
+  --secondary: 225 4% 9.5%;
+  --secondary-foreground: 210 4% 88%;
 
-  /* Muted - refined hierarchy */
-  --muted: 0 0% 9%;                    /* #171717 */
-  --muted-foreground: 0 0% 55%;        /* #8c8c8c - softer secondary text */
+  /* Muted — sharp text hierarchy (48% vs 94% foreground) */
+  --muted: 225 4% 9.5%;
+  --muted-foreground: 220 4% 48%;
 
-  /* Accent for hover states - visible but subtle */
-  --accent: 0 0% 12%;                  /* #1f1f1f */
-  --accent-foreground: 0 0% 93%;
+  /* Accent for hover states — 5% sat adds warmth on interaction */
+  --accent: 225 5% 12.5%;
+  --accent-foreground: 210 5% 94%;
 
-  /* Semantic colors - desaturated for dark mode comfort */
-  --destructive: 0 62% 50%;            /* Slightly muted red */
+  /* Semantic colors — gem-like, rich */
+  --destructive: 0 65% 48%;             /* Ruby */
   --destructive-foreground: 0 0% 100%;
 
-  --success: 160 60% 40%;              /* Muted green - easier on eyes */
+  --success: 158 55% 36%;               /* Emerald */
   --success-foreground: 0 0% 100%;
 
-  --warning: 38 75% 50%;               /* Muted amber */
+  --warning: 40 72% 48%;                /* Rich amber */
   --warning-foreground: 0 0% 0%;
 
-  --info: 217 80% 58%;                 /* Slightly muted blue */
+  --info: 217 82% 58%;                  /* Distinct from primary (lower sat) */
   --info-foreground: 0 0% 100%;
 
-  /* Borders - visible but not harsh */
-  --border: 0 0% 14%;                  /* #242424 - clear separation */
-  --input: 0 0% 12%;                   /* #1f1f1f */
-  --ring: 217 91% 60%;                 /* matches primary */
+  /* Brand Accent */
+  --brand: 20 85% 55%;
+  --brand-foreground: 0 0% 100%;
+
+  /* Borders — blue-tinted, subtle separation */
+  --border: 225 4% 13%;
+  --input: 225 4% 8%;
+  --ring: 217 91% 60%;
 }
 
 /* =============================================================================
@@ -570,62 +584,78 @@ body {
 
 /* =============================================================================
    DARK MODE ENHANCEMENTS
-   Additional refinements for premium dark mode experience
+   Premium dark — blue-tinted surfaces, dimensional cards, magnetic buttons
    =============================================================================*/
 
-/* Cards get subtle glow/ring in dark mode for depth */
+/* Cards — faint blue halo + deep shadow for dimensionality */
 .dark .card,
 .dark [class*="rounded-lg"][class*="border"][class*="bg-card"] {
-  box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.03);
+  box-shadow: 0 0 0 1px hsl(225 8% 100% / 0.04),
+              0 1px 2px 0 hsl(225 20% 0% / 0.4);
 }
 
-/* Tables - softer row borders */
+/* Tables — blue-tinted row borders */
 .dark table tbody tr {
-  border-color: hsl(0 0% 12%);
+  border-color: hsl(225 4% 11%);
 }
 
-/* Input fields - subtle inset feel */
-.dark input,
+/* Input fields — recessed into card surface */
+.dark input:not([type="checkbox"]):not([type="radio"]),
 .dark textarea,
 .dark select {
-  background-color: hsl(0 0% 5%);
-  box-shadow: inset 0 1px 2px hsl(0 0% 0% / 0.3);
+  background-color: hsl(225 4% 5%);
+  box-shadow: inset 0 1px 2px hsl(225 10% 0% / 0.4),
+              0 0 0 1px hsl(225 5% 14%);
 }
 
-/* Buttons - subtle depth */
+/* Primary buttons — colored shadow + hover aura */
 .dark button[class*="bg-primary"] {
-  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.4), inset 0 1px 0 hsl(0 0% 100% / 0.1);
+  box-shadow: 0 1px 2px hsl(217 80% 20% / 0.5),
+              inset 0 1px 0 hsl(0 0% 100% / 0.08);
+  transition: box-shadow 150ms ease, transform 100ms ease;
 }
 
-/* Focus states - more visible in dark */
+.dark button[class*="bg-primary"]:hover {
+  box-shadow: 0 0 12px 0 hsl(217 91% 60% / 0.25),
+              0 2px 4px hsl(217 80% 20% / 0.4),
+              inset 0 1px 0 hsl(0 0% 100% / 0.1);
+}
+
+.dark button[class*="bg-primary"]:active {
+  box-shadow: 0 0 6px 0 hsl(217 91% 60% / 0.15),
+              inset 0 1px 3px hsl(217 80% 10% / 0.5);
+}
+
+/* Focus states — double-ring technique */
 .dark *:focus-visible {
-  outline-color: hsl(217 91% 65%);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(225 4% 6.5%),
+              0 0 0 4px hsl(217 91% 60% / 0.6);
 }
 
-/* Selection - tinted with primary */
+/* Selection — refined transparency */
 .dark ::selection {
-  background-color: hsl(217 91% 60% / 0.35);
-  color: hsl(0 0% 100%);
+  background-color: hsl(217 91% 60% / 0.30);
+  color: hsl(210 5% 98%);
 }
 
-/* Scrollbars - dark mode friendly */
+/* Scrollbars — blue-tinted to match surfaces */
 .dark ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 .dark ::-webkit-scrollbar-track {
-  background: hsl(0 0% 6%);
+  background: hsl(225 4% 5%);
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: hsl(0 0% 20%);
+  background: hsl(225 3% 18%);
   border-radius: 4px;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: hsl(0 0% 28%);
+  background: hsl(225 3% 25%);
 }
 
 /* =============================================================================

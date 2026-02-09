@@ -75,12 +75,14 @@ export function NavRail({ orgSlug, orgName, userButton }: NavRailProps) {
   return (
     <TooltipProvider delayDuration={0}>
       <aside className="hidden md:flex w-[60px] flex-shrink-0 flex-col border-r border-border bg-card">
-        {/* Org Avatar */}
+        {/* Manifest Brand Mark */}
         <div className="flex h-14 items-center justify-center border-b border-border">
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold cursor-pointer hover:opacity-90 transition-opacity">
-                {orgName.charAt(0).toUpperCase()}
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary cursor-pointer hover:opacity-90 transition-opacity">
+                <svg width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 25V7l10 12 10-12v18h-5V14l-5 8-5-8v11z" fill="currentColor" className="text-primary-foreground"/>
+                </svg>
               </div>
             </TooltipTrigger>
             <TooltipContent side="right">

@@ -86,11 +86,11 @@ export function ActionBar({
   if (actionItems.length === 0) {
     return (
       <div className={cn(
-        "flex items-center gap-2 px-3 py-2 rounded-lg bg-success dark:bg-success/30 border border-success dark:border-success",
+        "flex items-center gap-2 px-3 py-2 rounded-lg bg-success/15 border border-success/30",
         className
       )}>
-        <CheckCircle className="h-4 w-4 text-success dark:text-success" />
-        <span className="text-sm font-medium text-success dark:text-success">
+        <CheckCircle className="h-4 w-4 text-success" />
+        <span className="text-sm font-medium text-success">
           All caught up - no pending actions
         </span>
       </div>
@@ -102,23 +102,23 @@ export function ActionBar({
     switch (variant) {
       case "confirm":
         return {
-          bg: "bg-warning dark:bg-warning/30",
-          border: "border-warning dark:border-warning",
-          text: "text-warning dark:text-warning",
+          bg: "bg-warning/15 dark:bg-warning/15",
+          border: "border-warning/30 dark:border-warning/30",
+          text: "text-warning",
           icon: Clock,
         };
       case "payment":
         return {
-          bg: "bg-success dark:bg-success/30",
-          border: "border-success dark:border-success",
-          text: "text-success dark:text-success",
+          bg: "bg-success/15 dark:bg-success/15",
+          border: "border-success/30 dark:border-success/30",
+          text: "text-success",
           icon: CreditCard,
         };
       case "guide":
         return {
-          bg: "bg-info dark:bg-info/30",
-          border: "border-info dark:border-info",
-          text: "text-info dark:text-info",
+          bg: "bg-info/15 dark:bg-info/15",
+          border: "border-info/30 dark:border-info/30",
+          text: "text-info",
           icon: UserPlus,
         };
       default:
@@ -136,9 +136,9 @@ export function ActionBar({
   return (
     <div className={cn("flex items-center gap-2 flex-wrap", className)}>
       {/* Action count badge */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning dark:bg-warning/50">
-        <AlertCircle className="h-3.5 w-3.5 text-warning dark:text-warning" />
-        <span className="text-xs font-semibold text-warning dark:text-warning">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warning/15 dark:bg-warning/15">
+        <AlertCircle className="h-3.5 w-3.5 text-warning" />
+        <span className="text-xs font-semibold text-warning">
           {actionItems.length} action{actionItems.length !== 1 ? "s" : ""}
         </span>
       </div>

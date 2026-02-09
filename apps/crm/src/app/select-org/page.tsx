@@ -31,7 +31,7 @@ export default async function SelectOrgPage() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Building2 className="h-4 w-4" />
           </div>
-          <span className="font-semibold text-foreground">Tour CRM</span>
+          <span className="font-semibold text-foreground">Manifest</span>
         </div>
         <UserButton />
       </header>

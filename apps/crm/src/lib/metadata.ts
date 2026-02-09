@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-const APP_NAME = "Tour CRM";
-const APP_DESCRIPTION = "Tour operations management platform";
+const APP_NAME = "Manifest";
+const APP_DESCRIPTION = "The operations platform for tour companies";
 
 interface PageMetadataOptions {
   title: string;

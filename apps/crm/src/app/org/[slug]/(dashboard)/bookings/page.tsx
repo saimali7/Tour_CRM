@@ -146,7 +146,7 @@ export default function BookingsPage() {
         <h1 className="text-lg font-semibold text-foreground">Bookings</h1>
         <button
           onClick={() => openQuickBooking()}
-          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-medium rounded-md bg-brand text-brand-foreground hover:bg-brand/90 transition-colors"
         >
           <Zap className="h-4 w-4" />
           <span className="hidden sm:inline">Quick Book</span>

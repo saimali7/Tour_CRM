@@ -198,9 +198,9 @@ export function TomorrowPreview({
 
       {/* All Clear Message - Compact version */}
       {hasContent && !hasIssues && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success dark:bg-success/30 border border-success dark:border-success">
-          <CheckCircle2 className="h-4 w-4 text-success dark:text-success" />
-          <span className="text-sm font-medium text-success dark:text-success">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/15 border border-success/30">
+          <CheckCircle2 className="h-4 w-4 text-success" />
+          <span className="text-sm font-medium text-success">
             All set for tomorrow
           </span>
         </div>

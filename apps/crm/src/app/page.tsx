@@ -33,7 +33,7 @@ export default async function HomePage() {
             <Building2 className="h-8 w-8" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-foreground">
-            Tour CRM
+            Manifest
           </h1>
           <p className="text-muted-foreground text-lg max-w-md">
             Multi-tenant tour operations platform for managing bookings,
@@ -87,7 +87,7 @@ export default async function HomePage() {
           <Building2 className="h-8 w-8" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Welcome to Tour CRM
+          Welcome to Manifest
         </h1>
         <p className="text-muted-foreground">
           You don&apos;t have access to any organizations yet. Contact your

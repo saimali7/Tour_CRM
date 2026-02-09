@@ -593,7 +593,7 @@ export default function TourRunPage() {
 
       {/* Print Footer */}
       <div className="hidden print:block text-center text-xs text-muted-foreground pt-4 border-t">
-        Printed on {format(new Date(), "MMMM d, yyyy 'at' h:mm a")} | Tour CRM
+        Printed on {format(new Date(), "MMMM d, yyyy 'at' h:mm a")} | Manifest
       </div>
     </div>
   );

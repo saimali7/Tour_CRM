@@ -585,11 +585,11 @@ export const organizationRouter = createRouter({
             const { data, error } = await resend.emails.send({
               from: fromEmail,
               to: input.testEmail,
-              subject: "🧪 Test Email from Tour CRM",
+              subject: "🧪 Test Email from Manifest",
               html: `
                 <div style="font-family: sans-serif; padding: 20px;">
                   <h2>Email Service Test</h2>
-                  <p>This is a test email from your Tour CRM system.</p>
+                  <p>This is a test email from your Manifest system.</p>
                   <p>If you received this, your email service is working correctly!</p>
                   <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;" />
                   <p style="color: #666; font-size: 12px;">
@@ -773,7 +773,7 @@ export const organizationRouter = createRouter({
 
             // Send test SMS
             const message = await client.messages.create({
-              body: `🧪 Test SMS from Tour CRM - ${new Date().toLocaleTimeString()}`,
+              body: `🧪 Test SMS from Manifest - ${new Date().toLocaleTimeString()}`,
               from: process.env.TWILIO_PHONE_NUMBER,
               to: input.testPhone,
             });

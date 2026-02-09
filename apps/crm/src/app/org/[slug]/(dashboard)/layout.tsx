@@ -22,8 +22,8 @@ export async function generateMetadata({
     const { organization } = await getOrgContext(slug);
     return {
       title: {
-        template: `%s | ${organization.name}`,
-        default: organization.name,
+        template: `%s | ${organization.name} · Manifest`,
+        default: `${organization.name} · Manifest`,
       },
       description: `Tour operations dashboard for ${organization.name}`,
     };
@@ -31,10 +31,10 @@ export async function generateMetadata({
     logger.debug({ err: error, slug }, "Could not get org context for metadata, using defaults");
     return {
       title: {
-        template: "%s | Tour CRM",
-        default: "Tour CRM",
+        template: "%s | Manifest",
+        default: "Manifest",
       },
-      description: "Tour operations management platform",
+      description: "The operations platform for tour companies",
     };
   }
 }

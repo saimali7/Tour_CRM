@@ -6,8 +6,8 @@ import { AccessibilityProvider } from "@/components/accessibility-provider";
 import "@tour/ui/globals.css";
 
 export const metadata: Metadata = {
-  title: "Tour CRM",
-  description: "Tour operations management platform",
+  title: "Manifest",
+  description: "The operations platform for tour companies",
 };
 
 // Check if Clerk is enabled

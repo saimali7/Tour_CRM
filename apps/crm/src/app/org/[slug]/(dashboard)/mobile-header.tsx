@@ -29,8 +29,10 @@ export function MobileHeader({ organization, slug }: MobileHeaderProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-          {organization.name.charAt(0).toUpperCase()}
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+          <svg width="16" height="16" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 25V7l10 12 10-12v18h-5V14l-5 8-5-8v11z" fill="currentColor" className="text-primary-foreground"/>
+          </svg>
         </div>
         <p className="flex-1 text-sm font-semibold text-foreground truncate">
           {organization.name}
@@ -54,8 +56,10 @@ export function MobileHeader({ organization, slug }: MobileHeaderProps) {
             {/* Drawer header */}
             <div className="flex h-16 items-center justify-between border-b border-border px-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-                  {organization.name.charAt(0).toUpperCase()}
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                  <svg width="16" height="16" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 25V7l10 12 10-12v18h-5V14l-5 8-5-8v11z" fill="currentColor" className="text-primary-foreground"/>
+                  </svg>
                 </div>
                 <p className="text-sm font-semibold text-foreground">
                   {organization.name}
