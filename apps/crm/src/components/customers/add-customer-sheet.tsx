@@ -339,7 +339,7 @@ export function AddCustomerSheet({ open, onOpenChange, onSuccess }: AddCustomerS
   // Calculate form progress
   const progress = (() => {
     let filled = 0;
-    let total = 3; // Required fields: firstName, lastName, email/phone
+    const total = 3; // Required fields: firstName, lastName, email/phone
 
     if (formData.firstName.trim()) filled++;
     if (formData.lastName.trim()) filled++;

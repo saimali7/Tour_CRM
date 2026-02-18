@@ -119,8 +119,7 @@ Customer-facing booking website.
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Technical architecture |
 | [docs/SYSTEM_DESIGN.md](./docs/SYSTEM_DESIGN.md) | System-level architecture |
 | [docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md) | UI patterns and tokens |
-| [docs/COMMAND_CENTER_SPEC.md](./docs/COMMAND_CENTER_SPEC.md) | Dispatch behavior contract |
-| [docs/project/features/COMMAND_CENTER_SHIP_PLAN.md](./docs/project/features/COMMAND_CENTER_SHIP_PLAN.md) | Command center ship checklist |
+| [docs/RELEASE_NOTES_2026-02-18_PHASE7_STABILIZATION.md](./docs/RELEASE_NOTES_2026-02-18_PHASE7_STABILIZATION.md) | Dispatch stabilization release summary |
 
 ## Status
 

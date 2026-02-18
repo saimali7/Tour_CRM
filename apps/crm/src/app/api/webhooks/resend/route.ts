@@ -223,7 +223,7 @@ export async function POST(req: Request) {
         }
         break;
 
-      case "email.clicked":
+      case "email.clicked": {
         // Track the click and update status
         const existingLinks = (log.metadata as { links?: Array<{ url: string; clicks: number }> })?.links || [];
         const clickedUrl = event.data.click?.link || "";
@@ -256,6 +256,7 @@ export async function POST(req: Request) {
           "Email link clicked"
         );
         break;
+      }
 
       case "email.bounced":
         await db
