@@ -33,6 +33,7 @@ import type {
   BookingWithRelations,
   CreateBookingInput,
   UpdateBookingInput,
+  UpdateCashCollectionInput,
   ParticipantInput,
   BookingStats,
   UrgencyGroupedBookings,
@@ -107,6 +108,10 @@ export class BookingService extends BaseService {
 
   update(id: string, input: UpdateBookingInput): Promise<BookingWithRelations> {
     return this.command.update(id, input);
+  }
+
+  updateCashCollection(id: string, input: UpdateCashCollectionInput): Promise<BookingWithRelations> {
+    return this.command.updateCashCollection(id, input);
   }
 
   confirm(id: string): Promise<BookingWithRelations> {

@@ -9,6 +9,7 @@ import {
   ValidationError,
   ServiceError,
 } from "./types";
+import { formatDateForKey } from "./lib/tour-run-utils";
 
 export interface SeasonalPricingFilters {
   tourId?: string;
@@ -67,11 +68,11 @@ export class SeasonalPricingService extends BaseService {
     }
 
     if (filters.dateRange?.from) {
-      conditions.push(gte(seasonalPricing.endDate, filters.dateRange.from.toISOString().split('T')[0]!));
+      conditions.push(gte(seasonalPricing.endDate, formatDateForKey(filters.dateRange.from)));
     }
 
     if (filters.dateRange?.to) {
-      conditions.push(lte(seasonalPricing.startDate, filters.dateRange.to.toISOString().split('T')[0]!));
+      conditions.push(lte(seasonalPricing.startDate, formatDateForKey(filters.dateRange.to)));
     }
 
     const orderBy =
@@ -112,11 +113,11 @@ export class SeasonalPricingService extends BaseService {
     }
 
     if (filters.dateRange?.from) {
-      conditions.push(gte(seasonalPricing.endDate, filters.dateRange.from.toISOString().split('T')[0]!));
+      conditions.push(gte(seasonalPricing.endDate, formatDateForKey(filters.dateRange.from)));
     }
 
     if (filters.dateRange?.to) {
-      conditions.push(lte(seasonalPricing.startDate, filters.dateRange.to.toISOString().split('T')[0]!));
+      conditions.push(lte(seasonalPricing.startDate, formatDateForKey(filters.dateRange.to)));
     }
 
     return this.db
@@ -160,8 +161,8 @@ export class SeasonalPricingService extends BaseService {
         organizationId: this.organizationId,
         name: input.name,
         description: input.description,
-        startDate: input.startDate.toISOString().split('T')[0]!,
-        endDate: input.endDate.toISOString().split('T')[0]!,
+        startDate: formatDateForKey(input.startDate),
+        endDate: formatDateForKey(input.endDate),
         adjustmentType: input.adjustmentType,
         adjustmentValue: input.adjustmentValue.toString(),
         appliesTo: input.appliesTo ?? "all",
@@ -206,10 +207,10 @@ export class SeasonalPricingService extends BaseService {
       updatedAt: new Date(),
     };
     if (input.startDate) {
-      updateData.startDate = input.startDate.toISOString().split('T')[0];
+      updateData.startDate = formatDateForKey(input.startDate);
     }
     if (input.endDate) {
-      updateData.endDate = input.endDate.toISOString().split('T')[0];
+      updateData.endDate = formatDateForKey(input.endDate);
     }
     if (input.adjustmentValue !== undefined) {
       updateData.adjustmentValue = input.adjustmentValue.toString();
@@ -255,7 +256,7 @@ export class SeasonalPricingService extends BaseService {
     date: Date,
     basePrice: number
   ): Promise<PriceAdjustment> {
-    const dateStr = date.toISOString().split('T')[0]!;
+    const dateStr = formatDateForKey(date);
 
     // Get all active seasons that apply to this tour and date
     const applicableSeasons = await this.db
@@ -321,8 +322,8 @@ export class SeasonalPricingService extends BaseService {
     endDate: Date,
     excludeId?: string
   ): Promise<SeasonalPricing[]> {
-    const startDateStr = startDate.toISOString().split('T')[0]!;
-    const endDateStr = endDate.toISOString().split('T')[0]!;
+    const startDateStr = formatDateForKey(startDate);
+    const endDateStr = formatDateForKey(endDate);
 
     const conditions = [
       eq(seasonalPricing.organizationId, this.organizationId),
@@ -359,7 +360,7 @@ export class SeasonalPricingService extends BaseService {
     current: number;
     past: number;
   }> {
-    const now = new Date().toISOString().split('T')[0]!;
+    const now = await this.getOrganizationDateKey();
 
     const statsResult = await this.db
       .select({

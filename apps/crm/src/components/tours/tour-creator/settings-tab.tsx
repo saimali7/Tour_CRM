@@ -212,6 +212,96 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
             />
           </div>
         </div>
+
+        <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground">Pickup Policy</label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Define whether guests meet at a point, request hotel pickup, or both.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {[
+              { value: "meeting_point", label: "Meeting Point Only", description: "Guests come to the fixed location" },
+              { value: "hotel_pickup", label: "Hotel Pickup", description: "Pickup required from guest location" },
+              { value: "hybrid", label: "Both Options", description: "Guest can choose meeting point or pickup" },
+            ].map((mode) => (
+              <button
+                key={mode.value}
+                type="button"
+                onClick={() => updateForm({ pickupMode: mode.value as TourFormState["pickupMode"] })}
+                className={cn(
+                  "rounded-lg border px-3 py-3 text-left transition-colors",
+                  formState.pickupMode === mode.value
+                    ? "border-primary bg-primary/5"
+                    : "border-input bg-background hover:border-primary/40"
+                )}
+              >
+                <p className="text-sm font-medium text-foreground">{mode.label}</p>
+                <p className="text-xs text-muted-foreground mt-1">{mode.description}</p>
+              </button>
+            ))}
+          </div>
+
+          {(formState.pickupMode === "hotel_pickup" || formState.pickupMode === "hybrid") && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">
+                  Allowed Pickup Cities
+                </label>
+                <input
+                  type="text"
+                  value={formState.pickupAllowedCities.join(", ")}
+                  onChange={(e) =>
+                    updateForm({
+                      pickupAllowedCities: e.target.value
+                        .split(",")
+                        .map((city) => city.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                  placeholder="Dubai, Abu Dhabi"
+                  className={cn(
+                    "w-full px-4 py-3 border rounded-xl transition-all",
+                    "bg-background text-foreground placeholder:text-muted-foreground",
+                    "focus:ring-2 focus:ring-primary/20 focus:border-primary border-input"
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma-separated list. Leave empty to allow any city.
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formState.pickupAirportAllowed}
+                  onChange={(e) => updateForm({ pickupAirportAllowed: e.target.checked })}
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-foreground">Allow airport pickup</span>
+              </label>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">
+                  Pickup Policy Notes
+                </label>
+                <textarea
+                  value={formState.pickupPolicyNotes}
+                  onChange={(e) => updateForm({ pickupPolicyNotes: e.target.value })}
+                  placeholder="Example: Airport pickup available only for Terminal 3 with a surcharge."
+                  rows={2}
+                  className={cn(
+                    "w-full px-4 py-3 border rounded-xl transition-all resize-none",
+                    "bg-background text-foreground placeholder:text-muted-foreground",
+                    "focus:ring-2 focus:ring-primary/20 focus:border-primary border-input"
+                  )}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Cancellation Policy Section */}

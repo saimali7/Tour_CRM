@@ -6,7 +6,7 @@
  * dynamically from availability windows, departure times, and bookings.
  */
 
-import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   tours,
   tourAvailabilityWindows,
@@ -20,6 +20,11 @@ import {
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { NotFoundError, ValidationError } from "./types";
+import {
+  formatDateKeyInTimeZone,
+  getMinutesSinceMidnightInTimeZone,
+} from "./lib/date-time";
+import { formatDateForKey } from "./lib/tour-run-utils";
 
 // =============================================================================
 // TYPES
@@ -190,8 +195,15 @@ export class TourAvailabilityService extends BaseService {
 
     // 3. Enforce date-level booking rules for real bookings.
     // Capacity-only checks pass requestedSpots=0 and should not be blocked.
+    const timezone = await this.getOrganizationTimezone();
+    const now = new Date();
     const bookingRestrictionReason =
-      requestedSpots > 0 ? this.getDayBookingRestrictionReason(tour, date) : null;
+      requestedSpots > 0
+        ? this.getDayBookingRestrictionReason(tour, date, {
+            todayDateKey: formatDateKeyInTimeZone(now, timezone),
+            nowMinutes: getMinutesSinceMidnightInTimeZone(now, timezone),
+          })
+        : null;
     if (bookingRestrictionReason) {
       return {
         available: false,
@@ -341,12 +353,23 @@ export class TourAvailabilityService extends BaseService {
     // 6. Generate dates for the month
     const dates: AvailableDate[] = [];
 
+    const timezone = await this.getOrganizationTimezone();
+    const now = new Date();
+    const restrictionContext = {
+      todayDateKey: formatDateKeyInTimeZone(now, timezone),
+      nowMinutes: getMinutesSinceMidnightInTimeZone(now, timezone),
+    };
+
     for (let day = 1; day <= endOfMonth.getDate(); day++) {
       const date = new Date(year, month - 1, day);
       const dateStr = this.formatDateForDb(date);
 
       // Skip past dates
-      const dayRestrictionReason = this.getDayBookingRestrictionReason(tour, date);
+      const dayRestrictionReason = this.getDayBookingRestrictionReason(
+        tour,
+        date,
+        restrictionContext
+      );
       if (dayRestrictionReason === "past_date") {
         continue;
       }
@@ -400,6 +423,8 @@ export class TourAvailabilityService extends BaseService {
     startDate: Date,
     endDate: Date
   ): Promise<Map<string, number>> {
+    const startDateKey = this.formatDateForDb(startDate);
+    const endDateKey = this.formatDateForDb(endDate);
     const results = await this.db
       .select({
         bookingDate: bookings.bookingDate,
@@ -411,8 +436,8 @@ export class TourAvailabilityService extends BaseService {
         and(
           eq(bookings.organizationId, this.organizationId),
           eq(bookings.tourId, tourId),
-          gte(bookings.bookingDate, startDate),
-          lte(bookings.bookingDate, endDate),
+          sql`${bookings.bookingDate}::text >= ${startDateKey}`,
+          sql`${bookings.bookingDate}::text <= ${endDateKey}`,
           inArray(bookings.status, ["pending", "confirmed"])
         )
       )
@@ -502,8 +527,8 @@ export class TourAvailabilityService extends BaseService {
         and(
           eq(bookings.organizationId, this.organizationId),
           inArray(bookings.tourId, tourIdList),
-          gte(bookings.bookingDate, dateRange.start),
-          lte(bookings.bookingDate, dateRange.end),
+          sql`${bookings.bookingDate}::text >= ${this.formatDateForDb(dateRange.start)}`,
+          sql`${bookings.bookingDate}::text <= ${this.formatDateForDb(dateRange.end)}`,
           inArray(bookings.status, ["pending", "confirmed"])
         )
       )
@@ -766,9 +791,11 @@ export class TourAvailabilityService extends BaseService {
     ];
 
     if (dateRange) {
+      const startDateKey = this.formatDateForDb(dateRange.start);
+      const endDateKey = this.formatDateForDb(dateRange.end);
       conditions.push(
-        gte(tourBlackoutDates.date, dateRange.start),
-        lte(tourBlackoutDates.date, dateRange.end)
+        sql`${tourBlackoutDates.date}::text >= ${startDateKey}`,
+        sql`${tourBlackoutDates.date}::text <= ${endDateKey}`
       );
     }
 
@@ -805,14 +832,15 @@ export class TourAvailabilityService extends BaseService {
   // ===========================================================================
 
   private formatDateForDb(date: Date): string {
-    return date.toISOString().split("T")[0]!;
+    return formatDateForKey(date);
   }
 
   private getDayBookingRestrictionReason(
     tour: Pick<Tour, "allowSameDayBooking" | "sameDayCutoffTime">,
-    date: Date
+    date: Date,
+    context?: { todayDateKey: string; nowMinutes: number }
   ): SlotAvailabilityResult["reason"] | null {
-    const today = this.formatDateForDb(new Date());
+    const today = context?.todayDateKey ?? this.formatDateForDb(new Date());
     const requestedDate = this.formatDateForDb(date);
 
     if (requestedDate < today) {
@@ -829,7 +857,7 @@ export class TourAvailabilityService extends BaseService {
 
     if (
       tour.sameDayCutoffTime &&
-      this.hasTimeReachedOrPassed(tour.sameDayCutoffTime)
+      this.hasTimeReachedOrPassed(tour.sameDayCutoffTime, context?.nowMinutes)
     ) {
       return "same_day_cutoff_passed";
     }
@@ -837,7 +865,7 @@ export class TourAvailabilityService extends BaseService {
     return null;
   }
 
-  private hasTimeReachedOrPassed(time: string): boolean {
+  private hasTimeReachedOrPassed(time: string, nowMinutes?: number): boolean {
     if (!/^\d{2}:\d{2}$/.test(time)) {
       return false;
     }
@@ -856,8 +884,7 @@ export class TourAvailabilityService extends BaseService {
       return false;
     }
 
-    const now = new Date();
-    const nowTotalMinutes = now.getHours() * 60 + now.getMinutes();
+    const nowTotalMinutes = nowMinutes ?? new Date().getHours() * 60 + new Date().getMinutes();
     const cutoffTotalMinutes = cutoffHours * 60 + cutoffMinutes;
     return nowTotalMinutes >= cutoffTotalMinutes;
   }

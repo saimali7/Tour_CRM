@@ -18,9 +18,20 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { QuickGuideAssignSheet } from "@/components/scheduling/quick-guide-assign-sheet";
 import { Badge } from "@/components/ui/badge";
+import { formatLocalDateKey } from "@/lib/date-time";
 
 interface TodaysFocusProps {
   orgSlug: string;
+}
+
+function toDateKey(value: Date | string | null | undefined): string {
+  if (!value) return formatLocalDateKey(new Date());
+  if (typeof value === "string") {
+    const explicitMatch = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (explicitMatch?.[1]) return explicitMatch[1];
+    return formatLocalDateKey(new Date(value));
+  }
+  return formatLocalDateKey(value);
 }
 
 // =============================================================================
@@ -33,7 +44,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
     tourRun: {
       tourId: string;
       tourName: string;
-      date: Date;
+      date: Date | string;
       time: string;
       bookingId?: string;
     };
@@ -67,6 +78,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
     const groups = new Map<string, {
       tourId: string;
       tourName: string;
+      dateKey: string;
       time: string;
       startsAt: Date;
       bookings: typeof todayBookings;
@@ -83,6 +95,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
         groups.set(key, {
           tourId: booking.tour.id,
           tourName: booking.tour.name,
+          dateKey: booking.schedule.dateKey,
           time: format(new Date(booking.schedule.startsAt), "h:mm a"),
           startsAt: new Date(booking.schedule.startsAt),
           bookings: [],
@@ -108,7 +121,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Today&apos;s Tours
+            Today&apos;s Tour Runs
           </h2>
         </div>
         <div className="flex items-center justify-center py-8">
@@ -125,7 +138,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
       {/* Compact Header - stats are now in MetricsBar at dashboard level */}
       <div className="flex items-center gap-2">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Today&apos;s Tours
+          Today&apos;s Tour Runs
         </h2>
         {hasBookings && (
           <span className="text-xs text-muted-foreground">
@@ -238,7 +251,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
                                 tourRun: {
                                   tourId: group.tourId,
                                   tourName: group.tourName,
-                                  date: new Date(),
+                                  date: group.dateKey,
                                   time: group.time,
                                   bookingId: firstBooking.bookingId,
                                 },
@@ -252,7 +265,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
                         </button>
                       )}
                       <Link
-                        href={`/org/${orgSlug}/tour-run?tourId=${group.tourId}&date=${new Date().toISOString().split("T")[0]}&time=${format(group.startsAt, "HH:mm")}` as Route}
+                        href={`/org/${orgSlug}/tour-run?tourId=${group.tourId}&date=${group.dateKey}&time=${format(group.startsAt, "HH:mm")}` as Route}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -288,7 +301,7 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
           scheduleInfo={{
             id: `${assignState.tourRun.tourId}-${assignState.tourRun.time}`,
             tourName: assignState.tourRun.tourName,
-            date: assignState.tourRun.date.toISOString().split("T")[0]!,
+            date: toDateKey(assignState.tourRun.date),
             time: assignState.tourRun.time,
           }}
           onSuccess={() => setAssignState(null)}

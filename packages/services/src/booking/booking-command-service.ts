@@ -25,11 +25,20 @@ import type { ServiceContext } from "../types";
 import { NotFoundError, ValidationError, ServiceError } from "../types";
 import { createServiceLogger } from "../lib/logger";
 import { TourAvailabilityService } from "../tour-availability-service";
+import { formatDateForKey } from "../lib/tour-run-utils";
+import { formatDateOnlyKey } from "../lib/date-time";
 import type { BookingCore } from "./booking-core";
 import { BookingQueryService } from "./booking-query-service";
+import {
+  createPendingCashCollection,
+  getCashCollectionMetadata,
+  updatePendingCashCollection,
+  withCashCollectionMetadata,
+} from "./cash-collection";
 import type {
   CreateBookingInput,
   UpdateBookingInput,
+  UpdateCashCollectionInput,
   BookingWithRelations,
 } from "./types";
 
@@ -57,7 +66,7 @@ export class BookingCommandService extends BaseService {
       {
         tourId: input.tourId,
         customerId: input.customerId,
-        bookingDate: input.bookingDate?.toISOString().split("T")[0],
+        bookingDate: input.bookingDate ? formatDateForKey(input.bookingDate) : undefined,
         bookingTime: input.bookingTime,
         adultCount: input.adultCount,
         childCount: input.childCount,
@@ -144,6 +153,7 @@ export class BookingCommandService extends BaseService {
         parseFloat(discount) +
         parseFloat(tax)
       ).toFixed(2);
+    const cashCollectionExpectedAmount = input.cashCollectionExpectedAmount || total;
 
     const referenceNumber = this.generateReferenceNumber("BK");
 
@@ -175,7 +185,8 @@ export class BookingCommandService extends BaseService {
           tax,
           total,
           currency,
-          status: "pending",
+          status: "confirmed",
+          confirmedAt: new Date(),
           paymentStatus: "pending",
           source: input.source || "manual",
           sourceDetails: input.sourceDetails,
@@ -183,6 +194,18 @@ export class BookingCommandService extends BaseService {
           dietaryRequirements: input.dietaryRequirements,
           accessibilityNeeds: input.accessibilityNeeds,
           internalNotes: input.internalNotes,
+          metadata:
+            input.paymentMethod === "cash"
+              ? withCashCollectionMetadata(
+                  undefined,
+                  createPendingCashCollection(
+                    cashCollectionExpectedAmount,
+                    currency,
+                    input.cashCollectionNotes,
+                    this.userId
+                  )
+                )
+              : undefined,
         })
         .returning();
 
@@ -219,7 +242,7 @@ export class BookingCommandService extends BaseService {
         referenceNumber,
         customerId: input.customerId,
         tourId,
-        bookingDate: bookingDate.toISOString().split("T")[0],
+        bookingDate: formatDateForKey(bookingDate),
         bookingTime,
         totalParticipants,
         total,
@@ -558,8 +581,8 @@ export class BookingCommandService extends BaseService {
         bookingId: id,
         oldTourId: booking.tourId,
         newTourId,
-        oldDate: booking.bookingDate?.toISOString().split("T")[0],
-        newDate: input.bookingDate.toISOString().split("T")[0],
+        oldDate: booking.bookingDate ? formatDateOnlyKey(booking.bookingDate) : null,
+        newDate: formatDateOnlyKey(input.bookingDate),
         oldTime: booking.bookingTime,
         newTime: input.bookingTime,
       },
@@ -586,6 +609,54 @@ export class BookingCommandService extends BaseService {
         paymentStatus,
         paidAmount,
         stripePaymentIntentId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(bookings.id, id),
+          eq(bookings.organizationId, this.organizationId)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      throw new NotFoundError("Booking", id);
+    }
+
+    return this.queryService.getById(updated.id);
+  }
+
+  async updateCashCollection(
+    id: string,
+    input: UpdateCashCollectionInput
+  ): Promise<BookingWithRelations> {
+    const booking = await this.queryService.getById(id);
+    const expectedAmount = parseFloat(input.expectedAmount);
+    if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
+      throw new ValidationError("Expected cash collection amount must be greater than 0");
+    }
+
+    const currentCashCollection = getCashCollectionMetadata(
+      (booking.metadata as Record<string, unknown> | null | undefined) ?? {}
+    );
+    if (!currentCashCollection) {
+      throw new ValidationError("This booking is not configured for cash collection");
+    }
+
+    const updatedCashCollection = updatePendingCashCollection(
+      currentCashCollection,
+      input.expectedAmount,
+      input.notes,
+      this.userId
+    );
+
+    const [updated] = await this.db
+      .update(bookings)
+      .set({
+        metadata: withCashCollectionMetadata(
+          (booking.metadata as Record<string, unknown> | null | undefined) ?? {},
+          updatedCashCollection
+        ),
         updatedAt: new Date(),
       })
       .where(

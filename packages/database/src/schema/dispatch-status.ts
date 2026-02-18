@@ -72,7 +72,6 @@ export interface DispatchWarning {
   type:
     | "insufficient_guides"
     | "capacity_exceeded"
-    | "no_qualified_guide"
     | "no_available_guide"
     | "conflict"
     | "schedule_conflict"

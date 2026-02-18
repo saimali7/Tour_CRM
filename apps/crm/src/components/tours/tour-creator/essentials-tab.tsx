@@ -83,7 +83,7 @@ const validators = {
       return "Must allow at least 1 guest";
     }
     if (value > 100) {
-      return "Maximum 100 guests per session";
+      return "Maximum 100 guests per run";
     }
     if (!Number.isInteger(value)) {
       return "Must be a whole number";
@@ -407,13 +407,13 @@ export function EssentialsTab({
 
         {/* Capacity */}
         <ValidatedFormField
-          label="Max Guests"
+          label="Max Guests Per Run"
           htmlFor="max-guests"
           required
           touched={fields.maxParticipants.touched}
           error={fields.maxParticipants.error}
           valid={isFieldValid("maxParticipants")}
-          hint="Per session"
+          hint="Single departure time slot (not per day)"
           showValidState={true}
         >
           <div className="relative">

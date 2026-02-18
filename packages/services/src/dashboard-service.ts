@@ -1,8 +1,15 @@
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { bookings, tours, customers } from "@tour/database";
 import { BaseService } from "./base-service";
 import { type DateRangeFilter } from "./types";
 import { AnalyticsService } from "./analytics-service";
+import {
+  addDaysToDateKey,
+  dateKeyToDate,
+  formatDateKeyInTimeZone,
+  formatDateOnlyKey,
+  parseDateOnlyKeyToLocalDate,
+} from "./lib/date-time";
 import type {
   TodaysOperations,
   RecentActivityItem,
@@ -92,7 +99,7 @@ export interface TrendData {
 export class DashboardService extends BaseService {
   private analytics: AnalyticsService;
 
-  constructor(ctx: { organizationId: string; userId?: string }) {
+  constructor(ctx: { organizationId: string; userId?: string; timezone?: string }) {
     super(ctx);
     this.analytics = new AnalyticsService(ctx);
   }
@@ -350,9 +357,7 @@ export class DashboardService extends BaseService {
    * Core method used by getTodayBookings and getTomorrowBookings
    * Uses booking.bookingDate for date-based queries (availability-based model)
    */
-  private async getBookingsForDateRange(startDate: Date, endDate: Date): Promise<TodayBooking[]> {
-    const startDateStr = startDate.toISOString().split("T")[0]!;
-    const endDateStr = endDate.toISOString().split("T")[0]!;
+  private async getBookingsForDateRange(startDateKey: string, endDateKey: string): Promise<TodayBooking[]> {
 
     const result = await this.db
       .select({
@@ -381,16 +386,21 @@ export class DashboardService extends BaseService {
       .where(
         and(
           eq(bookings.organizationId, this.organizationId),
-          sql`${bookings.bookingDate}::text >= ${startDateStr}`,
-          sql`${bookings.bookingDate}::text < ${endDateStr}`,
+          sql`${bookings.bookingDate}::text >= ${startDateKey}`,
+          sql`${bookings.bookingDate}::text < ${endDateKey}`,
           sql`${bookings.status} NOT IN ('cancelled')`
         )
       )
       .orderBy(bookings.bookingDate, bookings.bookingTime, desc(bookings.createdAt));
 
     return result.map(row => {
-      // Calculate start time from bookingDate and bookingTime
-      const startsAt = row.bookingDate ? new Date(row.bookingDate) : new Date();
+      const bookingDateKey = row.bookingDate
+        ? formatDateOnlyKey(row.bookingDate)
+        : "";
+      // Rebuild run start from stable YYYY-MM-DD key to avoid DATE timezone shifts.
+      const startsAt = bookingDateKey
+        ? parseDateOnlyKeyToLocalDate(bookingDateKey)
+        : new Date();
       if (row.bookingTime) {
         const [hours, minutes] = row.bookingTime.split(":").map(Number);
         startsAt.setHours(hours || 0, minutes || 0, 0, 0);
@@ -416,7 +426,8 @@ export class DashboardService extends BaseService {
           name: row.tourName || "Unknown",
         },
         schedule: {
-          id: `${row.tourId}-${row.bookingDate}-${row.bookingTime}`, // Virtual schedule ID
+          id: `${row.tourId}-${bookingDateKey}-${row.bookingTime}`, // Virtual schedule ID
+          dateKey: bookingDateKey,
           startsAt,
           endsAt,
           maxParticipants: row.tourMaxParticipants ?? 0,
@@ -431,24 +442,21 @@ export class DashboardService extends BaseService {
    * Get today's bookings - actual customers with bookings for today
    */
   async getTodayBookings(): Promise<TodayBooking[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return this.getBookingsForDateRange(today, tomorrow);
+    const timezone = await this.getOrganizationTimezone();
+    const todayDateKey = formatDateKeyInTimeZone(new Date(), timezone);
+    const tomorrowDateKey = addDaysToDateKey(todayDateKey, 1);
+    return this.getBookingsForDateRange(todayDateKey, tomorrowDateKey);
   }
 
   /**
    * Get tomorrow's bookings - preview for preparation
    */
   async getTomorrowBookings(): Promise<TodayBooking[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dayAfter = new Date(tomorrow);
-    dayAfter.setDate(dayAfter.getDate() + 1);
-    return this.getBookingsForDateRange(tomorrow, dayAfter);
+    const timezone = await this.getOrganizationTimezone();
+    const todayDateKey = formatDateKeyInTimeZone(new Date(), timezone);
+    const tomorrowDateKey = addDaysToDateKey(todayDateKey, 1);
+    const dayAfterDateKey = addDaysToDateKey(todayDateKey, 2);
+    return this.getBookingsForDateRange(tomorrowDateKey, dayAfterDateKey);
   }
 
   /**
@@ -456,15 +464,16 @@ export class DashboardService extends BaseService {
    * Uses availability-based booking model (bookingDate, bookingTime)
    */
   async getTomorrowPreview(): Promise<TomorrowPreview> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dayAfter = new Date(tomorrow);
-    dayAfter.setDate(dayAfter.getDate() + 1);
+    const timezone = await this.getOrganizationTimezone();
+    const todayDateKey = formatDateKeyInTimeZone(new Date(), timezone);
+    const tomorrowDateKey = addDaysToDateKey(todayDateKey, 1);
+    const dayAfterDateKey = addDaysToDateKey(todayDateKey, 2);
 
     // Get all bookings for tomorrow
-    const tomorrowBookings = await this.getBookingsForDateRange(tomorrow, dayAfter);
+    const tomorrowBookings = await this.getBookingsForDateRange(
+      tomorrowDateKey,
+      dayAfterDateKey
+    );
 
     // Group bookings by tour run (tourId + date + time) to simulate schedules
     const tourRunsMap = new Map<string, {
@@ -506,7 +515,7 @@ export class DashboardService extends BaseService {
     const unpaidBookings = tomorrowBookings.filter(b => b.paymentStatus === "pending" || b.paymentStatus === "partial");
 
     return {
-      date: tomorrow,
+      date: dateKeyToDate(tomorrowDateKey),
       stats: {
         totalBookings,
         totalGuests,
@@ -565,6 +574,7 @@ export interface TodayBooking {
   };
   schedule: {
     id: string;
+    dateKey: string;
     startsAt: Date;
     endsAt: Date;
     maxParticipants: number;

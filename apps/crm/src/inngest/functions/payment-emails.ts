@@ -2,6 +2,7 @@ import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
 import { createServices, logger } from "@tour/services";
 import { format } from "date-fns";
+import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 import {
   validateEventData,
   paymentSucceededSchema,
@@ -127,7 +128,7 @@ export const sendPaymentFailedEmail = inngest.createFunction(
         bookingReference: data.bookingReference,
         tourName: booking?.tour?.name || "Your Tour",
         tourDate: booking?.bookingDate
-          ? format(new Date(booking.bookingDate), "MMMM d, yyyy")
+          ? format(parseDateKeyToLocalDate(formatDbDateKey(booking.bookingDate)), "MMMM d, yyyy")
           : "Scheduled Date",
         tourTime: booking?.bookingTime || "Scheduled Time",
         participants: booking?.totalParticipants || 1,

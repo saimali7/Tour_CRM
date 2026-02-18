@@ -108,7 +108,7 @@ export function ProductCard({
   isOptimistic,
 }: ProductCardProps) {
   const detailUrl = `/org/${orgSlug}/tours/${product.tour?.id || product.id}` as Route;
-  const editUrl = `/org/${orgSlug}/tours/${product.tour?.id || product.id}?tab=details` as Route;
+  const editUrl = `/org/${orgSlug}/tours/${product.tour?.id || product.id}/edit` as Route;
 
   // Tour stats rendering
   const renderTourStats = () => {

@@ -9,6 +9,7 @@ import { eq, and } from "drizzle-orm";
 import { inngest } from "@/inngest";
 import { format } from "date-fns";
 import { webhookLogger } from "@tour/services";
+import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 /**
  * Stripe Webhook Handler
@@ -235,7 +236,7 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
 
   // Format tour date from booking fields
   const tourDate = booking.bookingDate
-    ? format(new Date(booking.bookingDate), "MMMM d, yyyy")
+    ? format(parseDateKeyToLocalDate(formatDbDateKey(booking.bookingDate)), "MMMM d, yyyy")
     : "Scheduled Date";
 
   // Send payment confirmation email via Inngest

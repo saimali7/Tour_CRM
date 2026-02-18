@@ -5,6 +5,7 @@ import { Users, CheckCircle2, AlertCircle, Eye, FileText, UserPlus } from "lucid
 import Link from "next/link";
 import type { Route } from "next";
 import { QuickAssignGuideModal } from "./QuickAssignGuideModal";
+import { formatLocalDateKey } from "@/lib/date-time";
 
 interface TodayScheduleItem {
   scheduleId: string;
@@ -57,7 +58,7 @@ export function TodaySchedule({ schedule, orgSlug }: TodayScheduleProps) {
           const utilization = item.capacity > 0 ? (item.bookedParticipants / item.capacity) * 100 : 0;
           const isFull = utilization >= 100;
           const isLow = utilization < 30;
-          const isoDate = item.startsAt ? (new Date(item.startsAt).toISOString().split("T")[0] ?? "") : "";
+          const isoDate = item.startsAt ? formatLocalDateKey(new Date(item.startsAt)) : "";
           const dateParam = isoDate
             ? `?date=${isoDate}`
             : "";

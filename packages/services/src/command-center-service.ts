@@ -21,7 +21,6 @@ import {
   guideAssignments,
   dispatchStatus,
   guides,
-  tourGuideQualifications,
   type Tour,
   type Booking,
   type Guide,
@@ -34,7 +33,6 @@ import {
 import { BaseService } from "./base-service";
 import { NotFoundError, ValidationError, ConflictError } from "./types";
 import { GuideAssignmentService } from "./guide-assignment-service";
-import { TourGuideQualificationService } from "./tour-guide-qualification-service";
 import { PickupAssignmentService } from "./pickup-assignment-service";
 import { createServiceLogger } from "./lib/logger";
 import { createTourRunKey, parseTourRunKey, formatDateForKey } from "./lib/tour-run-utils";
@@ -49,6 +47,7 @@ import {
   validateGuideAssignmentWithRelationsArray,
   validateBookingWithRelations,
 } from "./lib/type-guards";
+import { formatDateOnlyKey } from "./lib/date-time";
 
 // =============================================================================
 // INTERNAL TYPES
@@ -169,7 +168,6 @@ export interface AvailableGuide {
   guide: Pick<Guide, "id" | "firstName" | "lastName" | "email" | "phone" | "avatarUrl" | "languages">;
   vehicleCapacity: number;
   baseZone: string | null;
-  qualifiedTours: string[];
   currentAssignments: CurrentAssignment[];
 }
 
@@ -235,7 +233,6 @@ export interface OptimizedAssignment {
 export type WarningType =
   | "insufficient_guides"
   | "capacity_exceeded"
-  | "no_qualified_guide"
   | "no_available_guide"
   | "conflict"
   | "schedule_conflict"
@@ -362,14 +359,12 @@ export interface CreateTempGuideForDateResult {
  */
 export class CommandCenterService extends BaseService {
   private guideAssignmentService: GuideAssignmentService;
-  private tourGuideQualificationService: TourGuideQualificationService;
   private pickupAssignmentService: PickupAssignmentService;
   private logger: ReturnType<typeof createServiceLogger>;
 
   constructor(ctx: { organizationId: string; userId?: string }) {
     super(ctx);
     this.guideAssignmentService = new GuideAssignmentService(ctx);
-    this.tourGuideQualificationService = new TourGuideQualificationService(ctx);
     this.pickupAssignmentService = new PickupAssignmentService(ctx);
     this.logger = createServiceLogger("command-center", ctx.organizationId);
   }
@@ -580,7 +575,6 @@ export class CommandCenterService extends BaseService {
     const autoResolveTypes = new Set<WarningType>([
       "insufficient_guides",
       "no_available_guide",
-      "no_qualified_guide",
     ]);
 
     const updatedWarnings = warnings.map((warning) => {
@@ -940,8 +934,9 @@ export class CommandCenterService extends BaseService {
   // ===========================================================================
 
   /**
-   * Get available guides for a date (checking availability patterns + overrides)
-   * Optimized to parallelize per-guide queries and batch where possible
+   * Get available guides for a date.
+   * Active guides are considered available; this method enriches them with
+   * current-day assignments for dispatch decisions.
    */
   async getAvailableGuides(date: Date | string): Promise<AvailableGuide[]> {
     // Get all active guides
@@ -958,20 +953,12 @@ export class CommandCenterService extends BaseService {
 
     const guideIds = allGuides.map((g) => g.id);
 
-    // Batch fetch qualifications and assignments in parallel
-    const [
-      allQualifications,
-      allAssignments,
-    ] = await Promise.all([
-      this.batchGetGuideQualifications(guideIds),
-      this.batchGetGuideAssignmentsForDate(guideIds, date),
-    ]);
+    const allAssignments = await this.batchGetGuideAssignmentsForDate(guideIds, date);
 
     // All active guides are considered available (no availability slot system)
     const availableGuides: AvailableGuide[] = [];
 
     for (const guide of allGuides) {
-      const qualifiedTours = allQualifications.get(guide.id) ?? [];
       const currentAssignments = allAssignments.get(guide.id) ?? [];
 
       availableGuides.push({
@@ -986,61 +973,11 @@ export class CommandCenterService extends BaseService {
         },
         vehicleCapacity: Math.max(guide.vehicleCapacity ?? 6, 1),
         baseZone: null,
-        qualifiedTours,
         currentAssignments,
       });
     }
 
     return availableGuides;
-  }
-
-  /**
-   * Batch get qualifications for multiple guides
-   * Returns Map of guideId -> tourId[]
-   */
-  private async batchGetGuideQualifications(guideIds: string[]): Promise<Map<string, string[]>> {
-    const result = new Map<string, string[]>();
-
-    if (guideIds.length === 0) {
-      return result;
-    }
-
-    try {
-      const qualifications = await this.db
-        .select({
-          guideId: tourGuideQualifications.guideId,
-          tourId: tourGuideQualifications.tourId,
-        })
-        .from(tourGuideQualifications)
-        .where(
-          and(
-            eq(tourGuideQualifications.organizationId, this.organizationId),
-            inArray(tourGuideQualifications.guideId, guideIds)
-          )
-        );
-
-      // Group by guideId
-      for (const q of qualifications) {
-        const existing = result.get(q.guideId) ?? [];
-        existing.push(q.tourId);
-        result.set(q.guideId, existing);
-      }
-
-      // Ensure all guides have an entry (even if empty)
-      for (const guideId of guideIds) {
-        if (!result.has(guideId)) {
-          result.set(guideId, []);
-        }
-      }
-    } catch (error) {
-      this.logger.error({ err: error, guideIds }, "Failed to batch get guide qualifications");
-      // Fallback: empty arrays
-      for (const guideId of guideIds) {
-        result.set(guideId, []);
-      }
-    }
-
-    return result;
   }
 
   /**
@@ -1615,7 +1552,6 @@ export class CommandCenterService extends BaseService {
       vehicleCapacity: guide.vehicleCapacity,
       baseZoneId: guide.baseZone ?? undefined,
       languages: guide.guide.languages ?? [],
-      qualifiedTourIds: guide.qualifiedTours,
       primaryTourIds: [],
       availableFrom: buildDateTime("00:00"),
       availableTo: buildDateTime("23:59"),
@@ -1748,8 +1684,6 @@ export class CommandCenterService extends BaseService {
     switch (type) {
       case "insufficient_guides":
         return "insufficient_guides";
-      case "no_qualified_guide":
-        return "no_qualified_guide";
       case "vehicle_capacity_exceeded":
         return "capacity_exceeded";
       case "time_conflict":
@@ -1963,7 +1897,7 @@ export class CommandCenterService extends BaseService {
         throw new ValidationError(`No bookings found for tour run: ${resolution.tourRunKey}`);
       }
 
-      const date = new Date(dateStr);
+      const date = this.parseDateKey(dateStr);
       await this.batchApplyChanges(
         date,
         tourRunBookings.map((booking) => ({
@@ -2081,7 +2015,7 @@ export class CommandCenterService extends BaseService {
     }
 
     // Refresh dispatch status
-    const date = new Date(dateStr);
+    const date = this.parseDateKey(dateStr);
     await this.refreshDispatchStatus(date);
 
     this.logger.warn(
@@ -2350,7 +2284,6 @@ export class CommandCenterService extends BaseService {
     const dateKey = this.formatDateKey(date);
     const changedBookingIds = new Set<string>();
     const involvedGuideIds = new Set<string>();
-    const qualificationCheckBookingIds = new Set<string>();
 
     for (const change of changes) {
       if (change.type === "assign") {
@@ -2475,7 +2408,6 @@ export class CommandCenterService extends BaseService {
         const state = working.get(change.bookingId);
         if (!state) throw new ValidationError(`Booking ${change.bookingId} not found in working set`);
         state.assignedGuideId = change.toGuideId;
-        qualificationCheckBookingIds.add(change.bookingId);
         continue;
       }
 
@@ -2493,7 +2425,6 @@ export class CommandCenterService extends BaseService {
           const state = working.get(bookingId);
           if (!state) throw new ValidationError(`Booking ${bookingId} not found in working set`);
           state.assignedGuideId = change.toGuideId;
-          qualificationCheckBookingIds.add(bookingId);
         }
         continue;
       }
@@ -2529,60 +2460,6 @@ export class CommandCenterService extends BaseService {
     const missingGuides = guideIdList.filter((guideId) => !guideById.has(guideId));
     if (missingGuides.length > 0) {
       throw new ValidationError(`Guide not found: ${missingGuides.join(", ")}`);
-    }
-
-    const requiredQualificationPairs = [...qualificationCheckBookingIds]
-      .map((bookingId) => working.get(bookingId))
-      .filter(
-        (
-          state
-        ): state is {
-          bookingId: string;
-          tourId: string;
-          bookingDate: Date;
-          bookingDateKey: string;
-          bookingTime: string;
-          durationMinutes: number;
-          guestCount: number;
-          experienceMode: BookingWithCustomer["experienceMode"];
-          assignedGuideId: string | null;
-        } => Boolean(state?.assignedGuideId)
-      )
-      .map((state) => ({
-        bookingId: state.bookingId,
-        guideId: state.assignedGuideId!,
-        tourId: state.tourId,
-      }));
-
-    if (requiredQualificationPairs.length > 0) {
-      const qualificationGuideIds = [...new Set(requiredQualificationPairs.map((pair) => pair.guideId))];
-      const qualificationTourIds = [...new Set(requiredQualificationPairs.map((pair) => pair.tourId))];
-      const qualificationRows = await this.db
-        .select({
-          guideId: tourGuideQualifications.guideId,
-          tourId: tourGuideQualifications.tourId,
-        })
-        .from(tourGuideQualifications)
-        .where(
-          and(
-            eq(tourGuideQualifications.organizationId, this.organizationId),
-            inArray(tourGuideQualifications.guideId, qualificationGuideIds),
-            inArray(tourGuideQualifications.tourId, qualificationTourIds)
-          )
-        );
-
-      const qualifiedPairs = new Set(
-        qualificationRows.map((row) => `${row.guideId}|${row.tourId}`)
-      );
-
-      for (const pair of requiredQualificationPairs) {
-        if (qualifiedPairs.has(`${pair.guideId}|${pair.tourId}`)) continue;
-        const guide = guideById.get(pair.guideId);
-        const guideName = guide ? `${guide.firstName} ${guide.lastName}`.trim() : pair.guideId;
-        throw new ValidationError(
-          `no_qualified_guide: ${guideName} is not qualified for tour ${pair.tourId}`
-        );
-      }
     }
 
     const existingGuideAssignments = guideIdList.length > 0
@@ -3246,7 +3123,7 @@ export class CommandCenterService extends BaseService {
    * so using UTC date parts preserves the stored calendar date across timezones.
    */
   private formatDbDateKey(date: Date): string {
-    return date.toISOString().split("T")[0]!;
+    return formatDateOnlyKey(date);
   }
 
   /**

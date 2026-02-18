@@ -9,16 +9,25 @@ import {
   FileText,
   UserPlus,
   Loader2,
-  MapPin,
-  Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { QuickGuideAssignSheet } from "@/components/scheduling/quick-guide-assign-sheet";
+import { formatLocalDateKey } from "@/lib/date-time";
 
 interface TodayTourRunsProps {
   orgSlug: string;
+}
+
+function toDateKey(value: Date | string | null | undefined): string {
+  if (!value) return formatLocalDateKey(new Date());
+  if (typeof value === "string") {
+    const explicitMatch = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (explicitMatch?.[1]) return explicitMatch[1];
+    return formatLocalDateKey(new Date(value));
+  }
+  return formatLocalDateKey(value);
 }
 
 export function TodayTourRuns({ orgSlug }: TodayTourRunsProps) {
@@ -27,7 +36,7 @@ export function TodayTourRuns({ orgSlug }: TodayTourRunsProps) {
     tourRun: {
       tourId: string;
       tourName: string;
-      date: Date;
+      date: Date | string;
       time: string;
       bookingId?: string;
     };
@@ -69,6 +78,7 @@ export function TodayTourRuns({ orgSlug }: TodayTourRunsProps) {
             run.capacity > 0
               ? (run.totalParticipants / run.capacity) * 100
               : 0;
+          const runDateKey = toDateKey(run.date as Date | string | undefined);
           const isFull = utilization >= 100;
           const isLow = utilization < 30;
           const needsGuides = run.guidesAssigned < run.guidesRequired;
@@ -150,7 +160,7 @@ export function TodayTourRuns({ orgSlug }: TodayTourRunsProps) {
                         tourRun: {
                           tourId: run.tourId,
                           tourName: run.tourName,
-                          date: new Date(),
+                          date: run.date,
                           time: run.time,
                           bookingId: firstBooking?.id,
                         },
@@ -170,7 +180,7 @@ export function TodayTourRuns({ orgSlug }: TodayTourRunsProps) {
               {/* Quick Actions */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 <Link
-                  href={`/org/${orgSlug}/tour-run?tourId=${run.tourId}&date=${new Date().toISOString().split("T")[0]}&time=${run.time}`}
+                  href={`/org/${orgSlug}/tour-run?tourId=${run.tourId}&date=${runDateKey}&time=${run.time}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                   title="View Manifest"
                 >
@@ -194,7 +204,7 @@ export function TodayTourRuns({ orgSlug }: TodayTourRunsProps) {
                         tourRun: {
                           tourId: run.tourId,
                           tourName: run.tourName,
-                          date: new Date(),
+                          date: run.date,
                           time: run.time,
                           bookingId: firstBooking?.id,
                         },
@@ -222,7 +232,7 @@ export function TodayTourRuns({ orgSlug }: TodayTourRunsProps) {
           scheduleInfo={{
             id: `${assignState.tourRun.tourId}-${assignState.tourRun.time}`,
             tourName: assignState.tourRun.tourName,
-            date: assignState.tourRun.date.toISOString().split("T")[0]!,
+            date: toDateKey(assignState.tourRun.date),
             time: assignState.tourRun.time,
           }}
           onSuccess={() => setAssignState(null)}

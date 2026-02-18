@@ -10,6 +10,7 @@ import {
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { NotFoundError, ServiceError } from "./types";
+import { formatDateOnlyKey } from "./lib/date-time";
 
 // Types
 export interface CreateGoalInput {
@@ -292,8 +293,8 @@ export class GoalService extends BaseService {
    * Since schedules table has been removed, we estimate based on bookings
    */
   private async calculateCapacityUtilization(from: Date, to: Date): Promise<string> {
-    const fromStr = from.toISOString().split("T")[0]!;
-    const toStr = to.toISOString().split("T")[0]!;
+    const fromStr = formatDateOnlyKey(from);
+    const toStr = formatDateOnlyKey(to);
 
     // Get bookings with tour capacity for the date range
     const result = await this.db

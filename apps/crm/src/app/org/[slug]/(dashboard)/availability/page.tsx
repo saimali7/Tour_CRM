@@ -22,12 +22,17 @@ import { useParams } from "next/navigation";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
+  formatDbDateKey,
+  formatLocalDateKey,
+  parseDateKeyToLocalDate,
+} from "@/lib/date-time";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format, addDays, startOfDay, endOfDay } from "date-fns";
+import { addDays, startOfDay, endOfDay } from "date-fns";
 
 type DateFilter = "next7" | "next14" | "next30" | "all";
 
@@ -54,7 +59,7 @@ function formatTime(time: string): string {
 }
 
 function formatDateLabel(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = parseDateKeyToLocalDate(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -68,7 +73,11 @@ function formatDateLabel(dateStr: string): string {
   if (targetDate.getTime() === tomorrow.getTime()) {
     return "Tomorrow";
   }
-  return format(date, "EEE, MMM d");
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function getDateRange(filter: DateFilter): { from: Date; to: Date } | undefined {
@@ -101,8 +110,8 @@ export default function AvailabilityPage() {
   // Fetch tour runs for the date range
   const { data: tourRunsResult, isLoading } = trpc.tourRun.list.useQuery(
     {
-      dateFrom: dateRange?.from || startOfDay(new Date()),
-      dateTo: dateRange?.to || endOfDay(addDays(new Date(), 14)),
+      dateFrom: formatLocalDateKey(dateRange?.from || startOfDay(new Date())),
+      dateTo: formatLocalDateKey(dateRange?.to || endOfDay(addDays(new Date(), 14))),
     },
     { enabled: !!dateRange }
   );
@@ -121,7 +130,7 @@ export default function AvailabilityPage() {
     const groups = new Map<string, TourRunGroup>();
 
     filtered.forEach((tourRun) => {
-      const dateKey = format(new Date(tourRun.date), "yyyy-MM-dd");
+      const dateKey = formatDbDateKey(tourRun.date as Date | string);
 
       if (!groups.has(dateKey)) {
         groups.set(dateKey, {
@@ -144,7 +153,8 @@ export default function AvailabilityPage() {
 
     // Sort dates
     return Array.from(groups.values()).sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      (a, b) =>
+        parseDateKeyToLocalDate(a.date).getTime() - parseDateKeyToLocalDate(b.date).getTime()
     );
   }, [tourRunsData, tourFilter]);
 

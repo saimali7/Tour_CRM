@@ -7,7 +7,7 @@
  *
  * Algorithm Overview:
  * 1. Group & Sort Tour Runs (earlier first, larger first)
- * 2. For each tour run, find qualified and available guides
+ * 2. For each tour run, find assignable and available guides
  * 3. Score candidates using multiple factors
  * 4. Assign top N guides (where N = guidesNeeded)
  * 5. Distribute bookings to guides respecting capacity
@@ -38,6 +38,8 @@ import {
   getTravelTime,
   getMostCommonZone,
 } from "./travel-matrix";
+import { formatDateForKey } from "../lib/tour-run-utils";
+import { formatDateOnlyKey, parseDateOnlyKeyToLocalDate } from "../lib/date-time";
 
 // =============================================================================
 // CONSTANTS
@@ -198,9 +200,8 @@ function processTourRun(
   const tourStartTime = parseTourStartTime(tourRun.date, tourRun.time);
   const tourEndTime = new Date(tourStartTime.getTime() + tourRun.durationMinutes * 60 * 1000);
 
-  // Step 2: Find qualified and available guides
-  const candidates = findQualifiedGuides(
-    tourRun,
+  // Step 2: Find assignable and available guides
+  const candidates = findAssignableGuides(
     tourRunId,
     incomingHasExclusive,
     allGuides,
@@ -351,12 +352,10 @@ function processTourRun(
 
 /**
  * Find guides who are:
- * 1. Qualified for the tour
- * 2. Available during the time window
- * 3. Not conflicting with other assignments
+ * 1. Available during the time window
+ * 2. Not conflicting with other assignments
  */
-function findQualifiedGuides(
-  tourRun: TourRunInput,
+function findAssignableGuides(
   tourRunId: string,
   incomingHasExclusive: boolean,
   allGuides: AvailableGuide[],
@@ -365,11 +364,6 @@ function findQualifiedGuides(
   tourEndTime: Date
 ): AvailableGuide[] {
   return allGuides.filter((guide) => {
-    // Check qualification
-    if (!isQualified(guide, tourRun.tourId)) {
-      return false;
-    }
-
     // Check availability window
     if (!isWithinAvailabilityWindow(guide, tourStartTime, tourEndTime)) {
       return false;
@@ -383,13 +377,6 @@ function findQualifiedGuides(
 
     return true;
   });
-}
-
-/**
- * Check if guide is qualified for a tour
- */
-function isQualified(guide: AvailableGuide, tourId: string): boolean {
-  return guide.qualifiedTourIds.includes(tourId);
 }
 
 /**
@@ -911,7 +898,7 @@ function createInsufficientGuidesResolutions(
  */
 function parseTourStartTime(date: Date, time: string): Date {
   const [hours, minutes] = time.split(":").map(Number);
-  const result = new Date(date);
+  const result = parseDateOnlyKeyToLocalDate(formatDateOnlyKey(date));
   result.setHours(hours || 0, minutes || 0, 0, 0);
   return result;
 }
@@ -929,7 +916,7 @@ function formatTime(date: Date): string {
  * Format date to YYYY-MM-DD key
  */
 function formatDateKey(date: Date): string {
-  return date.toISOString().split("T")[0]!;
+  return formatDateForKey(date);
 }
 
 /**

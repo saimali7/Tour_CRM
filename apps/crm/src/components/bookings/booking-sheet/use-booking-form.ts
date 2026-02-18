@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { formatLocalDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 import type { CustomerData } from "./customer-selector";
 import type { TourData } from "./tour-selector";
 import type { TimeSlot } from "./date-time-selector";
@@ -150,16 +151,30 @@ export function useBookingForm({
   );
 
   const currentDate = new Date();
-  const availabilityYear = currentDate.getFullYear();
-  const availabilityMonth = currentDate.getMonth() + 1;
+  const startYear = currentDate.getFullYear();
+  const startMonth = currentDate.getMonth() + 1;
+  const rangeEndDate = new Date(currentDate);
+  rangeEndDate.setDate(rangeEndDate.getDate() + 21);
+  const endYear = rangeEndDate.getFullYear();
+  const endMonth = rangeEndDate.getMonth() + 1;
+  const hasSecondMonth = startYear !== endYear || startMonth !== endMonth;
 
-  const { data: availableDatesData } = trpc.availability.getAvailableDatesForMonth.useQuery(
+  const { data: firstMonthAvailability } = trpc.availability.getAvailableDatesForMonth.useQuery(
     {
       tourId: selectedTourId,
-      year: availabilityYear,
-      month: availabilityMonth,
+      year: startYear,
+      month: startMonth,
     },
-    { enabled: open && !!selectedTourId && (!departureTimes || departureTimes.filter(dt => dt.isActive).length === 0) }
+    { enabled: open && !!selectedTourId }
+  );
+
+  const { data: secondMonthAvailability } = trpc.availability.getAvailableDatesForMonth.useQuery(
+    {
+      tourId: selectedTourId,
+      year: endYear,
+      month: endMonth,
+    },
+    { enabled: open && !!selectedTourId && hasSecondMonth }
   );
 
   // ---------------------------------------------------------------------------
@@ -196,15 +211,42 @@ export function useBookingForm({
       }));
   }, [departureTimes]);
 
+  const monthAvailabilityDates = useMemo(
+    () => [...(firstMonthAvailability?.dates ?? []), ...(secondMonthAvailability?.dates ?? [])],
+    [firstMonthAvailability, secondMonthAvailability]
+  );
+
+  const dateIndicators = useMemo<Record<string, "available" | "limited" | "unavailable">>(() => {
+    const indicators: Record<string, "available" | "limited" | "unavailable"> = {};
+    for (const date of monthAvailabilityDates) {
+      const totalSlots = date.slots.length;
+      if (totalSlots <= 0) {
+        indicators[date.date] = "unavailable";
+        continue;
+      }
+      const availableSlots = date.slots.filter((slot) => slot.available).length;
+      if (availableSlots <= 0) {
+        indicators[date.date] = "unavailable";
+      } else if (availableSlots <= Math.max(1, Math.floor(totalSlots * 0.4))) {
+        indicators[date.date] = "limited";
+      } else {
+        indicators[date.date] = "available";
+      }
+    }
+    return indicators;
+  }, [monthAvailabilityDates]);
+
   const nextAvailableDate = useMemo(() => {
-    if (!availableDatesData?.dates?.length) return null;
+    if (!monthAvailabilityDates.length) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const futureDates = availableDatesData.dates.filter((d) => new Date(d.date) > today);
+    const futureDates = monthAvailabilityDates.filter(
+      (d) => parseDateKeyToLocalDate(d.date) > today
+    );
     if (futureDates.length === 0) return null;
     const firstDate = futureDates[0];
-    return firstDate ? new Date(firstDate.date) : null;
-  }, [availableDatesData]);
+    return firstDate ? parseDateKeyToLocalDate(firstDate.date) : null;
+  }, [monthAvailabilityDates]);
 
   const selectedTour = useMemo(() => {
     return toursData?.data?.find((t) => t.id === selectedTourId);
@@ -354,7 +396,7 @@ export function useBookingForm({
   // SUBMIT
   // ---------------------------------------------------------------------------
 
-  const getDateString = (date: Date): string => date.toISOString().split("T")[0] || "";
+  const getDateString = (date: Date): string => formatLocalDateKey(date);
 
   const handleSubmit = useCallback(async () => {
     if (!validate()) return;
@@ -392,6 +434,9 @@ export function useBookingForm({
         tourId: selectedTourId,
         bookingDate: getDateString(selectedDate),
         bookingTime: selectedTime,
+        paymentMethod,
+        cashCollectionExpectedAmount:
+          paymentMethod === "cash" ? pricing.total.toFixed(2) : undefined,
         adultCount: guestCounts.adults,
         childCount: guestCounts.children || undefined,
         infantCount: guestCounts.infants || undefined,
@@ -481,6 +526,7 @@ export function useBookingForm({
     setSelectedTime,
     dateScrollOffset,
     setDateScrollOffset,
+    dateIndicators,
     timeSlots,
     departureTimesLoading,
     nextAvailableDate,

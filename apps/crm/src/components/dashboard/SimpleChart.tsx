@@ -7,6 +7,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 interface ChartDataPoint {
   date: string;
@@ -53,7 +54,7 @@ export function SimpleChart({
     date: d.date,
     value: d.value,
     // Format the date for display
-    formattedDate: new Date(d.date).toLocaleDateString("en-US", {
+    formattedDate: parseDateKeyToLocalDate(formatDbDateKey(d.date)).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
     }),

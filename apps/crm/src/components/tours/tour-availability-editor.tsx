@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatDbDateKey, formatLocalDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 interface TourAvailabilityEditorProps {
   tourId: string;
@@ -54,7 +55,7 @@ export function TourAvailabilityEditor({
   // New window form
   const [windowName, setWindowName] = useState("");
   const [windowStartDate, setWindowStartDate] = useState(
-    new Date().toISOString().split("T")[0] || ""
+    formatLocalDateKey(new Date())
   );
   const [windowEndDate, setWindowEndDate] = useState("");
   const [windowDays, setWindowDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
@@ -150,7 +151,7 @@ export function TourAvailabilityEditor({
   const resetWindowForm = () => {
     setShowNewWindow(false);
     setWindowName("");
-    setWindowStartDate(new Date().toISOString().split("T")[0] || "");
+    setWindowStartDate(formatLocalDateKey(new Date()));
     setWindowEndDate("");
     setWindowDays([0, 1, 2, 3, 4, 5, 6]);
     setWindowCapacity(undefined);
@@ -187,8 +188,8 @@ export function TourAvailabilityEditor({
     createWindowMutation.mutate({
       tourId,
       name: windowName || undefined,
-      startDate: new Date(windowStartDate),
-      endDate: windowEndDate ? new Date(windowEndDate) : undefined,
+      startDate: parseDateKeyToLocalDate(windowStartDate),
+      endDate: windowEndDate ? parseDateKeyToLocalDate(windowEndDate) : undefined,
       daysOfWeek: windowDays.sort((a, b) => a - b),
       maxParticipantsOverride: windowCapacity,
     });
@@ -215,7 +216,7 @@ export function TourAvailabilityEditor({
 
     createBlackoutMutation.mutate({
       tourId,
-      date: new Date(blackoutDate),
+      date: parseDateKeyToLocalDate(blackoutDate),
       reason: blackoutReason || undefined,
     });
   };
@@ -287,9 +288,9 @@ export function TourAvailabilityEditor({
                         )}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {new Date(window.startDate).toLocaleDateString()} –{" "}
+                        {parseDateKeyToLocalDate(formatDbDateKey(window.startDate)).toLocaleDateString()} –{" "}
                         {window.endDate
-                          ? new Date(window.endDate).toLocaleDateString()
+                          ? parseDateKeyToLocalDate(formatDbDateKey(window.endDate)).toLocaleDateString()
                           : "Ongoing"}
                       </div>
                       <div className="flex gap-1 mt-2">
@@ -601,7 +602,7 @@ export function TourAvailabilityEditor({
                   >
                     <div>
                       <span className="font-medium text-foreground">
-                        {new Date(blackout.date).toLocaleDateString(undefined, {
+                        {parseDateKeyToLocalDate(formatDbDateKey(blackout.date)).toLocaleDateString(undefined, {
                           weekday: "short",
                           year: "numeric",
                           month: "short",

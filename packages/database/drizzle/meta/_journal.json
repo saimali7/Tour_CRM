@@ -50,6 +50,20 @@
       "when": 1770663613684,
       "tag": "0006_add-notification-center",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771400000000,
+      "tag": "0007_add-tour-pickup-policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771500000000,
+      "tag": "0008_remove-tour-guide-qualifications",
+      "breakpoints": true
     }
   ]
 }

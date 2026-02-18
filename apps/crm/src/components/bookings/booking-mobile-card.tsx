@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import type { Route } from 'next';
 import { cn } from '@/lib/utils';
-import { Users, ChevronRight, CheckCircle, X, Eye, Edit } from 'lucide-react';
+import { Users, ChevronRight, CheckCircle, X } from 'lucide-react';
 import { BookingStatusBadge, PaymentStatusBadge } from '@/components/ui/status-badge';
+import { getDisplayPaymentStatus } from '@/lib/cash-collection';
 
 interface BookingMobileCardProps {
   booking: {
@@ -12,6 +13,7 @@ interface BookingMobileCardProps {
     referenceNumber: string;
     status: string;
     paymentStatus: string;
+    metadata?: unknown;
     total: string;
     totalParticipants: number;
     customer?: {
@@ -89,7 +91,7 @@ export function BookingMobileCard({
             status={booking.status as 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'}
           />
           <PaymentStatusBadge
-            status={booking.paymentStatus as 'pending' | 'partial' | 'paid' | 'refunded' | 'failed'}
+            status={getDisplayPaymentStatus(booking.paymentStatus, booking.metadata)}
           />
         </div>
       </div>

@@ -20,7 +20,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
-import { format } from "date-fns";
+import { formatLocalDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 type Tab = "details" | "bookings";
 
@@ -42,24 +42,30 @@ export default function TourRunDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>("details");
   const { openQuickBooking } = useQuickBookingContext();
 
-  // Parse date from search params
-  const date = useMemo(() => {
-    if (!dateParam) return new Date();
-    return new Date(dateParam);
+  const dateKey = useMemo(() => {
+    if (!dateParam) return null;
+    const explicitMatch = dateParam.match(/^(\d{4}-\d{2}-\d{2})/);
+    return explicitMatch?.[1] ?? null;
   }, [dateParam]);
+
+  // Parse date key for local display
+  const date = useMemo(() => {
+    if (!dateKey) return new Date();
+    return parseDateKeyToLocalDate(dateKey);
+  }, [dateKey]);
 
   const time = timeParam || "09:00";
 
   // Fetch the tour run data
   const { data: tourRun, isLoading, error } = trpc.tourRun.get.useQuery(
-    { tourId, date, time },
-    { enabled: !!tourId && !!dateParam && !!timeParam }
+    { tourId, date: dateKey ?? formatLocalDateKey(new Date()), time },
+    { enabled: !!tourId && !!dateKey && !!timeParam }
   );
 
   // Fetch bookings for this tour run
   const { data: manifest } = trpc.tourRun.getManifest.useQuery(
-    { tourId, date, time },
-    { enabled: activeTab === "bookings" && !!tourId && !!dateParam && !!timeParam }
+    { tourId, date: dateKey ?? formatLocalDateKey(new Date()), time },
+    { enabled: activeTab === "bookings" && !!tourId && !!dateKey && !!timeParam }
   );
 
   // Fetch the tour for additional details
@@ -68,7 +74,7 @@ export default function TourRunDetailPage() {
     { enabled: !!tourId }
   );
 
-  if (!dateParam || !timeParam) {
+  if (!dateKey || !timeParam) {
     return (
       <div className="rounded-lg border border-border bg-card p-6">
         <p className="text-muted-foreground">Missing date or time parameter. Please access this page from the calendar or availability list.</p>

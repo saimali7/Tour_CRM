@@ -24,6 +24,11 @@ import {
   compareToBaseline,
   type GuestBreakdown,
 } from "./pricing-calculator-service";
+import {
+  addDaysToDateKey,
+  formatDateKeyInTimeZone,
+  getMinutesSinceMidnightInTimeZone,
+} from "./lib/date-time";
 
 // ============================================================
 // TYPES
@@ -152,7 +157,7 @@ export class AvailabilityService extends BaseService {
     }
 
     // 3. Enforce date-level booking rules (past dates / same-day cutoff).
-    const bookingRestriction = this.getDateBookingRestriction(tour, date);
+    const bookingRestriction = await this.getDateBookingRestriction(tour, date);
     if (bookingRestriction) {
       return {
         tour: {
@@ -268,7 +273,7 @@ export class AvailabilityService extends BaseService {
       return false;
     }
 
-    return this.getDateBookingRestriction(tour, dateStr) === null;
+    return (await this.getDateBookingRestriction(tour, dateStr)) === null;
   }
 
   /**
@@ -625,18 +630,13 @@ export class AvailabilityService extends BaseService {
     tourId: string,
     date: string
   ): Promise<CheckAvailabilityResponse["alternatives"]> {
-    const baseDate = new Date(date);
+    const baseDateKey = date;
 
     // Build list of dates to check (3 days before and after, excluding the requested date)
     const datesToCheck: string[] = [];
     for (let offset = -3; offset <= 3; offset++) {
       if (offset === 0) continue;
-
-      const checkDate = new Date(baseDate);
-      checkDate.setDate(checkDate.getDate() + offset);
-      const isoString = checkDate.toISOString();
-      const dateStr = isoString.split("T")[0] ?? isoString.slice(0, 10);
-      datesToCheck.push(dateStr);
+      datesToCheck.push(addDaysToDateKey(baseDateKey, offset));
     }
 
     // Check availability for all dates in parallel to avoid N+1 queries
@@ -698,11 +698,13 @@ export class AvailabilityService extends BaseService {
     ];
   }
 
-  private getDateBookingRestriction(
+  private async getDateBookingRestriction(
     tour: Pick<Tour, "allowSameDayBooking" | "sameDayCutoffTime">,
     dateStr: string
-  ): "past_date" | "same_day_booking_disabled" | "same_day_cutoff_passed" | null {
-    const todayStr = new Date().toISOString().split("T")[0]!;
+  ): Promise<"past_date" | "same_day_booking_disabled" | "same_day_cutoff_passed" | null> {
+    const timezone = await this.getOrganizationTimezone();
+    const now = new Date();
+    const todayStr = formatDateKeyInTimeZone(now, timezone);
 
     if (dateStr < todayStr) {
       return "past_date";
@@ -718,7 +720,7 @@ export class AvailabilityService extends BaseService {
 
     if (
       tour.sameDayCutoffTime &&
-      this.hasTimeReachedOrPassed(tour.sameDayCutoffTime)
+      this.hasTimeReachedOrPassed(tour.sameDayCutoffTime, timezone, now)
     ) {
       return "same_day_cutoff_passed";
     }
@@ -726,7 +728,7 @@ export class AvailabilityService extends BaseService {
     return null;
   }
 
-  private hasTimeReachedOrPassed(time: string): boolean {
+  private hasTimeReachedOrPassed(time: string, timezone: string, now: Date = new Date()): boolean {
     if (!/^\d{2}:\d{2}$/.test(time)) {
       return false;
     }
@@ -745,8 +747,7 @@ export class AvailabilityService extends BaseService {
       return false;
     }
 
-    const now = new Date();
-    const nowTotalMinutes = now.getHours() * 60 + now.getMinutes();
+    const nowTotalMinutes = getMinutesSinceMidnightInTimeZone(now, timezone);
     const cutoffTotalMinutes = cutoffHours * 60 + cutoffMinutes;
     return nowTotalMinutes >= cutoffTotalMinutes;
   }

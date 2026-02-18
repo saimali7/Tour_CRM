@@ -3,7 +3,7 @@
  *
  * This module implements the auto-assignment algorithm for the Tour Command Center.
  * It provides functions to optimize guide dispatch for tour operations, minimizing
- * drive time while respecting constraints like guide qualifications, vehicle capacity,
+ * drive time while respecting constraints like vehicle capacity,
  * and availability.
  *
  * @module optimization

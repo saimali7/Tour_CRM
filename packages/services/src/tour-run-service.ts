@@ -6,19 +6,12 @@
  * Unlike schedules, tour runs are computed on-demand from bookings, not stored.
  */
 
-import { eq, and, gte, lte, inArray, sql, asc, desc } from "drizzle-orm";
+import { eq, and, inArray, sql, asc } from "drizzle-orm";
 import {
   tours,
   bookings,
-  customers,
-  bookingParticipants,
   guideAssignments,
-  guides,
   type Tour,
-  type Booking,
-  type Customer,
-  type BookingParticipant,
-  type Guide,
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { TourAvailabilityService } from "./tour-availability-service";
@@ -28,6 +21,12 @@ import {
   validateBookingWithDateFieldsArray,
 } from "./lib/type-guards";
 import { createTourRunKey, formatDateForKey } from "./lib/tour-run-utils";
+import {
+  addDaysToDateKey,
+  formatDateKeyInTimeZone,
+  formatDateOnlyKey,
+  parseDateOnlyKeyToLocalDate,
+} from "./lib/date-time";
 
 // =============================================================================
 // TYPES
@@ -224,26 +223,19 @@ export class TourRunService extends BaseService {
    * Get tour runs for today (operations dashboard)
    */
   async getForToday(): Promise<TodayTourRunsResult> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    return this.getForDateRange(today, tomorrow);
+    const timezone = await this.getOrganizationTimezone();
+    const todayDateKey = formatDateKeyInTimeZone(new Date(), timezone);
+    const tomorrowDateKey = addDaysToDateKey(todayDateKey, 1);
+    return this.getForDateRangeKeys(todayDateKey, tomorrowDateKey);
   }
 
   /**
    * Get tour runs for a specific date
    */
   async getForDate(date: Date): Promise<TourRun[]> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const result = await this.getForDateRange(startOfDay, endOfDay);
+    const startDateKey = this.formatDateKey(date);
+    const endDateKey = addDaysToDateKey(startDateKey, 1);
+    const result = await this.getForDateRangeKeys(startDateKey, endDateKey);
     return result.tourRuns;
   }
 
@@ -251,12 +243,21 @@ export class TourRunService extends BaseService {
    * Get tour runs for a date range
    */
   async getForDateRange(startDate: Date, endDate: Date): Promise<TodayTourRunsResult> {
+    const startDateKey = this.formatDateKey(startDate);
+    const endDateKeyExclusive = addDaysToDateKey(this.formatDateKey(endDate), 1);
+    return this.getForDateRangeKeys(startDateKey, endDateKeyExclusive);
+  }
+
+  private async getForDateRangeKeys(
+    startDateKey: string,
+    endDateKeyExclusive: string
+  ): Promise<TodayTourRunsResult> {
     // 1. Get all bookings in the date range with new booking model
     const dateBookingsRaw = await this.db.query.bookings.findMany({
       where: and(
         eq(bookings.organizationId, this.organizationId),
-        gte(bookings.bookingDate, startDate),
-        lte(bookings.bookingDate, endDate),
+        sql`${bookings.bookingDate}::text >= ${startDateKey}`,
+        sql`${bookings.bookingDate}::text < ${endDateKeyExclusive}`,
         inArray(bookings.status, ["pending", "confirmed"])
       ),
       with: {
@@ -286,12 +287,13 @@ export class TourRunService extends BaseService {
         continue; // Skip bookings that don't have the new fields yet
       }
 
-      const key = createTourRunKey(booking.tourId, booking.bookingDate, booking.bookingTime);
+      const bookingDateKey = this.formatDbDateKey(booking.bookingDate);
+      const key = createTourRunKey(booking.tourId, bookingDateKey, booking.bookingTime);
 
       if (!runMap.has(key)) {
         runMap.set(key, {
           tourId: booking.tourId,
-          date: booking.bookingDate,
+          date: this.parseDateKey(bookingDateKey),
           time: booking.bookingTime,
           tour: booking.tour!,
           bookings: [],
@@ -350,7 +352,7 @@ export class TourRunService extends BaseService {
     }
 
     // Get bookings for this tour run
-    const dateStr = formatDateForKey(date);
+    const dateStr = this.formatDateKey(date);
     const runBookingsRaw = await this.db.query.bookings.findMany({
       where: and(
         eq(bookings.organizationId, this.organizationId),
@@ -396,7 +398,7 @@ export class TourRunService extends BaseService {
     }
 
     // Get bookings for this tour run with participants
-    const dateStr = formatDateForKey(date);
+    const dateStr = this.formatDateKey(date);
     const runBookingsRaw = await this.db.query.bookings.findMany({
       where: and(
         eq(bookings.organizationId, this.organizationId),
@@ -563,6 +565,22 @@ export class TourRunService extends BaseService {
   // HELPERS
   // ===========================================================================
 
+  private formatDateKey(date: Date | string): string {
+    return formatDateForKey(date);
+  }
+
+  private parseDateKey(dateKey: string): Date {
+    const [yearRaw, monthRaw, dayRaw] = dateKey.split("-").map(Number);
+    const year = yearRaw || 0;
+    const month = monthRaw || 1;
+    const day = dayRaw || 1;
+    return new Date(year, month - 1, day);
+  }
+
+  private formatDbDateKey(date: Date): string {
+    return formatDateOnlyKey(date);
+  }
+
   // Type for booking with relations loaded
   private async buildTourRun(data: {
     tourId: string;
@@ -650,7 +668,7 @@ export class TourRunService extends BaseService {
 
     // Determine status
     const now = new Date();
-    const runDateTime = new Date(date);
+    const runDateTime = parseDateOnlyKeyToLocalDate(formatDateOnlyKey(date));
     const timeParts = time.split(":");
     const hours = parseInt(timeParts[0] ?? "0", 10);
     const minutes = parseInt(timeParts[1] ?? "0", 10);

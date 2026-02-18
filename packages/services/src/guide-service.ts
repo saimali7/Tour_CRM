@@ -17,6 +17,8 @@ import {
   ConflictError,
   ServiceError,
 } from "./types";
+import { formatDateOnlyKey, parseDateOnlyKeyToLocalDate } from "./lib/date-time";
+import { formatDateForKey } from "./lib/tour-run-utils";
 
 export interface GuideFilters {
   status?: GuideStatus;
@@ -125,8 +127,7 @@ export class GuideService extends BaseService {
   async getByIdWithStats(id: string): Promise<GuideWithStats> {
     const guide = await this.getById(id);
 
-    const now = new Date();
-    const nowDateStr = now.toISOString().split("T")[0];
+    const nowDateStr = await this.getOrganizationDateKey();
 
     // Count confirmed assignments for this guide
     const statsResult = await this.db
@@ -279,10 +280,10 @@ export class GuideService extends BaseService {
     ];
 
     if (dateRange?.from) {
-      bookingConditions.push(gte(bookings.bookingDate, dateRange.from));
+      bookingConditions.push(sql`${bookings.bookingDate}::text >= ${formatDateForKey(dateRange.from)}`);
     }
     if (dateRange?.to) {
-      bookingConditions.push(lte(bookings.bookingDate, dateRange.to));
+      bookingConditions.push(sql`${bookings.bookingDate}::text <= ${formatDateForKey(dateRange.to)}`);
     }
 
     return this.db.query.bookings.findMany({
@@ -335,7 +336,7 @@ export class GuideService extends BaseService {
 
     // Build exclude key for tour run
     const excludeKey = excludeTourRun
-      ? `${excludeTourRun.tourId}|${excludeTourRun.date.toISOString().split("T")[0]}|${excludeTourRun.time}`
+      ? `${excludeTourRun.tourId}|${formatDateOnlyKey(excludeTourRun.date)}|${excludeTourRun.time}`
       : null;
 
     // Find busy guides by checking for time overlaps
@@ -345,12 +346,12 @@ export class GuideService extends BaseService {
       if (!assignment.guideId || !assignment.bookingDate || !assignment.bookingTime) continue;
 
       // Skip if this is the same tour run we're checking for
-      const tourRunKey = `${assignment.tourId}|${assignment.bookingDate.toISOString().split("T")[0]}|${assignment.bookingTime}`;
+      const tourRunKey = `${assignment.tourId}|${formatDateOnlyKey(assignment.bookingDate)}|${assignment.bookingTime}`;
       if (excludeKey && tourRunKey === excludeKey) continue;
 
       // Calculate assignment time window
       const [hours, minutes] = assignment.bookingTime.split(":").map(Number);
-      const assignmentStart = new Date(assignment.bookingDate);
+      const assignmentStart = parseDateOnlyKeyToLocalDate(formatDateOnlyKey(assignment.bookingDate));
       assignmentStart.setHours(hours ?? 0, minutes ?? 0, 0, 0);
 
       const durationMinutes = assignment.tourDurationMinutes || 60;

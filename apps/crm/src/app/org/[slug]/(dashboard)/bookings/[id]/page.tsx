@@ -37,6 +37,8 @@ import { Button, Badge } from "@tour/ui";
 import { toast } from "sonner";
 import { PageSpinner, ButtonSpinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { getCashCollectionMetadata } from "@/lib/cash-collection";
+import { dbDateToLocalDate, formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 // New booking detail components
 import {
@@ -93,6 +95,8 @@ export default function BookingDetailPage() {
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [paymentLinkUrl, setPaymentLinkUrl] = useState("");
+  const [cashExpectedAmount, setCashExpectedAmount] = useState("");
+  const [cashCollectionNotes, setCashCollectionNotes] = useState("");
 
   const confirmModal = useConfirmModal();
 
@@ -259,6 +263,15 @@ export default function BookingDetailPage() {
     onError: (error) => toast.error(`Failed to remove assignment: ${error.message}`),
   });
 
+  const updateCashCollectionMutation = trpc.booking.updateCashCollection.useMutation({
+    onSuccess: () => {
+      utils.booking.getById.invalidate({ id: bookingId });
+      utils.booking.list.invalidate();
+      toast.success("Cash collection details updated");
+    },
+    onError: (error) => toast.error(`Failed to update cash collection: ${error.message}`),
+  });
+
   // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
@@ -266,9 +279,11 @@ export default function BookingDetailPage() {
   // Calculate urgency/time context
   const urgency: UrgencyLevel | null = useMemo(() => {
     if (!booking?.bookingDate) return null;
-    const tourDate = new Date(booking.bookingDate);
-    const now = new Date();
-    const diffMs = tourDate.getTime() - now.getTime();
+    const dateKey = formatDbDateKey(booking.bookingDate);
+    const tourDate = parseDateKeyToLocalDate(dateKey);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffMs = tourDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0) return { type: "past", label: "Completed", daysUntil: diffDays };
@@ -277,6 +292,17 @@ export default function BookingDetailPage() {
     if (diffDays <= 3) return { type: "soon", label: `In ${diffDays} days`, daysUntil: diffDays };
     return { type: "normal", label: `In ${diffDays} days`, daysUntil: diffDays };
   }, [booking?.bookingDate]);
+
+  const cashCollection = useMemo(
+    () => getCashCollectionMetadata((booking as { metadata?: unknown } | undefined)?.metadata),
+    [booking]
+  );
+
+  useEffect(() => {
+    if (!cashCollection) return;
+    setCashExpectedAmount(cashCollection.expectedAmount);
+    setCashCollectionNotes(cashCollection.notes || "");
+  }, [cashCollection?.expectedAmount, cashCollection?.notes, cashCollection]);
 
   // Primary action based on booking state
   const primaryAction: PrimaryAction | null = useMemo(() => {
@@ -372,6 +398,19 @@ export default function BookingDetailPage() {
         notes: paymentNotes || undefined,
       });
     }
+  };
+
+  const handleUpdateCashCollection = () => {
+    if (!cashExpectedAmount || parseFloat(cashExpectedAmount) <= 0) {
+      toast.error("Expected cash amount must be greater than 0");
+      return;
+    }
+
+    updateCashCollectionMutation.mutate({
+      id: bookingId,
+      expectedAmount: cashExpectedAmount,
+      notes: cashCollectionNotes || undefined,
+    });
   };
 
   const handleDeletePayment = async (paymentId: string) => {
@@ -474,17 +513,9 @@ export default function BookingDetailPage() {
   }
 
   // Format helpers
-  const formatDate = (date: Date) => new Intl.DateTimeFormat("en-US", {
-    weekday: "long", month: "long", day: "numeric", year: "numeric",
-  }).format(new Date(date));
-
   const formatShortDate = (date: Date) => new Intl.DateTimeFormat("en-US", {
     weekday: "short", month: "short", day: "numeric",
-  }).format(new Date(date));
-
-  const formatTime = (date: Date) => new Intl.DateTimeFormat("en-US", {
-    hour: "numeric", minute: "2-digit", hour12: true,
-  }).format(new Date(date));
+  }).format(date);
 
   // Cast booking to our type (the actual data matches)
   const bookingData = booking as unknown as BookingData;
@@ -588,6 +619,58 @@ export default function BookingDetailPage() {
 
         {/* Right Column - Financial & Meta */}
         <div className="space-y-3">
+          {cashCollection && (
+            <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 sm:p-5">
+              <h3 className="text-sm font-semibold text-warning uppercase tracking-wide mb-2">
+                Cash Collection
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                {cashCollection.status === "pending"
+                  ? "Pending manual cash collection."
+                  : "Cash collection has been recorded."}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">
+                    Expected Amount
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={cashExpectedAmount}
+                      onChange={(e) => setCashExpectedAmount(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border rounded-lg bg-background"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={cashCollectionNotes}
+                    onChange={(e) => setCashCollectionNotes(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 border rounded-lg bg-background resize-none"
+                    placeholder="Collection notes..."
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={handleUpdateCashCollection}
+                  disabled={updateCashCollectionMutation.isPending}
+                >
+                  {updateCashCollectionMutation.isPending ? "Saving..." : "Update Cash Collection"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Payments Section - Shows balance and payment history */}
           <PaymentsSection
             balanceInfo={balanceData}
@@ -1066,7 +1149,7 @@ export default function BookingDetailPage() {
         scheduleInfo={booking.bookingDate ? {
           id: `${booking.tourId}-${booking.bookingDate}-${booking.bookingTime}`,
           tourName: booking.tour?.name || "Tour",
-          date: formatShortDate(new Date(booking.bookingDate)),
+          date: formatShortDate(dbDateToLocalDate(booking.bookingDate)),
           time: booking.bookingTime || "",
         } : undefined}
         availableGuides={availableGuides?.data

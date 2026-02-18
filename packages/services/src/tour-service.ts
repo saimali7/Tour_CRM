@@ -59,6 +59,10 @@ export interface CreateTourInput {
   meetingPointDetails?: string;
   meetingPointLat?: string;
   meetingPointLng?: string;
+  pickupMode?: "meeting_point" | "hotel_pickup" | "hybrid";
+  pickupAllowedCities?: string[];
+  pickupAirportAllowed?: boolean;
+  pickupPolicyNotes?: string;
   coverImageUrl?: string;
   images?: string[];
   category?: string;
@@ -201,7 +205,7 @@ export class TourService extends BaseService {
 
     // Get booking stats for these tours (availability-based model)
     const tourIds = toursResult.map(t => t.id);
-    const nowDate = new Date().toISOString().split("T")[0]!;
+    const nowDate = await this.getOrganizationDateKey();
 
     const bookingStats = await this.db
       .select({
@@ -368,6 +372,10 @@ export class TourService extends BaseService {
           meetingPointDetails: input.meetingPointDetails,
           meetingPointLat: input.meetingPointLat,
           meetingPointLng: input.meetingPointLng,
+          pickupMode: input.pickupMode,
+          pickupAllowedCities: input.pickupAllowedCities,
+          pickupAirportAllowed: input.pickupAirportAllowed,
+          pickupPolicyNotes: input.pickupPolicyNotes,
           coverImageUrl: input.coverImageUrl,
           images: input.images,
           category: input.category,
@@ -573,6 +581,10 @@ export class TourService extends BaseService {
       meetingPointDetails: original.meetingPointDetails || undefined,
       meetingPointLat: original.meetingPointLat || undefined,
       meetingPointLng: original.meetingPointLng || undefined,
+      pickupMode: original.pickupMode ?? undefined,
+      pickupAllowedCities: (original.pickupAllowedCities as string[] | null | undefined) ?? undefined,
+      pickupAirportAllowed: original.pickupAirportAllowed ?? undefined,
+      pickupPolicyNotes: original.pickupPolicyNotes || undefined,
       coverImageUrl: original.coverImageUrl || undefined,
       images: original.images || undefined,
       category: original.category || undefined,

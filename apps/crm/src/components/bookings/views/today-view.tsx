@@ -4,6 +4,7 @@ import * as React from "react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { getDisplayPaymentStatus } from "@/lib/cash-collection";
 import {
   Clock,
   Users,
@@ -30,6 +31,7 @@ interface TimelineBooking {
   referenceNumber: string;
   status: string;
   paymentStatus: string;
+  metadata?: unknown;
   total: string;
   totalParticipants: number;
   customer?: {
@@ -261,7 +263,7 @@ function BookingCard({ booking, orgSlug, onConfirm, onSendPaymentLink }: Booking
             status={booking.status as "pending" | "confirmed" | "completed" | "cancelled" | "no_show"}
           />
           <PaymentStatusBadge
-            status={booking.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed"}
+            status={getDisplayPaymentStatus(booking.paymentStatus, booking.metadata)}
           />
         </div>
 

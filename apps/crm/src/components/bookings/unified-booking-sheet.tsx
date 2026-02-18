@@ -141,6 +141,7 @@ export function UnifiedBookingSheet({
                 timeSlots={form.timeSlots}
                 isLoadingTimeSlots={form.departureTimesLoading}
                 nextAvailableDate={form.nextAvailableDate}
+                dateIndicators={form.dateIndicators}
                 timeError={form.errors.time}
               />
             )}

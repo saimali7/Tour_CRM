@@ -319,7 +319,6 @@ export function mapWarningType(type: string): DispatchWarning["type"] {
     case "insufficient_guides":
     case "capacity_exceeded":
       return "capacity";
-    case "no_qualified_guide":
     case "no_available_guide":
       return "no_guide";
     case "conflict":

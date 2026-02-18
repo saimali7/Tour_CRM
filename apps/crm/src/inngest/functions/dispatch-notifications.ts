@@ -3,15 +3,16 @@ import * as Sentry from "@sentry/nextjs";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
 import { createServices, createServiceLogger } from "@tour/services";
 import { formatInTimeZone } from "date-fns-tz";
+import { formatDbDateKey, parseDateKeyToDbDate } from "@/lib/date-time";
 
 const log = createServiceLogger("dispatch");
 
 function parseDateKey(dateKey: string): Date {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-    return new Date(dateKey);
+  const normalizedDateKey = formatDbDateKey(dateKey);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalizedDateKey)) {
+    return parseDateKeyToDbDate(normalizedDateKey);
   }
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(year || 0, (month || 1) - 1, day || 1);
+  throw new Error(`Invalid dispatch date: ${dateKey}`);
 }
 
 /**

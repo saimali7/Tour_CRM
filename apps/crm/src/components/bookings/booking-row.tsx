@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { BookingStatusBadge, PaymentStatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Send, Users, DollarSign, Clock } from "lucide-react";
+import { getDisplayPaymentStatus } from "@/lib/cash-collection";
 
 // =============================================================================
 // TYPES
@@ -17,6 +18,7 @@ interface BookingRowProps {
     referenceNumber: string;
     status: string;
     paymentStatus: string;
+    metadata?: unknown;
     total: string;
     totalParticipants: number;
     customer?: {
@@ -233,7 +235,7 @@ export function BookingRow({
               status={booking.status as "pending" | "confirmed" | "completed" | "cancelled" | "no_show"}
             />
             <PaymentStatusBadge
-              status={booking.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed"}
+              status={getDisplayPaymentStatus(booking.paymentStatus, booking.metadata)}
             />
           </div>
         </div>

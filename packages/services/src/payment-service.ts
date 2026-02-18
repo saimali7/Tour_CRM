@@ -17,6 +17,11 @@ import {
   ServiceError,
 } from "./types";
 import { createServiceLogger } from "./lib/logger";
+import {
+  getCashCollectionMetadata,
+  markCashCollectionCollected,
+  withCashCollectionMetadata,
+} from "./booking/cash-collection";
 
 export interface PaymentFilters {
   bookingId?: string;
@@ -279,11 +284,29 @@ export class PaymentService extends BaseService {
       newPaymentStatus = "partial";
     }
 
+    const bookingMetadata = (booking.metadata as Record<string, unknown> | null | undefined) ?? {};
+    const cashCollection = getCashCollectionMetadata(bookingMetadata);
+    let updatedMetadata: Record<string, unknown> | undefined;
+    if (cashCollection) {
+      const expectedAmount = parseFloat(cashCollection.expectedAmount);
+      if (Number.isFinite(expectedAmount) && totalPaid >= expectedAmount) {
+        updatedMetadata = withCashCollectionMetadata(
+          bookingMetadata,
+          markCashCollectionCollected(
+            cashCollection,
+            newBalanceInfo.totalPaid,
+            input.recordedBy
+          )
+        );
+      }
+    }
+
     await this.db
       .update(bookings)
       .set({
         paymentStatus: newPaymentStatus,
         paidAmount: newBalanceInfo.totalPaid,
+        metadata: updatedMetadata,
         updatedAt: new Date(),
       })
       .where(
@@ -344,11 +367,36 @@ export class PaymentService extends BaseService {
       newPaymentStatus = "partial";
     }
 
+    const bookingMetadata = (booking.metadata as Record<string, unknown> | null | undefined) ?? {};
+    const cashCollection = getCashCollectionMetadata(bookingMetadata);
+    let updatedMetadata: Record<string, unknown> | undefined;
+    if (cashCollection) {
+      const expectedAmount = parseFloat(cashCollection.expectedAmount);
+      if (!Number.isFinite(expectedAmount) || totalPaid < expectedAmount) {
+        updatedMetadata = withCashCollectionMetadata(bookingMetadata, {
+          ...cashCollection,
+          status: "pending",
+          collectedAt: undefined,
+          collectedAmount: undefined,
+          history: [
+            ...cashCollection.history,
+            {
+              at: new Date().toISOString(),
+              action: "updated",
+              expectedAmount: cashCollection.expectedAmount,
+              actorId: this.userId,
+            },
+          ],
+        });
+      }
+    }
+
     await this.db
       .update(bookings)
       .set({
         paymentStatus: newPaymentStatus,
         paidAmount: balanceInfo.totalPaid,
+        metadata: updatedMetadata,
         updatedAt: new Date(),
       })
       .where(

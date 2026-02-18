@@ -3,8 +3,19 @@ import { createRouter, publicProcedure } from "../trpc";
 import { createServices, validateGuidePortalBookingArray, createTourRunKey } from "@tour/services";
 import { TRPCError } from "@trpc/server";
 import { getGuideContext } from "../../lib/guide-auth";
-import { db, eq, and, gte, lte, inArray } from "@tour/database";
+import { db, eq, and } from "@tour/database";
 import { bookings, guideAssignments } from "@tour/database/schema";
+import {
+  addDaysToDateKey,
+  coerceDateInputToDateKey,
+  formatDbDateKey,
+  getNowDateKeyInTimeZone,
+  normalizeTimeZone,
+  parseDateKeyToDbDate,
+  parseDateKeyToLocalDate,
+} from "@/lib/date-time";
+
+const dateKeySchema = z.string().min(1, "Date is required");
 
 /**
  * Guide-authenticated procedure
@@ -34,11 +45,11 @@ export const guidePortalRouter = createRouter({
    */
   getMyDashboard: guideProcedure.query(async ({ ctx }) => {
     const { guideId, organizationId } = ctx.guideContext;
+    const timezone = normalizeTimeZone(ctx.guideContext.organization.timezone, "UTC");
 
     // Get upcoming tours (next 7 days) where the guide has confirmed assignments
-    const today = new Date();
-    const nextWeek = new Date();
-    nextWeek.setDate(today.getDate() + 7);
+    const todayDateKey = getNowDateKeyInTimeZone(timezone);
+    const nextWeekDateKey = addDaysToDateKey(todayDateKey, 7);
 
     // First get confirmed assignments for this guide that link to upcoming bookings
     const confirmedAssignments = await db.query.guideAssignments.findMany({
@@ -70,21 +81,23 @@ export const guidePortalRouter = createRouter({
     const tourRunMap = new Map<string, TourRunInfo>();
     for (const assignment of confirmedAssignments) {
       const booking = assignment.booking as BookingWithTour;
+      const bookingDateKey = booking?.bookingDate ? formatDbDateKey(booking.bookingDate) : null;
       if (
         booking &&
         booking.bookingDate &&
         booking.bookingTime &&
         booking.tour &&
-        booking.bookingDate >= today &&
-        booking.bookingDate <= nextWeek &&
+        bookingDateKey &&
+        bookingDateKey >= todayDateKey &&
+        bookingDateKey <= nextWeekDateKey &&
         (booking.status === "pending" || booking.status === "confirmed")
       ) {
-        const tourRunKey = createTourRunKey(booking.tourId!, booking.bookingDate, booking.bookingTime);
+        const tourRunKey = createTourRunKey(booking.tourId!, bookingDateKey, booking.bookingTime);
         if (!tourRunMap.has(tourRunKey)) {
           tourRunMap.set(tourRunKey, {
             tourId: booking.tourId!,
             tourName: booking.tour.name,
-            bookingDate: booking.bookingDate,
+            bookingDate: parseDateKeyToLocalDate(bookingDateKey),
             bookingTime: booking.bookingTime,
             bookingCount: 1,
           });
@@ -169,13 +182,16 @@ export const guidePortalRouter = createRouter({
       // Filter by date range if provided (based on booking's bookingDate)
       let filteredAssignments = assignments;
       if (input.dateRange?.from || input.dateRange?.to) {
+        const fromKey = input.dateRange?.from ? formatDbDateKey(input.dateRange.from) : null;
+        const toKey = input.dateRange?.to ? formatDbDateKey(input.dateRange.to) : null;
         filteredAssignments = assignments.filter((assignment) => {
           const bookingDate = assignment.booking?.bookingDate;
           if (!bookingDate) return false;
-          if (input.dateRange?.from && bookingDate < input.dateRange.from) {
+          const bookingDateKey = formatDbDateKey(bookingDate);
+          if (fromKey && bookingDateKey < fromKey) {
             return false;
           }
-          if (input.dateRange?.to && bookingDate > input.dateRange.to) {
+          if (toKey && bookingDateKey > toKey) {
             return false;
           }
           return true;
@@ -290,13 +306,15 @@ export const guidePortalRouter = createRouter({
   getTourRunManifest: guideProcedure
     .input(z.object({
       tourId: z.string(),
-      date: z.coerce.date(),
+      date: dateKeySchema,
       time: z.string(),
     }))
     .query(async ({ ctx, input }) => {
       const { guideId, organizationId } = ctx.guideContext;
-
-      const dateStr = input.date.toISOString().split("T")[0]!;
+      const dateStr = coerceDateInputToDateKey(
+        input.date,
+        ctx.guideContext.organization.timezone
+      );
       const tourRunKey = createTourRunKey(input.tourId, dateStr, input.time);
 
       // Verify the guide is assigned to this tour run (via any booking on this tour run)
@@ -314,7 +332,11 @@ export const guidePortalRouter = createRouter({
       const hasTourRunAssignment = allAssignments.some((a) => {
         const booking = a.booking;
         if (!booking || !booking.tourId || !booking.bookingDate || !booking.bookingTime) return false;
-        const assignmentTourRunKey = createTourRunKey(booking.tourId!, booking.bookingDate!, booking.bookingTime!);
+        const assignmentTourRunKey = createTourRunKey(
+          booking.tourId!,
+          formatDbDateKey(booking.bookingDate),
+          booking.bookingTime!
+        );
         return assignmentTourRunKey === tourRunKey;
       });
 
@@ -350,7 +372,7 @@ export const guidePortalRouter = createRouter({
       // Filter by date and time (date is stored as Date, need to compare)
       const filteredBookings = tourRunBookings.filter((b) => {
         if (!b.bookingDate || !b.bookingTime) return false;
-        const bookingDateStr = b.bookingDate.toISOString().split("T")[0];
+        const bookingDateStr = formatDbDateKey(b.bookingDate);
         return bookingDateStr === dateStr && b.bookingTime === input.time;
       });
 
@@ -378,7 +400,7 @@ export const guidePortalRouter = createRouter({
         tourRun: {
           tourId: input.tourId,
           tourName: tour?.name || "Unknown Tour",
-          date: input.date,
+          date: parseDateKeyToDbDate(dateStr),
           time: input.time,
           maxParticipants: tour?.maxParticipants || 0,
         },

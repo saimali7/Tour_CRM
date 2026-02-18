@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
   DollarSign,
@@ -55,6 +55,15 @@ export interface PricingFormState {
   occupancyPerUnit: string;
 }
 
+export interface PricingPackageDraft {
+  id: string;
+  optionId?: string;
+  name: string;
+  shortDescription: string;
+  isDefault?: boolean;
+  config: PricingFormState;
+}
+
 interface PricingTabProps {
   formState: TourFormState;
   updateForm: (updates: Partial<TourFormState>) => void;
@@ -87,51 +96,123 @@ const defaultPricingState: PricingFormState = {
   occupancyPerUnit: "6",
 };
 
+function createPackageId(): string {
+  return `pkg-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export function createDefaultPricingFormState(
+  basePrice: string,
+  maxParticipants: number
+): PricingFormState {
+  return {
+    ...defaultPricingState,
+    adultPrice: basePrice || "",
+    childPrice: basePrice ? (parseFloat(basePrice) * 0.5).toFixed(2) : "",
+    totalSeats: maxParticipants?.toString() || "20",
+  };
+}
+
 // ============================================================================
 // Component
 // ============================================================================
 
 export function PricingTab({ formState, updateForm }: PricingTabProps) {
-  // Track if initial sync has happened
-  const hasSyncedRef = useRef(false);
-
-  // Use pricing state from form or default
-  const [pricingState, setPricingState] = useState<PricingFormState>(() => {
-    // Initialize from formState.pricingConfig if available
-    if (formState.pricingConfig) {
-      return formState.pricingConfig as PricingFormState;
+  const [packages, setPackages] = useState<PricingPackageDraft[]>(() => {
+    if (formState.pricingPackages && formState.pricingPackages.length > 0) {
+      return formState.pricingPackages;
     }
-    // Auto-populate adult price from basePrice if set
-    return {
-      ...defaultPricingState,
-      adultPrice: formState.basePrice || "",
-      childPrice: formState.basePrice ? (parseFloat(formState.basePrice) * 0.5).toFixed(2) : "",
-      totalSeats: formState.maxParticipants?.toString() || "20",
-    };
+
+    const fallbackConfig = formState.pricingConfig
+      ? (formState.pricingConfig as PricingFormState)
+      : createDefaultPricingFormState(formState.basePrice, formState.maxParticipants);
+
+    return [
+      {
+        id: createPackageId(),
+        name: "Standard Experience",
+        shortDescription: "Join our regular tour",
+        isDefault: true,
+        config: fallbackConfig,
+      },
+    ];
   });
 
-  // Sync initial state to parent after mount (not during render)
-  useEffect(() => {
-    if (!hasSyncedRef.current && !formState.pricingConfig) {
-      hasSyncedRef.current = true;
-      updateForm({ pricingConfig: pricingState });
-    }
-  }, [formState.pricingConfig, pricingState, updateForm]);
+  const [activePackageId, setActivePackageId] = useState<string>(() => packages[0]?.id ?? "");
 
-  // Update local state and sync to form
-  const updatePricing = useCallback((updates: Partial<PricingFormState>) => {
-    setPricingState(prev => {
-      const next = { ...prev, ...updates };
-      return next;
+  useEffect(() => {
+    if (packages.length === 0) return;
+    if (!packages.some((pkg) => pkg.id === activePackageId)) {
+      setActivePackageId(packages[0]!.id);
+    }
+  }, [activePackageId, packages]);
+
+  const activePackage = useMemo(
+    () => packages.find((pkg) => pkg.id === activePackageId) ?? packages[0],
+    [activePackageId, packages]
+  );
+  const pricingState = activePackage?.config ?? createDefaultPricingFormState(formState.basePrice, formState.maxParticipants);
+
+  const updateActivePackage = useCallback(
+    (updates: Partial<PricingPackageDraft>) => {
+      if (!activePackageId) return;
+      setPackages((prev) =>
+        prev.map((pkg) =>
+          pkg.id === activePackageId
+            ? { ...pkg, ...updates }
+            : pkg
+        )
+      );
+    },
+    [activePackageId]
+  );
+
+  // Update local state and sync to active package config
+  const updatePricing = useCallback(
+    (updates: Partial<PricingFormState>) => {
+      updateActivePackage({
+        config: {
+          ...pricingState,
+          ...updates,
+        },
+      });
+    },
+    [pricingState, updateActivePackage]
+  );
+
+  const addPackage = useCallback(() => {
+    const baseConfig = activePackage?.config ?? createDefaultPricingFormState(formState.basePrice, formState.maxParticipants);
+    const next: PricingPackageDraft = {
+      id: createPackageId(),
+      name: `Package ${packages.length + 1}`,
+      shortDescription: "",
+      isDefault: false,
+      config: { ...baseConfig },
+    };
+
+    setPackages((prev) => [...prev, next]);
+    setActivePackageId(next.id);
+  }, [activePackage, formState.basePrice, formState.maxParticipants, packages.length]);
+
+  const removePackage = useCallback(
+    (id: string) => {
+      if (packages.length <= 1) return;
+      const remaining = packages.filter((pkg) => pkg.id !== id);
+      setPackages(remaining);
+      if (activePackageId === id && remaining[0]) {
+        setActivePackageId(remaining[0].id);
+      }
+    },
+    [activePackageId, packages]
+  );
+
+  // Sync package state changes to parent
+  useEffect(() => {
+    if (packages.length === 0) return;
+    updateForm({
+      pricingPackages: packages,
+      pricingConfig: activePackage?.config,
     });
-  }, []);
-
-  // Sync pricing state changes to parent
-  useEffect(() => {
-    if (hasSyncedRef.current) {
-      updateForm({ pricingConfig: pricingState });
-    }
-  }, [pricingState, updateForm]);
+  }, [activePackage?.config, packages, updateForm]);
 
   // Handle tour type change - auto-select appropriate pricing model
   const handleTourTypeChange = (tourType: TourType) => {
@@ -223,6 +304,96 @@ export function PricingTab({ formState, updateForm }: PricingTabProps) {
             Configure how customers book and pay for this tour.
           </p>
         </div>
+      </div>
+
+      {/* Package Variations */}
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Package Variations</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Create multiple package options (Standard, Premium, Private) before publishing.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={addPackage}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-input px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Package
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {packages.map((pkg, index) => {
+            const isActive = pkg.id === activePackageId;
+            return (
+              <button
+                key={pkg.id}
+                type="button"
+                onClick={() => setActivePackageId(pkg.id)}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  isActive
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-input bg-background text-muted-foreground hover:text-foreground hover:border-primary/40"
+                )}
+              >
+                <span>{pkg.name || `Package ${index + 1}`}</span>
+                {packages.length > 1 && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="inline-flex items-center justify-center rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      removePackage(pkg.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        removePackage(pkg.id);
+                      }
+                    }}
+                    aria-label={`Remove ${pkg.name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {activePackage && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Package Name</label>
+              <input
+                type="text"
+                value={activePackage.name}
+                onChange={(event) => updateActivePackage({ name: event.target.value })}
+                placeholder="e.g. Premium Experience"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Short Description</label>
+              <input
+                type="text"
+                value={activePackage.shortDescription}
+                onChange={(event) =>
+                  updateActivePackage({ shortDescription: event.target.value })
+                }
+                placeholder="How this package differs"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Step 1: Tour Type */}

@@ -6,6 +6,7 @@ import { Search, Calendar, Users, Clock, User, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuickBookingContext } from "@/components/bookings/quick-booking-provider";
 import { addDays, format, startOfDay, endOfDay } from "date-fns";
+import { formatDbDateKey, formatLocalDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 interface BookingPlannerProps {
   orgSlug: string;
@@ -20,7 +21,7 @@ function formatTime(time: string): string {
 }
 
 function formatDateForInput(date: Date): string {
-  return date.toISOString().split("T")[0]!;
+  return formatLocalDateKey(date);
 }
 
 export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
@@ -39,7 +40,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
 
   // Calculate date range for search
   const dateRange = useMemo(() => {
-    const baseDate = new Date(searchDate);
+    const baseDate = parseDateKeyToLocalDate(searchDate);
     const from = startOfDay(addDays(baseDate, -flexDays));
     const to = endOfDay(addDays(baseDate, flexDays));
     return { from, to };
@@ -48,8 +49,8 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
   // Search tour runs using tourRun.list
   const { data: tourRunsResult, isLoading, error, refetch } = trpc.tourRun.list.useQuery(
     {
-      dateFrom: dateRange.from,
-      dateTo: dateRange.to,
+      dateFrom: formatLocalDateKey(dateRange.from),
+      dateTo: formatLocalDateKey(dateRange.to),
     },
     { enabled: hasSearched }
   );
@@ -92,7 +93,7 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
 
     const groups = new Map<string, typeof results>();
     for (const result of results) {
-      const dateKey = new Date(result.date).toDateString();
+      const dateKey = formatDbDateKey(result.date as Date | string);
       if (!groups.has(dateKey)) {
         groups.set(dateKey, []);
       }
@@ -100,13 +101,13 @@ export function BookingPlanner({ orgSlug }: BookingPlannerProps) {
     }
 
     return Array.from(groups.entries()).map(([dateKey, tourRuns]) => ({
-      date: new Date(dateKey),
+      date: parseDateKeyToLocalDate(dateKey),
       tourRuns,
     }));
   }, [results]);
 
   const isExactDateMatch = (date: Date) => {
-    const searchDateObj = new Date(searchDate);
+    const searchDateObj = parseDateKeyToLocalDate(searchDate);
     return date.toDateString() === searchDateObj.toDateString();
   };
 

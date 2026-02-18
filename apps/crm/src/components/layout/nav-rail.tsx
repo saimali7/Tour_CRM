@@ -22,6 +22,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useEffect } from "react";
 import { NotificationCenter } from "@/components/notification-center";
 import { CommandPalette } from "@/components/command-palette";
+import { UserAccountButton } from "@/components/layout/user-account-button";
 
 interface NavItem {
   name: string;
@@ -45,10 +46,10 @@ const navItems: NavItem[] = [
 interface NavRailProps {
   orgSlug: string;
   orgName: string;
-  userButton: React.ReactNode;
+  clerkEnabled: boolean;
 }
 
-export function NavRail({ orgSlug, orgName, userButton }: NavRailProps) {
+export function NavRail({ orgSlug, orgName, clerkEnabled }: NavRailProps) {
   const pathname = usePathname();
   const router = useRouter();
   const basePath = `/org/${orgSlug}`;
@@ -194,7 +195,7 @@ export function NavRail({ orgSlug, orgName, userButton }: NavRailProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex h-9 w-9 items-center justify-center cursor-pointer">
-                {userButton}
+                <UserAccountButton clerkEnabled={clerkEnabled} />
               </div>
             </TooltipTrigger>
             <TooltipContent side="right">Account</TooltipContent>

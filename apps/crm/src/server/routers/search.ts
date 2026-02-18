@@ -2,7 +2,8 @@ import { z } from "zod";
 import { createRouter, protectedProcedure } from "../trpc";
 import { db } from "@tour/database";
 import { bookings, customers, tours, guides } from "@tour/database/schema";
-import { and, eq, ilike, or, sql, desc, gte } from "drizzle-orm";
+import { and, eq, ilike, or, sql, desc } from "drizzle-orm";
+import { dbDateToLocalDate, formatDbDateKey } from "@/lib/date-time";
 
 export type EntityType = "booking" | "customer" | "tour" | "guide";
 
@@ -204,7 +205,7 @@ export const searchRouter = createRouter({
       const perEntityLimit = Math.ceil(input.limit / 3);
 
       // Get recent bookings, customers, and upcoming tour bookings
-      const today = new Date();
+      const todayDateKey = formatDbDateKey(new Date());
       const [recentBookings, recentCustomers, upcomingTourBookings] = await Promise.all([
         db
           .select({
@@ -246,7 +247,7 @@ export const searchRouter = createRouter({
             and(
               eq(bookings.organizationId, orgId),
               eq(bookings.status, "confirmed"),
-              gte(bookings.bookingDate, today)
+              sql`${bookings.bookingDate}::text >= ${todayDateKey}`
             )
           )
           .orderBy(bookings.bookingDate)
@@ -281,7 +282,7 @@ export const searchRouter = createRouter({
           const dateStr = new Intl.DateTimeFormat("en-US", {
             month: "short",
             day: "numeric",
-          }).format(tourBooking.bookingDate);
+          }).format(dbDateToLocalDate(tourBooking.bookingDate));
           results.push({
             id: tourBooking.id,
             type: "booking",

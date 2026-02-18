@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MoreVertical, Archive, Pause, Play, Trash2, Copy, Package } from "lucide-react";
+import { ArrowLeft, MoreVertical, Archive, Pause, Play, Trash2, Copy, Package, Edit } from "lucide-react";
 import { Button, IconButton } from "@/components/ui/button";
 import { TourStatusBadge } from "@/components/ui/status-badge";
 import {
@@ -76,6 +78,13 @@ export function TourPageHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <Link href={`/org/${orgSlug}/tours/${tour.id}/edit` as Route}>
+          <Button variant="outline" disabled={isLoading}>
+            <Edit className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+        </Link>
+
         {/* Status Actions */}
         {tour.status === "draft" && onPublish && (
           <Button onClick={onPublish} disabled={isLoading}>

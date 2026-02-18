@@ -1,6 +1,10 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createRouter, protectedProcedure } from "../trpc";
 import { createServices } from "@tour/services";
+import { coerceDateInputToDateKey, parseDateKeyToDbDate } from "@/lib/date-time";
+
+const dateKeySchema = z.string().min(1, "Date is required");
 
 export const manifestRouter = createRouter({
   getForSchedule: protectedProcedure
@@ -14,19 +18,21 @@ export const manifestRouter = createRouter({
     .input(
       z.object({
         guideId: z.string(),
-        date: z.coerce.date(),
+        date: dateKeySchema,
       })
     )
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.manifest.getManifestsForGuide(input.guideId, input.date);
+      const dateKey = normalizeManifestDate(input.date, ctx.orgContext.organization.timezone);
+      return services.manifest.getManifestsForGuide(input.guideId, parseDateKeyToDbDate(dateKey));
     }),
 
   getForDate: protectedProcedure
-    .input(z.object({ date: z.coerce.date() }))
+    .input(z.object({ date: dateKeySchema }))
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.manifest.getManifestsForDate(input.date);
+      const dateKey = normalizeManifestDate(input.date, ctx.orgContext.organization.timezone);
+      return services.manifest.getManifestsForDate(parseDateKeyToDbDate(dateKey));
     }),
 
   /**
@@ -37,16 +43,31 @@ export const manifestRouter = createRouter({
     .input(
       z.object({
         tourId: z.string(),
-        date: z.string(), // YYYY-MM-DD format
+        date: dateKeySchema,
         time: z.string(), // HH:MM format
       })
     )
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      const dateKey = normalizeManifestDate(input.date, ctx.orgContext.organization.timezone);
       return services.manifest.getForTourRun(
         input.tourId,
-        new Date(input.date),
+        parseDateKeyToDbDate(dateKey),
         input.time
       );
     }),
 });
+
+function normalizeManifestDate(
+  value: string,
+  organizationTimeZone: string | null | undefined
+): string {
+  try {
+    return coerceDateInputToDateKey(value, organizationTimeZone);
+  } catch {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Date must be in YYYY-MM-DD format or a valid datetime",
+    });
+  }
+}

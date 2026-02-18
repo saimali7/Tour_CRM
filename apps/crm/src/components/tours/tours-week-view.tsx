@@ -7,6 +7,11 @@ import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
 import { startOfDay, endOfDay } from "date-fns";
+import {
+  formatDbDateKey,
+  formatLocalDateKey,
+  parseDateKeyToLocalDate,
+} from "@/lib/date-time";
 
 interface ToursWeekViewProps {
   orgSlug: string;
@@ -54,8 +59,8 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
   }, [weekDates]);
 
   const { data, isLoading, error } = trpc.tourRun.list.useQuery({
-    dateFrom: dateRange.from,
-    dateTo: dateRange.to,
+    dateFrom: formatLocalDateKey(dateRange.from),
+    dateTo: formatLocalDateKey(dateRange.to),
   });
 
   const tourRuns = data?.tourRuns || [];
@@ -77,11 +82,8 @@ export function ToursWeekView({ orgSlug, weekStart, onDayClick }: ToursWeekViewP
       grouped[date.toDateString()] = [];
     }
     for (const tourRun of tourRuns) {
-      const dateKey = new Date(tourRun.date).toDateString();
-      // Convert Date to YYYY-MM-DD string for URL params
-      const dateStr = tourRun.date instanceof Date
-        ? tourRun.date.toISOString().split('T')[0]!
-        : String(tourRun.date);
+      const dateStr = formatDbDateKey(tourRun.date as Date | string);
+      const dateKey = parseDateKeyToLocalDate(dateStr).toDateString();
       if (grouped[dateKey]) {
         grouped[dateKey].push({
           tourId: tourRun.tourId,

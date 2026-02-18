@@ -1,5 +1,12 @@
 import { db as database } from "@tour/database";
+import { organizations } from "@tour/database";
+import { eq } from "drizzle-orm";
 import type { ServiceContext } from "./types";
+import {
+  formatDateKeyInTimeZone,
+  getMinutesSinceMidnightInTimeZone,
+  normalizeTimeZone,
+} from "./lib/date-time";
 
 /**
  * Base service class that all services extend
@@ -8,6 +15,7 @@ import type { ServiceContext } from "./types";
 export abstract class BaseService {
   protected readonly ctx: ServiceContext;
   protected readonly db = database;
+  private organizationTimeZoneCache?: Promise<string>;
 
   constructor(ctx: ServiceContext) {
     this.ctx = ctx;
@@ -25,6 +33,35 @@ export abstract class BaseService {
    */
   protected get userId(): string | undefined {
     return this.ctx.userId;
+  }
+
+  protected async getOrganizationTimezone(): Promise<string> {
+    if (!this.organizationTimeZoneCache) {
+      this.organizationTimeZoneCache = (async () => {
+        if (this.ctx.timezone) {
+          return normalizeTimeZone(this.ctx.timezone, "UTC");
+        }
+
+        const org = await this.db.query.organizations.findFirst({
+          where: eq(organizations.id, this.organizationId),
+          columns: { timezone: true },
+        });
+
+        return normalizeTimeZone(org?.timezone, "UTC");
+      })();
+    }
+
+    return this.organizationTimeZoneCache;
+  }
+
+  protected async getOrganizationDateKey(date: Date = new Date()): Promise<string> {
+    const timezone = await this.getOrganizationTimezone();
+    return formatDateKeyInTimeZone(date, timezone);
+  }
+
+  protected async getOrganizationMinutesSinceMidnight(date: Date = new Date()): Promise<number> {
+    const timezone = await this.getOrganizationTimezone();
+    return getMinutesSinceMidnightInTimeZone(date, timezone);
   }
 
   /**

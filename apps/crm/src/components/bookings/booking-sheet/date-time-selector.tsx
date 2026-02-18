@@ -32,6 +32,7 @@ export interface DateTimeSelectorProps {
   isLoadingTimeSlots: boolean;
   // Next available hint
   nextAvailableDate: Date | null;
+  dateIndicators?: Record<string, "available" | "limited" | "unavailable">;
   // Validation
   timeError?: string;
 }
@@ -79,6 +80,7 @@ export function DateTimeSelector({
   timeSlots,
   isLoadingTimeSlots,
   nextAvailableDate,
+  dateIndicators,
   timeError,
 }: DateTimeSelectorProps) {
   const dates = useMemo(() => generateDateRange(21), []);
@@ -133,9 +135,12 @@ export function DateTimeSelector({
             {visibleDates.map((date) => {
               const { day, weekday, isToday } = formatDateLabel(date);
               const isSelected = date.toDateString() === selectedDate.toDateString();
+              const indicatorState = dateIndicators?.[
+                `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+              ];
               return (
                 <button
-                  key={date.toISOString()}
+                  key={`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`}
                   type="button"
                   onClick={() => handleDateSelect(date)}
                   className={cn(
@@ -152,6 +157,18 @@ export function DateTimeSelector({
                   <p className={cn("text-lg font-bold", isSelected ? "text-primary" : "text-foreground")}>
                     {day}
                   </p>
+                  <span className="mt-1 flex items-center justify-center">
+                    {indicatorState && (
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          indicatorState === "available" && "bg-success",
+                          indicatorState === "limited" && "bg-warning",
+                          indicatorState === "unavailable" && "bg-destructive/70"
+                        )}
+                      />
+                    )}
+                  </span>
                 </button>
               );
             })}

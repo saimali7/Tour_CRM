@@ -3,7 +3,6 @@ import { relations } from "drizzle-orm";
 import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { guides } from "./guides";
-import { tours } from "./tours";
 import { bookings } from "./bookings";
 
 // Guide Availability - Weekly recurring availability pattern (org-scoped)
@@ -74,41 +73,6 @@ export const guideAvailabilityOverrides = pgTable("guide_availability_overrides"
   guideIdx: index("guide_availability_overrides_guide_idx").on(table.guideId),
   dateIdx: index("guide_availability_overrides_date_idx").on(table.date),
   guideDateUnique: unique().on(table.guideId, table.date), // One override per guide per date
-}));
-
-// Tour Guide Qualifications - Which guides are qualified for which tours (org-scoped)
-export const tourGuideQualifications = pgTable("tour_guide_qualifications", {
-  id: text("id").primaryKey().$defaultFn(createId),
-
-  // Organization (tenant isolation)
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-
-  // Tour reference
-  tourId: text("tour_id")
-    .notNull()
-    .references(() => tours.id, { onDelete: "cascade" }),
-
-  // Guide reference
-  guideId: text("guide_id")
-    .notNull()
-    .references(() => guides.id, { onDelete: "cascade" }),
-
-  // Is this guide the primary/preferred guide for this tour?
-  isPrimary: boolean("is_primary").notNull().default(false),
-
-  // Notes about this qualification
-  notes: text("notes"),
-
-  // Timestamps
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  orgIdx: index("tour_guide_qualifications_org_idx").on(table.organizationId),
-  tourIdx: index("tour_guide_qualifications_tour_idx").on(table.tourId),
-  guideIdx: index("tour_guide_qualifications_guide_idx").on(table.guideId),
-  tourGuideUnique: unique().on(table.tourId, table.guideId), // One qualification per tour-guide pair
 }));
 
 // Guide Assignments - Assignment of guides to specific bookings with confirmation status (org-scoped)
@@ -193,21 +157,6 @@ export const guideAvailabilityOverridesRelations = relations(guideAvailabilityOv
   }),
 }));
 
-export const tourGuideQualificationsRelations = relations(tourGuideQualifications, ({ one }) => ({
-  organization: one(organizations, {
-    fields: [tourGuideQualifications.organizationId],
-    references: [organizations.id],
-  }),
-  tour: one(tours, {
-    fields: [tourGuideQualifications.tourId],
-    references: [tours.id],
-  }),
-  guide: one(guides, {
-    fields: [tourGuideQualifications.guideId],
-    references: [guides.id],
-  }),
-}));
-
 export const guideAssignmentsRelations = relations(guideAssignments, ({ one }) => ({
   organization: one(organizations, {
     fields: [guideAssignments.organizationId],
@@ -236,9 +185,6 @@ export type NewGuideAvailability = typeof guideAvailability.$inferInsert;
 
 export type GuideAvailabilityOverride = typeof guideAvailabilityOverrides.$inferSelect;
 export type NewGuideAvailabilityOverride = typeof guideAvailabilityOverrides.$inferInsert;
-
-export type TourGuideQualification = typeof tourGuideQualifications.$inferSelect;
-export type NewTourGuideQualification = typeof tourGuideQualifications.$inferInsert;
 
 export type GuideAssignment = typeof guideAssignments.$inferSelect;
 export type NewGuideAssignment = typeof guideAssignments.$inferInsert;

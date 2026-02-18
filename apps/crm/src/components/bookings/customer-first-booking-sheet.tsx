@@ -29,7 +29,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  CreditCard,
   Calendar,
   Sparkles,
   Ship,
@@ -39,9 +38,9 @@ import {
   Heart,
   Crown,
   ArrowRight,
-  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatLocalDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 // ============================================================================
 // TYPES
@@ -71,7 +70,28 @@ interface GuestCounts {
 
 type PaymentMethod = "cash" | "card" | "bank_transfer" | "check";
 
-type BookingStep = "who-when" | "options" | "add-ons" | "checkout";
+type BookingStep = "who-when" | "options" | "checkout";
+
+type DateAvailabilityState = "available" | "limited" | "unavailable";
+
+interface BookingDraft {
+  step: BookingStep;
+  customerMode: "search" | "create";
+  customerSearch: string;
+  selectedCustomer: CustomerData | null;
+  newCustomer: CustomerData;
+  selectedTourId: string;
+  selectedDate: string;
+  dateScrollOffset: number;
+  guestCounts: GuestCounts;
+  selectedOptionId: string;
+  selectedTime: string;
+  pickupLocation: string;
+  notes: string;
+  recordPayment: boolean;
+  paymentAmount: string;
+  paymentMethod: PaymentMethod;
+}
 
 // ============================================================================
 // HELPERS
@@ -108,7 +128,7 @@ function formatCurrency(amount: number): string {
 }
 
 function getDateString(date: Date): string {
-  return date.toISOString().split("T")[0] || "";
+  return formatLocalDateKey(date);
 }
 
 function getBadgeIcon(badge?: string | null) {
@@ -158,6 +178,7 @@ export function CustomerFirstBookingSheet({
 }: CustomerFirstBookingSheetProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
+  const draftStorageKey = `quick-booking-draft:${orgSlug}:customer-first`;
 
   // ---------------------------------------------------------------------------
   // STATE
@@ -200,6 +221,7 @@ export function CustomerFirstBookingSheet({
 
   // Validation
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loadedFromDraft, setLoadedFromDraft] = useState(false);
 
   // Generate dates
   const dates = useMemo(() => generateDateRange(21), []);
@@ -212,27 +234,85 @@ export function CustomerFirstBookingSheet({
   // RESET ON OPEN
   // ---------------------------------------------------------------------------
 
+  const resetToDefaults = useCallback(() => {
+    setStep("who-when");
+    setCustomerMode(preselectedCustomerId ? "search" : "create");
+    setCustomerSearch("");
+    setSelectedCustomer(null);
+    setNewCustomer({ firstName: "", lastName: "", email: "", phone: "" });
+    setSelectedTourId(preselectedTourId || "");
+    setSelectedDate(new Date());
+    setDateScrollOffset(0);
+    setGuestCounts({ adults: 2, children: 0, infants: 0 });
+    setSelectedOptionId("");
+    setSelectedTime("");
+    setPickupLocation("");
+    setNotes("");
+    setRecordPayment(false);
+    setPaymentAmount("");
+    setPaymentMethod("card");
+    setErrors({});
+    setLoadedFromDraft(false);
+  }, [preselectedCustomerId, preselectedTourId]);
+
   useEffect(() => {
-    if (open) {
-      setStep("who-when");
-      setCustomerMode(preselectedCustomerId ? "search" : "create");
-      setCustomerSearch("");
-      setSelectedCustomer(null);
-      setNewCustomer({ firstName: "", lastName: "", email: "", phone: "" });
-      setSelectedTourId(preselectedTourId || "");
-      setSelectedDate(new Date());
-      setDateScrollOffset(0);
-      setGuestCounts({ adults: 2, children: 0, infants: 0 });
-      setSelectedOptionId("");
-      setSelectedTime("");
-      setPickupLocation("");
-      setNotes("");
-      setRecordPayment(false);
-      setPaymentAmount("");
-      setPaymentMethod("card");
-      setErrors({});
+    if (!open) return;
+
+    const parseDraft = (): BookingDraft | null => {
+      try {
+        const raw = window.localStorage.getItem(draftStorageKey);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as Partial<BookingDraft>;
+        if (!parsed || typeof parsed !== "object") return null;
+        if (!parsed.selectedDate || typeof parsed.selectedDate !== "string") return null;
+        return {
+          step: parsed.step ?? "who-when",
+          customerMode: parsed.customerMode ?? "create",
+          customerSearch: parsed.customerSearch ?? "",
+          selectedCustomer: parsed.selectedCustomer ?? null,
+          newCustomer: parsed.newCustomer ?? { firstName: "", lastName: "", email: "", phone: "" },
+          selectedTourId: parsed.selectedTourId ?? "",
+          selectedDate: parsed.selectedDate,
+          dateScrollOffset: parsed.dateScrollOffset ?? 0,
+          guestCounts: parsed.guestCounts ?? { adults: 2, children: 0, infants: 0 },
+          selectedOptionId: parsed.selectedOptionId ?? "",
+          selectedTime: parsed.selectedTime ?? "",
+          pickupLocation: parsed.pickupLocation ?? "",
+          notes: parsed.notes ?? "",
+          recordPayment: parsed.recordPayment ?? false,
+          paymentAmount: parsed.paymentAmount ?? "",
+          paymentMethod: parsed.paymentMethod ?? "card",
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    const draft = parseDraft();
+    if (!draft) {
+      resetToDefaults();
+      return;
     }
-  }, [open, preselectedCustomerId, preselectedTourId]);
+
+    setStep(draft.step);
+    setCustomerMode(preselectedCustomerId ? "search" : draft.customerMode);
+    setCustomerSearch(draft.customerSearch);
+    setSelectedCustomer(draft.selectedCustomer);
+    setNewCustomer(draft.newCustomer);
+    setSelectedTourId(preselectedTourId || draft.selectedTourId);
+    setSelectedDate(parseDateKeyToLocalDate(draft.selectedDate));
+    setDateScrollOffset(draft.dateScrollOffset);
+    setGuestCounts(draft.guestCounts);
+    setSelectedOptionId(draft.selectedOptionId);
+    setSelectedTime(draft.selectedTime);
+    setPickupLocation(draft.pickupLocation);
+    setNotes(draft.notes);
+    setRecordPayment(draft.recordPayment);
+    setPaymentAmount(draft.paymentAmount);
+    setPaymentMethod(draft.paymentMethod);
+    setErrors({});
+    setLoadedFromDraft(true);
+  }, [open, draftStorageKey, preselectedCustomerId, preselectedTourId, resetToDefaults]);
 
   // ---------------------------------------------------------------------------
   // QUERIES
@@ -261,8 +341,26 @@ export function CustomerFirstBookingSheet({
       guests: guestCounts,
     },
     {
-      enabled: open && !!selectedTourId && step === "options",
+      enabled: open && !!selectedTourId && (step === "options" || step === "checkout"),
     }
+  );
+
+  const rangeStartDate = dates[0] ?? new Date();
+  const rangeEndDate = dates[dates.length - 1] ?? rangeStartDate;
+  const startYear = rangeStartDate.getFullYear();
+  const startMonth = rangeStartDate.getMonth() + 1;
+  const endYear = rangeEndDate.getFullYear();
+  const endMonth = rangeEndDate.getMonth() + 1;
+  const hasSecondMonth = startYear !== endYear || startMonth !== endMonth;
+
+  const { data: firstMonthAvailability } = trpc.availability.getAvailableDatesForMonth.useQuery(
+    { tourId: selectedTourId, year: startYear, month: startMonth },
+    { enabled: open && !!selectedTourId }
+  );
+
+  const { data: secondMonthAvailability } = trpc.availability.getAvailableDatesForMonth.useQuery(
+    { tourId: selectedTourId, year: endYear, month: endMonth },
+    { enabled: open && !!selectedTourId && hasSecondMonth }
   );
 
   // ---------------------------------------------------------------------------
@@ -304,6 +402,77 @@ export function CustomerFirstBookingSheet({
   // Has valid contact
   const hasValidContact = newCustomer.email.trim() || newCustomer.phone.trim();
 
+  const dateAvailabilityMap = useMemo(() => {
+    const map = new Map<string, DateAvailabilityState>();
+    const sourceDates = [...(firstMonthAvailability?.dates ?? []), ...(secondMonthAvailability?.dates ?? [])];
+
+    for (const date of sourceDates) {
+      const totalSlots = date.slots.length;
+      if (totalSlots === 0) {
+        map.set(date.date, "unavailable");
+        continue;
+      }
+
+      const availableSlots = date.slots.filter((slot) => slot.available).length;
+      if (availableSlots <= 0) {
+        map.set(date.date, "unavailable");
+      } else if (availableSlots <= Math.max(1, Math.floor(totalSlots * 0.4))) {
+        map.set(date.date, "limited");
+      } else {
+        map.set(date.date, "available");
+      }
+    }
+
+    return map;
+  }, [firstMonthAvailability, secondMonthAvailability]);
+
+  const clearDraft = useCallback(() => {
+    window.localStorage.removeItem(draftStorageKey);
+    resetToDefaults();
+  }, [draftStorageKey, resetToDefaults]);
+
+  useEffect(() => {
+    if (!open) return;
+    const draft: BookingDraft = {
+      step,
+      customerMode,
+      customerSearch,
+      selectedCustomer,
+      newCustomer,
+      selectedTourId,
+      selectedDate: getDateString(selectedDate),
+      dateScrollOffset,
+      guestCounts,
+      selectedOptionId,
+      selectedTime,
+      pickupLocation,
+      notes,
+      recordPayment,
+      paymentAmount,
+      paymentMethod,
+    };
+    window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+  }, [
+    open,
+    step,
+    customerMode,
+    customerSearch,
+    selectedCustomer,
+    newCustomer,
+    selectedTourId,
+    selectedDate,
+    dateScrollOffset,
+    guestCounts,
+    selectedOptionId,
+    selectedTime,
+    pickupLocation,
+    notes,
+    recordPayment,
+    paymentAmount,
+    paymentMethod,
+    draftStorageKey,
+  ]);
+
   // ---------------------------------------------------------------------------
   // MUTATIONS
   // ---------------------------------------------------------------------------
@@ -312,6 +481,7 @@ export function CustomerFirstBookingSheet({
   const createBookingMutation = trpc.booking.create.useMutation({
     onSuccess: (booking) => {
       utils.booking.list.invalidate();
+      window.localStorage.removeItem(draftStorageKey);
       toast.success("Booking created successfully!");
       onOpenChange(false);
       router.push(`/org/${orgSlug}/bookings/${booking.id}`);
@@ -328,15 +498,7 @@ export function CustomerFirstBookingSheet({
   // ---------------------------------------------------------------------------
 
   const handleProceedToOptions = useCallback(() => {
-    // Validate customer
     const newErrors: Record<string, string> = {};
-
-    if (customerMode === "create") {
-      if (!newCustomer.firstName.trim()) newErrors.firstName = "First name required";
-      if (!hasValidContact) newErrors.contact = "Email or phone required";
-    } else if (!selectedCustomer) {
-      newErrors.customer = "Select a customer";
-    }
 
     if (!selectedTourId) newErrors.tour = "Select a tour";
     if (totalGuests < 1) newErrors.guests = "At least 1 guest required";
@@ -346,7 +508,7 @@ export function CustomerFirstBookingSheet({
     if (Object.keys(newErrors).length === 0) {
       setStep("options");
     }
-  }, [customerMode, newCustomer, selectedCustomer, selectedTourId, totalGuests, hasValidContact]);
+  }, [selectedTourId, totalGuests]);
 
   const handleSelectOption = (optionId: string, time?: string) => {
     setSelectedOptionId(optionId);
@@ -357,7 +519,24 @@ export function CustomerFirstBookingSheet({
   };
 
   const handleSubmit = async () => {
+    const newErrors: Record<string, string> = {};
     let customerId = selectedCustomer?.id;
+
+    if (customerMode === "create") {
+      if (!newCustomer.firstName.trim()) newErrors.firstName = "First name required";
+      if (!hasValidContact) newErrors.contact = "Email or phone required";
+    } else if (!selectedCustomer) {
+      newErrors.customer = "Select a customer";
+    }
+
+    if (!selectedOptionId || !selectedTime) {
+      newErrors.option = "Select a package and time slot";
+    }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
 
     // Create customer if new
     if (customerMode === "create") {
@@ -406,6 +585,15 @@ export function CustomerFirstBookingSheet({
         tourId: selectedTourId,
         bookingDate: getDateString(selectedDate),
         bookingTime: selectedTime,
+        paymentMethod,
+        cashCollectionExpectedAmount:
+          paymentMethod === "cash"
+            ? selectedOption
+              ? (selectedOption.totalPrice.amount / 100).toFixed(2)
+              : undefined
+            : undefined,
+        cashCollectionNotes:
+          paymentMethod === "cash" ? "Cash to be collected manually." : undefined,
         bookingOptionId: selectedOptionId,
         pricingSnapshot: selectedOption ? {
           optionId: selectedOption.id,
@@ -456,29 +644,481 @@ export function CustomerFirstBookingSheet({
         <SheetHeader className="px-6 py-4 border-b border-border bg-gradient-to-r from-primary/5 to-primary/10">
           <SheetTitle className="flex items-center gap-2 text-lg">
             <Zap className="h-5 w-5 text-primary" />
-            {step === "who-when" && "New Booking"}
-            {step === "options" && "Choose Your Experience"}
-            {step === "checkout" && "Complete Booking"}
+            {step === "who-when" && "Quick Book"}
+            {step === "options" && "Select Package & Time"}
+            {step === "checkout" && "Customer & Review"}
           </SheetTitle>
           <SheetDescription className="text-sm">
-            {step === "who-when" && "Enter guests and select a date to see available options"}
-            {step === "options" && `Prices calculated for ${totalGuests} guest${totalGuests > 1 ? "s" : ""}`}
-            {step === "checkout" && "Review and confirm your booking"}
+            {step === "who-when" && "Follow the operator flow: Tour → Date → Guests"}
+            {step === "options" && `Availability for ${totalGuests} guest${totalGuests > 1 ? "s" : ""}`}
+            {step === "checkout" && "Add customer details, review, and create booking"}
           </SheetDescription>
         </SheetHeader>
 
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
+            {loadedFromDraft && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-info/30 bg-info/10 px-3 py-2">
+                <p className="text-xs font-medium text-info">Draft restored. Continue where you left off.</p>
+                <button
+                  type="button"
+                  onClick={clearDraft}
+                  className="text-xs font-semibold text-info hover:underline"
+                >
+                  Discard draft
+                </button>
+              </div>
+            )}
             {/* =========================================================== */}
-            {/* STEP 1: WHO + WHEN */}
+            {/* STEP 1: TOUR + WHEN + GUESTS */}
             {/* =========================================================== */}
             {step === "who-when" && (
               <>
+                {/* Tour Selection */}
+                <section className="space-y-3">
+                  <label className="text-sm font-medium text-foreground">1. Select Tour</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {toursData?.data?.map((tour) => (
+                      <button
+                        key={tour.id}
+                        type="button"
+                        onClick={() => setSelectedTourId(tour.id)}
+                        className={cn(
+                          "w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3",
+                          selectedTourId === tour.id
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-border hover:border-primary/50 hover:bg-accent/50"
+                        )}
+                      >
+                        {tour.coverImageUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={tour.coverImageUrl}
+                            alt={tour.name}
+                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            <MapPin className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground truncate">{tour.name}</p>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5" />
+                              {tour.durationMinutes}min
+                            </span>
+                          </div>
+                        </div>
+                        {selectedTourId === tour.id && <Check className="h-5 w-5 text-primary flex-shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                  {errors.tour && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.tour}
+                    </p>
+                  )}
+                </section>
+
+                {/* Date Selection */}
+                {selectedTourId && (
+                  <section className="space-y-3">
+                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      2. Select Date
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setDateScrollOffset(Math.max(0, dateScrollOffset - 7))}
+                        disabled={dateScrollOffset === 0}
+                        className="p-1.5 rounded-lg border border-border hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <div className="flex-1 flex gap-1">
+                        {visibleDates.map((date) => {
+                          const { day, weekday, isToday } = formatDateLabel(date);
+                          const isSelected = date.toDateString() === selectedDate.toDateString();
+                          const dateKey = formatLocalDateKey(date);
+                          const availabilityState = dateAvailabilityMap.get(dateKey);
+                          return (
+                            <button
+                              key={dateKey}
+                              type="button"
+                              onClick={() => setSelectedDate(date)}
+                              className={cn(
+                                "flex-1 py-2 px-1 rounded-lg border-2 text-center transition-all",
+                                isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+                                isToday && !isSelected && "bg-accent"
+                              )}
+                            >
+                              <p
+                                className={cn(
+                                  "text-xs font-medium",
+                                  isSelected ? "text-primary" : "text-muted-foreground"
+                                )}
+                              >
+                                {weekday}
+                              </p>
+                              <p className={cn("text-lg font-bold", isSelected ? "text-primary" : "text-foreground")}>
+                                {day}
+                              </p>
+                              <span className="mt-1 flex items-center justify-center">
+                                {availabilityState && (
+                                  <span
+                                    className={cn(
+                                      "h-1.5 w-1.5 rounded-full",
+                                      availabilityState === "available" && "bg-success",
+                                      availabilityState === "limited" && "bg-warning",
+                                      availabilityState === "unavailable" && "bg-destructive/70"
+                                    )}
+                                  />
+                                )}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDateScrollOffset(Math.min(dates.length - 7, dateScrollOffset + 7))}
+                        disabled={dateScrollOffset >= dates.length - 7}
+                        className="p-1.5 rounded-lg border border-border hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Date dots: green available, amber limited, red unavailable.
+                    </p>
+                  </section>
+                )}
+
+                {/* Guests Section */}
+                <section className="space-y-3">
+                  <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    3. How Many Guests?
+                  </label>
+
+                  <div className="space-y-1 bg-muted/50 rounded-lg border border-border divide-y divide-border overflow-hidden">
+                    {/* Adults */}
+                    <div className="flex items-center justify-between p-3">
+                      <div>
+                        <p className="font-medium text-foreground">Adults</p>
+                        <p className="text-xs text-muted-foreground">Ages 13+</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setGuestCounts((prev) => ({ ...prev, adults: Math.max(1, prev.adults - 1) }))}
+                          disabled={guestCounts.adults <= 1}
+                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30 transition-colors"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <span className="w-6 text-center font-semibold">{guestCounts.adults}</span>
+                        <button
+                          type="button"
+                          onClick={() => setGuestCounts((prev) => ({ ...prev, adults: prev.adults + 1 }))}
+                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Children */}
+                    <div className="flex items-center justify-between p-3">
+                      <div>
+                        <p className="font-medium text-foreground">Children</p>
+                        <p className="text-xs text-muted-foreground">Ages 3-12</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setGuestCounts((prev) => ({ ...prev, children: Math.max(0, prev.children - 1) }))
+                          }
+                          disabled={guestCounts.children <= 0}
+                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30 transition-colors"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <span className="w-6 text-center font-semibold">{guestCounts.children}</span>
+                        <button
+                          type="button"
+                          onClick={() => setGuestCounts((prev) => ({ ...prev, children: prev.children + 1 }))}
+                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Infants */}
+                    <div className="flex items-center justify-between p-3">
+                      <div>
+                        <p className="font-medium text-foreground">Infants</p>
+                        <p className="text-xs text-muted-foreground">Under 3</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setGuestCounts((prev) => ({ ...prev, infants: Math.max(0, prev.infants - 1) }))
+                          }
+                          disabled={guestCounts.infants <= 0}
+                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30 transition-colors"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <span className="w-6 text-center font-semibold">{guestCounts.infants}</span>
+                        <button
+                          type="button"
+                          onClick={() => setGuestCounts((prev) => ({ ...prev, infants: prev.infants + 1 }))}
+                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </>
+            )}
+
+            {/* =========================================================== */}
+            {/* STEP 2: OPTIONS */}
+            {/* =========================================================== */}
+            {step === "options" && (
+              <>
+                {/* Back Button */}
+                <button
+                  type="button"
+                  onClick={() => setStep("who-when")}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back to tour, date, and guests
+                </button>
+
+                {/* Summary */}
+                <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">{selectedTour?.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedDate.toLocaleDateString("en-US", {
+                          weekday: "long",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-foreground">{totalGuests} guests</p>
+                      <p className="text-sm text-muted-foreground">
+                        {guestCounts.adults} adults
+                        {guestCounts.children > 0 && `, ${guestCounts.children} children`}
+                        {guestCounts.infants > 0 && `, ${guestCounts.infants} infants`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Options */}
+                {availabilityLoading || availabilityFetching ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                    <p className="text-muted-foreground">Calculating your options...</p>
+                  </div>
+                ) : availabilityError ? (
+                  <div className="text-center py-12 bg-muted/50 rounded-lg border border-dashed border-border">
+                    <AlertTriangle className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="font-medium text-foreground mb-1">Options not configured</p>
+                    <p className="text-sm text-muted-foreground">
+                      {availabilityError.message || "Set up booking options for this tour to enable availability."}
+                    </p>
+                  </div>
+                ) : availabilityData?.soldOut ? (
+                  <div className="text-center py-12 bg-muted/50 rounded-lg border border-dashed border-border">
+                    <Calendar className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="font-medium text-foreground mb-1">Sold Out</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      No availability for this date. Try a nearby date.
+                    </p>
+                    {availabilityData.alternatives?.nearbyDates?.map((alt) => (
+                      <button
+                        key={alt.date}
+                        type="button"
+                        onClick={() => {
+                          setSelectedDate(parseDateKeyToLocalDate(alt.date));
+                        }}
+                        className="text-sm text-primary hover:underline mr-3"
+                      >
+                        {parseDateKeyToLocalDate(alt.date).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {availabilityData?.options.map((option) => (
+                      <div
+                        key={option.id}
+                        className={cn(
+                          "relative rounded-xl border-2 p-4 transition-all cursor-pointer hover:shadow-md",
+                          selectedOptionId === option.id
+                            ? "border-primary bg-primary/5 shadow-md"
+                            : option.available
+                            ? "border-border hover:border-primary/50"
+                            : "border-border bg-muted/50 opacity-60"
+                        )}
+                        onClick={() => {
+                          if (option.available && option.scheduling.type === "fixed" && option.scheduling.timeSlots.length > 0) {
+                            const availableSlot = option.scheduling.timeSlots.find((s) => s.available);
+                            if (availableSlot) {
+                              handleSelectOption(option.id, availableSlot.time);
+                            }
+                          }
+                        }}
+                      >
+                        {/* Badge */}
+                        {option.badge && (
+                          <div
+                            className={cn(
+                              "absolute -top-2 left-4 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1",
+                              getBadgeColor(option.badge)
+                            )}
+                          >
+                            {getBadgeIcon(option.badge)}
+                            {option.badge.replace("_", " ")}
+                          </div>
+                        )}
+
+                        <div className="flex items-start justify-between gap-4">
+                          {/* Left: Info */}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {option.experienceMode === "join" && <Users className="h-4 w-4 text-muted-foreground" />}
+                              {option.experienceMode === "book" && <Ship className="h-4 w-4 text-muted-foreground" />}
+                              {option.experienceMode === "charter" && <Car className="h-4 w-4 text-muted-foreground" />}
+                              <span className="font-semibold text-foreground">{option.name}</span>
+                            </div>
+                            {option.shortDescription && (
+                              <p className="text-sm text-muted-foreground mb-2">{option.shortDescription}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground">{option.priceBreakdown}</p>
+
+                            {/* Comparison */}
+                            {option.comparison?.vsShared && (
+                              <p className="text-xs text-muted-foreground mt-1">{option.comparison.vsShared.statement}</p>
+                            )}
+
+                            {/* Recommendation */}
+                            {option.recommendation && (
+                              <p className="text-xs text-primary font-medium mt-1">{option.recommendation}</p>
+                            )}
+
+                            {/* Time Slots */}
+                            {option.scheduling.type === "fixed" && option.scheduling.timeSlots.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                {option.scheduling.timeSlots.map((slot) => (
+                                  <button
+                                    key={slot.time}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (slot.available) {
+                                        handleSelectOption(option.id, slot.time);
+                                      }
+                                    }}
+                                    disabled={!slot.available}
+                                    className={cn(
+                                      "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                                      slot.available
+                                        ? selectedTime === slot.time
+                                          ? "bg-primary text-primary-foreground"
+                                          : "bg-muted hover:bg-accent"
+                                        : "bg-muted/50 text-muted-foreground cursor-not-allowed"
+                                    )}
+                                  >
+                                    {slot.time}
+                                    {slot.available && slot.spotsLeft !== undefined && slot.spotsLeft <= 5 && (
+                                      <span className="ml-1 text-xs text-warning">({slot.spotsLeft} left)</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right: Price */}
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-foreground">{formatCurrency(option.totalPrice.amount)}</p>
+                            {option.urgency && (
+                              <p className="text-xs text-warning font-medium mt-1">{option.urgency}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* =========================================================== */}
+            {/* STEP 3: CHECKOUT */}
+            {/* =========================================================== */}
+            {step === "checkout" && selectedOption && (
+              <>
+                {/* Back Button */}
+                <button
+                  type="button"
+                  onClick={() => setStep("options")}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back to package selection
+                </button>
+
+                {/* Selected Option Summary */}
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-semibold text-foreground">{selectedOption.name}</p>
+                      <p className="text-sm text-muted-foreground">{selectedTour?.name}</p>
+                    </div>
+                    <p className="text-2xl font-bold text-primary">{formatCurrency(selectedOption.totalPrice.amount)}</p>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <p>
+                      {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    </p>
+                    <p>{selectedOption.priceBreakdown}</p>
+                  </div>
+                </div>
+                {errors.option && (
+                  <p className="text-sm text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {errors.option}
+                  </p>
+                )}
+
                 {/* Customer Section */}
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-foreground">Customer</label>
+                    <label className="text-sm font-medium text-foreground">4. Customer Details</label>
                     <button
                       type="button"
                       onClick={() => {
@@ -655,422 +1295,9 @@ export function CustomerFirstBookingSheet({
                   )}
                 </section>
 
-                {/* Guests Section - WHO FIRST */}
-                <section className="space-y-3">
-                  <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Who&apos;s Coming?
-                  </label>
-
-                  <div className="space-y-1 bg-muted/50 rounded-lg border border-border divide-y divide-border overflow-hidden">
-                    {/* Adults */}
-                    <div className="flex items-center justify-between p-3">
-                      <div>
-                        <p className="font-medium text-foreground">Adults</p>
-                        <p className="text-xs text-muted-foreground">Ages 13+</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setGuestCounts((prev) => ({ ...prev, adults: Math.max(1, prev.adults - 1) }))}
-                          disabled={guestCounts.adults <= 1}
-                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30 transition-colors"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-6 text-center font-semibold">{guestCounts.adults}</span>
-                        <button
-                          type="button"
-                          onClick={() => setGuestCounts((prev) => ({ ...prev, adults: prev.adults + 1 }))}
-                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Children */}
-                    <div className="flex items-center justify-between p-3">
-                      <div>
-                        <p className="font-medium text-foreground">Children</p>
-                        <p className="text-xs text-muted-foreground">Ages 3-12</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setGuestCounts((prev) => ({ ...prev, children: Math.max(0, prev.children - 1) }))
-                          }
-                          disabled={guestCounts.children <= 0}
-                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30 transition-colors"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-6 text-center font-semibold">{guestCounts.children}</span>
-                        <button
-                          type="button"
-                          onClick={() => setGuestCounts((prev) => ({ ...prev, children: prev.children + 1 }))}
-                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Infants */}
-                    <div className="flex items-center justify-between p-3">
-                      <div>
-                        <p className="font-medium text-foreground">Infants</p>
-                        <p className="text-xs text-muted-foreground">Under 3</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setGuestCounts((prev) => ({ ...prev, infants: Math.max(0, prev.infants - 1) }))
-                          }
-                          disabled={guestCounts.infants <= 0}
-                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30 transition-colors"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-6 text-center font-semibold">{guestCounts.infants}</span>
-                        <button
-                          type="button"
-                          onClick={() => setGuestCounts((prev) => ({ ...prev, infants: prev.infants + 1 }))}
-                          className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Tour Selection */}
-                <section className="space-y-3">
-                  <label className="text-sm font-medium text-foreground">Tour</label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {toursData?.data?.map((tour) => (
-                      <button
-                        key={tour.id}
-                        type="button"
-                        onClick={() => setSelectedTourId(tour.id)}
-                        className={cn(
-                          "w-full p-3 rounded-lg border-2 text-left transition-all flex items-center gap-3",
-                          selectedTourId === tour.id
-                            ? "border-primary bg-primary/5 shadow-sm"
-                            : "border-border hover:border-primary/50 hover:bg-accent/50"
-                        )}
-                      >
-                        {tour.coverImageUrl ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={tour.coverImageUrl}
-                            alt={tour.name}
-                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                            <MapPin className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground truncate">{tour.name}</p>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3.5 w-3.5" />
-                              {tour.durationMinutes}min
-                            </span>
-                          </div>
-                        </div>
-                        {selectedTourId === tour.id && <Check className="h-5 w-5 text-primary flex-shrink-0" />}
-                      </button>
-                    ))}
-                  </div>
-                  {errors.tour && (
-                    <p className="text-sm text-destructive flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {errors.tour}
-                    </p>
-                  )}
-                </section>
-
-                {/* Date Selection */}
-                {selectedTourId && (
-                  <section className="space-y-3">
-                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      When?
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setDateScrollOffset(Math.max(0, dateScrollOffset - 7))}
-                        disabled={dateScrollOffset === 0}
-                        className="p-1.5 rounded-lg border border-border hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <div className="flex-1 flex gap-1">
-                        {visibleDates.map((date) => {
-                          const { day, weekday, isToday } = formatDateLabel(date);
-                          const isSelected = date.toDateString() === selectedDate.toDateString();
-                          return (
-                            <button
-                              key={date.toISOString()}
-                              type="button"
-                              onClick={() => setSelectedDate(date)}
-                              className={cn(
-                                "flex-1 py-2 px-1 rounded-lg border-2 text-center transition-all",
-                                isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
-                                isToday && !isSelected && "bg-accent"
-                              )}
-                            >
-                              <p
-                                className={cn(
-                                  "text-xs font-medium",
-                                  isSelected ? "text-primary" : "text-muted-foreground"
-                                )}
-                              >
-                                {weekday}
-                              </p>
-                              <p className={cn("text-lg font-bold", isSelected ? "text-primary" : "text-foreground")}>
-                                {day}
-                              </p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setDateScrollOffset(Math.min(dates.length - 7, dateScrollOffset + 7))}
-                        disabled={dateScrollOffset >= dates.length - 7}
-                        className="p-1.5 rounded-lg border border-border hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </section>
-                )}
-              </>
-            )}
-
-            {/* =========================================================== */}
-            {/* STEP 2: OPTIONS */}
-            {/* =========================================================== */}
-            {step === "options" && (
-              <>
-                {/* Back Button */}
-                <button
-                  type="button"
-                  onClick={() => setStep("who-when")}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Back to details
-                </button>
-
-                {/* Summary */}
-                <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">{selectedTour?.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedDate.toLocaleDateString("en-US", {
-                          weekday: "long",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-foreground">{totalGuests} guests</p>
-                      <p className="text-sm text-muted-foreground">
-                        {guestCounts.adults} adults
-                        {guestCounts.children > 0 && `, ${guestCounts.children} children`}
-                        {guestCounts.infants > 0 && `, ${guestCounts.infants} infants`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Options */}
-                {availabilityLoading || availabilityFetching ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-                    <p className="text-muted-foreground">Calculating your options...</p>
-                  </div>
-                ) : availabilityError ? (
-                  <div className="text-center py-12 bg-muted/50 rounded-lg border border-dashed border-border">
-                    <AlertTriangle className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-                    <p className="font-medium text-foreground mb-1">Options not configured</p>
-                    <p className="text-sm text-muted-foreground">
-                      {availabilityError.message || "Set up booking options for this tour to enable availability."}
-                    </p>
-                  </div>
-                ) : availabilityData?.soldOut ? (
-                  <div className="text-center py-12 bg-muted/50 rounded-lg border border-dashed border-border">
-                    <Calendar className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-                    <p className="font-medium text-foreground mb-1">Sold Out</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      No availability for this date. Try a nearby date.
-                    </p>
-                    {availabilityData.alternatives?.nearbyDates?.map((alt) => (
-                      <button
-                        key={alt.date}
-                        type="button"
-                        onClick={() => {
-                          setSelectedDate(new Date(alt.date));
-                        }}
-                        className="text-sm text-primary hover:underline mr-3"
-                      >
-                        {new Date(alt.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {availabilityData?.options.map((option) => (
-                      <div
-                        key={option.id}
-                        className={cn(
-                          "relative rounded-xl border-2 p-4 transition-all cursor-pointer hover:shadow-md",
-                          selectedOptionId === option.id
-                            ? "border-primary bg-primary/5 shadow-md"
-                            : option.available
-                            ? "border-border hover:border-primary/50"
-                            : "border-border bg-muted/50 opacity-60"
-                        )}
-                        onClick={() => {
-                          if (option.available && option.scheduling.type === "fixed" && option.scheduling.timeSlots.length > 0) {
-                            const availableSlot = option.scheduling.timeSlots.find((s) => s.available);
-                            if (availableSlot) {
-                              handleSelectOption(option.id, availableSlot.time);
-                            }
-                          }
-                        }}
-                      >
-                        {/* Badge */}
-                        {option.badge && (
-                          <div
-                            className={cn(
-                              "absolute -top-2 left-4 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1",
-                              getBadgeColor(option.badge)
-                            )}
-                          >
-                            {getBadgeIcon(option.badge)}
-                            {option.badge.replace("_", " ")}
-                          </div>
-                        )}
-
-                        <div className="flex items-start justify-between gap-4">
-                          {/* Left: Info */}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              {option.experienceMode === "join" && <Users className="h-4 w-4 text-muted-foreground" />}
-                              {option.experienceMode === "book" && <Ship className="h-4 w-4 text-muted-foreground" />}
-                              {option.experienceMode === "charter" && <Car className="h-4 w-4 text-muted-foreground" />}
-                              <span className="font-semibold text-foreground">{option.name}</span>
-                            </div>
-                            {option.shortDescription && (
-                              <p className="text-sm text-muted-foreground mb-2">{option.shortDescription}</p>
-                            )}
-                            <p className="text-xs text-muted-foreground">{option.priceBreakdown}</p>
-
-                            {/* Comparison */}
-                            {option.comparison?.vsShared && (
-                              <p className="text-xs text-muted-foreground mt-1">{option.comparison.vsShared.statement}</p>
-                            )}
-
-                            {/* Recommendation */}
-                            {option.recommendation && (
-                              <p className="text-xs text-primary font-medium mt-1">{option.recommendation}</p>
-                            )}
-
-                            {/* Time Slots */}
-                            {option.scheduling.type === "fixed" && option.scheduling.timeSlots.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-3">
-                                {option.scheduling.timeSlots.map((slot) => (
-                                  <button
-                                    key={slot.time}
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (slot.available) {
-                                        handleSelectOption(option.id, slot.time);
-                                      }
-                                    }}
-                                    disabled={!slot.available}
-                                    className={cn(
-                                      "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                                      slot.available
-                                        ? selectedTime === slot.time
-                                          ? "bg-primary text-primary-foreground"
-                                          : "bg-muted hover:bg-accent"
-                                        : "bg-muted/50 text-muted-foreground cursor-not-allowed"
-                                    )}
-                                  >
-                                    {slot.time}
-                                    {slot.available && slot.spotsLeft !== undefined && slot.spotsLeft <= 5 && (
-                                      <span className="ml-1 text-xs text-warning">({slot.spotsLeft} left)</span>
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Right: Price */}
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-foreground">{formatCurrency(option.totalPrice.amount)}</p>
-                            {option.urgency && (
-                              <p className="text-xs text-warning font-medium mt-1">{option.urgency}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* =========================================================== */}
-            {/* STEP 3: CHECKOUT */}
-            {/* =========================================================== */}
-            {step === "checkout" && selectedOption && (
-              <>
-                {/* Back Button */}
-                <button
-                  type="button"
-                  onClick={() => setStep("options")}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Back to options
-                </button>
-
-                {/* Selected Option Summary */}
-                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="font-semibold text-foreground">{selectedOption.name}</p>
-                      <p className="text-sm text-muted-foreground">{selectedTour?.name}</p>
-                    </div>
-                    <p className="text-2xl font-bold text-primary">{formatCurrency(selectedOption.totalPrice.amount)}</p>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <p>
-                      {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-                    </p>
-                    <p>{selectedOption.priceBreakdown}</p>
-                  </div>
-                </div>
-
                 {/* Extras */}
                 <section className="space-y-3">
-                  <label className="text-sm font-medium text-foreground">Details (optional)</label>
+                  <label className="text-sm font-medium text-foreground">5. Pickup & Notes (optional)</label>
                   <div className="space-y-3">
                     <div className="relative">
                       <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -1094,23 +1321,53 @@ export function CustomerFirstBookingSheet({
 
                 {/* Payment */}
                 <section className="space-y-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={recordPayment}
-                      onChange={(e) => {
-                        setRecordPayment(e.target.checked);
-                        if (e.target.checked) {
-                          setPaymentAmount((selectedOption.totalPrice.amount / 100).toFixed(2));
-                        }
-                      }}
-                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-medium text-foreground">Record payment now</span>
-                  </label>
+                  <label className="text-sm font-medium text-foreground">6. Payment Plan</label>
 
-                  {recordPayment && (
-                    <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
+                  <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground">Method</label>
+                      <div className="flex flex-wrap gap-2">
+                        {(["card", "cash", "bank_transfer", "check"] as PaymentMethod[]).map((method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => setPaymentMethod(method)}
+                            className={cn(
+                              "px-3 py-1.5 text-xs font-medium rounded-lg border transition-all",
+                              paymentMethod === method
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background border-input hover:bg-accent"
+                            )}
+                          >
+                            {method === "bank_transfer"
+                              ? "Bank transfer"
+                              : method.charAt(0).toUpperCase() + method.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                      {paymentMethod === "cash" && !recordPayment && (
+                        <p className="text-xs text-warning dark:text-warning">
+                          Booking will be marked as Cash collection until manually collected.
+                        </p>
+                      )}
+                    </div>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={recordPayment}
+                        onChange={(e) => {
+                          setRecordPayment(e.target.checked);
+                          if (e.target.checked) {
+                            setPaymentAmount((selectedOption.totalPrice.amount / 100).toFixed(2));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
+                      />
+                      <span className="text-sm font-medium text-foreground">Record payment now</span>
+                    </label>
+
+                    {recordPayment && (
                       <div className="space-y-2">
                         <label className="text-xs font-medium text-muted-foreground">Amount</label>
                         <div className="relative">
@@ -1125,28 +1382,82 @@ export function CustomerFirstBookingSheet({
                           />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-muted-foreground">Method</label>
-                        <div className="flex flex-wrap gap-2">
-                          {(["card", "cash", "bank_transfer", "check"] as PaymentMethod[]).map((method) => (
-                            <button
-                              key={method}
-                              type="button"
-                              onClick={() => setPaymentMethod(method)}
-                              className={cn(
-                                "px-3 py-1.5 text-xs font-medium rounded-lg border transition-all",
-                                paymentMethod === method
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-background border-input hover:bg-accent"
-                              )}
-                            >
-                              {method === "bank_transfer" ? "Bank" : method.charAt(0).toUpperCase() + method.slice(1)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Final Review */}
+                <section className="space-y-3">
+                  <label className="text-sm font-medium text-foreground">7. Final Review</label>
+                  <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">Tour</span>
+                      <span className="font-medium text-foreground text-right">
+                        {selectedTour?.name} · {selectedOption.name}
+                      </span>
                     </div>
-                  )}
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">Date & Time</span>
+                      <span className="font-medium text-foreground text-right">
+                        {selectedDate.toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}{" "}
+                        · {selectedTime}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">Guests</span>
+                      <span className="font-medium text-foreground text-right">
+                        {guestCounts.adults} adult{guestCounts.adults === 1 ? "" : "s"}
+                        {guestCounts.children > 0
+                          ? `, ${guestCounts.children} child${guestCounts.children === 1 ? "" : "ren"}`
+                          : ""}
+                        {guestCounts.infants > 0
+                          ? `, ${guestCounts.infants} infant${guestCounts.infants === 1 ? "" : "s"}`
+                          : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-start justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">Customer</span>
+                      <span className="font-medium text-foreground text-right">
+                        {customerMode === "search" && selectedCustomer
+                          ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}`
+                          : `${newCustomer.firstName || "—"} ${newCustomer.lastName || ""}`.trim()}
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          {customerMode === "search" && selectedCustomer
+                            ? selectedCustomer.email || selectedCustomer.phone || "No contact"
+                            : newCustomer.email || newCustomer.phone || "No contact"}
+                        </span>
+                      </span>
+                    </div>
+                    {(pickupLocation || notes) && (
+                      <div className="flex items-start justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground">Pickup / Notes</span>
+                        <span className="font-medium text-foreground text-right">
+                          {pickupLocation || "No pickup location"}
+                          {notes && <span className="block text-xs font-normal text-muted-foreground">{notes}</span>}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground">Payment</span>
+                      <span className="font-medium text-foreground text-right">
+                        {recordPayment
+                          ? `Collecting now via ${paymentMethod === "bank_transfer" ? "bank transfer" : paymentMethod}`
+                          : paymentMethod === "cash"
+                            ? "Cash collection (manual)"
+                            : `Pending via ${paymentMethod === "bank_transfer" ? "bank transfer" : paymentMethod}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 border-t border-border pt-2 text-sm">
+                      <span className="text-muted-foreground">Total</span>
+                      <span className="text-base font-semibold text-foreground">
+                        {formatCurrency(selectedOption.totalPrice.amount)}
+                      </span>
+                    </div>
+                  </div>
                 </section>
               </>
             )}
@@ -1161,7 +1472,7 @@ export function CustomerFirstBookingSheet({
                 Cancel
               </Button>
               <Button onClick={handleProceedToOptions} className="flex-1 bg-primary hover:bg-primary/90">
-                See Options
+                Continue to Packages
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
@@ -1169,7 +1480,7 @@ export function CustomerFirstBookingSheet({
 
           {step === "options" && (
             <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">Select a time slot to continue</p>
+              <p className="text-sm text-muted-foreground mb-2">Choose a package and departure time to continue</p>
             </div>
           )}
 

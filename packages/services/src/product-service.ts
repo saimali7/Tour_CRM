@@ -218,7 +218,7 @@ export class ProductService extends BaseService {
       // Get booking stats for tours (availability-based model)
       if (toursResult.length > 0) {
         const tourIds = toursResult.map(t => t.id);
-        const nowDate = new Date().toISOString().split("T")[0]!;
+        const nowDate = await this.getOrganizationDateKey();
 
         const bookingStats = await this.db
           .select({

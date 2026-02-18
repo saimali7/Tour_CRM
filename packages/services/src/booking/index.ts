@@ -39,6 +39,15 @@ export { BookingCommandService } from "./booking-command-service";
 export { BookingStatsService } from "./booking-stats-service";
 export { BookingParticipantService } from "./booking-participant-service";
 export { BookingBulkService } from "./booking-bulk-service";
+export {
+  getCashCollectionMetadata,
+  withCashCollectionMetadata,
+  createPendingCashCollection,
+  updatePendingCashCollection,
+  markCashCollectionCollected,
+  type CashCollectionMetadata,
+  type CashCollectionStatus,
+} from "./cash-collection";
 
 // Export all types
 export type {
@@ -51,6 +60,7 @@ export type {
   // Input types
   CreateBookingInput,
   UpdateBookingInput,
+  UpdateCashCollectionInput,
   ParticipantInput,
   // Bulk operation results
   BulkConfirmResult,

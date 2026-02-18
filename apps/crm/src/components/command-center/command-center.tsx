@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { trpc, type RouterInputs, type RouterOutputs } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { formatLocalDateKey } from "@/lib/date-time";
 import { CommandStrip } from "./command-strip";
 import { DispatchConfirmDialog } from "./dispatch-confirm-dialog";
 import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
@@ -156,7 +157,7 @@ function CommandCenterContent({
   const [undoStack, setUndoStack] = useState<OperationRecord[]>([]);
   const [redoStack, setRedoStack] = useState<OperationRecord[]>([]);
 
-  const dateString = format(date, "yyyy-MM-dd");
+  const dateString = formatLocalDateKey(date);
   const isPastDate = isPast(startOfDay(date)) && !isToday(date);
 
   const {
@@ -359,7 +360,7 @@ function CommandCenterContent({
       const shouldRecord = options?.record ?? true;
 
       const result = await batchMutation.mutateAsync({
-        date,
+        date: dateString,
         changes: operation.changes,
       });
 
@@ -378,7 +379,17 @@ function CommandCenterContent({
         announce(operation.description);
       }
     },
-    [announce, batchMutation, date, dateString, utils.commandCenter.getDispatch]
+    [announce, batchMutation, dateString, utils.commandCenter.getDispatch]
+  );
+
+  const getAssignmentTargetErrorForGuide = useCallback(
+    (guideId: string, _bookingIds: string[]): string | null => {
+      const row = rowsForCanvas.find((item) => item.guide.id === guideId);
+      if (!row) return "Selected guide lane is unavailable";
+      if (row.isOutsourced) return "Cannot assign directly to outsourced lanes";
+      return null;
+    },
+    [rowsForCanvas]
   );
 
   const handleUndo = useCallback(async () => {
@@ -479,6 +490,12 @@ function CommandCenterContent({
 
   const handleMobileAssign = useCallback(
     async (bookingId: string, guideId: string, guideName: string) => {
+      const assignmentTargetError = getAssignmentTargetErrorForGuide(guideId, [bookingId]);
+      if (assignmentTargetError) {
+        toast.error(assignmentTargetError);
+        return;
+      }
+
       const operation: OperationRecord = {
         changes: [{ type: "assign", bookingId, toGuideId: guideId }],
         undoChanges: [{ type: "unassign", bookingIds: [bookingId], fromGuideId: guideId }],
@@ -486,7 +503,7 @@ function CommandCenterContent({
       };
       await executeOperation(operation);
     },
-    [executeOperation]
+    [executeOperation, getAssignmentTargetErrorForGuide]
   );
 
   const handleMobileReassignRun = useCallback(
@@ -500,6 +517,12 @@ function CommandCenterContent({
       if (!targetRow) return;
       if (targetRow.isOutsourced) {
         toast.error("Cannot assign directly to outsourced lanes");
+        return;
+      }
+
+      const assignmentTargetError = getAssignmentTargetErrorForGuide(toGuideId, source.run.bookingIds);
+      if (assignmentTargetError) {
+        toast.error(assignmentTargetError);
         return;
       }
 
@@ -552,7 +575,7 @@ function CommandCenterContent({
       };
       await executeOperation(operation);
     },
-    [executeOperation, rowsForCanvas, runLookup, viewModel]
+    [executeOperation, getAssignmentTargetErrorForGuide, rowsForCanvas, runLookup, viewModel]
   );
 
   const handleCreateTempGuide = useCallback(

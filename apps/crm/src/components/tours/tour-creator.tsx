@@ -19,13 +19,14 @@ import {
   X,
   DollarSign,
 } from "lucide-react";
-import Link from "next/link";
-import type { Route } from "next";
-import { useIsMobile } from "@/hooks/use-media-query";
 
 // Tab Components
 import { EssentialsTab } from "./tour-creator/essentials-tab";
-import { PricingTab, type PricingFormState } from "./tour-creator/pricing-tab";
+import {
+  PricingTab,
+  type PricingFormState,
+  type PricingPackageDraft,
+} from "./tour-creator/pricing-tab";
 import { ContentTab } from "./tour-creator/content-tab";
 import { SettingsTab } from "./tour-creator/settings-tab";
 
@@ -53,6 +54,10 @@ export interface TourFormState {
   slug: string;
   meetingPoint: string;
   meetingPointDetails: string;
+  pickupMode: "meeting_point" | "hotel_pickup" | "hybrid";
+  pickupAllowedCities: string[];
+  pickupAirportAllowed: boolean;
+  pickupPolicyNotes: string;
   cancellationHours: number;
   cancellationPolicy: string;
   metaTitle: string;
@@ -66,6 +71,7 @@ export interface TourFormState {
 
   // Pricing configuration (for creating default booking option)
   pricingConfig?: PricingFormState;
+  pricingPackages?: PricingPackageDraft[];
 }
 
 interface TourCreatorProps {
@@ -114,6 +120,10 @@ const DEFAULT_FORM_STATE: TourFormState = {
   slug: "",
   meetingPoint: "",
   meetingPointDetails: "",
+  pickupMode: "meeting_point",
+  pickupAllowedCities: [],
+  pickupAirportAllowed: false,
+  pickupPolicyNotes: "",
   cancellationHours: 24,
   cancellationPolicy: "",
   metaTitle: "",
@@ -125,6 +135,122 @@ const DEFAULT_FORM_STATE: TourFormState = {
   allowSameDayBooking: true,
   sameDayCutoffTime: "12:00",
 };
+
+function isPricingConfigComplete(config?: PricingFormState): boolean {
+  if (!config) return false;
+
+  switch (config.pricingType) {
+    case "per_person":
+      return !!config.adultPrice && parseFloat(config.adultPrice) > 0;
+    case "per_unit":
+      return !!config.pricePerUnit && parseFloat(config.pricePerUnit) > 0;
+    case "flat_rate":
+      return !!config.flatPrice && parseFloat(config.flatPrice) > 0;
+    case "base_plus_person":
+      return !!config.basePricePricing && parseFloat(config.basePricePricing) > 0;
+    case "tiered_group":
+      return (
+        config.tierRanges.length > 0 &&
+        config.tierRanges.every((tier) => tier.price && parseFloat(tier.price) > 0)
+      );
+    default:
+      return false;
+  }
+}
+
+function buildPricingModelFromConfig(config: PricingFormState) {
+  const createId = () => Math.random().toString(36).slice(2, 9);
+
+  switch (config.pricingType) {
+    case "per_person": {
+      const tiers = [
+        {
+          id: createId(),
+          name: "adult",
+          price: { amount: Math.round(parseFloat(config.adultPrice || "0") * 100), currency: "USD" },
+          ageMin: 13,
+          isDefault: true,
+          sortOrder: 0,
+        },
+      ];
+
+      if (config.hasChildPrice && config.childPrice) {
+        tiers.push({
+          id: createId(),
+          name: "child",
+          price: { amount: Math.round(parseFloat(config.childPrice) * 100), currency: "USD" },
+          ageMin: 3,
+          ageMax: 12,
+          isDefault: false,
+          sortOrder: 1,
+        } as typeof tiers[0]);
+      }
+
+      if (config.hasInfantPrice) {
+        tiers.push({
+          id: createId(),
+          name: "infant",
+          price: { amount: Math.round(parseFloat(config.infantPrice || "0") * 100), currency: "USD" },
+          ageMin: 0,
+          ageMax: 2,
+          isDefault: false,
+          sortOrder: 2,
+        } as typeof tiers[0]);
+      }
+
+      return { type: "per_person" as const, tiers };
+    }
+    case "per_unit":
+      return {
+        type: "per_unit" as const,
+        unitName: "Vehicle",
+        unitNamePlural: "Vehicles",
+        pricePerUnit: { amount: Math.round(parseFloat(config.pricePerUnit || "0") * 100), currency: "USD" },
+        maxOccupancy: parseInt(config.maxOccupancy) || 6,
+        minOccupancy: 1,
+      };
+    case "flat_rate":
+      return {
+        type: "flat_rate" as const,
+        price: { amount: Math.round(parseFloat(config.flatPrice || "0") * 100), currency: "USD" },
+        maxParticipants: parseInt(config.flatMaxParticipants) || 10,
+      };
+    case "tiered_group":
+      return {
+        type: "tiered_group" as const,
+        tiers: config.tierRanges.map((tier) => ({
+          minSize: parseInt(tier.min) || 1,
+          maxSize: parseInt(tier.max) || 10,
+          price: { amount: Math.round(parseFloat(tier.price || "0") * 100), currency: "USD" },
+        })),
+      };
+    case "base_plus_person":
+      return {
+        type: "base_plus_person" as const,
+        basePrice: { amount: Math.round(parseFloat(config.basePricePricing || "0") * 100), currency: "USD" },
+        perPersonPrice: { amount: Math.round(parseFloat(config.pricePerAdditional || "0") * 100), currency: "USD" },
+        includedParticipants: parseInt(config.includedParticipants) || 2,
+        maxParticipants: parseInt(config.baseMaxParticipants) || 10,
+      };
+    default:
+      return { type: "per_person" as const, tiers: [] };
+  }
+}
+
+function buildCapacityModelFromConfig(
+  config: PricingFormState,
+  fallbackMaxParticipants: number
+) {
+  if (config.capacityType === "shared") {
+    return { type: "shared" as const, totalSeats: parseInt(config.totalSeats) || fallbackMaxParticipants };
+  }
+
+  return {
+    type: "unit" as const,
+    totalUnits: parseInt(config.totalUnits) || 3,
+    occupancyPerUnit: parseInt(config.occupancyPerUnit) || 6,
+  };
+}
 
 // Smart defaults based on category
 // Default duration is 6 hours (360 min), categories can override
@@ -202,7 +328,6 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
   const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
-  const isMobile = useIsMobile();
 
   const [activeTab, setActiveTab] = useState<TabId>("essentials");
   const [formState, setFormState] = useState<TourFormState>({
@@ -218,8 +343,20 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
   const createMutation = trpc.tour.create.useMutation();
   const updateMutation = trpc.tour.update.useMutation();
   const createBookingOptionMutation = trpc.bookingOptions.create.useMutation();
+  const updateBookingOptionMutation = trpc.bookingOptions.update.useMutation();
+  const deleteBookingOptionMutation = trpc.bookingOptions.delete.useMutation();
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const { data: existingBookingOptions } = trpc.bookingOptions.listByTour.useQuery(
+    { tourId: tourId ?? "" },
+    { enabled: mode === "edit" && Boolean(tourId) }
+  );
+
+  const isSubmitting =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    createBookingOptionMutation.isPending ||
+    updateBookingOptionMutation.isPending ||
+    deleteBookingOptionMutation.isPending;
 
   // Update form state
   const updateForm = useCallback((updates: Partial<TourFormState>) => {
@@ -258,29 +395,13 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
       formState.maxParticipants > 0
     );
 
-    // Check if pricing is configured
-    const pc = formState.pricingConfig;
-    let pricingComplete = false;
-    if (pc) {
-      switch (pc.pricingType) {
-        case "per_person":
-          pricingComplete = !!pc.adultPrice && parseFloat(pc.adultPrice) > 0;
-          break;
-        case "per_unit":
-          pricingComplete = !!pc.pricePerUnit && parseFloat(pc.pricePerUnit) > 0;
-          break;
-        case "flat_rate":
-          pricingComplete = !!pc.flatPrice && parseFloat(pc.flatPrice) > 0;
-          break;
-        case "base_plus_person":
-          pricingComplete = !!pc.basePricePricing && parseFloat(pc.basePricePricing) > 0;
-          break;
-        case "tiered_group":
-          pricingComplete = pc.tierRanges.length > 0 &&
-            pc.tierRanges.every(t => t.price && parseFloat(t.price) > 0);
-          break;
-      }
-    }
+    const pricingPackages = formState.pricingPackages ?? [];
+    const pricingComplete =
+      pricingPackages.length > 0
+        ? pricingPackages.every(
+            (pkg) => pkg.name.trim().length > 0 && isPricingConfigComplete(pkg.config)
+          )
+        : isPricingConfigComplete(formState.pricingConfig);
 
     const contentComplete = !!(
       formState.description ||
@@ -387,6 +508,10 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           requirements: formState.requirements.length > 0 ? formState.requirements : undefined,
           meetingPoint: formState.meetingPoint || undefined,
           meetingPointDetails: formState.meetingPointDetails || undefined,
+          pickupMode: formState.pickupMode,
+          pickupAllowedCities: formState.pickupAllowedCities,
+          pickupAirportAllowed: formState.pickupAirportAllowed,
+          pickupPolicyNotes: formState.pickupPolicyNotes || undefined,
           cancellationPolicy: formState.cancellationPolicy || undefined,
           cancellationHours: formState.cancellationHours,
           minimumNoticeHours: formState.minimumNoticeHours,
@@ -398,6 +523,34 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           status: publish ? "active" as const : "draft" as const,
         };
 
+        const normalizedPackages =
+          (formState.pricingPackages ?? [])
+            .map((pkg) => ({
+              ...pkg,
+              name: pkg.name.trim(),
+              shortDescription: pkg.shortDescription?.trim() ?? "",
+            }))
+            .filter(
+              (pkg) => pkg.name.length > 0 && isPricingConfigComplete(pkg.config)
+            );
+
+        const fallbackPackage =
+          formState.pricingConfig && isPricingConfigComplete(formState.pricingConfig)
+            ? [
+                {
+                  id: "standard",
+                  optionId: undefined,
+                  name: "Standard Experience",
+                  shortDescription: "Join our regular tour",
+                  isDefault: true,
+                  config: formState.pricingConfig,
+                } satisfies PricingPackageDraft,
+              ]
+            : [];
+
+        const packagesToPersist =
+          normalizedPackages.length > 0 ? normalizedPackages : fallbackPackage;
+
         let savedTourId: string;
 
         if (mode === "edit" && tourId) {
@@ -408,121 +561,65 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           const result = await createMutation.mutateAsync(payload);
           savedTourId = result.id;
           toast.success("Tour created successfully");
+        }
 
-          // Create default booking option from pricing config
-          if (formState.pricingConfig && tabCompletion.pricing.complete) {
-            try {
-              const pc = formState.pricingConfig;
+        if (packagesToPersist.length > 0) {
+          try {
+            const persistedOptionIds = new Set<string>();
 
-              // Build pricing model based on type
-              const buildPricingModel = () => {
-                const createId = () => Math.random().toString(36).slice(2, 9);
-
-                switch (pc.pricingType) {
-                  case "per_person": {
-                    const tiers = [
-                      {
-                        id: createId(),
-                        name: "adult",
-                        price: { amount: Math.round(parseFloat(pc.adultPrice || "0") * 100), currency: "USD" },
-                        ageMin: 13,
-                        isDefault: true,
-                        sortOrder: 0,
-                      },
-                    ];
-                    if (pc.hasChildPrice && pc.childPrice) {
-                      tiers.push({
-                        id: createId(),
-                        name: "child",
-                        price: { amount: Math.round(parseFloat(pc.childPrice) * 100), currency: "USD" },
-                        ageMin: 3,
-                        ageMax: 12,
-                        isDefault: false,
-                        sortOrder: 1,
-                      } as typeof tiers[0]);
-                    }
-                    if (pc.hasInfantPrice) {
-                      tiers.push({
-                        id: createId(),
-                        name: "infant",
-                        price: { amount: Math.round(parseFloat(pc.infantPrice || "0") * 100), currency: "USD" },
-                        ageMin: 0,
-                        ageMax: 2,
-                        isDefault: false,
-                        sortOrder: 2,
-                      } as typeof tiers[0]);
-                    }
-                    return { type: "per_person" as const, tiers };
-                  }
-                  case "per_unit":
-                    return {
-                      type: "per_unit" as const,
-                      unitName: "Vehicle",
-                      unitNamePlural: "Vehicles",
-                      pricePerUnit: { amount: Math.round(parseFloat(pc.pricePerUnit || "0") * 100), currency: "USD" },
-                      maxOccupancy: parseInt(pc.maxOccupancy) || 6,
-                      minOccupancy: 1,
-                    };
-                  case "flat_rate":
-                    return {
-                      type: "flat_rate" as const,
-                      price: { amount: Math.round(parseFloat(pc.flatPrice || "0") * 100), currency: "USD" },
-                      maxParticipants: parseInt(pc.flatMaxParticipants) || 10,
-                    };
-                  case "tiered_group":
-                    return {
-                      type: "tiered_group" as const,
-                      tiers: pc.tierRanges.map((tier) => ({
-                        minSize: parseInt(tier.min) || 1,
-                        maxSize: parseInt(tier.max) || 10,
-                        price: { amount: Math.round(parseFloat(tier.price || "0") * 100), currency: "USD" },
-                      })),
-                    };
-                  case "base_plus_person":
-                    return {
-                      type: "base_plus_person" as const,
-                      basePrice: { amount: Math.round(parseFloat(pc.basePricePricing || "0") * 100), currency: "USD" },
-                      perPersonPrice: { amount: Math.round(parseFloat(pc.pricePerAdditional || "0") * 100), currency: "USD" },
-                      includedParticipants: parseInt(pc.includedParticipants) || 2,
-                      maxParticipants: parseInt(pc.baseMaxParticipants) || 10,
-                    };
-                  default:
-                    return { type: "per_person" as const, tiers: [] };
-                }
+            for (let index = 0; index < packagesToPersist.length; index += 1) {
+              const pkg = packagesToPersist[index]!;
+              const optionPayload = {
+                name: pkg.name,
+                shortDescription: pkg.shortDescription || undefined,
+                pricingModel: buildPricingModelFromConfig(pkg.config),
+                capacityModel: buildCapacityModelFromConfig(
+                  pkg.config,
+                  formState.maxParticipants
+                ),
+                schedulingType: "fixed" as const,
+                isDefault: index === 0,
+                sortOrder: index,
               };
 
-              // Build capacity model
-              const buildCapacityModel = () => {
-                if (pc.capacityType === "shared") {
-                  return { type: "shared" as const, totalSeats: parseInt(pc.totalSeats) || formState.maxParticipants };
-                }
-                return {
-                  type: "unit" as const,
-                  totalUnits: parseInt(pc.totalUnits) || 3,
-                  occupancyPerUnit: parseInt(pc.occupancyPerUnit) || 6,
-                };
-              };
-
-              await createBookingOptionMutation.mutateAsync({
-                tourId: savedTourId,
-                name: "Standard Experience",
-                shortDescription: "Join our regular tour",
-                pricingModel: buildPricingModel(),
-                capacityModel: buildCapacityModel(),
-                schedulingType: "fixed",
-                isDefault: true,
-              });
-              toast.success("Booking option created");
-            } catch {
-              // Don't fail the whole flow, the tour is created
+              if (mode === "edit" && pkg.optionId) {
+                await updateBookingOptionMutation.mutateAsync({
+                  id: pkg.optionId,
+                  data: optionPayload,
+                });
+                persistedOptionIds.add(pkg.optionId);
+              } else {
+                const created = await createBookingOptionMutation.mutateAsync({
+                  tourId: savedTourId,
+                  ...optionPayload,
+                });
+                persistedOptionIds.add(created.id);
+              }
             }
+
+            if (mode === "edit") {
+              const staleOptions = (existingBookingOptions ?? []).filter(
+                (option) => !persistedOptionIds.has(option.id)
+              );
+              for (const staleOption of staleOptions) {
+                await deleteBookingOptionMutation.mutateAsync({
+                  id: staleOption.id,
+                });
+              }
+            }
+          } catch {
+            toast.warning(
+              "Tour saved, but some package variations could not be synced."
+            );
           }
         }
 
         utils.tour.list.invalidate();
         router.push(`/org/${slug}/tours/${savedTourId}`);
       } catch (error) {
-        toast.error(mode === "edit" ? "Failed to update tour" : "Failed to create tour");
+        const fallback = mode === "edit" ? "Failed to update tour" : "Failed to create tour";
+        const message = error instanceof Error && error.message ? error.message : fallback;
+        toast.error(message);
       }
     },
     [
@@ -534,6 +631,9 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
       createMutation,
       updateMutation,
       createBookingOptionMutation,
+      updateBookingOptionMutation,
+      deleteBookingOptionMutation,
+      existingBookingOptions,
       utils,
       router,
       slug,
@@ -597,14 +697,15 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           <button
             type="button"
             onClick={() => setShowMobileActions(true)}
-            className="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-lg bg-primary text-primary-foreground touch-target"
+            className="sm:hidden inline-flex items-center gap-2 h-10 px-3 rounded-lg bg-primary text-primary-foreground touch-target"
             aria-label="Save options"
           >
             {isSubmitting ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <Send className="h-5 w-5" />
+              <Send className="h-4 w-4" />
             )}
+            <span className="text-sm font-medium">Save</span>
           </button>
         </div>
 
@@ -719,20 +820,43 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={isLastTab || !canNavigateToTab(TABS[currentTabIndex + 1]?.id ?? "essentials")}
-            className={cn(
-              "inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-target",
-              isLastTab || !canNavigateToTab(TABS[currentTabIndex + 1]?.id ?? "essentials")
-                ? "text-muted-foreground/50 cursor-not-allowed"
-                : "bg-primary text-primary-foreground hover:bg-primary/90"
-            )}
-          >
-            <span>Next</span>
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          {isLastTab ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSave(false)}
+                disabled={isSubmitting || !tabCompletion.essentials.complete}
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg border border-input text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="h-4 w-4" />
+                Save Draft
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSave(true)}
+                disabled={isSubmitting || !tabCompletion.essentials.complete}
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {mode === "edit" ? "Save & Publish" : "Create & Publish"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!canNavigateToTab(TABS[currentTabIndex + 1]?.id ?? "essentials")}
+              className={cn(
+                "inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-target",
+                !canNavigateToTab(TABS[currentTabIndex + 1]?.id ?? "essentials")
+                  ? "text-muted-foreground/50 cursor-not-allowed"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
+              )}
+            >
+              <span>Next</span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -777,7 +901,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                 className="w-full flex items-center justify-center gap-2 h-12 text-base font-medium text-foreground bg-muted hover:bg-accent rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="h-5 w-5" />
-                Save as Draft
+                Save Draft
               </button>
 
               <button

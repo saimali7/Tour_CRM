@@ -1,20 +1,18 @@
 "use client";
 
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useMemo, useCallback, useEffect } from "react";
-import { format, parseISO, addDays, subDays, isToday } from "date-fns";
+import { useMemo, useCallback } from "react";
+import { addDays, subDays } from "date-fns";
 import { CommandCenter } from "@/components/command-center/command-center";
 import { useHotkeys } from "@/hooks/use-keyboard-navigation";
 import type { Route } from "next";
+import { formatLocalDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 function getDateFromParam(dateParam: string | null): Date {
   if (!dateParam) return new Date();
-  try {
-    return parseISO(dateParam);
-  } catch {
-    // Invalid date format, fall back to today
-    return new Date();
-  }
+  const explicitMatch = dateParam.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (!explicitMatch?.[1]) return new Date();
+  return parseDateKeyToLocalDate(explicitMatch[1]);
 }
 
 export default function CommandCenterPage() {
@@ -30,7 +28,7 @@ export default function CommandCenterPage() {
   // Navigation helper
   const navigateToDate = useCallback(
     (date: Date) => {
-      const dateStr = format(date, "yyyy-MM-dd");
+      const dateStr = formatLocalDateKey(date);
       const newParams = new URLSearchParams(searchParams.toString());
       newParams.set("date", dateStr);
       router.push(`/org/${slug}/command-center?${newParams.toString()}` as Route);
@@ -73,7 +71,7 @@ export default function CommandCenterPage() {
   // - Desktop: minimal padding (1.5rem) = 1.5rem offset
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-1.5rem)]">
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         <CommandCenter
           date={selectedDate}
           onDateChange={handleDateChange}

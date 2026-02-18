@@ -10,6 +10,7 @@ import {
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { NotFoundError } from "./types";
+import { formatDateOnlyKey, parseDateOnlyKeyToLocalDate } from "./lib/date-time";
 
 export interface ManifestParticipant {
   id: string;
@@ -184,7 +185,8 @@ export class ManifestService extends BaseService {
       throw new NotFoundError("Guide", guideId);
     }
 
-    const dateStr = date.toISOString().split("T")[0]!;
+    const dateStr = formatDateOnlyKey(date);
+    const localDate = parseDateOnlyKeyToLocalDate(dateStr);
 
     // Get bookings where this guide has confirmed assignments for the date
     const assignmentBookings = await this.db
@@ -254,7 +256,7 @@ export class ManifestService extends BaseService {
     }
 
     const scheduleSummaries = Array.from(tourRunsMap.values()).map((run) => {
-      const startsAt = new Date(date);
+      const startsAt = new Date(localDate);
       if (run.bookingTime) {
         const [hours, minutes] = run.bookingTime.split(":").map(Number);
         startsAt.setHours(hours || 0, minutes || 0, 0, 0);
@@ -298,7 +300,8 @@ export class ManifestService extends BaseService {
    * Uses availability-based booking model (bookingDate, bookingTime)
    */
   async getManifestsForDate(date: Date): Promise<DateManifestSummary> {
-    const dateStr = date.toISOString().split("T")[0]!;
+    const dateStr = formatDateOnlyKey(date);
+    const localDate = parseDateOnlyKeyToLocalDate(dateStr);
 
     // Get all confirmed bookings for this date grouped by tour + time
     const bookingResults = await this.db
@@ -326,7 +329,7 @@ export class ManifestService extends BaseService {
     let totalRevenue = 0;
 
     const scheduleSummaries = bookingResults.map((result) => {
-      const startsAt = new Date(date);
+      const startsAt = new Date(localDate);
       if (result.bookingTime) {
         const [hours, minutes] = result.bookingTime.split(":").map(Number);
         startsAt.setHours(hours || 0, minutes || 0, 0, 0);
@@ -354,7 +357,7 @@ export class ManifestService extends BaseService {
     );
 
     return {
-      date,
+      date: localDate,
       schedules: scheduleSummaries,
       summary: {
         totalSchedules,
@@ -382,7 +385,7 @@ export class ManifestService extends BaseService {
     }
 
     // Format date for SQL comparison
-    const dateStr = date.toISOString().split("T")[0]!;
+    const dateStr = formatDateOnlyKey(date);
 
     // Get all confirmed bookings for this tour run
     const bookingResults = await this.db

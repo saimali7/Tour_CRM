@@ -13,8 +13,10 @@ import type {
   BookingSource,
   PricingModel,
   ExperienceMode,
+  PaymentMethod,
 } from "@tour/database";
 import type { DateRangeFilter } from "../types";
+import type { CashCollectionMetadata } from "./cash-collection";
 
 // ============================================================================
 // Booking Filters & Sorting
@@ -27,7 +29,10 @@ export interface BookingFilters {
   customerId?: string;
   tourId?: string;
   dateRange?: DateRangeFilter;
-  bookingDateRange?: DateRangeFilter; // Filter by booking date (tour date)
+  bookingDateRange?: {
+    from?: Date | string;
+    to?: Date | string;
+  }; // Filter by booking date (tour date)
   search?: string;
 }
 
@@ -100,6 +105,9 @@ export interface CreateBookingInput {
   internalNotes?: string;
   source?: BookingSource;
   sourceDetails?: string;
+  paymentMethod?: PaymentMethod;
+  cashCollectionExpectedAmount?: string;
+  cashCollectionNotes?: string;
   participants?: Array<{
     firstName: string;
     lastName: string;
@@ -114,6 +122,15 @@ export interface CreateBookingInput {
   discount?: string;
   tax?: string;
   total?: string;
+}
+
+export interface UpdateCashCollectionInput {
+  expectedAmount: string;
+  notes?: string;
+}
+
+export interface BookingWithCashCollection extends BookingWithRelations {
+  cashCollection?: CashCollectionMetadata | null;
 }
 
 export interface UpdateBookingInput {

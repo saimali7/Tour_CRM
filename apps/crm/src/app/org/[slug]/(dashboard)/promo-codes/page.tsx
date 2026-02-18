@@ -25,6 +25,7 @@ import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 type StatusFilter = "all" | "active" | "inactive" | "expired";
 type DiscountType = "percentage" | "fixed";
@@ -167,8 +168,8 @@ export default function PromoCodesPage() {
       description: promo.description || "",
       discountType: promo.discountType,
       discountValue: parseFloat(promo.discountValue),
-      validFrom: promo.validFrom ? new Date(promo.validFrom).toISOString().split('T')[0]! : "",
-      validUntil: promo.validUntil ? new Date(promo.validUntil).toISOString().split('T')[0]! : "",
+      validFrom: promo.validFrom ? formatDbDateKey(promo.validFrom) : "",
+      validUntil: promo.validUntil ? formatDbDateKey(promo.validUntil) : "",
       maxUses: promo.maxUses ?? null,
       maxUsesPerCustomer: promo.maxUsesPerCustomer ?? null,
       minBookingAmount: promo.minBookingAmount ? parseFloat(promo.minBookingAmount) : null,
@@ -188,8 +189,8 @@ export default function PromoCodesPage() {
       description: form.description || undefined,
       discountType: form.discountType,
       discountValue: form.discountValue,
-      validFrom: form.validFrom ? new Date(form.validFrom) : undefined,
-      validUntil: form.validUntil ? new Date(form.validUntil) : undefined,
+      validFrom: form.validFrom ? parseDateKeyToLocalDate(form.validFrom) : undefined,
+      validUntil: form.validUntil ? parseDateKeyToLocalDate(form.validUntil) : undefined,
       maxUses: form.maxUses ?? undefined,
       maxUsesPerCustomer: form.maxUsesPerCustomer ?? undefined,
       minBookingAmount: form.minBookingAmount ?? undefined,

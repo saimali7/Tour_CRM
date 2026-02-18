@@ -97,8 +97,21 @@ export function formatDateForKey(date: Date | string): string {
     return date;
   }
 
-  // For Date objects, use LOCAL date components (not UTC)
-  // This ensures the date displayed to the user matches the date stored
+  // DB DATE columns and `new Date("YYYY-MM-DD")` normalize to 00:00 UTC.
+  // Preserve the stored date in those cases; otherwise keep local-date semantics.
+  if (
+    date.getUTCHours() === 0 &&
+    date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 &&
+    date.getUTCMilliseconds() === 0
+  ) {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  // For local date values (e.g. Date picker), use local components.
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");

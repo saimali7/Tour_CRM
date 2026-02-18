@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 import { inngest } from "@/inngest";
+import { coerceDateInputToDateKey } from "@/lib/date-time";
 
 /**
  * Command Center Router
@@ -30,24 +31,13 @@ const getServices = (ctx: { orgContext: { organizationId: string }; user?: { id?
  * Date input schema that accepts either:
  * - ISO date string (YYYY-MM-DD) - preferred for consistency
  * - Full ISO datetime string (2026-01-03T00:00:00.000Z) - will extract date part
- * - Date object (will be coerced)
  *
  * The date is stored as a string internally to avoid timezone issues.
  */
+const dateInputValueSchema = z.string().min(1, "Date is required");
+
 const dateInputSchema = z.object({
-  date: z.union([
-    // Accept YYYY-MM-DD strings directly
-    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-    // Accept ISO datetime strings and extract date part
-    z.string().datetime().transform((val) => val.split("T")[0]!),
-    // Accept Date objects for backward compatibility
-    z.date().transform((val) => {
-      const year = val.getFullYear();
-      const month = String(val.getMonth() + 1).padStart(2, "0");
-      const day = String(val.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }),
-  ]),
+  date: dateInputValueSchema,
 });
 
 const warningResolutionSchema = z.object({
@@ -61,16 +51,7 @@ const warningResolutionSchema = z.object({
 });
 
 const resolveWarningInputSchema = z.object({
-  date: z.union([
-    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-    z.string().datetime().transform((val) => val.split("T")[0]!),
-    z.date().transform((val) => {
-      const year = val.getFullYear();
-      const month = String(val.getMonth() + 1).padStart(2, "0");
-      const day = String(val.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }),
-  ]),
+  date: dateInputValueSchema,
   warningId: z.string(),
   resolution: warningResolutionSchema,
 });
@@ -89,47 +70,20 @@ const guestDetailsInputSchema = z.object({
 });
 
 const addOutsourcedGuideToRunInputSchema = z.object({
-  date: z.union([
-    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-    z.string().datetime().transform((val) => val.split("T")[0]!),
-    z.date().transform((val) => {
-      const year = val.getFullYear();
-      const month = String(val.getMonth() + 1).padStart(2, "0");
-      const day = String(val.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }),
-  ]),
+  date: dateInputValueSchema,
   tourRunKey: z.string().min(1),
   externalGuideName: z.string().min(1),
   externalGuideContact: z.string().optional(),
 });
 
 const createTempGuideInputSchema = z.object({
-  date: z.union([
-    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-    z.string().datetime().transform((val) => val.split("T")[0]!),
-    z.date().transform((val) => {
-      const year = val.getFullYear();
-      const month = String(val.getMonth() + 1).padStart(2, "0");
-      const day = String(val.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }),
-  ]),
+  date: dateInputValueSchema,
   name: z.string().min(1),
   phone: z.string().min(1),
   vehicleCapacity: z.number().int().min(1).max(99),
 });
 
-const commandCenterDateSchema = z.union([
-  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
-  z.string().datetime().transform((val) => val.split("T")[0]!),
-  z.date().transform((val) => {
-    const year = val.getUTCFullYear();
-    const month = String(val.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(val.getUTCDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }),
-]);
+const commandCenterDateSchema = dateInputValueSchema;
 
 // =============================================================================
 // ROUTER
@@ -144,12 +98,13 @@ export const commandCenterRouter = createRouter({
     .input(dateInputSchema)
     .query(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
         const [status, tourRuns, timelines] = await Promise.all([
-          services.commandCenter.getDispatchStatus(input.date),
-          services.commandCenter.getTourRuns(input.date),
-          services.commandCenter.getGuideTimelines(input.date),
+          services.commandCenter.getDispatchStatus(dateKey),
+          services.commandCenter.getTourRuns(dateKey),
+          services.commandCenter.getGuideTimelines(dateKey),
         ]);
 
         return {
@@ -177,9 +132,10 @@ export const commandCenterRouter = createRouter({
     .input(dateInputSchema)
     .query(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
-        return await services.commandCenter.getTourRuns(input.date);
+        return await services.commandCenter.getTourRuns(dateKey);
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -200,9 +156,10 @@ export const commandCenterRouter = createRouter({
     .input(dateInputSchema)
     .query(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
-        return await services.commandCenter.getAvailableGuides(input.date);
+        return await services.commandCenter.getAvailableGuides(dateKey);
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -223,9 +180,10 @@ export const commandCenterRouter = createRouter({
     .input(dateInputSchema)
     .query(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
-        return await services.commandCenter.getGuideTimelines(input.date);
+        return await services.commandCenter.getGuideTimelines(dateKey);
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -246,9 +204,10 @@ export const commandCenterRouter = createRouter({
     .input(dateInputSchema)
     .mutation(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
-        return await services.commandCenter.optimize(input.date);
+        return await services.commandCenter.optimize(dateKey);
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -416,16 +375,17 @@ export const commandCenterRouter = createRouter({
     .input(dateInputSchema)
     .mutation(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
-        const result = await services.commandCenter.dispatch(input.date);
+        const result = await services.commandCenter.dispatch(dateKey);
 
         // Emit dispatch.completed event to trigger guide notifications
         await inngest.send({
           name: "dispatch.completed",
           data: {
             organizationId: ctx.orgContext.organizationId,
-            dispatchDate: input.date, // Already in YYYY-MM-DD format
+            dispatchDate: dateKey,
             dispatchedBy: ctx.user?.id || "system",
           },
         });
@@ -503,6 +463,7 @@ export const commandCenterRouter = createRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
       try {
         // Delegate to the same batch engine used by adjust-mode apply.
         const batchChanges = input.changes.map((change) =>
@@ -519,7 +480,7 @@ export const commandCenterRouter = createRouter({
                 toGuideId: change.toGuideId,
               }
         );
-        const result = await services.commandCenter.batchApplyChanges(input.date, batchChanges);
+        const result = await services.commandCenter.batchApplyChanges(dateKey, batchChanges);
 
         return {
           success: result.success,
@@ -580,9 +541,10 @@ export const commandCenterRouter = createRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
-        return await services.commandCenter.batchApplyChanges(input.date, input.changes);
+        return await services.commandCenter.batchApplyChanges(dateKey, input.changes);
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -598,10 +560,11 @@ export const commandCenterRouter = createRouter({
     .input(addOutsourcedGuideToRunInputSchema)
     .mutation(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
         return await services.commandCenter.addOutsourcedGuideToRun({
-          date: input.date,
+          date: dateKey,
           tourRunKey: input.tourRunKey,
           externalGuideName: input.externalGuideName,
           externalGuideContact: input.externalGuideContact,
@@ -622,10 +585,11 @@ export const commandCenterRouter = createRouter({
     .input(createTempGuideInputSchema)
     .mutation(async ({ ctx, input }) => {
       const services = getServices(ctx);
+      const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
         return await services.commandCenter.createTempGuideForDate({
-          date: input.date,
+          date: dateKey,
           name: input.name,
           phone: input.phone,
           vehicleCapacity: input.vehicleCapacity,
@@ -665,5 +629,19 @@ function mapResolutionType(
       return "acknowledge";
     default:
       return "assign_guide";
+  }
+}
+
+function normalizeCommandCenterDate(
+  value: string,
+  organizationTimeZone: string | null | undefined
+): string {
+  try {
+    return coerceDateInputToDateKey(value, organizationTimeZone);
+  } catch {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Date must be in YYYY-MM-DD format or a valid datetime",
+    });
   }
 }

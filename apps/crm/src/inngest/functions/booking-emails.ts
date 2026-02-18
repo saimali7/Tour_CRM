@@ -5,6 +5,7 @@ import { db, bookings, organizations, type Booking } from "@tour/database";
 import { eq, and } from "drizzle-orm";
 import { format } from "date-fns";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
+import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 import {
   validateEventData,
   bookingCreatedSchema,
@@ -426,7 +427,7 @@ export const sendRefundProcessedEmail = inngest.createFunction(
       const emailService = createEmailService(orgConfig);
       // Use booking's bookingDate and bookingTime fields
       const tourDate = booking?.bookingDate
-        ? format(new Date(booking.bookingDate), "MMMM d, yyyy")
+        ? format(parseDateKeyToLocalDate(formatDbDateKey(booking.bookingDate)), "MMMM d, yyyy")
         : "N/A";
       const tourTime = booking?.bookingTime || "N/A";
       return emailService.sendRefundConfirmation({
@@ -518,18 +519,16 @@ export const dailyBookingReminderCheck = inngest.createFunction(
             };
           }
 
-          // Calculate tomorrow's date range in UTC based on org timezone
-          // Get start of tomorrow in org timezone, then convert to UTC for query
-          const tomorrowInOrgTz = new Date(nowInOrgTz);
-          tomorrowInOrgTz.setDate(tomorrowInOrgTz.getDate() + 1);
-          tomorrowInOrgTz.setHours(0, 0, 0, 0);
-
-          const dayAfterInOrgTz = new Date(tomorrowInOrgTz);
-          dayAfterInOrgTz.setDate(dayAfterInOrgTz.getDate() + 1);
-
-          // Convert to UTC for database query
-          const tomorrowUtc = new Date(tomorrowInOrgTz.getTime() - getTimezoneOffset(timezone, tomorrowInOrgTz));
-          const dayAfterUtc = new Date(dayAfterInOrgTz.getTime() - getTimezoneOffset(timezone, dayAfterInOrgTz));
+          const tomorrowDateKey = formatInTimeZone(
+            new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000),
+            timezone,
+            "yyyy-MM-dd"
+          );
+          const dayAfterDateKey = formatInTimeZone(
+            new Date(nowUtc.getTime() + 48 * 60 * 60 * 1000),
+            timezone,
+            "yyyy-MM-dd"
+          );
 
           const tomorrowsBookings = await db.query.bookings.findMany({
             where: and(
@@ -545,8 +544,8 @@ export const dailyBookingReminderCheck = inngest.createFunction(
           // Filter bookings where bookingDate is tomorrow in org timezone
           const bookingsToRemind = tomorrowsBookings.filter((booking) => {
             if (!booking.bookingDate) return false;
-            const bookingDateObj = new Date(booking.bookingDate);
-            return bookingDateObj >= tomorrowUtc && bookingDateObj < dayAfterUtc;
+            const bookingDateKey = formatDbDateKey(booking.bookingDate);
+            return bookingDateKey >= tomorrowDateKey && bookingDateKey < dayAfterDateKey;
           });
 
           let remindersSent = 0;
@@ -557,13 +556,12 @@ export const dailyBookingReminderCheck = inngest.createFunction(
               continue;
             }
 
-            const bookingDateObj = new Date(booking.bookingDate);
+            const bookingDateObj = parseDateKeyToLocalDate(formatDbDateKey(booking.bookingDate));
             const hoursUntilTour = Math.round(
               (bookingDateObj.getTime() - nowUtc.getTime()) / (1000 * 60 * 60)
             );
 
-            // Format dates in organization's timezone for customer-facing content
-            const tourDateFormatted = formatInTimeZone(bookingDateObj, timezone, "MMMM d, yyyy");
+            const tourDateFormatted = format(bookingDateObj, "MMMM d, yyyy");
             // Use bookingTime directly as it's already formatted
             const tourTimeFormatted = booking.bookingTime || "N/A";
 
@@ -611,12 +609,3 @@ export const dailyBookingReminderCheck = inngest.createFunction(
     };
   }
 );
-
-/**
- * Helper function to get timezone offset in milliseconds
- */
-function getTimezoneOffset(timezone: string, date: Date): number {
-  const utcDate = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
-  const tzDate = new Date(date.toLocaleString("en-US", { timeZone: timezone }));
-  return tzDate.getTime() - utcDate.getTime();
-}

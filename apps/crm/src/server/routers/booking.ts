@@ -1,13 +1,31 @@
 import { z } from "zod";
 import { format } from "date-fns";
 import { createRouter, protectedProcedure, adminProcedure, bulkProcedure } from "../trpc";
-import { createServices, bookingLogger, NotFoundError, ValidationError, ServiceError } from "@tour/services";
+import { createServices, NotFoundError, ValidationError, ServiceError } from "@tour/services";
 import { sendEvent } from "@/inngest/helpers";
 import { priceStringSchema } from "@tour/validators";
+import {
+  coerceDateInputToDateKey,
+  formatDbDateKey,
+  parseDateKeyToDbDate,
+  parseDateKeyToLocalDate,
+} from "@/lib/date-time";
+
+const formatBookingDateForEmail = (
+  date: Date | string,
+  pattern: string = "MMMM d, yyyy"
+): string => format(parseDateKeyToLocalDate(formatDbDateKey(date)), pattern);
 
 const dateRangeSchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
+});
+
+const bookingDateKeySchema = z.string().min(1, "Date is required");
+
+const bookingDateRangeSchema = z.object({
+  from: bookingDateKeySchema.optional(),
+  to: bookingDateKeySchema.optional(),
 });
 
 const bookingFilterSchema = z.object({
@@ -17,7 +35,7 @@ const bookingFilterSchema = z.object({
   customerId: z.string().optional(),
   tourId: z.string().optional(),
   dateRange: dateRangeSchema.optional(),
-  bookingDateRange: dateRangeSchema.optional(), // Filter by booking date (tour date)
+  bookingDateRange: bookingDateRangeSchema.optional(), // Filter by booking date (tour date)
   search: z.string().optional(),
 });
 
@@ -80,6 +98,9 @@ const createBookingSchema = z.object({
   internalNotes: z.string().max(5000).optional(),
   source: z.enum(["manual", "website", "api", "phone", "walk_in"]).optional(),
   sourceDetails: z.string().max(500).optional(),
+  paymentMethod: z.enum(["cash", "card", "bank_transfer", "check", "other"]).optional(),
+  cashCollectionExpectedAmount: priceStringSchema.optional(),
+  cashCollectionNotes: z.string().max(500).optional(),
   participants: z.array(participantSchema).max(100).optional(),
   subtotal: priceStringSchema.optional(),
   discount: priceStringSchema.optional(),
@@ -110,8 +131,29 @@ export const bookingRouter = createRouter({
     )
     .query(async ({ ctx, input }) => {
       const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      const normalizedFilters = input.filters
+        ? {
+            ...input.filters,
+            bookingDateRange: input.filters.bookingDateRange
+              ? {
+                  from: input.filters.bookingDateRange.from
+                    ? normalizeBookingDateKey(
+                        input.filters.bookingDateRange.from,
+                        ctx.orgContext.organization.timezone
+                      )
+                    : undefined,
+                  to: input.filters.bookingDateRange.to
+                    ? normalizeBookingDateKey(
+                        input.filters.bookingDateRange.to,
+                        ctx.orgContext.organization.timezone
+                      )
+                    : undefined,
+                }
+              : undefined,
+          }
+        : undefined;
       return services.booking.getAll(
-        input.filters,
+        normalizedFilters,
         input.pagination,
         input.sort
       );
@@ -140,7 +182,7 @@ export const bookingRouter = createRouter({
       const serviceInput = {
         customerId: input.customerId,
         tourId: input.tourId,
-        bookingDate: new Date(input.bookingDate),
+        bookingDate: parseDateKeyToDbDate(input.bookingDate),
         bookingTime: input.bookingTime,
         bookingOptionId: input.bookingOptionId,
         guestAdults: input.guestAdults,
@@ -157,6 +199,9 @@ export const bookingRouter = createRouter({
         internalNotes: input.internalNotes,
         source: input.source,
         sourceDetails: input.sourceDetails,
+        paymentMethod: input.paymentMethod,
+        cashCollectionExpectedAmount: input.cashCollectionExpectedAmount,
+        cashCollectionNotes: input.cashCollectionNotes,
         participants: input.participants,
         subtotal: input.subtotal,
         discount: input.discount,
@@ -180,7 +225,7 @@ export const bookingRouter = createRouter({
               customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
               bookingReference: booking.referenceNumber,
               tourName: booking.tour.name,
-              tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
+              tourDate: formatBookingDateForEmail(booking.bookingDate),
               tourTime: booking.bookingTime || "N/A",
               participants: booking.totalParticipants,
               totalAmount: booking.total,
@@ -227,7 +272,7 @@ export const bookingRouter = createRouter({
               customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
               bookingReference: booking.referenceNumber,
               tourName: booking.tour.name,
-              tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
+              tourDate: formatBookingDateForEmail(booking.bookingDate),
               tourTime: booking.bookingTime || "N/A",
               participants: booking.totalParticipants,
               totalAmount: booking.total,
@@ -265,7 +310,7 @@ export const bookingRouter = createRouter({
               customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
               bookingReference: booking.referenceNumber,
               tourName: booking.tour.name,
-              tourDate: format(new Date(booking.bookingDate), "MMMM d, yyyy"),
+              tourDate: formatBookingDateForEmail(booking.bookingDate),
               tourTime: booking.bookingTime || "N/A",
               cancellationReason: input.reason,
               refundAmount: input.refundAmount,
@@ -310,6 +355,22 @@ export const bookingRouter = createRouter({
         input.paidAmount,
         input.stripePaymentIntentId
       );
+    }),
+
+  updateCashCollection: adminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        expectedAmount: priceStringSchema,
+        notes: z.string().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const services = createServices({ organizationId: ctx.orgContext.organizationId });
+      return services.booking.updateCashCollection(input.id, {
+        expectedAmount: input.expectedAmount,
+        notes: input.notes,
+      });
     }),
 
   addParticipant: protectedProcedure
@@ -566,7 +627,7 @@ export const bookingRouter = createRouter({
       });
 
       const tourDate = booking.bookingDate
-        ? format(new Date(booking.bookingDate), "MMMM d, yyyy")
+        ? formatBookingDateForEmail(booking.bookingDate)
         : "Scheduled Date";
       const tourTime = booking.bookingTime || "Scheduled Time";
 
@@ -649,7 +710,7 @@ export const bookingRouter = createRouter({
                   customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
                   bookingReference: booking.referenceNumber,
                   tourName: booking.tour.name,
-                  tourDate: format(new Date(booking.bookingDate), "EEEE, MMMM d, yyyy"),
+                  tourDate: formatBookingDateForEmail(booking.bookingDate, "EEEE, MMMM d, yyyy"),
                   tourTime: booking.bookingTime || "N/A",
                   participants: booking.totalParticipants,
                   totalAmount: booking.total,
@@ -693,7 +754,7 @@ export const bookingRouter = createRouter({
                   customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
                   bookingReference: booking.referenceNumber,
                   tourName: booking.tour.name,
-                  tourDate: format(new Date(booking.bookingDate), "EEEE, MMMM d, yyyy"),
+                  tourDate: formatBookingDateForEmail(booking.bookingDate, "EEEE, MMMM d, yyyy"),
                   tourTime: booking.bookingTime || "N/A",
                   cancellationReason: input.reason,
                   currency: booking.currency,
@@ -718,3 +779,14 @@ export const bookingRouter = createRouter({
       return services.booking.bulkUpdatePaymentStatus(input.ids, input.paymentStatus);
     }),
 });
+
+function normalizeBookingDateKey(
+  value: string,
+  organizationTimeZone: string | null | undefined
+): string {
+  try {
+    return coerceDateInputToDateKey(value, organizationTimeZone);
+  } catch {
+    throw new ValidationError("Date must be in YYYY-MM-DD format or a valid datetime");
+  }
+}

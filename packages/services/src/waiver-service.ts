@@ -619,7 +619,7 @@ export class WaiverService extends BaseService {
       };
     }>
   > {
-    const nowDate = new Date().toISOString().split("T")[0]!;
+    const nowDate = await this.getOrganizationDateKey();
 
     // Get upcoming confirmed bookings with customer info (availability-based model)
     const upcomingBookings = await this.db

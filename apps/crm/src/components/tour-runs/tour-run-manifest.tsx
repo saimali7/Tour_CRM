@@ -23,10 +23,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 interface TourRunManifestProps {
   tourId: string;
-  date: Date;
+  date: Date | string;
   time: string;
   orgSlug: string;
 }
@@ -43,7 +44,7 @@ export function TourRunManifest({
 
   const { data: manifest, isLoading } = trpc.tourRun.getManifest.useQuery({
     tourId,
-    date,
+    date: formatDbDateKey(date),
     time,
   });
 
@@ -81,6 +82,7 @@ export function TourRunManifest({
   }
 
   const { tourRun, summary, bookings, guides } = manifest;
+  const runDate = parseDateKeyToLocalDate(formatDbDateKey(tourRun.date));
 
   return (
     <div className="space-y-6 print:space-y-4">
@@ -93,7 +95,7 @@ export function TourRunManifest({
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <Clock className="h-4 w-4" />
-              {new Date(tourRun.date).toLocaleDateString(undefined, {
+              {runDate.toLocaleDateString(undefined, {
                 weekday: "long",
                 year: "numeric",
                 month: "long",
@@ -128,7 +130,7 @@ export function TourRunManifest({
       <div className="hidden print:block">
         <h1 className="text-xl font-bold">{tourRun.tourName} — Manifest</h1>
         <p className="text-sm">
-          {new Date(tourRun.date).toLocaleDateString()} at {tourRun.time} •{" "}
+          {runDate.toLocaleDateString()} at {tourRun.time} •{" "}
           {tourRun.durationMinutes} min
         </p>
         {tourRun.meetingPoint && (

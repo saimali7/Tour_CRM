@@ -18,6 +18,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useConfirmModal, ConfirmModal } from "@/components/ui/confirm-modal";
+import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 type PricingTab = "seasonal" | "groupDiscounts";
 
@@ -263,8 +264,8 @@ export default function PricingSettingsPage() {
     // Convert string dates to Date objects
     const formData = {
       ...seasonalForm,
-      startDate: new Date(seasonalForm.startDate),
-      endDate: new Date(seasonalForm.endDate),
+      startDate: parseDateKeyToLocalDate(seasonalForm.startDate),
+      endDate: parseDateKeyToLocalDate(seasonalForm.endDate),
     };
 
     if (editingSeasonalId) {
@@ -295,7 +296,7 @@ export default function PricingSettingsPage() {
       month: "short",
       day: "numeric",
       year: "numeric",
-    }).format(new Date(date));
+    }).format(parseDateKeyToLocalDate(formatDbDateKey(date)));
   };
 
   const tabs = [

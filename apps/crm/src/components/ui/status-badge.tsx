@@ -107,7 +107,7 @@ export function BookingStatusBadge({
 // PAYMENT STATUS BADGE
 // =============================================================================
 
-type PaymentStatus = "pending" | "partial" | "paid" | "refunded" | "failed";
+type PaymentStatus = "pending" | "partial" | "paid" | "refunded" | "failed" | "cash_collection";
 
 const paymentStatusConfig: Record<
   PaymentStatus,
@@ -117,6 +117,11 @@ const paymentStatusConfig: Record<
     label: "Pending",
     className: "payment-pending",
     icon: Clock,
+  },
+  cash_collection: {
+    label: "Cash Collection",
+    className: "payment-pending",
+    icon: DollarSign,
   },
   partial: {
     label: "Partial",

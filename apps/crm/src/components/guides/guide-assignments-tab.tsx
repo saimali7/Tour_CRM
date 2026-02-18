@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Calendar, Clock } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
+import { dbDateToLocalDate, formatDbDateKey, formatLocalDateKey } from "@/lib/date-time";
 
 interface GuideAssignmentsTabProps {
   guideId: string;
@@ -15,7 +16,7 @@ const formatDate = (date: Date) =>
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(date);
 
 export function GuideAssignmentsTab({ guideId, orgSlug }: GuideAssignmentsTabProps) {
   const { data: assignments, isLoading } = trpc.guideAssignment.getAssignmentsForGuide.useQuery({
@@ -30,13 +31,16 @@ export function GuideAssignmentsTab({ guideId, orgSlug }: GuideAssignmentsTabPro
     );
   }
 
-  const upcomingAssignments = assignments?.filter(
-    (a) => a.booking?.bookingDate && new Date(a.booking.bookingDate) > new Date()
-  ) || [];
+  const todayKey = formatLocalDateKey(new Date());
+  const upcomingAssignments = assignments?.filter((a) => {
+    if (!a.booking?.bookingDate) return false;
+    return formatDbDateKey(a.booking.bookingDate) >= todayKey;
+  }) || [];
 
-  const pastAssignments = assignments?.filter(
-    (a) => !a.booking?.bookingDate || new Date(a.booking.bookingDate) <= new Date()
-  ) || [];
+  const pastAssignments = assignments?.filter((a) => {
+    if (!a.booking?.bookingDate) return true;
+    return formatDbDateKey(a.booking.bookingDate) < todayKey;
+  }) || [];
 
   if (!assignments || assignments.length === 0) {
     return (
@@ -83,7 +87,7 @@ export function GuideAssignmentsTab({ guideId, orgSlug }: GuideAssignmentsTabPro
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                       <Clock className="h-4 w-4" />
-                      {assignment.booking?.bookingDate ? formatDate(new Date(assignment.booking.bookingDate)) : "No date"}
+                      {assignment.booking?.bookingDate ? formatDate(dbDateToLocalDate(assignment.booking.bookingDate)) : "No date"}
                       {assignment.booking?.bookingTime && ` at ${assignment.booking.bookingTime}`}
                     </p>
                   </div>
@@ -141,7 +145,7 @@ export function GuideAssignmentsTab({ guideId, orgSlug }: GuideAssignmentsTabPro
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                       <Clock className="h-4 w-4" />
-                      {assignment.booking?.bookingDate ? formatDate(new Date(assignment.booking.bookingDate)) : "No date"}
+                      {assignment.booking?.bookingDate ? formatDate(dbDateToLocalDate(assignment.booking.bookingDate)) : "No date"}
                       {assignment.booking?.bookingTime && ` at ${assignment.booking.bookingTime}`}
                     </p>
                   </div>

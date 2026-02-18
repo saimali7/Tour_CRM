@@ -8,6 +8,8 @@ import {
 } from "@tour/database";
 import { BaseService } from "./base-service";
 import { NotFoundError, ValidationError, ServiceError } from "./types";
+import { formatDateOnlyKey } from "./lib/date-time";
+import { formatDateForKey } from "./lib/tour-run-utils";
 
 /**
  * Weekly availability slot input
@@ -308,10 +310,7 @@ export class GuideAvailabilityService extends BaseService {
   async getOverrideForDate(guideId: string, date: Date): Promise<GuideAvailabilityOverride | null> {
     await this.verifyGuideOwnership(guideId);
 
-    // Normalize date to start of day and format as ISO string for SQL
-    const normalizedDate = new Date(date);
-    normalizedDate.setHours(0, 0, 0, 0);
-    const dateStr = normalizedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const dateStr = formatDateForKey(date);
 
     const override = await this.db.query.guideAvailabilityOverrides.findFirst({
       where: and(
@@ -344,7 +343,7 @@ export class GuideAvailabilityService extends BaseService {
     const existing = await this.getOverrideForDate(guideId, input.date);
     if (existing) {
       throw new ValidationError(
-        `Override already exists for guide on ${input.date.toISOString().split("T")[0]}`
+        `Override already exists for guide on ${formatDateForKey(input.date)}`
       );
     }
 
@@ -555,7 +554,7 @@ export class GuideAvailabilityService extends BaseService {
     const overrides = await this.getOverrides(guideId, { from, to });
     const overrideMap = new Map<string, GuideAvailabilityOverride>();
     overrides.forEach((override) => {
-      const dateKey = override.date.toISOString().split("T")[0] ?? "";
+      const dateKey = formatDateOnlyKey(override.date);
       if (dateKey) {
         overrideMap.set(dateKey, override);
       }
@@ -576,7 +575,7 @@ export class GuideAvailabilityService extends BaseService {
     const currentDate = new Date(from);
 
     while (currentDate <= to) {
-      const dateKey = currentDate.toISOString().split("T")[0] ?? "";
+      const dateKey = formatDateForKey(currentDate);
       const override = dateKey ? overrideMap.get(dateKey) : undefined;
 
       if (override) {

@@ -1,6 +1,12 @@
 import { z } from "zod";
-import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
+import { TRPCError } from "@trpc/server";
+import { createRouter, protectedProcedure } from "../trpc";
 import { createServices } from "@tour/services";
+import { coerceDateInputToDateKey, parseDateKeyToDbDate } from "@/lib/date-time";
+
+const parseDateKey = (dateKey: string): Date => parseDateKeyToDbDate(dateKey);
+
+const tourRunDateSchema = z.string().min(1, "Date is required");
 
 /**
  * Tour Run Router
@@ -25,12 +31,13 @@ export const tourRunRouter = createRouter({
    * Get tour runs for a specific date
    */
   getForDate: protectedProcedure
-    .input(z.object({ date: z.coerce.date() }))
+    .input(z.object({ date: tourRunDateSchema }))
     .query(async ({ ctx, input }) => {
       const services = createServices({
         organizationId: ctx.orgContext.organizationId,
       });
-      return services.tourRun.getForDate(input.date);
+      const dateKey = normalizeTourRunDate(input.date, ctx.orgContext.organization.timezone);
+      return services.tourRun.getForDate(parseDateKey(dateKey));
     }),
 
   /**
@@ -40,15 +47,20 @@ export const tourRunRouter = createRouter({
   list: protectedProcedure
     .input(
       z.object({
-        dateFrom: z.coerce.date(),
-        dateTo: z.coerce.date(),
+        dateFrom: tourRunDateSchema,
+        dateTo: tourRunDateSchema,
       })
     )
     .query(async ({ ctx, input }) => {
       const services = createServices({
         organizationId: ctx.orgContext.organizationId,
       });
-      return services.tourRun.getForDateRange(input.dateFrom, input.dateTo);
+      const dateFromKey = normalizeTourRunDate(input.dateFrom, ctx.orgContext.organization.timezone);
+      const dateToKey = normalizeTourRunDate(input.dateTo, ctx.orgContext.organization.timezone);
+      return services.tourRun.getForDateRange(
+        parseDateKey(dateFromKey),
+        parseDateKey(dateToKey)
+      );
     }),
 
   /**
@@ -58,7 +70,7 @@ export const tourRunRouter = createRouter({
     .input(
       z.object({
         tourId: z.string(),
-        date: z.coerce.date(),
+        date: tourRunDateSchema,
         time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
       })
     )
@@ -66,7 +78,8 @@ export const tourRunRouter = createRouter({
       const services = createServices({
         organizationId: ctx.orgContext.organizationId,
       });
-      return services.tourRun.get(input.tourId, input.date, input.time);
+      const dateKey = normalizeTourRunDate(input.date, ctx.orgContext.organization.timezone);
+      return services.tourRun.get(input.tourId, parseDateKey(dateKey), input.time);
     }),
 
   /**
@@ -77,7 +90,7 @@ export const tourRunRouter = createRouter({
     .input(
       z.object({
         tourId: z.string(),
-        date: z.coerce.date(),
+        date: tourRunDateSchema,
         time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
       })
     )
@@ -85,7 +98,12 @@ export const tourRunRouter = createRouter({
       const services = createServices({
         organizationId: ctx.orgContext.organizationId,
       });
-      return services.tourRun.getManifest(input.tourId, input.date, input.time);
+      const dateKey = normalizeTourRunDate(input.date, ctx.orgContext.organization.timezone);
+      return services.tourRun.getManifest(
+        input.tourId,
+        parseDateKey(dateKey),
+        input.time
+      );
     }),
 
   /**
@@ -95,7 +113,7 @@ export const tourRunRouter = createRouter({
     .input(
       z.object({
         tourId: z.string(),
-        date: z.coerce.date(),
+        date: tourRunDateSchema,
         time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
       })
     )
@@ -103,9 +121,10 @@ export const tourRunRouter = createRouter({
       const services = createServices({
         organizationId: ctx.orgContext.organizationId,
       });
+      const dateKey = normalizeTourRunDate(input.date, ctx.orgContext.organization.timezone);
       return services.tourRun.calculateGuidesRequired(
         input.tourId,
-        input.date,
+        parseDateKey(dateKey),
         input.time
       );
     }),
@@ -117,7 +136,7 @@ export const tourRunRouter = createRouter({
     .input(
       z.object({
         tourId: z.string(),
-        date: z.coerce.date(),
+        date: tourRunDateSchema,
         time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
       })
     )
@@ -125,10 +144,25 @@ export const tourRunRouter = createRouter({
       const services = createServices({
         organizationId: ctx.orgContext.organizationId,
       });
+      const dateKey = normalizeTourRunDate(input.date, ctx.orgContext.organization.timezone);
       return services.guideAssignment.getAssignmentsForTourRun(
         input.tourId,
-        input.date,
+        parseDateKey(dateKey),
         input.time
       );
     }),
 });
+
+function normalizeTourRunDate(
+  value: string,
+  organizationTimeZone: string | null | undefined
+): string {
+  try {
+    return coerceDateInputToDateKey(value, organizationTimeZone);
+  } catch {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Date must be in YYYY-MM-DD format or a valid datetime",
+    });
+  }
+}

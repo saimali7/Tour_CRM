@@ -518,6 +518,11 @@ export function DispatchShell({
     [bookingLookup]
   );
 
+  const assignmentTargetFailureMessageForRow = useCallback(
+    (_targetRow: CanvasRow, _bookingIds: string[]): string | null => null,
+    []
+  );
+
   const hasRunOverlapConflict = useCallback(
     (
       targetRow: CanvasRow,
@@ -614,6 +619,12 @@ export function DispatchShell({
       }
       const incomingStartTime = incomingRun.startTime;
 
+      const assignmentTargetError = assignmentTargetFailureMessageForRow(targetRow, bookingIds);
+      if (assignmentTargetError) {
+        toast.error(assignmentTargetError);
+        return;
+      }
+
       if (hasRunOverlapConflict(targetRow, incomingRun)) {
         toast.error("Guide has overlapping runs during this time window");
         return;
@@ -694,6 +705,7 @@ export function DispatchShell({
       bookingRunMetadataForIds,
       executeOperation,
       hasRunOverlapConflict,
+      assignmentTargetFailureMessageForRow,
       rowLookup,
       slotGuestCount,
       violatesPrivateSlotRule,
@@ -712,6 +724,10 @@ export function DispatchShell({
       const candidates = rows
         .filter((row) => !row.isOutsourced)
         .map((row) => {
+          if (assignmentTargetFailureMessageForRow(row, bookingIds)) {
+            return null;
+          }
+
           if (hasRunOverlapConflict(row, incomingRun)) {
             return null;
           }
@@ -764,6 +780,7 @@ export function DispatchShell({
       bookingLookup,
       bookingRunMetadataForIds,
       hasRunOverlapConflict,
+      assignmentTargetFailureMessageForRow,
       rows,
       slotGuestCount,
       violatesPrivateSlotRule,
@@ -882,6 +899,12 @@ export function DispatchShell({
           runKey: incomingRunKey,
         };
 
+        const assignmentTargetError = assignmentTargetFailureMessageForRow(targetRow, dragPayload.bookingIds);
+        if (assignmentTargetError) {
+          toast.error(assignmentTargetError);
+          return;
+        }
+
         if (
           hasRunOverlapConflict(targetRow, incomingRun, {
             ignoreRunId: dragPayload.sourceGuideId === targetGuideId ? dragPayload.runId : undefined,
@@ -966,6 +989,7 @@ export function DispatchShell({
       dragPayload,
       executeOperation,
       hasRunOverlapConflict,
+      assignmentTargetFailureMessageForRow,
       resetDrag,
       rowLookup,
       slotGuestCount,
@@ -1041,6 +1065,12 @@ export function DispatchShell({
         return;
       }
 
+      const assignmentTargetError = assignmentTargetFailureMessageForRow(targetRow, selected.run.bookingIds);
+      if (assignmentTargetError) {
+        toast.error(assignmentTargetError);
+        return;
+      }
+
       if (
         hasRunOverlapConflict(targetRow, {
           startTime: selected.run.startTime,
@@ -1085,7 +1115,15 @@ export function DispatchShell({
         description: `Moved ${selected.run.tourName} to ${targetRow.guide.firstName} ${targetRow.guide.lastName}`,
       });
     },
-    [executeOperation, hasRunOverlapConflict, rowLookup, runLookup, slotGuestCount, violatesPrivateSlotRule]
+    [
+      executeOperation,
+      hasRunOverlapConflict,
+      assignmentTargetFailureMessageForRow,
+      rowLookup,
+      runLookup,
+      slotGuestCount,
+      violatesPrivateSlotRule,
+    ]
   );
 
   const handleRescheduleRun = useCallback(

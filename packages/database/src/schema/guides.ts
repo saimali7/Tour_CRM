@@ -31,7 +31,7 @@ export const guides = pgTable("guides", {
   // Languages spoken
   languages: jsonb("languages").$type<string[]>().default(["en"]),
 
-  // Certifications/qualifications
+  // Optional certifications metadata
   certifications: jsonb("certifications").$type<string[]>().default([]),
 
   // Availability preferences

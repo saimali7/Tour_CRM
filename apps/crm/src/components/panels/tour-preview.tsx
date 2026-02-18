@@ -8,6 +8,7 @@ import {
   Users,
   DollarSign,
   MapPin,
+  Car,
   Calendar,
   Tag,
   Image as ImageIcon,
@@ -60,6 +61,20 @@ export function TourPreview({ tourId }: TourPreviewProps) {
 
   const basePrice = parseFloat(tour.basePrice || "0");
   const currency = tour.currency || "USD";
+  const pickupModeLabel =
+    tour.pickupMode === "hotel_pickup"
+      ? "Hotel pickup"
+      : tour.pickupMode === "hybrid"
+        ? "Meeting point + pickup"
+        : "Meeting point only";
+  const pickupCities = Array.isArray(tour.pickupAllowedCities)
+    ? tour.pickupAllowedCities.filter(Boolean)
+    : [];
+  const showPickupPolicy =
+    tour.pickupMode !== "meeting_point" ||
+    pickupCities.length > 0 ||
+    Boolean(tour.pickupAirportAllowed) ||
+    Boolean(tour.pickupPolicyNotes);
 
   // Format currency
   const formatPrice = (price: number) => {
@@ -162,6 +177,31 @@ export function TourPreview({ tourId }: TourPreviewProps) {
                   {tour.meetingPointDetails}
                 </p>
               )}
+            </div>
+          </div>
+        </ContextPanelSection>
+      )}
+
+      {/* Pickup Policy */}
+      {showPickupPolicy && (
+        <ContextPanelSection title="Pickup Policy">
+          <div className="space-y-2 text-sm">
+            <div className="flex items-start gap-2">
+              <Car className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-foreground">{pickupModeLabel}</p>
+                {pickupCities.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Cities: {pickupCities.join(", ")}
+                  </p>
+                )}
+                {tour.pickupAirportAllowed && (
+                  <p className="text-xs text-muted-foreground mt-1">Airport pickup allowed</p>
+                )}
+                {tour.pickupPolicyNotes && (
+                  <p className="text-xs text-muted-foreground mt-1">{tour.pickupPolicyNotes}</p>
+                )}
+              </div>
             </div>
           </div>
         </ContextPanelSection>

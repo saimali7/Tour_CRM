@@ -35,6 +35,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getDisplayPaymentStatus } from "@/lib/cash-collection";
+import { formatDbDateKey, formatLocalDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
 
 // Design system components
 import {
@@ -218,24 +220,26 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
 
   // Calculate date range based on quick filter
-  const bookingDateRange = useMemo(() => {
+  const bookingDateRange = useMemo<{ from: string; to: string } | undefined>(() => {
     if (quickDateFilter === "all") return undefined;
 
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000 - 1);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayKey = formatLocalDateKey(today);
 
     switch (quickDateFilter) {
       case "today":
-        return { from: startOfToday, to: endOfToday };
+        return { from: todayKey, to: todayKey };
       case "tomorrow": {
-        const startOfTomorrow = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
-        const endOfTomorrow = new Date(startOfTomorrow.getTime() + 24 * 60 * 60 * 1000 - 1);
-        return { from: startOfTomorrow, to: endOfTomorrow };
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowKey = formatLocalDateKey(tomorrow);
+        return { from: tomorrowKey, to: tomorrowKey };
       }
       case "this-week": {
-        const endOfWeek = new Date(startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000);
-        return { from: startOfToday, to: endOfWeek };
+        const endOfWindow = new Date(today);
+        endOfWindow.setDate(endOfWindow.getDate() + 6);
+        return { from: todayKey, to: formatLocalDateKey(endOfWindow) };
       }
       default:
         return undefined;
@@ -407,20 +411,13 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | string) => {
+    const safeDate = parseDateKeyToLocalDate(formatDbDateKey(date));
     return new Intl.DateTimeFormat("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
-    }).format(new Date(date));
-  };
-
-  const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date(date));
+    }).format(safeDate);
   };
 
   if (error) {
@@ -554,7 +551,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
                   setPage(1);
                 }}
                 className={cn(
-                  "px-2.5 py-1 text-xs font-medium rounded-md transition-all",
+                  "px-2.5 py-1 text-sm font-medium rounded-md transition-all",
                   isActive
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
@@ -566,7 +563,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           })}
         </div>
 
-        <span className="text-xs text-muted-foreground">
+        <span className="text-sm text-muted-foreground">
           {quickDateFilter === "all" ? "Sorted by newest bookings" : "Sorted by tour date/time"}
         </span>
 
@@ -579,7 +576,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           }}
           aria-label="Filter by source"
           className={cn(
-            "h-9 px-2.5 text-xs rounded-lg border transition-colors",
+            "h-9 px-2.5 text-sm rounded-lg border transition-colors",
             sourceFilter !== "all"
               ? "border-primary bg-primary/5 text-foreground"
               : "border-input bg-background text-muted-foreground"
@@ -601,7 +598,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           }}
           aria-label="Filter by status"
           className={cn(
-            "h-9 px-2.5 text-xs rounded-lg border transition-colors",
+            "h-9 px-2.5 text-sm rounded-lg border transition-colors",
             statusFilter !== "all"
               ? "border-primary bg-primary/5 text-foreground"
               : "border-input bg-background text-muted-foreground"
@@ -623,7 +620,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
           }}
           aria-label="Filter by payment"
           className={cn(
-            "h-9 px-2.5 text-xs rounded-lg border transition-colors",
+            "h-9 px-2.5 text-sm rounded-lg border transition-colors",
             paymentFilter !== "all"
               ? "border-primary bg-primary/5 text-foreground"
               : "border-input bg-background text-muted-foreground"
@@ -647,7 +644,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
               setQuickDateFilter(DEFAULT_QUICK_DATE_FILTER);
               setPage(1);
             }}
-            className="h-9 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+            className="h-9 px-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
             aria-label="Clear all filters"
           >
             Clear
@@ -712,7 +709,11 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
               {data?.data.map((booking) => {
                 const total = parseFloat(booking.total);
                 const isHighValue = total >= 500;
-                const isOptimistic = (booking as any)._optimistic;
+                const optimisticBooking = booking as typeof booking & {
+                  _optimistic?: boolean;
+                  _originalPaymentStatus?: string;
+                };
+                const isOptimistic = Boolean(optimisticBooking._optimistic);
                 return (
                 <TableRow
                   key={booking.id}
@@ -770,7 +771,7 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
                       </div>
                       {booking.bookingDate && (
                         <div className="text-sm text-muted-foreground whitespace-nowrap">
-                          {formatDate(new Date(booking.bookingDate))}
+                          {formatDate(booking.bookingDate)}
                           {booking.bookingTime && ` at ${booking.bookingTime}`}
                         </div>
                       )}
@@ -786,8 +787,13 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
-                      <PaymentStatusBadge status={booking.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed"} />
-                      {isOptimistic && booking.paymentStatus !== (data?.data.find(b => b.id === booking.id) as any)?._originalPaymentStatus && (
+                      <PaymentStatusBadge
+                        status={getDisplayPaymentStatus(
+                          booking.paymentStatus,
+                          (booking as { metadata?: unknown }).metadata
+                        )}
+                      />
+                      {isOptimistic && booking.paymentStatus !== optimisticBooking._originalPaymentStatus && (
                         <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                       )}
                     </div>
@@ -814,33 +820,39 @@ function AllBookingsView({ slug, isMobile, openQuickBooking, urgencyData }: AllB
                     </div>
                   </TableCell>
                   <TableCell>
-                    <TableActions>
+                    <TableActions className="gap-2">
                       <Link href={`/org/${slug}/bookings/${booking.id}` as Route}>
-                        <ActionButton tooltip="View booking">
+                        <ActionButton className="h-8 gap-1.5 px-2 text-xs font-medium" tooltip="View booking">
                           <Eye className="h-4 w-4" />
+                          <span>View</span>
                         </ActionButton>
                       </Link>
                       <Link href={`/org/${slug}/bookings/${booking.id}/edit` as Route}>
-                        <ActionButton tooltip="Edit booking">
+                        <ActionButton className="h-8 gap-1.5 px-2 text-xs font-medium" tooltip="Edit booking">
                           <Edit className="h-4 w-4" />
+                          <span>Edit</span>
                         </ActionButton>
                       </Link>
                       {booking.status === "pending" && (
                         <ActionButton
                           variant="success"
                           tooltip="Confirm booking"
+                          className="h-8 gap-1.5 px-2 text-xs font-medium"
                           onClick={() => handleConfirm(booking.id)}
                         >
                           <CheckCircle className="h-4 w-4" />
+                          <span>Confirm</span>
                         </ActionButton>
                       )}
                       {(booking.status === "pending" || booking.status === "confirmed") && (
                         <ActionButton
                           variant="danger"
                           tooltip="Cancel booking"
+                          className="h-8 gap-1.5 px-2 text-xs font-medium"
                           onClick={() => handleCancel(booking.id)}
                         >
                           <X className="h-4 w-4" />
+                          <span>Cancel</span>
                         </ActionButton>
                       )}
                     </TableActions>

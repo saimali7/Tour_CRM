@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createRouter, protectedProcedure } from "../trpc";
 import { createServices } from "@tour/services";
+import { formatLocalDateKey } from "@/lib/date-time";
 
 const dateRangeSchema = z.object({
   from: z.coerce.date(),
@@ -223,14 +224,14 @@ export const reportsRouter = createRouter({
         return {
           format: "csv" as const,
           data: csv,
-          filename: `${input.reportType}-report-${new Date().toISOString().split("T")[0]}.csv`,
+          filename: `${input.reportType}-report-${formatLocalDateKey(new Date())}.csv`,
         };
       }
 
       return {
         format: "json" as const,
         data: reportData,
-        filename: `${input.reportType}-report-${new Date().toISOString().split("T")[0]}.json`,
+        filename: `${input.reportType}-report-${formatLocalDateKey(new Date())}.json`,
       };
     }),
 });

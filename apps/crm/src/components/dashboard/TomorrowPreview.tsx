@@ -91,7 +91,7 @@ export function TomorrowPreview({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Tomorrow
+            Tomorrow&apos;s Tour Plan
           </h2>
           {hasContent && (
             <span className="text-xs text-muted-foreground">
@@ -154,7 +154,6 @@ export function TomorrowPreview({
               }))}
               actionLabel="Assign guides"
               actionHref={`/org/${orgSlug}/guides`}
-              orgSlug={orgSlug}
             />
           )}
 
@@ -172,7 +171,6 @@ export function TomorrowPreview({
               }))}
               actionLabel="View all"
               actionHref={`/org/${orgSlug}/bookings?status=pending`}
-              orgSlug={orgSlug}
             />
           )}
 
@@ -190,7 +188,6 @@ export function TomorrowPreview({
               }))}
               actionLabel="View all"
               actionHref={`/org/${orgSlug}/bookings?payment=pending`}
-              orgSlug={orgSlug}
             />
           )}
         </div>
@@ -220,7 +217,6 @@ function ActionCard({
   items,
   actionLabel,
   actionHref,
-  orgSlug,
 }: {
   type: "critical" | "warning" | "info";
   icon: React.ReactNode;
@@ -228,7 +224,6 @@ function ActionCard({
   items: Array<{ id: string; label: string; sublabel: string; href: string }>;
   actionLabel: string;
   actionHref: string;
-  orgSlug: string;
 }) {
   // Clean alert colors - subtle backgrounds with semantic icon/border colors
   const colors = {

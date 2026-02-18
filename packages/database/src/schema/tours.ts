@@ -43,6 +43,12 @@ export const tours = pgTable("tours", {
   meetingPointDetails: text("meeting_point_details"),
   meetingPointLat: numeric("meeting_point_lat", { precision: 10, scale: 7 }),
   meetingPointLng: numeric("meeting_point_lng", { precision: 10, scale: 7 }),
+  pickupMode: text("pickup_mode")
+    .$type<"meeting_point" | "hotel_pickup" | "hybrid">()
+    .default("meeting_point"),
+  pickupAllowedCities: jsonb("pickup_allowed_cities").$type<string[]>().default([]),
+  pickupAirportAllowed: boolean("pickup_airport_allowed").default(false),
+  pickupPolicyNotes: text("pickup_policy_notes"),
 
   // Media
   coverImageUrl: text("cover_image_url"),

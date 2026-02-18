@@ -19,6 +19,8 @@ import {
 import { BaseService } from "../base-service";
 import type { ServiceContext, PaginationOptions, PaginatedResult, SortOptions } from "../types";
 import { NotFoundError } from "../types";
+import { formatDateOnlyKey } from "../lib/date-time";
+import { formatDateForKey } from "../lib/tour-run-utils";
 import { BookingCore } from "./booking-core";
 import type {
   BookingFilters,
@@ -70,10 +72,14 @@ export class BookingQueryService extends BaseService {
     }
     // Filter by booking date (for calendar view)
     if (filters.bookingDateRange?.from) {
-      conditions.push(gte(bookings.bookingDate, filters.bookingDateRange.from));
+      conditions.push(
+        sql`${bookings.bookingDate}::text >= ${formatDateForKey(filters.bookingDateRange.from)}`
+      );
     }
     if (filters.bookingDateRange?.to) {
-      conditions.push(lte(bookings.bookingDate, filters.bookingDateRange.to));
+      conditions.push(
+        sql`${bookings.bookingDate}::text <= ${formatDateForKey(filters.bookingDateRange.to)}`
+      );
     }
     if (filters.search) {
       conditions.push(
@@ -257,7 +263,7 @@ export class BookingQueryService extends BaseService {
     date: Date,
     time: string
   ): Promise<BookingWithRelations[]> {
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = formatDateOnlyKey(date);
 
     const result = await this.db
       .select({
@@ -322,7 +328,7 @@ export class BookingQueryService extends BaseService {
    * Get today's confirmed bookings.
    */
   async getTodaysBookings(): Promise<BookingWithRelations[]> {
-    const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const todayStr = await this.getOrganizationDateKey();
 
     const result = await this.db
       .select({

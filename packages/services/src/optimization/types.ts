@@ -79,8 +79,6 @@ export interface AvailableGuide {
   baseZoneId?: string;
   /** Languages spoken */
   languages: string[];
-  /** Tour IDs this guide is qualified for */
-  qualifiedTourIds: string[];
   /** Tour IDs where this guide is the primary guide */
   primaryTourIds: string[];
   /** Availability window start */
@@ -237,7 +235,6 @@ export interface OptimizationWarning {
  */
 export type WarningType =
   | "insufficient_guides"
-  | "no_qualified_guide"
   | "vehicle_capacity_exceeded"
   | "time_conflict"
   | "long_drive_time"

@@ -4,9 +4,11 @@ import {
   bookingParticipants,
   bookings,
   tours,
+  organizations,
 } from "@tour/database/schema";
 import type { CheckedInStatus } from "@tour/database/schema";
 import { type ServiceContext, NotFoundError } from "./types";
+import { formatDateOnlyKey, getNowDateKeyInTimeZone, normalizeTimeZone, parseDateOnlyKeyToLocalDate } from "./lib/date-time";
 
 /**
  * Tour run check-in status result
@@ -36,7 +38,33 @@ export interface TourRunCheckInStatus {
 }
 
 export class CheckInService {
+  private organizationTimeZoneCache?: Promise<string>;
+
   constructor(private ctx: ServiceContext) {}
+
+  private async getOrganizationTimezone(): Promise<string> {
+    if (!this.organizationTimeZoneCache) {
+      this.organizationTimeZoneCache = (async () => {
+        if (this.ctx.timezone) {
+          return normalizeTimeZone(this.ctx.timezone, "UTC");
+        }
+
+        const org = await db.query.organizations.findFirst({
+          where: eq(organizations.id, this.ctx.organizationId),
+          columns: { timezone: true },
+        });
+
+        return normalizeTimeZone(org?.timezone, "UTC");
+      })();
+    }
+
+    return this.organizationTimeZoneCache;
+  }
+
+  private async getTodayDateKey(): Promise<string> {
+    const timezone = await this.getOrganizationTimezone();
+    return getNowDateKeyInTimeZone(timezone);
+  }
 
   // ==========================================
   // Check-In Operations
@@ -195,9 +223,8 @@ export class CheckInService {
    * Groups bookings by tour run (tourId + date + time)
    */
   async getTodaysCheckInSummary() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split("T")[0]!;
+    const todayStr = await this.getTodayDateKey();
+    const today = parseDateOnlyKeyToLocalDate(todayStr);
 
     // Get today's bookings with check-in status
     const todayBookings = await db
@@ -327,7 +354,7 @@ export class CheckInService {
     time: string
   ): Promise<TourRunCheckInStatus> {
     // Format date for SQL comparison
-    const dateStr = date.toISOString().split("T")[0]!;
+    const dateStr = formatDateOnlyKey(date);
 
     // Get all bookings and their participants for this tour run
     const participants = await db
@@ -398,7 +425,7 @@ export class CheckInService {
     status: CheckedInStatus = "yes"
   ) {
     // Format date for SQL comparison
-    const dateStr = date.toISOString().split("T")[0]!;
+    const dateStr = formatDateOnlyKey(date);
 
     // First verify the booking belongs to this tour run
     const booking = await db

@@ -5,7 +5,6 @@ import { DashboardProviders } from "./providers";
 import { NavigationProgress } from "@/components/navigation-progress";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { Suspense } from "react";
-import { User } from "lucide-react";
 import { NavRail } from "@/components/layout/nav-rail";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { MobileHeader } from "./mobile-header";
@@ -42,29 +41,6 @@ export async function generateMetadata({
 // Check if Clerk is enabled
 const ENABLE_CLERK = process.env.ENABLE_CLERK === "true";
 
-// Conditionally import UserButton
-async function UserAccountButton() {
-  if (ENABLE_CLERK) {
-    const { UserButton } = await import("@clerk/nextjs");
-    return (
-      <UserButton
-        appearance={{
-          elements: {
-            avatarBox: "h-7 w-7",
-          },
-        }}
-      />
-    );
-  }
-
-  // Fallback avatar when Clerk is disabled
-  return (
-    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted">
-      <User className="h-3.5 w-3.5 text-muted-foreground" />
-    </div>
-  );
-}
-
 interface DashboardLayoutProps {
   children: React.ReactNode;
   params: Promise<{ slug: string }>;
@@ -89,7 +65,7 @@ export default async function DashboardLayout({
         <NavRail
           orgSlug={slug}
           orgName={organization.name}
-          userButton={<UserAccountButton />}
+          clerkEnabled={ENABLE_CLERK}
         />
 
         {/* Main Content Area - responds to context panel state */}

@@ -11,6 +11,7 @@ import type {
   PricingTier,
 } from "./types";
 import type { ComboboxOption } from "@/components/ui/combobox";
+import { formatDbDateKey } from "@/lib/date-time";
 
 interface UseBookingFormOptions {
   booking?: ExistingBooking;
@@ -35,11 +36,9 @@ function deriveAvailabilityFromBooking(booking?: ExistingBooking): {
   const dateValue = booking.bookingDate;
   let dateString: string | null = null;
   if (dateValue instanceof Date) {
-    // toISOString() returns "YYYY-MM-DDTHH:MM:SS.sssZ", split gives us the date part
-    const parts = dateValue.toISOString().split("T");
-    dateString = parts[0] ?? null;
+    dateString = formatDbDateKey(dateValue);
   } else if (typeof dateValue === "string") {
-    dateString = dateValue;
+    dateString = formatDbDateKey(dateValue);
   }
 
   return {

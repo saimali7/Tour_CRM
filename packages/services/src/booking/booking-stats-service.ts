@@ -17,6 +17,7 @@ import {
 } from "@tour/database";
 import { BaseService } from "../base-service";
 import type { ServiceContext, DateRangeFilter } from "../types";
+import { addDaysToDateKey, formatDateOnlyKey, parseDateOnlyKeyToLocalDate } from "../lib/date-time";
 import { BookingCore } from "./booking-core";
 import { BookingQueryService } from "./booking-query-service";
 import type {
@@ -94,6 +95,8 @@ export class BookingStatsService extends BaseService {
     const now = new Date();
     const thirtyDaysOut = new Date(now);
     thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30); // Look 30 days out for issues
+    const nowDateKey = await this.getOrganizationDateKey(now);
+    const thirtyDaysOutDateKey = await this.getOrganizationDateKey(thirtyDaysOut);
 
     // Get all upcoming bookings that might need action
     const result = await this.db
@@ -128,8 +131,8 @@ export class BookingStatsService extends BaseService {
           // Only upcoming tours (within 30 days)
           and(
             isNotNull(bookings.bookingDate),
-            gte(bookings.bookingDate, now),
-            lte(bookings.bookingDate, thirtyDaysOut)
+            sql`${bookings.bookingDate}::text >= ${nowDateKey}`,
+            sql`${bookings.bookingDate}::text <= ${thirtyDaysOutDateKey}`
           )
         )
       )
@@ -186,6 +189,7 @@ export class BookingStatsService extends BaseService {
    */
   async getNeedsAction(): Promise<ActionableBookings> {
     const now = new Date();
+    const todayDateKey = await this.getOrganizationDateKey(now);
 
     // Get all pending or unpaid bookings for upcoming tours
     const result = await this.db
@@ -218,7 +222,7 @@ export class BookingStatsService extends BaseService {
             eq(bookings.status, "confirmed")
           ),
           // Only upcoming tours
-          and(isNotNull(bookings.bookingDate), gte(bookings.bookingDate, now)),
+          and(isNotNull(bookings.bookingDate), sql`${bookings.bookingDate}::text >= ${todayDateKey}`),
           // Has some issue (pending status OR unpaid)
           or(
             eq(bookings.status, "pending"),
@@ -271,10 +275,10 @@ export class BookingStatsService extends BaseService {
    */
   async getUpcoming(days: number = 7): Promise<UpcomingBookings> {
     const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-    const endDate = new Date(startOfToday);
+    const endDate = new Date(now);
     endDate.setDate(endDate.getDate() + days);
+    const startDateKey = await this.getOrganizationDateKey(now);
+    const endDateKey = await this.getOrganizationDateKey(endDate);
 
     const result = await this.db
       .select({
@@ -308,8 +312,8 @@ export class BookingStatsService extends BaseService {
           // Within date range
           and(
             isNotNull(bookings.bookingDate),
-            gte(bookings.bookingDate, startOfToday),
-            lte(bookings.bookingDate, endDate)
+            sql`${bookings.bookingDate}::text >= ${startDateKey}`,
+            sql`${bookings.bookingDate}::text <= ${endDateKey}`
           )
         )
       )
@@ -334,18 +338,15 @@ export class BookingStatsService extends BaseService {
         continue; // Skip if no date
       }
 
-      const tourDate = new Date(booking.bookingDate);
-      const dateKey = tourDate.toISOString().split("T")[0] ?? "";
+      const dateKey = formatDateOnlyKey(booking.bookingDate);
       const existing = dayMap.get(dateKey) || [];
       existing.push(booking);
       dayMap.set(dateKey, existing);
     }
 
     // Convert to array with labels
-    const today = startOfToday.toISOString().split("T")[0];
-    const tomorrow = new Date(startOfToday);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    const today = startDateKey;
+    const tomorrowStr = addDaysToDateKey(startDateKey, 1);
 
     let totalBookings = 0;
     let totalGuests = 0;
@@ -355,7 +356,7 @@ export class BookingStatsService extends BaseService {
     const byDay = Array.from(dayMap.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([dateStr, dayBookings]) => {
-        const date = new Date(dateStr);
+        const date = parseDateOnlyKeyToLocalDate(dateStr);
         let dayLabel: string;
 
         if (dateStr === today) {
@@ -418,7 +419,7 @@ export class BookingStatsService extends BaseService {
         const parts = booking.bookingTime.split(":");
         const hours = parseInt(parts[0] ?? "0", 10);
         const minutes = parseInt(parts[1] ?? "0", 10);
-        tourDate = new Date(booking.bookingDate);
+        tourDate = parseDateOnlyKeyToLocalDate(formatDateOnlyKey(booking.bookingDate));
         tourDate.setHours(hours, minutes, 0, 0);
       }
 
@@ -445,11 +446,11 @@ export class BookingStatsService extends BaseService {
       if (!a.bookingDate || !a.bookingTime) return 1;
       if (!b.bookingDate || !b.bookingTime) return -1;
 
-      const aTime = new Date(a.bookingDate);
+      const aTime = parseDateOnlyKeyToLocalDate(formatDateOnlyKey(a.bookingDate));
       const aParts = a.bookingTime.split(":");
       aTime.setHours(parseInt(aParts[0] ?? "0", 10), parseInt(aParts[1] ?? "0", 10));
 
-      const bTime = new Date(b.bookingDate);
+      const bTime = parseDateOnlyKeyToLocalDate(formatDateOnlyKey(b.bookingDate));
       const bParts = b.bookingTime.split(":");
       bTime.setHours(parseInt(bParts[0] ?? "0", 10), parseInt(bParts[1] ?? "0", 10));
 

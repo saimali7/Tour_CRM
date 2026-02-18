@@ -29,6 +29,8 @@ import {
   ContextPanelEmpty,
 } from "@/components/layout/context-panel";
 import { cn } from "@/lib/utils";
+import { getDisplayPaymentStatus } from "@/lib/cash-collection";
+import { dbDateToLocalDate } from "@/lib/date-time";
 
 interface BookingPreviewProps {
   bookingId: string;
@@ -63,15 +65,7 @@ export function BookingPreview({ bookingId }: BookingPreviewProps) {
       month: "short",
       day: "numeric",
       year: "numeric",
-    }).format(new Date(date));
-  };
-
-  const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date(date));
+    }).format(date);
   };
 
   const total = parseFloat(booking.total);
@@ -85,7 +79,9 @@ export function BookingPreview({ bookingId }: BookingPreviewProps) {
       <ContextPanelSection>
         <div className="flex items-center gap-2 mb-3">
           <BookingStatusBadge status={booking.status as "pending" | "confirmed" | "completed" | "cancelled" | "no_show"} />
-          <PaymentStatusBadge status={booking.paymentStatus as "pending" | "partial" | "paid" | "refunded" | "failed"} />
+          <PaymentStatusBadge
+            status={getDisplayPaymentStatus(booking.paymentStatus, booking.metadata)}
+          />
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-lg font-semibold text-foreground">
@@ -141,7 +137,7 @@ export function BookingPreview({ bookingId }: BookingPreviewProps) {
             {booking.bookingDate && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5 shrink-0" />
-                <span>{formatDate(new Date(booking.bookingDate))}</span>
+                <span>{formatDate(dbDateToLocalDate(booking.bookingDate))}</span>
               </div>
             )}
             {booking.bookingTime && (

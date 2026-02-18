@@ -10,6 +10,8 @@ import {
 import { BaseService } from "./base-service";
 import { type DateRangeFilter, ValidationError } from "./types";
 import { createServiceLogger } from "./lib/logger";
+import { formatDateOnlyKey, parseDateOnlyKeyToLocalDate } from "./lib/date-time";
+import { formatDateForKey } from "./lib/tour-run-utils";
 
 const logger = createServiceLogger("analytics");
 
@@ -543,8 +545,8 @@ export class AnalyticsService extends BaseService {
       throw new ValidationError("Both from and to dates are required for capacity utilization");
     }
 
-    const fromStr = from.toISOString().split("T")[0]!;
-    const toStr = to.toISOString().split("T")[0]!;
+    const fromStr = formatDateForKey(from);
+    const toStr = formatDateForKey(to);
 
     // Get booking-based stats grouped by tour
     const bookingsByTourQuery = await this.db
@@ -680,9 +682,7 @@ export class AnalyticsService extends BaseService {
    * Uses availability-based booking model (bookingDate, bookingTime)
    */
   async getTodaysOperations(): Promise<TodaysOperations> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split("T")[0]!;
+    const todayStr = await this.getOrganizationDateKey();
 
     // Count today's bookings (grouped by unique tour runs)
     const statsQuery = await this.db
@@ -728,7 +728,7 @@ export class AnalyticsService extends BaseService {
     // Get upcoming tour runs for next 24 hours (grouped by tour + time)
     const now = new Date();
     const next24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const next24Str = next24Hours.toISOString().split("T")[0]!;
+    const next24Str = await this.getOrganizationDateKey(next24Hours);
 
     const upcomingBookings = await this.db
       .select({
@@ -757,7 +757,9 @@ export class AnalyticsService extends BaseService {
 
     // Map results to output format
     const upcomingSchedules = upcomingBookings.map(row => {
-      const startsAt = row.bookingDate ? new Date(row.bookingDate) : new Date();
+      const startsAt = row.bookingDate
+        ? parseDateOnlyKeyToLocalDate(formatDateOnlyKey(row.bookingDate))
+        : new Date();
       if (row.bookingTime) {
         const [hours, minutes] = row.bookingTime.split(":").map(Number);
         startsAt.setHours(hours || 0, minutes || 0, 0, 0);

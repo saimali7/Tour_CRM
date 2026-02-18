@@ -7,6 +7,7 @@ export interface ServiceContext {
   organizationId: string;
   userId?: string;
   role?: OrganizationRole;
+  timezone?: string;
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { trpc } from "@/lib/trpc";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { toast } from "sonner";
+import { parseDateKeyToLocalDate } from "@/lib/date-time";
 
 export default function TourRunPage() {
   const params = useParams();
@@ -49,8 +50,8 @@ export default function TourRunPage() {
   const dateStr = searchParams.get("date");
   const time = searchParams.get("time");
 
-  // Parse date
-  const date = dateStr ? parseISO(dateStr) : null;
+  // Parse date key
+  const dateKey = dateStr?.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
 
   // Fetch manifest data
   const {
@@ -61,11 +62,11 @@ export default function TourRunPage() {
   } = trpc.tourRun.getManifest.useQuery(
     {
       tourId: tourId!,
-      date: date!,
+      date: dateKey!,
       time: time!,
     },
     {
-      enabled: !!tourId && !!date && !!time,
+      enabled: !!tourId && !!dateKey && !!time,
       refetchInterval: 30000, // Refresh every 30s for live updates
     }
   );
@@ -112,7 +113,7 @@ export default function TourRunPage() {
   }
 
   // Error or missing params
-  if (!tourId || !date || !time) {
+  if (!tourId || !dateKey || !time) {
     return (
       <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
         <div className="flex items-center gap-3">
@@ -216,7 +217,7 @@ export default function TourRunPage() {
             <div className="flex flex-wrap items-center gap-4 mt-2 text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {format(parseISO(tourRun.date), "EEEE, MMMM d, yyyy")}
+                {format(parseDateKeyToLocalDate(tourRun.date), "EEEE, MMMM d, yyyy")}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" />

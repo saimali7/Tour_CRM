@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { dbDateToLocalDate } from "@/lib/date-time";
 
 interface BookingQuickViewProps {
   bookingId: string;
@@ -158,7 +159,7 @@ export function BookingQuickView({
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  {format(new Date(booking.bookingDate), "EEE, MMM d, yyyy")}
+                  {format(dbDateToLocalDate(booking.bookingDate), "EEE, MMM d, yyyy")}
                 </span>
                 {booking.bookingTime && (
                   <span className="flex items-center gap-1">

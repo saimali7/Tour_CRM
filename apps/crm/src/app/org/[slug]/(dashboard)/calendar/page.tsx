@@ -9,6 +9,11 @@ import { useState, useMemo } from "react";
 import { startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { OperationsCalendar } from "@/components/calendar/operations-calendar";
 import {
+  formatDbDateKey,
+  formatLocalDateKey,
+  parseDateKeyToLocalDate,
+} from "@/lib/date-time";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -41,8 +46,8 @@ export default function CalendarPage() {
 
   // Fetch tour runs for calendar
   const { data: tourRunsResult, isLoading } = trpc.tourRun.list.useQuery({
-    dateFrom: calendarDateRange.from,
-    dateTo: calendarDateRange.to,
+    dateFrom: formatLocalDateKey(calendarDateRange.from),
+    dateTo: formatLocalDateKey(calendarDateRange.to),
   });
 
   const tourRunsData = tourRunsResult?.tourRuns || [];
@@ -57,9 +62,7 @@ export default function CalendarPage() {
   // Convert tour runs to schedule-like objects for the calendar component
   const schedules = useMemo(() => {
     return filteredTourRuns.map((tr) => {
-      const dateStr = tr.date instanceof Date
-        ? tr.date.toISOString().split("T")[0]
-        : String(tr.date).split("T")[0];
+      const dateStr = formatDbDateKey(tr.date as Date | string);
       const startsAt = new Date(`${dateStr}T${tr.time}:00`);
       const endsAt = new Date(startsAt.getTime() + (tr.durationMinutes || 60) * 60000);
       return {
@@ -84,7 +87,7 @@ export default function CalendarPage() {
   // Calculate inline stats
   const stats = useMemo(() => {
     const thisMonth = filteredTourRuns.filter((tr) => {
-      const date = new Date(tr.date);
+      const date = parseDateKeyToLocalDate(formatDbDateKey(tr.date as Date | string));
       return date.getMonth() === selectedDate.getMonth() && date.getFullYear() === selectedDate.getFullYear();
     });
     const totalTourRuns = thisMonth.length;

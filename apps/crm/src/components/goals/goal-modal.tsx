@@ -18,6 +18,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { Goal } from "@tour/database";
+import { formatLocalDateKey } from "@/lib/date-time";
 
 interface GoalModalProps {
   open: boolean;
@@ -69,7 +70,7 @@ const PERIOD_OPTIONS = [
 
 // Helper to format date for input[type="date"]
 function formatDateForInput(date: Date): string {
-  return date.toISOString().split("T")[0] ?? "";
+  return formatLocalDateKey(date);
 }
 
 export function GoalModal({ open, onOpenChange, goal, onSuccess }: GoalModalProps) {

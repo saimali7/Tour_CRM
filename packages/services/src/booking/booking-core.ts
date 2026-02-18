@@ -17,6 +17,7 @@ import {
 } from "@tour/database";
 import type { ServiceContext } from "../types";
 import { bookingLogger } from "../lib/logger";
+import { formatDateOnlyKey, parseDateOnlyKeyToLocalDate } from "../lib/date-time";
 import type { BookingWithRelations } from "./types";
 
 export type UrgencyLevel = "critical" | "high" | "medium" | "low" | "none" | "past";
@@ -54,7 +55,7 @@ export class BookingCore {
       const parts = booking.bookingTime.split(":");
       const hours = parseInt(parts[0] ?? "0", 10);
       const minutes = parseInt(parts[1] ?? "0", 10);
-      tourDate = new Date(booking.bookingDate);
+      tourDate = parseDateOnlyKeyToLocalDate(formatDateOnlyKey(booking.bookingDate));
       tourDate.setHours(hours, minutes, 0, 0);
     }
 

@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
 import { startOfDay, endOfDay } from "date-fns";
+import { formatDbDateKey, formatLocalDateKey } from "@/lib/date-time";
 
 interface ToursDayViewProps {
   orgSlug: string;
@@ -38,8 +39,8 @@ export function ToursDayView({ orgSlug, selectedDate }: ToursDayViewProps) {
   }, [selectedDate]);
 
   const { data, isLoading, error } = trpc.tourRun.list.useQuery({
-    dateFrom: dateRange.from,
-    dateTo: dateRange.to,
+    dateFrom: formatLocalDateKey(dateRange.from),
+    dateTo: formatLocalDateKey(dateRange.to),
   });
 
   const tourRuns = data?.tourRuns || [];
@@ -66,10 +67,7 @@ export function ToursDayView({ orgSlug, selectedDate }: ToursDayViewProps) {
 
     for (const tourRun of tourRuns) {
       const slot = getTimeSlotLabel(tourRun.time) as "Morning" | "Afternoon" | "Evening";
-      // Convert Date to YYYY-MM-DD string for URL params
-      const dateStr = tourRun.date instanceof Date
-        ? tourRun.date.toISOString().split('T')[0]!
-        : String(tourRun.date);
+      const dateStr = formatDbDateKey(tourRun.date as Date | string);
       groups[slot].push({
         tourId: tourRun.tourId,
         tourName: tourRun.tourName,

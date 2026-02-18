@@ -7,8 +7,6 @@ import type { Route } from "next";
 import {
   format,
   parse,
-  startOfDay,
-  endOfDay,
   addDays,
   subDays,
   isValid,
@@ -25,6 +23,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { DayTourSection } from "@/components/calendar/day-tour-section";
+import { formatLocalDateKey } from "@/lib/date-time";
 
 export default function CalendarDayPage() {
   const params = useParams();
@@ -38,29 +37,29 @@ export default function CalendarDayPage() {
     return isValid(parsed) ? parsed : new Date();
   }, [dateParam]);
 
-  const dateStr = format(date, "yyyy-MM-dd");
+  const dateStr = formatLocalDateKey(date);
 
   // Navigation helpers
   const goToPrevDay = () => {
     const prevDay = subDays(date, 1);
-    router.push(`/org/${slug}/calendar/${format(prevDay, "yyyy-MM-dd")}` as Route);
+    router.push(`/org/${slug}/calendar/${formatLocalDateKey(prevDay)}` as Route);
   };
 
   const goToNextDay = () => {
     const nextDay = addDays(date, 1);
-    router.push(`/org/${slug}/calendar/${format(nextDay, "yyyy-MM-dd")}` as Route);
+    router.push(`/org/${slug}/calendar/${formatLocalDateKey(nextDay)}` as Route);
   };
 
   // Fetch tour runs for this date
   const { data: tourRunsData, isLoading: tourRunsLoading } =
-    trpc.tourRun.getForDate.useQuery({ date });
+    trpc.tourRun.getForDate.useQuery({ date: dateStr });
 
   // Fetch bookings for this date
   const { data: bookingsData, isLoading: bookingsLoading } =
     trpc.booking.list.useQuery({
       pagination: { page: 1, limit: 100 },
       filters: {
-        bookingDateRange: { from: startOfDay(date), to: endOfDay(date) },
+        bookingDateRange: { from: dateStr, to: dateStr },
       },
       sort: { field: "createdAt", direction: "desc" },
     });

@@ -4,7 +4,6 @@ import {
   bookings,
   guides,
   tours,
-  tourGuideQualifications,
   type GuideAssignment,
   type GuideAssignmentStatus,
   type Booking,
@@ -20,6 +19,8 @@ import {
   ServiceError,
 } from "./types";
 import { createServiceLogger } from "./lib/logger";
+import { formatDateOnlyKey, parseDateOnlyKeyToLocalDate } from "./lib/date-time";
+import { formatDateForKey } from "./lib/tour-run-utils";
 
 export interface GuideAssignmentFilters {
   status?: GuideAssignmentStatus;
@@ -103,7 +104,7 @@ export class GuideAssignmentService extends BaseService {
     date: Date,
     time: string
   ): Promise<GuideAssignmentWithRelations[]> {
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = formatDateOnlyKey(date);
 
     // First get all booking IDs for this tour run
     const tourRunBookings = await this.db.query.bookings.findMany({
@@ -171,15 +172,18 @@ export class GuideAssignmentService extends BaseService {
 
     // Filter by date range if provided (based on booking date)
     if (filters.dateRange) {
+      const fromKey = filters.dateRange.from ? formatDateForKey(filters.dateRange.from) : null;
+      const toKey = filters.dateRange.to ? formatDateForKey(filters.dateRange.to) : null;
       return assignments.filter((assignment) => {
         const bookingDate = assignment.booking?.bookingDate;
         if (!bookingDate) return false;
+        const bookingDateKey = formatDateOnlyKey(bookingDate);
 
-        if (filters.dateRange?.from && bookingDate < filters.dateRange.from) {
+        if (fromKey && bookingDateKey < fromKey) {
           return false;
         }
 
-        if (filters.dateRange?.to && bookingDate > filters.dateRange.to) {
+        if (toKey && bookingDateKey > toKey) {
           return false;
         }
 
@@ -294,9 +298,7 @@ export class GuideAssignmentService extends BaseService {
     }
 
     // Calculate time window from booking date + time + tour duration
-    const [hours, minutes] = booking.bookingTime.split(":").map(Number);
-    const startsAt = new Date(booking.bookingDate);
-    startsAt.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+    const startsAt = this.buildRunStartsAt(booking.bookingDate, booking.bookingTime);
 
     const durationMinutes = tour.durationMinutes || 60; // Default 1 hour
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60 * 1000);
@@ -311,21 +313,6 @@ export class GuideAssignmentService extends BaseService {
 
     if (!guide) {
       throw new NotFoundError("Guide", input.guideId);
-    }
-
-    const qualification = await this.db.query.tourGuideQualifications.findFirst({
-      where: and(
-        eq(tourGuideQualifications.organizationId, this.organizationId),
-        eq(tourGuideQualifications.guideId, input.guideId),
-        eq(tourGuideQualifications.tourId, booking.tourId)
-      ),
-      columns: {
-        id: true,
-      },
-    });
-
-    if (!qualification) {
-      throw new ConflictError("Guide is not qualified for this tour");
     }
 
     const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);
@@ -406,7 +393,7 @@ export class GuideAssignmentService extends BaseService {
         bookingId: input.bookingId,
         guideId: input.guideId,
         tourId: booking.tourId,
-        bookingDate: booking.bookingDate?.toISOString().split("T")[0],
+        bookingDate: booking.bookingDate ? formatDateOnlyKey(booking.bookingDate) : null,
         bookingTime: booking.bookingTime,
       },
       "Guide assignment created successfully"
@@ -448,21 +435,6 @@ export class GuideAssignmentService extends BaseService {
         throw new ValidationError("Guide not found");
       }
 
-      const qualification = await this.db.query.tourGuideQualifications.findFirst({
-        where: and(
-          eq(tourGuideQualifications.organizationId, this.organizationId),
-          eq(tourGuideQualifications.guideId, assignment.guideId),
-          eq(tourGuideQualifications.tourId, booking.tourId)
-        ),
-        columns: {
-          id: true,
-        },
-      });
-
-      if (!qualification) {
-        throw new ConflictError("Guide is not qualified for this tour");
-      }
-
       const guideCapacity = Math.max(guide.vehicleCapacity ?? 6, 1);
       const exceedsRunCapacity = await this.wouldExceedRunCapacity({
         guideId: assignment.guideId,
@@ -493,9 +465,7 @@ export class GuideAssignmentService extends BaseService {
       }
 
       // Calculate time window
-      const [hours, minutes] = booking.bookingTime.split(":").map(Number);
-      const startsAt = new Date(booking.bookingDate);
-      startsAt.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+      const startsAt = this.buildRunStartsAt(booking.bookingDate, booking.bookingTime);
 
       const durationMinutes = tour.durationMinutes || 60;
       const endsAt = new Date(startsAt.getTime() + durationMinutes * 60 * 1000);
@@ -673,7 +643,7 @@ export class GuideAssignmentService extends BaseService {
       },
     }) as GuideAssignmentWithRelations[];
 
-    const excludeTourRunKey = `${excludeTourRun.tourId}|${excludeTourRun.bookingDate.toISOString().split("T")[0]}|${excludeTourRun.bookingTime}`;
+    const excludeTourRunKey = `${excludeTourRun.tourId}|${formatDateOnlyKey(excludeTourRun.bookingDate)}|${excludeTourRun.bookingTime}`;
 
     // Check if any confirmed assignment overlaps
     for (const assignment of confirmedAssignments) {
@@ -682,7 +652,7 @@ export class GuideAssignmentService extends BaseService {
       if (booking.status !== "pending" && booking.status !== "confirmed") continue;
 
       // Build tour run key for comparison
-      const tourRunKey = `${booking.tourId}|${booking.bookingDate.toISOString().split("T")[0]}|${booking.bookingTime}`;
+      const tourRunKey = `${booking.tourId}|${formatDateOnlyKey(booking.bookingDate)}|${booking.bookingTime}`;
 
       // Same run is usually allowed (shared tours), but private/charter blocks the slot.
       if (tourRunKey === excludeTourRunKey) {
@@ -702,9 +672,7 @@ export class GuideAssignmentService extends BaseService {
       const tour = booking.tour;
       if (!tour) continue;
 
-      const [hours, minutes] = booking.bookingTime.split(":").map(Number);
-      const assignmentStartsAt = new Date(booking.bookingDate);
-      assignmentStartsAt.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+      const assignmentStartsAt = this.buildRunStartsAt(booking.bookingDate, booking.bookingTime);
 
       const durationMinutes = tour.durationMinutes || 60;
       const assignmentEndsAt = new Date(assignmentStartsAt.getTime() + durationMinutes * 60 * 1000);
@@ -884,9 +852,7 @@ export class GuideAssignmentService extends BaseService {
         const booking = a.booking;
         if (!booking?.bookingDate || !booking?.bookingTime) return false;
 
-        const [hours, minutes] = booking.bookingTime.split(":").map(Number);
-        const startsAt = new Date(booking.bookingDate);
-        startsAt.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+        const startsAt = this.buildRunStartsAt(booking.bookingDate, booking.bookingTime);
 
         return startsAt > now;
       })
@@ -896,13 +862,9 @@ export class GuideAssignmentService extends BaseService {
         if (!bookingA?.bookingDate || !bookingA?.bookingTime) return 0;
         if (!bookingB?.bookingDate || !bookingB?.bookingTime) return 0;
 
-        const [hoursA, minutesA] = bookingA.bookingTime.split(":").map(Number);
-        const startsAtA = new Date(bookingA.bookingDate);
-        startsAtA.setHours(hoursA ?? 0, minutesA ?? 0, 0, 0);
+        const startsAtA = this.buildRunStartsAt(bookingA.bookingDate, bookingA.bookingTime);
 
-        const [hoursB, minutesB] = bookingB.bookingTime.split(":").map(Number);
-        const startsAtB = new Date(bookingB.bookingDate);
-        startsAtB.setHours(hoursB ?? 0, minutesB ?? 0, 0, 0);
+        const startsAtB = this.buildRunStartsAt(bookingB.bookingDate, bookingB.bookingTime);
 
         return startsAtA.getTime() - startsAtB.getTime();
       })
@@ -927,6 +889,13 @@ export class GuideAssignmentService extends BaseService {
     }
 
     return Array.from(confirmedGuides.values());
+  }
+
+  private buildRunStartsAt(bookingDate: Date, bookingTime: string): Date {
+    const [hours, minutes] = bookingTime.split(":").map(Number);
+    const startsAt = parseDateOnlyKeyToLocalDate(formatDateOnlyKey(bookingDate));
+    startsAt.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+    return startsAt;
   }
 
   private async wouldExceedRunCapacity(input: {

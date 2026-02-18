@@ -33,6 +33,7 @@ import { CustomerMobileCard, CustomerMobileCardSkeleton } from "@/components/cus
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useHotkeys, useKeyboardNavigation } from "@/hooks/use-keyboard-navigation";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { formatLocalDateKey } from "@/lib/date-time";
 
 // Design system components
 import {
@@ -298,7 +299,7 @@ export default function CustomersPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `customers-export-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `customers-export-${formatLocalDateKey(new Date())}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 
