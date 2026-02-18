@@ -101,10 +101,10 @@ export const commandCenterRouter = createRouter({
       const dateKey = normalizeCommandCenterDate(input.date, ctx.orgContext.organization.timezone);
 
       try {
-        const [status, tourRuns, timelines] = await Promise.all([
-          services.commandCenter.getDispatchStatus(dateKey),
-          services.commandCenter.getTourRuns(dateKey),
-          services.commandCenter.getGuideTimelines(dateKey),
+        const tourRuns = await services.commandCenter.getTourRuns(dateKey);
+        const [status, timelines] = await Promise.all([
+          services.commandCenter.getDispatchStatus(dateKey, tourRuns),
+          services.commandCenter.getGuideTimelines(dateKey, tourRuns),
         ]);
 
         return {

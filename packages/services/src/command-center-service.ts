@@ -376,15 +376,21 @@ export class CommandCenterService extends BaseService {
   /**
    * Get or create dispatch status for a date
    */
-  async getDispatchStatus(date: Date | string): Promise<DispatchStatus> {
-    return this.refreshDispatchStatus(date);
+  async getDispatchStatus(
+    date: Date | string,
+    preloadedTourRuns?: TourRun[]
+  ): Promise<DispatchStatus> {
+    return this.refreshDispatchStatus(date, preloadedTourRuns);
   }
 
   /**
    * Refresh and persist dispatch status from current data
    */
-  private async refreshDispatchStatus(date: Date | string): Promise<DispatchStatus> {
-    const tourRuns = await this.getTourRuns(date);
+  private async refreshDispatchStatus(
+    date: Date | string,
+    preloadedTourRuns?: TourRun[]
+  ): Promise<DispatchStatus> {
+    const tourRuns = preloadedTourRuns ?? await this.getTourRuns(date);
     const summary = this.computeDispatchSummaryFromRuns(tourRuns);
     const existing = await this.getDispatchStatusRecord(date);
     const warningState = await this.reconcileWarnings(existing?.warnings ?? [], tourRuns);
@@ -412,7 +418,7 @@ export class CommandCenterService extends BaseService {
       warnings: warningState.warnings,
     } satisfies Partial<DispatchStatusRow>;
 
-    const row = await this.upsertDispatchStatus(date, merged, existing);
+    const row = await this.upsertDispatchStatus(date, merged);
     return this.mapDispatchStatusRow(row);
   }
 
@@ -460,7 +466,7 @@ export class CommandCenterService extends BaseService {
       dispatchedBy: updates.dispatchedBy ?? existing?.dispatchedBy ?? null,
     } satisfies Partial<DispatchStatusRow>;
 
-    const row = await this.upsertDispatchStatus(date, merged, existing);
+    const row = await this.upsertDispatchStatus(date, merged);
     return this.mapDispatchStatusRow(row);
   }
 
@@ -630,31 +636,12 @@ export class CommandCenterService extends BaseService {
    */
   private async upsertDispatchStatus(
     date: Date | string,
-    updates: Partial<DispatchStatusRow>,
-    existing?: DispatchStatusRow | null
+    updates: Partial<DispatchStatusRow>
   ): Promise<DispatchStatusRow> {
     const dateKey = this.formatDateKey(date);
     const dispatchDate = this.parseDateKey(dateKey);
 
-    if (existing) {
-      const [updated] = await this.db
-        .update(dispatchStatus)
-        .set({
-          ...updates,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(dispatchStatus.organizationId, this.organizationId),
-            sql`${dispatchStatus.dispatchDate}::text = ${dateKey}`
-          )
-        )
-        .returning();
-
-      return updated ?? existing;
-    }
-
-    const [created] = await this.db
+    const [row] = await this.db
       .insert(dispatchStatus)
       .values({
         organizationId: this.organizationId,
@@ -662,13 +649,20 @@ export class CommandCenterService extends BaseService {
         status: "pending",
         ...updates,
       })
+      .onConflictDoUpdate({
+        target: [dispatchStatus.organizationId, dispatchStatus.dispatchDate],
+        set: {
+          ...updates,
+          updatedAt: new Date(),
+        },
+      })
       .returning();
 
-    if (!created) {
-      throw new ValidationError("Failed to create dispatch status");
+    if (!row) {
+      throw new ValidationError("Failed to upsert dispatch status");
     }
 
-    return created;
+    return row;
   }
 
   /**
@@ -1072,14 +1066,17 @@ export class CommandCenterService extends BaseService {
    * Get guide timelines for visualization
    * Returns guide rows with their segments (drive, pickup, tour)
    */
-  async getGuideTimelines(date: Date | string): Promise<GuideTimeline[]> {
+  async getGuideTimelines(
+    date: Date | string,
+    preloadedTourRuns?: TourRun[]
+  ): Promise<GuideTimeline[]> {
     // Ensure pickup assignments exist for the date
     await this.pickupAssignmentService.syncForDate(date);
     const dateKey = this.formatDateKey(date);
+    const tourRuns = preloadedTourRuns ?? await this.getTourRuns(date);
 
-    const [availableGuides, tourRuns, pickupAssignments] = await Promise.all([
+    const [availableGuides, pickupAssignments] = await Promise.all([
       this.getAvailableGuides(date),
-      this.getTourRuns(date),
       this.pickupAssignmentService.getForDate(date),
     ]);
 

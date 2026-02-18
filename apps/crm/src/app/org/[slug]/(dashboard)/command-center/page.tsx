@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useMemo, useCallback } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { useMemo, useCallback, useEffect, useState } from "react";
 import { addDays, subDays } from "date-fns";
 import { CommandCenter } from "@/components/command-center/command-center";
 import { useHotkeys } from "@/hooks/use-keyboard-navigation";
@@ -18,7 +18,6 @@ function getDateFromParam(dateParam: string | null): Date {
 export default function CommandCenterPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const slug = params.slug as string;
 
   // Get date from URL params, defaulting to today
@@ -26,7 +25,15 @@ export default function CommandCenterPage() {
   const bookingIdParam = searchParams.get("bookingId");
   const runKeyParam = searchParams.get("runKey");
   const focusParam = searchParams.get("focus");
-  const selectedDate = useMemo(() => getDateFromParam(dateParam), [dateParam]);
+  const initialDate = useMemo(() => getDateFromParam(dateParam), [dateParam]);
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
+
+  useEffect(() => {
+    const next = getDateFromParam(dateParam);
+    setSelectedDate((prev) =>
+      formatLocalDateKey(prev) === formatLocalDateKey(next) ? prev : next
+    );
+  }, [dateParam]);
   const initialFocus = useMemo(() => {
     const bookingId = bookingIdParam?.trim();
     const runKey = runKeyParam?.trim();
@@ -50,11 +57,14 @@ export default function CommandCenterPage() {
   const navigateToDate = useCallback(
     (date: Date) => {
       const dateStr = formatLocalDateKey(date);
+      setSelectedDate(date);
+
       const newParams = new URLSearchParams(searchParams.toString());
       newParams.set("date", dateStr);
-      router.push(`/org/${slug}/command-center?${newParams.toString()}` as Route);
+      const nextUrl = `/org/${slug}/command-center?${newParams.toString()}` as Route;
+      window.history.replaceState(window.history.state, "", nextUrl);
     },
-    [router, slug, searchParams]
+    [slug, searchParams]
   );
 
   // Date navigation handlers

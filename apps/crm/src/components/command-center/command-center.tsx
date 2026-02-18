@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useCallback, useState, useEffect } from "react";
-import { format, isToday, isTomorrow, isYesterday, isPast, startOfDay } from "date-fns";
+import { addDays, format, isToday, isTomorrow, isYesterday, isPast, startOfDay, subDays } from "date-fns";
 import { AlertCircle, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type RouterInputs, type RouterOutputs } from "@/lib/trpc";
@@ -171,14 +171,29 @@ function CommandCenterContent({
   const {
     data: dispatchResponse,
     isLoading,
+    isFetching,
     error,
   } = trpc.commandCenter.getDispatch.useQuery(
     { date: dateString },
     {
-      refetchOnWindowFocus: true,
-      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
     }
   );
+
+  useEffect(() => {
+    const nearbyDates = [
+      addDays(date, 1),
+      subDays(date, 1),
+    ];
+
+    for (const nearbyDate of nearbyDates) {
+      const nearbyDateKey = formatLocalDateKey(nearbyDate);
+      if (nearbyDateKey === dateString) continue;
+      void utils.commandCenter.getDispatch.prefetch({ date: nearbyDateKey });
+    }
+  }, [date, dateString, utils]);
 
   const optimizeMutation = trpc.commandCenter.optimize.useMutation({
     onSuccess: (result) => {
@@ -741,7 +756,14 @@ function CommandCenterContent({
         isMutating={isMutating}
       />
 
-      <div className={cn("min-h-0 flex-1 overflow-hidden rounded-lg border bg-card", isReadOnly && "opacity-90")}>
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-hidden rounded-lg border bg-card transition-opacity",
+          isReadOnly && "opacity-90",
+          isFetching && "opacity-80"
+        )}
+        aria-busy={isFetching}
+      >
         <DispatchCanvas
           rows={rowsForCanvas}
           groups={viewModel.groups}
