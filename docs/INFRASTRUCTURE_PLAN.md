@@ -2,8 +2,8 @@
 
 **Version:** 1.0
 **Created:** December 2024
-**Status:** Ready for Implementation
-**Timeline:** 2-4 weeks to full production
+**Status:** Reference Plan (refresh before execution)
+**Timeline:** Phased rollout; not the active execution stream
 
 ---
 

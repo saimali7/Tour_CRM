@@ -1,9 +1,9 @@
 # Tour Operations Platform — Technical Architecture
 
 **Version:** 2.1
-**Last Updated:** December 2025
-**Status:** Multi-Tenant Platform Architecture
-**Related Documents:** [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md), [FEATURES.md](./FEATURES.md)
+**Last Updated:** February 2026
+**Status:** Multi-Tenant Platform Architecture (Production CRM + Command Center)
+**Related Documents:** [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md), [PROGRESS.md](./PROGRESS.md)
 
 ---
 

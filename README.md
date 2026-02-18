@@ -30,10 +30,12 @@ Tour operators are stuck with either generic CRMs that don't understand tours, o
 │   └── config/              # Shared configuration
 │
 └── docs/
-    ├── strategy/            # Vision, roadmap
-    ├── project/             # Active work, backlog
-    ├── history/             # Changelog, completed milestones
-    └── reference/           # Architecture, design system
+    ├── PROGRESS.md
+    ├── ARCHITECTURE.md
+    ├── SYSTEM_DESIGN.md
+    ├── DESIGN_SYSTEM.md
+    ├── COMMAND_CENTER_SPEC.md
+    └── project/features/COMMAND_CENTER_SHIP_PLAN.md
 ```
 
 ## Tech Stack
@@ -113,17 +115,18 @@ Customer-facing booking website.
 | Document | Purpose |
 |----------|---------|
 | [CLAUDE.md](./CLAUDE.md) | Engineering reference & code patterns |
-| [docs/project/ACTIVE.md](./docs/project/ACTIVE.md) | Current work |
-| [docs/strategy/VISION.md](./docs/strategy/VISION.md) | Product vision |
-| [docs/strategy/ROADMAP.md](./docs/strategy/ROADMAP.md) | All milestones |
-| [docs/reference/ARCHITECTURE.md](./docs/reference/ARCHITECTURE.md) | Technical architecture |
-| [docs/reference/DESIGN_SYSTEM.md](./docs/reference/DESIGN_SYSTEM.md) | UI patterns |
+| [docs/PROGRESS.md](./docs/PROGRESS.md) | Current delivery status |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Technical architecture |
+| [docs/SYSTEM_DESIGN.md](./docs/SYSTEM_DESIGN.md) | System-level architecture |
+| [docs/DESIGN_SYSTEM.md](./docs/DESIGN_SYSTEM.md) | UI patterns and tokens |
+| [docs/COMMAND_CENTER_SPEC.md](./docs/COMMAND_CENTER_SPEC.md) | Dispatch behavior contract |
+| [docs/project/features/COMMAND_CENTER_SHIP_PLAN.md](./docs/project/features/COMMAND_CENTER_SHIP_PLAN.md) | Command center ship checklist |
 
 ## Status
 
-**Milestone 7: Operations Excellence** — 80% complete
+**Milestone 7: Operations Excellence** — Active hardening and production readiness
 
-See [docs/project/ACTIVE.md](./docs/project/ACTIVE.md) for current work.
+See [docs/PROGRESS.md](./docs/PROGRESS.md) for current work and latest updates.
 
 ## License
 

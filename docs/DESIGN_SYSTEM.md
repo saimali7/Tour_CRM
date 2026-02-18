@@ -1,5 +1,8 @@
 # Tour Design System (Single Source of Truth)
 
+**Last Updated:** February 2026
+**Status:** Active UI Standard
+
 Clean, clear, and focused. The UI should feel like a sharp operations console that just works: fast, intuitive, and quietly branded. This is the only authoritative design guide for the CRM and Web apps.
 
 ---

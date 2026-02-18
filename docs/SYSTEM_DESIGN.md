@@ -1,9 +1,9 @@
 # Tour Operations Platform — System Design Document
 
 **Version:** 2.0
-**Last Updated:** December 2025
-**Status:** Multi-Tenant Platform Architecture
-**Related Documents:** ARCHITECTURE.md, FEATURES.md
+**Last Updated:** February 2026
+**Status:** Multi-Tenant Platform Architecture (Active Reference)
+**Related Documents:** ARCHITECTURE.md, PROGRESS.md, COMMAND_CENTER_SPEC.md
 
 ---
 
@@ -2171,4 +2171,4 @@ $$ LANGUAGE plpgsql;
 
 ---
 
-*Document Version: 2.0 | Last Updated: December 2025 | Architecture: Multi-Tenant Platform*
+*Document Version: 2.0 | Last Updated: February 2026 | Architecture: Multi-Tenant Platform*

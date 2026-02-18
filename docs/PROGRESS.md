@@ -1,7 +1,7 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** February 5, 2026
-**Status:** Sequential Phase Development
+**Last Updated:** February 18, 2026
+**Status:** Production hardening and operational stabilization
 **Current Phase:** Phase 7 - Operations Excellence
 **Main Branch:** `main`
 
@@ -51,7 +51,7 @@
 | **4** | Pricing & Promotions | ✅ COMPLETE | 100% |
 | **5** | Reporting & Analytics | ✅ COMPLETE | 100% |
 | **6** | UX Overhaul | ✅ COMPLETE | 100% |
-| **7** | **Operations Excellence** | 🔄 IN PROGRESS | 80% |
+| **7** | **Operations Excellence** | 🔄 IN PROGRESS | 92% |
 
 ### Web Application (Customer Portal)
 
@@ -70,7 +70,21 @@
 
 ---
 
-## Recent Updates (February 5, 2026)
+## Recent Updates (February 18, 2026)
+
+- Completed big-bang guide assignment cutover: Command Center is now the single write surface.
+- Blocked legacy guide-assignment write endpoints and moved all assignment CTAs to Command Center deep links.
+- Removed qualification-gating semantics from dispatch flows and guide UI.
+- Fixed command center date-switch performance by deduplicating dispatch reads and prefetching adjacent days.
+- Fixed command center future-date race condition (`dispatch_status` concurrent insert) via atomic upsert.
+- Fixed root-cause temp guide day-scope leak:
+  - day-scope filter in available guide lanes,
+  - day-scope guard in assignment writes,
+  - day-scope enforcement in run assignment projection.
+- Retired guide availability router/service from runtime assignment flow (active guides are dispatch-available).
+- Updated docs index and removed stale/finished docs from active documentation set.
+
+### Previous Update (February 5, 2026)
 
 - Rebuilt `Tour Command Center` dispatch surface around a new canvas + view-model pipeline.
 - Added operation-based assignment workflow with server-backed undo/redo (`batchApplyChanges`).
@@ -80,10 +94,6 @@
 - Added keyboard run time nudging (`Alt + Left/Right`) with undo/redo support.
 - Fixed command-center type issues (`Link` typing, guide capacity access, guest detail `total/currency` mapping).
 - Removed legacy/orphaned command-center modules to reduce dead code and maintenance overhead.
-- Rewrote command center spec as a production-ready interaction and release contract:
-  `docs/COMMAND_CENTER_SPEC.md`.
-- Added explicit command center feature backlog and release checklist:
-  `docs/COMMAND_CENTER_FEATURE_LIST.md`.
 
 ---
 
@@ -251,6 +261,8 @@ pnpm test                 # Run tests
 - guide_assignments ✅ (schedule-guide with status)
 - guide_tokens ✅ (magic link authentication)
 ```
+
+> Note (February 2026): qualification and availability gating were later retired from dispatch runtime. Command Center now treats active guides as dispatch-available and enforces only operational constraints (time overlap, run window, and capacity).
 
 ### Services Added
 | Service | File | Status |
@@ -543,7 +555,7 @@ All browser `confirm()`, `prompt()`, `alert()` replaced with ConfirmModal:
 ## Phase 7: Operations Excellence 🔄 IN PROGRESS
 
 > **Goal:** Transform from feature-complete to operations-first world-class CRM.
-> **Detailed Plan:** See [`docs/PHASE7_OPERATIONS_EXCELLENCE.md`](./PHASE7_OPERATIONS_EXCELLENCE.md)
+> **Detailed Plan:** See [`docs/project/features/COMMAND_CENTER_SHIP_PLAN.md`](./project/features/COMMAND_CENTER_SHIP_PLAN.md)
 
 ### Overview
 
@@ -622,69 +634,32 @@ Mobile-first experience for guides:
 | Mobile-first UI | ⬜ TODO |
 | Check-in from phone | ⬜ TODO |
 
-### 7.6 Tour Command Center 🔄 NEXT (Critical Core Feature)
+### 7.6 Tour Command Center ✅ COMPLETE (Core Dispatch System Shipped)
 
-> **Full Design:** See [`docs/GUIDE_DISPATCH_SYSTEM.md`](./GUIDE_DISPATCH_SYSTEM.md)
+> **Primary references:**  
+> [`docs/COMMAND_CENTER_SPEC.md`](./COMMAND_CENTER_SPEC.md)  
+> [`docs/COMMAND_CENTER_FEATURE_LIST.md`](./COMMAND_CENTER_FEATURE_LIST.md)  
+> [`docs/project/features/COMMAND_CENTER_SHIP_PLAN.md`](./project/features/COMMAND_CENTER_SHIP_PLAN.md)
 
-The operations nerve center — **computer solves the puzzle, humans review and dispatch**.
+The command center is now the operational source of truth for dispatch execution.
 
-**Design Philosophy (Jobs/Ive Approved):**
-- Computer does the work (auto-optimization overnight)
-- Human provides judgment (review and approve)
-- Time is the truth (horizontal timeline primary view)
-- Drive time is visible (segmented tape visualization)
-- Guests are people, not inventory (surface human details)
-- Completion has ceremony (celebration when ready)
+**Delivered capabilities:**
+- Single command surface for assignment/reassignment/unassignment writes.
+- Timeline-based run dispatch with overlap checks, private/charter exclusivity, and per-run capacity logic.
+- Read-only lock behavior after dispatch.
+- Deep-linking from dashboard and booking detail directly into actionable context.
+- Day-level date-key/timezone hardening across command center reads and writes.
+- Temp guide day-scoping enforced in lane rendering, assignment writes, and run projection.
 
-**The Flow:**
+**Status summary:**
 
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   OVERNIGHT  │────▶│   MORNING    │────▶│    REVIEW    │────▶│   DISPATCH   │
-│  Auto-Solve  │     │ Open Command │     │   Warnings   │     │  Send Guides │
-│   @ 4 AM     │     │    Center    │     │  (if any)    │     │  Manifests   │
-└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
-```
-
-**States:**
-1. **Optimized** — Algorithm solved the day, ready for review
-2. **Needs Review** — Warnings to resolve (tap to pick from suggestions)
-3. **Ready to Dispatch** — All clear, one button to send
-4. **Dispatched** — Locked, guides notified
-
-**Implementation Phases:**
-
-| Phase | Focus | Duration | Status |
-|-------|-------|----------|--------|
-| **Foundation** | Schema, services, algorithm | 3 days | ⬜ TODO |
-| **Timeline UI** | Guide rows, segmented tape, time axis | 4 days | ⬜ TODO |
-| **Warnings & Resolution** | Exception handling, tap-to-resolve | 2 days | ⬜ TODO |
-| **Adjust Mode** | Power user drag-drop, ghost preview | 2 days | ⬜ TODO |
-| **Dispatch & Polish** | Notifications, animations, completion | 2 days | ⬜ TODO |
-
-**Schema Additions:**
-```typescript
-// New tables
-pickup_zones: { id, name, color, center_lat, center_lng }
-zone_travel_times: { from_zone_id, to_zone_id, estimated_minutes }
-dispatch_status: { dispatch_date, status, efficiency_score }
-
-// Enhanced fields
-guides.vehicleCapacity: integer (default: 6)
-guides.baseZoneId: text
-bookings.pickupZoneId: text
-bookings.pickupLocation: text
-bookings.specialOccasion: text
-guideAssignments.pickupOrder: integer
-guideAssignments.calculatedPickupTime: text
-```
-
-**Key UI Elements:**
-- 📊 **Status Banner** — Optimized / Needs Review / Ready / Dispatched
-- ⏱️ **Segmented Tape** — Drive (░) → Pickup (▓) → Tour (█)
-- 🎨 **Confidence Colors** — Green/Blue/Amber/Red (not zone colors)
-- 👤 **Guest Cards** — Full human details, special occasions, requests
-- ⚡ **Tap-to-Resolve** — Warnings show actionable choices, not drag puzzles
+| Area | Status |
+|------|--------|
+| Dispatch timeline & run model | ✅ Shipped |
+| Assignment centralization | ✅ Shipped |
+| Legacy write path blockade | ✅ Shipped |
+| Date/time resilience | ✅ Shipped |
+| Temp guide day scope correctness | ✅ Shipped |
 
 ### Previously Completed (Review System)
 
@@ -931,12 +906,12 @@ Implemented backend services and UI for high-impact features:
 Created comprehensive implementation plan for Phase 7 transformation:
 
 **Strategic Analysis:**
-- Created `docs/STRATEGIC_ANALYSIS.md` with first-principles CRM evaluation
+- Created first-principles CRM evaluation artifacts
 - Analyzed 4 user personas (Operations Manager, Customer Service, Business Owner, Guide)
 - Mapped daily/weekly/monthly/annual operations gaps
 - Identified transformation path: Work → Fast → Smart → Unique
 
-**Phase 7 Implementation Plan (`docs/PHASE7_OPERATIONS_EXCELLENCE.md`):**
+**Phase 7 Implementation Plan (tracked in this document and `docs/project/features/COMMAND_CENTER_SHIP_PLAN.md`):**
 
 | Sub-Phase | Focus | Key Deliverables |
 |-----------|-------|------------------|
@@ -963,8 +938,7 @@ Created comprehensive implementation plan for Phase 7 transformation:
 
 ### December 13, 2025 - Phase 6 UX Overhaul Started
 - Created comprehensive UX Overhaul plan
-- Updated FEATURES.md with UX Standards section (design principles, interaction patterns, user stories)
-- Updated SPRINT.md with Sprint 7 UX Overhaul sprint
+- Updated UX standards and sprint planning artifacts
 - Updated PROGRESS.md with detailed Phase 6 tracking
 - Identified 6 system-wide interaction patterns:
   1. Entity Card (consistent card representation)
