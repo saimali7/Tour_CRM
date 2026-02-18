@@ -846,6 +846,12 @@ export class CommandCenterService extends BaseService {
       // Keep latest confirmed assignment per booking as canonical.
       const assignmentsByBooking = new Map<string, GuideAssignmentWithRelations>();
       for (const assignment of assignments) {
+        if (
+          assignment.guide &&
+          !this.isGuideAvailableOnDate(assignment.guide.email, assignment.guide.notes, dateStr)
+        ) {
+          continue;
+        }
         if (!assignmentsByBooking.has(assignment.bookingId)) {
           assignmentsByBooking.set(assignment.bookingId, assignment);
         }
@@ -933,13 +939,20 @@ export class CommandCenterService extends BaseService {
    * current-day assignments for dispatch decisions.
    */
   async getAvailableGuides(date: Date | string): Promise<AvailableGuide[]> {
+    const dateKey = this.formatDateKey(date);
+
     // Get all active guides
-    const allGuides = await this.db.query.guides.findMany({
+    const activeGuides = await this.db.query.guides.findMany({
       where: and(
         eq(guides.organizationId, this.organizationId),
         eq(guides.status, "active")
       ),
     });
+
+    // Temp guides are day-only and must only appear on their original date.
+    const allGuides = activeGuides.filter((guide) =>
+      this.isGuideAvailableOnDate(guide.email, guide.notes, dateKey)
+    );
 
     if (allGuides.length === 0) {
       return [];
@@ -2449,6 +2462,8 @@ export class CommandCenterService extends BaseService {
             firstName: true,
             lastName: true,
             vehicleCapacity: true,
+            email: true,
+            notes: true,
           },
         })
       : [];
@@ -2457,6 +2472,16 @@ export class CommandCenterService extends BaseService {
     const missingGuides = guideIdList.filter((guideId) => !guideById.has(guideId));
     if (missingGuides.length > 0) {
       throw new ValidationError(`Guide not found: ${missingGuides.join(", ")}`);
+    }
+
+    for (const guide of guideRows) {
+      if (this.isGuideAvailableOnDate(guide.email, guide.notes, dateKey)) {
+        continue;
+      }
+      const guideName = `${guide.firstName} ${guide.lastName}`.trim();
+      throw new ValidationError(
+        `temp_guide_day_scope: ${guideName} is a day-only temp guide and cannot be assigned on ${dateKey}`
+      );
     }
 
     const existingGuideAssignments = guideIdList.length > 0
@@ -3326,6 +3351,34 @@ export class CommandCenterService extends BaseService {
       return mode;
     }
     return null;
+  }
+
+  private isGuideAvailableOnDate(
+    email: string | null | undefined,
+    notes: string | null | undefined,
+    dateKey: string
+  ): boolean {
+    const tempGuideDateKey = this.extractTempGuideDateKey(notes, email);
+    if (!tempGuideDateKey) {
+      return true;
+    }
+    return tempGuideDateKey === dateKey;
+  }
+
+  private extractTempGuideDateKey(
+    notes: string | null | undefined,
+    email: string | null | undefined
+  ): string | null {
+    const notesMatch = notes?.match(/temporary outsourced guide for (\d{4}-\d{2}-\d{2})/i);
+    if (notesMatch?.[1]) {
+      return notesMatch[1];
+    }
+
+    if (!email) return null;
+    const match = email.match(/\.([0-9]{8})\.[a-z0-9]+@temp-outsourced\.local$/i);
+    const compact = match?.[1];
+    if (!compact) return null;
+    return `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}`;
   }
 
   private async buildOutsourcedTimelinesForDate(
