@@ -24,6 +24,12 @@ interface DispatchCanvasProps {
   onResolveWarning: (warningId: string, suggestionId: string) => void;
   onCreateTempGuide: (draft: { name: string; phone: string; vehicleCapacity: number }) => Promise<void>;
   showCurrentTime: boolean;
+  deepLinkTarget?: {
+    dateKey: string;
+    bookingId?: string;
+    runKey?: string;
+    focus?: "booking" | "run";
+  };
 }
 
 export type { DispatchOperation };

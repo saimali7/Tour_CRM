@@ -64,6 +64,12 @@ interface DispatchShellProps {
   onResolveWarning: (warningId: string, suggestionId: string) => void;
   onCreateTempGuide: (draft: { name: string; phone: string; vehicleCapacity: number }) => Promise<void>;
   showCurrentTime: boolean;
+  deepLinkTarget?: {
+    dateKey: string;
+    bookingId?: string;
+    runKey?: string;
+    focus?: "booking" | "run";
+  };
 }
 
 interface Marker {
@@ -210,6 +216,7 @@ export function DispatchShell({
   onResolveWarning,
   onCreateTempGuide,
   showCurrentTime,
+  deepLinkTarget,
 }: DispatchShellProps) {
   const [filterState, setFilterState] = useState<QueueFilterState>({
     search: "",
@@ -231,6 +238,7 @@ export function DispatchShell({
   const [tempGuideName, setTempGuideName] = useState("");
   const [tempGuidePhone, setTempGuidePhone] = useState("");
   const [tempGuideVehicleCapacity, setTempGuideVehicleCapacity] = useState("6");
+  const [resolvedDeepLinkKey, setResolvedDeepLinkKey] = useState<string | null>(null);
   const parsedTempGuideVehicleCapacity = parseVehicleCapacity(tempGuideVehicleCapacity);
 
   const markers = useMemo(() => hourMarkers(), []);
@@ -476,6 +484,85 @@ export function DispatchShell({
     if (!selectedWarningId) return;
     setSelection({ type: "warning", warningId: selectedWarningId });
   }, [selectedWarningId]);
+
+  const deepLinkKey = useMemo(() => {
+    if (!deepLinkTarget) return null;
+    return `${deepLinkTarget.dateKey}|${deepLinkTarget.focus ?? "auto"}|${
+      deepLinkTarget.bookingId ?? ""
+    }|${deepLinkTarget.runKey ?? ""}`;
+  }, [deepLinkTarget]);
+
+  useEffect(() => {
+    if (!deepLinkTarget || !deepLinkKey) return;
+    if (resolvedDeepLinkKey === deepLinkKey) return;
+
+    const focus = deepLinkTarget.focus ?? (deepLinkTarget.runKey ? "run" : "booking");
+    const bookingId = deepLinkTarget.bookingId;
+    const runKey = deepLinkTarget.runKey;
+
+    let matched = false;
+
+    if (focus === "run" && runKey) {
+      const assignedRun = Array.from(runLookup.values()).find(
+        (entry) => entry.run.tourRunKey === runKey
+      );
+      if (assignedRun) {
+        setSelection({
+          type: "run",
+          guideId: assignedRun.row.guide.id,
+          runId: assignedRun.run.id,
+        });
+        matched = true;
+      } else {
+        const queuedRun = groups.find((group) => group.tourRunKey === runKey);
+        const queuedBookingId = queuedRun?.bookings[0]?.id;
+        if (queuedBookingId) {
+          setSelection({ type: "booking", bookingId: queuedBookingId });
+          matched = true;
+        }
+      }
+    }
+
+    if (!matched && bookingId && bookingLookup.has(bookingId)) {
+      setSelection({ type: "booking", bookingId });
+      matched = true;
+    }
+
+    if (!matched && runKey) {
+      const assignedRun = Array.from(runLookup.values()).find(
+        (entry) => entry.run.tourRunKey === runKey
+      );
+      if (assignedRun) {
+        setSelection({
+          type: "run",
+          guideId: assignedRun.row.guide.id,
+          runId: assignedRun.run.id,
+        });
+        matched = true;
+      }
+    }
+
+    if (!matched) {
+      if (bookingId) {
+        toast.error(
+          `Booking ${bookingId} is not on ${deepLinkTarget.dateKey}. Open the correct date in Command Center.`
+        );
+      } else if (runKey) {
+        toast.error(
+          `Run ${runKey} is not on ${deepLinkTarget.dateKey}. Open the correct date in Command Center.`
+        );
+      }
+    }
+
+    setResolvedDeepLinkKey(deepLinkKey);
+  }, [
+    bookingLookup,
+    deepLinkKey,
+    deepLinkTarget,
+    groups,
+    resolvedDeepLinkKey,
+    runLookup,
+  ]);
 
   // Auto-open context on selection and close immediately on deselection.
   useEffect(() => {

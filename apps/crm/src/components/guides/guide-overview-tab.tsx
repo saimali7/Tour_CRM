@@ -221,9 +221,9 @@ export function GuideOverviewTab({ guide }: GuideOverviewTabProps) {
           </div>
         </div>
 
-        {/* Qualifications */}
+        {/* Languages & Credentials */}
         <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Qualifications</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Languages &amp; Credentials</h2>
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground mb-2">Languages</p>

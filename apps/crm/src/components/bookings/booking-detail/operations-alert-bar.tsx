@@ -131,7 +131,7 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border-2 transition-all duration-300",
+        "group relative overflow-hidden rounded-xl border-2 transition-all duration-300",
         hasHighPriority
           ? "border-warning/60 bg-warning/10"
           : "border-info/60 bg-info/10",
@@ -154,7 +154,7 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
         type="button"
         onClick={() => hasMultipleItems && setIsExpanded(!isExpanded)}
         className={cn(
-          "relative flex items-start gap-3 p-3 sm:p-4 w-full text-left",
+          "relative flex items-start gap-3 p-3 pr-12 sm:p-4 sm:pr-14 w-full text-left",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
           hasHighPriority
             ? "focus-visible:ring-warning/40"
@@ -241,25 +241,23 @@ export function OperationsAlertBar({ booking, className }: OperationsAlertBarPro
           </div>
         </div>
 
-        {/* Dismiss button (optional - session only) */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsDismissed(true);
-          }}
-          className={cn(
-            "flex-shrink-0 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity",
-            "hover:bg-black/5 dark:hover:bg-white/10",
-            "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2",
-            hasHighPriority
-              ? "text-warning focus-visible:ring-warning/40"
-              : "text-info focus-visible:ring-info/40"
-          )}
-          aria-label="Dismiss alert for this session"
-        >
-          <X className="h-4 w-4" />
-        </button>
+      </button>
+
+      {/* Dismiss button (optional - session only) */}
+      <button
+        type="button"
+        onClick={() => setIsDismissed(true)}
+        className={cn(
+          "absolute right-3 top-3 z-10 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity",
+          "hover:bg-black/5 dark:hover:bg-white/10",
+          "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2",
+          hasHighPriority
+            ? "text-warning focus-visible:ring-warning/40"
+            : "text-info focus-visible:ring-info/40"
+        )}
+        aria-label="Dismiss alert for this session"
+      >
+        <X className="h-4 w-4" />
       </button>
 
       {/* Expanded Content */}

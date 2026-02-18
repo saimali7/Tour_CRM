@@ -61,4 +61,9 @@ export interface CommandCenterProps {
   onPreviousDay: () => void;
   onNextDay: () => void;
   onToday: () => void;
+  initialFocus?: {
+    bookingId?: string;
+    runKey?: string;
+    focus?: "booking" | "run";
+  };
 }

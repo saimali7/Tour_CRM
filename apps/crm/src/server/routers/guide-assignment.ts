@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { createServices } from "@tour/services";
 
@@ -7,13 +8,6 @@ const guideAssignmentStatusSchema = z.enum(["pending", "confirmed", "declined"])
 const createGuideAssignmentInputSchema = z.object({
   bookingId: z.string(),
   guideId: z.string(),
-  notes: z.string().optional(),
-});
-
-const createOutsourcedGuideAssignmentInputSchema = z.object({
-  bookingId: z.string(),
-  outsourcedGuideName: z.string().min(1, "Guide name is required"),
-  outsourcedGuideContact: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -95,16 +89,14 @@ export const guideAssignmentRouter = createRouter({
 
   createAssignment: adminProcedure
     .input(createGuideAssignmentInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.createAssignment(input);
+    .mutation(async () => {
+      throwLegacyWriteBlocked();
     }),
 
   confirmAssignment: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.confirmAssignment(input.id);
+    .mutation(async () => {
+      throwLegacyWriteBlocked();
     }),
 
   declineAssignment: protectedProcedure
@@ -114,17 +106,14 @@ export const guideAssignmentRouter = createRouter({
         reason: z.string().optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.declineAssignment(input.id, input.reason);
+    .mutation(async () => {
+      throwLegacyWriteBlocked();
     }),
 
   cancelAssignment: adminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      await services.guideAssignment.cancelAssignment(input.id);
-      return { success: true };
+    .mutation(async () => {
+      throwLegacyWriteBlocked();
     }),
 
   getPendingAssignmentsForGuide: protectedProcedure
@@ -150,13 +139,8 @@ export const guideAssignmentRouter = createRouter({
           .optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.assignGuideToBooking(
-        input.bookingId,
-        input.guideId,
-        input.options
-      );
+    .mutation(async () => {
+      throwLegacyWriteBlocked();
     }),
 
   // Assign outsourced (external) guide to a booking
@@ -174,17 +158,8 @@ export const guideAssignmentRouter = createRouter({
           .optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.assignOutsourcedGuideToBooking(
-        {
-          bookingId: input.bookingId,
-          outsourcedGuideName: input.outsourcedGuideName,
-          outsourcedGuideContact: input.outsourcedGuideContact,
-          notes: input.notes,
-        },
-        input.options
-      );
+    .mutation(async () => {
+      throwLegacyWriteBlocked();
     }),
 
   // Reassign guide on a booking (cancel old, create new)
@@ -202,13 +177,8 @@ export const guideAssignmentRouter = createRouter({
           .optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      const services = createServices({ organizationId: ctx.orgContext.organizationId });
-      return services.guideAssignment.reassignBooking(
-        input.bookingId,
-        input.newGuideId,
-        input.options
-      );
+    .mutation(async () => {
+      throwLegacyWriteBlocked();
     }),
 
   hasConflictForTourRun: protectedProcedure
@@ -234,3 +204,11 @@ export const guideAssignmentRouter = createRouter({
       );
     }),
 });
+
+function throwLegacyWriteBlocked(): never {
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message:
+      "Guide assignment writes moved to Tour Command Center. Open Command Center to assign or manage guides.",
+  });
+}

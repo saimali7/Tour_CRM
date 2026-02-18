@@ -12,7 +12,6 @@ import { manifestRouter } from "./manifest";
 // Phase 2 routers
 import { customerNoteRouter } from "./customer-note";
 import { communicationRouter } from "./communication";
-import { guideAvailabilityRouter } from "./guide-availability";
 import { guideAssignmentRouter } from "./guide-assignment";
 import { guidePortalRouter } from "./guide-portal";
 // Phase 4 routers
@@ -63,7 +62,6 @@ export const appRouter = createRouter({
   // Phase 2 routers
   customerNote: customerNoteRouter,
   communication: communicationRouter,
-  guideAvailability: guideAvailabilityRouter,
   guideAssignment: guideAssignmentRouter,
   // Guide Portal
   guidePortal: guidePortalRouter,

@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Users, Clock, AlertCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import type { Route } from "next";
 import { cn } from "@/lib/utils";
 import {
   HoverCard,
@@ -11,6 +10,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { QuickGuideAssign } from "@/components/guides/QuickGuideAssign";
+import { buildCommandCenterHref } from "@/lib/command-center-links";
 
 type CalendarView = "month" | "week" | "day";
 
@@ -660,7 +660,10 @@ function WeekView({
                     return (
                       <Link
                         key={schedule.id}
-                        href={`/org/${orgSlug}/schedules/${schedule.id}` as Route}
+                        href={buildCommandCenterHref({
+                          orgSlug,
+                          date: schedule.startsAt,
+                        })}
                         className={cn(
                           "group/card block rounded-lg p-2.5 text-xs",
                           "transition-all duration-150 ease-out",
@@ -836,7 +839,10 @@ function DayView({
                 return (
                   <Link
                     key={schedule.id}
-                    href={`/org/${orgSlug}/schedules/${schedule.id}` as Route}
+                    href={buildCommandCenterHref({
+                      orgSlug,
+                      date: schedule.startsAt,
+                    })}
                     className="group rounded-lg border border-border bg-card p-4 hover:border-primary/50 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between gap-4">

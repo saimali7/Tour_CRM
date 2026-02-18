@@ -23,7 +23,28 @@ export default function CommandCenterPage() {
 
   // Get date from URL params, defaulting to today
   const dateParam = searchParams.get("date");
+  const bookingIdParam = searchParams.get("bookingId");
+  const runKeyParam = searchParams.get("runKey");
+  const focusParam = searchParams.get("focus");
   const selectedDate = useMemo(() => getDateFromParam(dateParam), [dateParam]);
+  const initialFocus = useMemo(() => {
+    const bookingId = bookingIdParam?.trim();
+    const runKey = runKeyParam?.trim();
+    const focus: "booking" | "run" | undefined =
+      focusParam === "run" || focusParam === "booking"
+        ? focusParam
+        : undefined;
+
+    if (!bookingId && !runKey && !focus) {
+      return undefined;
+    }
+
+    return {
+      bookingId: bookingId || undefined,
+      runKey: runKey || undefined,
+      focus,
+    };
+  }, [bookingIdParam, runKeyParam, focusParam]);
 
   // Navigation helper
   const navigateToDate = useCallback(
@@ -78,6 +99,7 @@ export default function CommandCenterPage() {
           onPreviousDay={handlePreviousDay}
           onNextDay={handleNextDay}
           onToday={handleToday}
+          initialFocus={initialFocus}
         />
       </div>
     </div>

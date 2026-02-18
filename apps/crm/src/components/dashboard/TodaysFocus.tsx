@@ -16,22 +16,11 @@ import type { Route } from "next";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { QuickGuideAssignSheet } from "@/components/scheduling/quick-guide-assign-sheet";
 import { Badge } from "@/components/ui/badge";
-import { formatLocalDateKey } from "@/lib/date-time";
+import { buildCommandCenterHref } from "@/lib/command-center-links";
 
 interface TodaysFocusProps {
   orgSlug: string;
-}
-
-function toDateKey(value: Date | string | null | undefined): string {
-  if (!value) return formatLocalDateKey(new Date());
-  if (typeof value === "string") {
-    const explicitMatch = value.match(/^(\d{4}-\d{2}-\d{2})/);
-    if (explicitMatch?.[1]) return explicitMatch[1];
-    return formatLocalDateKey(new Date(value));
-  }
-  return formatLocalDateKey(value);
 }
 
 // =============================================================================
@@ -39,17 +28,6 @@ function toDateKey(value: Date | string | null | undefined): string {
 // =============================================================================
 
 export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
-  const [assignState, setAssignState] = useState<{
-    isOpen: boolean;
-    tourRun: {
-      tourId: string;
-      tourName: string;
-      date: Date | string;
-      time: string;
-      bookingId?: string;
-    };
-  } | null>(null);
-
   // Track which tour runs are expanded (collapsed by default)
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
 
@@ -166,6 +144,21 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
 
             const runKey = `${group.tourId}-${group.time}`;
             const isExpanded = expandedRuns.has(runKey);
+            const runCommandCenterHref = buildCommandCenterHref({
+              orgSlug,
+              date: group.dateKey,
+              runKey: `${group.tourId}|${group.dateKey}|${format(group.startsAt, "HH:mm")}`,
+              focus: "run",
+            });
+            const firstBookingId = group.bookings[0]?.bookingId;
+            const firstBookingAssignHref = firstBookingId
+              ? buildCommandCenterHref({
+                  orgSlug,
+                  date: group.dateKey,
+                  bookingId: firstBookingId,
+                  focus: "booking",
+                })
+              : runCommandCenterHref;
 
             return (
               <div
@@ -241,28 +234,14 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
                     {/* Action buttons row */}
                     <div className="flex items-center gap-2 px-4 py-2 border-t border-border bg-muted/20">
                       {needsGuide && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const firstBooking = group.bookings[0];
-                            if (firstBooking) {
-                              setAssignState({
-                                isOpen: true,
-                                tourRun: {
-                                  tourId: group.tourId,
-                                  tourName: group.tourName,
-                                  date: group.dateKey,
-                                  time: group.time,
-                                  bookingId: firstBooking.bookingId,
-                                },
-                              });
-                            }
-                          }}
+                        <Link
+                          href={firstBookingAssignHref}
+                          onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                         >
                           <UserPlus className="h-4 w-4" />
-                          Assign Guide
-                        </button>
+                          Assign in Command Center
+                        </Link>
                       )}
                       <Link
                         href={`/org/${orgSlug}/tour-run?tourId=${group.tourId}&date=${group.dateKey}&time=${format(group.startsAt, "HH:mm")}` as Route}
@@ -290,22 +269,6 @@ export function TodaysFocus({ orgSlug }: TodaysFocusProps) {
             );
           })}
         </div>
-      )}
-
-      {/* Quick Guide Assign Sheet */}
-      {assignState && assignState.tourRun.bookingId && (
-        <QuickGuideAssignSheet
-          open={assignState.isOpen}
-          onOpenChange={(open) => !open && setAssignState(null)}
-          bookingId={assignState.tourRun.bookingId}
-          scheduleInfo={{
-            id: `${assignState.tourRun.tourId}-${assignState.tourRun.time}`,
-            tourName: assignState.tourRun.tourName,
-            date: toDateKey(assignState.tourRun.date),
-            time: assignState.tourRun.time,
-          }}
-          onSuccess={() => setAssignState(null)}
-        />
       )}
     </section>
   );

@@ -16,6 +16,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { format } from "date-fns";
+import { buildCommandCenterHref } from "@/lib/command-center-links";
 
 // =============================================================================
 // TYPES
@@ -150,10 +151,16 @@ export function TomorrowPreview({
                 id: s.scheduleId,
                 label: s.tourName,
                 sublabel: `${format(new Date(s.startsAt), "h:mm a")} · ${s.bookedCount} guests`,
-                href: `/org/${orgSlug}/schedules/${s.scheduleId}`,
+                href: buildCommandCenterHref({
+                  orgSlug,
+                  date: s.startsAt,
+                }),
               }))}
-              actionLabel="Assign guides"
-              actionHref={`/org/${orgSlug}/guides`}
+              actionLabel="Open Command Center"
+              actionHref={buildCommandCenterHref({
+                orgSlug,
+                date: data.date,
+              })}
             />
           )}
 

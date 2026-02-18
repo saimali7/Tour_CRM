@@ -139,12 +139,20 @@ function shiftStartTime(time: string, deltaMinutes: number, durationMinutes: num
   return formatMinutes(clamped);
 }
 
+function mapLegacyAssignmentErrorMessage(message: string): string {
+  if (/not qualified/i.test(message)) {
+    return "Qualification checks are disabled. Assign guides directly in Command Center lanes and retry.";
+  }
+  return message;
+}
+
 function CommandCenterContent({
   date,
   onDateChange: _onDateChange,
   onPreviousDay,
   onNextDay,
   onToday,
+  initialFocus,
 }: CommandCenterProps) {
   const { announce } = useLiveAnnouncer();
   const utils = trpc.useUtils();
@@ -219,7 +227,9 @@ function CommandCenterContent({
         });
         return;
       }
-      toast.error("Assignment update failed", { description: mutationError.message });
+      toast.error("Assignment update failed", {
+        description: mapLegacyAssignmentErrorMessage(mutationError.message),
+      });
     },
   });
 
@@ -315,6 +325,16 @@ function CommandCenterContent({
     () => viewModel?.groups.reduce((sum, group) => sum + group.totalBookings, 0) ?? 0,
     [viewModel]
   );
+
+  const deepLinkTarget = useMemo(() => {
+    if (!initialFocus) return undefined;
+    return {
+      dateKey: dateString,
+      bookingId: initialFocus.bookingId,
+      runKey: initialFocus.runKey,
+      focus: initialFocus.focus,
+    };
+  }, [dateString, initialFocus]);
 
   const runLookup = useMemo(() => {
     const map = new Map<string, { guideId: string; run: (typeof rowsForCanvas)[number]["runs"][number] }>();
@@ -740,6 +760,7 @@ function CommandCenterContent({
           onResolveWarning={handleResolveWarning}
           onCreateTempGuide={handleCreateTempGuide}
           showCurrentTime={isToday(date)}
+          deepLinkTarget={deepLinkTarget}
         />
       </div>
 

@@ -22,6 +22,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import { cn } from "@/lib/utils";
+import { buildCommandCenterHref } from "@/lib/command-center-links";
 import {
   format,
   isToday,
@@ -165,7 +166,13 @@ export default function DashboardPage() {
           type: "critical",
           title: "No guide assigned",
           subtitle: `${schedule.tourName} · ${getTimeLabel(new Date(schedule.startsAt))}`,
-          action: { label: "Assign", href: `/org/${slug}/guides` },
+          action: {
+            label: "Assign in Command Center",
+            href: buildCommandCenterHref({
+              orgSlug: slug,
+              date: schedule.startsAt,
+            }),
+          },
         });
       });
 
@@ -619,10 +626,14 @@ function LiveTourRow({
 }) {
   const startTime = new Date(schedule.startsAt);
   const util = getUtilization(schedule.bookedCount, schedule.maxParticipants);
+  const commandCenterHref = buildCommandCenterHref({
+    orgSlug: slug,
+    date: schedule.startsAt,
+  });
 
   return (
     <Link
-      href={`/org/${slug}/schedules/${schedule.scheduleId}` as Route}
+      href={commandCenterHref}
       className={cn(
         "flex items-center gap-4 px-4 py-4 hover:bg-primary/10 transition-colors group",
         !isLast && "border-b border-primary/10"
@@ -671,10 +682,14 @@ function ScheduleRow({ schedule, slug, index }: ScheduleRowProps) {
   const minsUntil = differenceInMinutes(startTime, new Date());
   const isStartingSoon = minsUntil <= 60 && minsUntil > 0;
   const isStartingVerySoon = minsUntil <= 15 && minsUntil > 0;
+  const commandCenterHref = buildCommandCenterHref({
+    orgSlug: slug,
+    date: schedule.startsAt,
+  });
 
   return (
     <Link
-      href={`/org/${slug}/schedules/${schedule.scheduleId}` as Route}
+      href={commandCenterHref}
       className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group"
     >
       <div className="w-16 flex-shrink-0">
@@ -748,10 +763,14 @@ function UpcomingRow({ schedule, slug, index }: ScheduleRowProps) {
   const dayLabel = isTomorrow(startTime) ? "Tomorrow" : format(startTime, "EEE, MMM d");
   const util = getUtilization(schedule.bookedCount, schedule.maxParticipants);
   const needsAttention = schedule.hasUnconfirmedGuide || util < 30;
+  const commandCenterHref = buildCommandCenterHref({
+    orgSlug: slug,
+    date: schedule.startsAt,
+  });
 
   return (
     <Link
-      href={`/org/${slug}/schedules/${schedule.scheduleId}` as Route}
+      href={commandCenterHref}
       className={cn(
         "flex items-center gap-4 px-4 py-2.5 hover:bg-muted/50 transition-colors group"
       )}

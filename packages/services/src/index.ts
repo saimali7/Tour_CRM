@@ -14,7 +14,6 @@ import { CommunicationService } from "./communication-service";
 import { WishlistService } from "./wishlist-service";
 import { AbandonedCartService } from "./abandoned-cart-service";
 import { AvailabilityAlertService } from "./availability-alert-service";
-import { GuideAvailabilityService } from "./guide-availability-service";
 import { ManifestService } from "./manifest-service";
 // Phase 4 services
 import { SeasonalPricingService } from "./seasonal-pricing-service";
@@ -65,7 +64,6 @@ export interface Services {
   wishlist: WishlistService;
   abandonedCart: AbandonedCartService;
   availabilityAlert: AvailabilityAlertService;
-  guideAvailability: GuideAvailabilityService;
   // Phase 4 services
   seasonalPricing: SeasonalPricingService;
   promoCode: PromoCodeService;
@@ -127,7 +125,6 @@ export function createServices(ctx: ServiceContext): Services {
     wishlist: new WishlistService(ctx),
     abandonedCart: new AbandonedCartService(ctx),
     availabilityAlert: new AvailabilityAlertService(ctx),
-    guideAvailability: new GuideAvailabilityService(ctx),
     // Phase 4 services
     seasonalPricing: new SeasonalPricingService(ctx),
     promoCode: new PromoCodeService(ctx),
@@ -188,7 +185,6 @@ export { CommunicationService } from "./communication-service";
 export { WishlistService } from "./wishlist-service";
 export { AbandonedCartService } from "./abandoned-cart-service";
 export { AvailabilityAlertService } from "./availability-alert-service";
-export { GuideAvailabilityService } from "./guide-availability-service";
 export { ManifestService } from "./manifest-service";
 // Phase 4 services
 export { SeasonalPricingService } from "./seasonal-pricing-service";
@@ -395,11 +391,6 @@ export type {
   AvailabilityAlertWithRelations,
   CreateAvailabilityAlertInput,
 } from "./availability-alert-service";
-export type {
-  WeeklyAvailabilitySlot,
-  AvailabilityOverrideInput,
-  DateAvailability,
-} from "./guide-availability-service";
 export type {
   ManifestParticipant,
   ManifestBooking,

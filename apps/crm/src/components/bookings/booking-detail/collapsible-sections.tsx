@@ -6,7 +6,7 @@ import {
   User,
   Baby,
   UserPlus,
-  UserX,
+  ExternalLink,
   Utensils,
   Accessibility,
   CheckCircle,
@@ -227,7 +227,7 @@ export function GuideSection({
       className="gap-1.5 h-7 text-xs"
     >
       <UserPlus className="h-3 w-3" />
-      {hasAssignments ? "Add" : "Assign"}
+      {hasAssignments ? "Manage in Command Center" : "Assign in Command Center"}
     </Button>
   ) : null;
 
@@ -274,17 +274,18 @@ export function GuideSection({
                 </div>
                 {isEditable && onRemoveAssignment && (
                   <Button
-                    size="icon"
-                    variant="ghost"
+                    size="sm"
+                    variant="outline"
                     onClick={() =>
                       onRemoveAssignment(
                         assignment.id,
                         `${assignment.guide?.firstName} ${assignment.guide?.lastName}`
                       )
                     }
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    className="h-8 text-xs gap-1.5"
                   >
-                    <UserX className="h-4 w-4" />
+                    Manage
+                    <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
                 )}
               </div>
@@ -299,7 +300,7 @@ export function GuideSection({
             isEditable && onAssignGuide ? (
               <Button size="sm" variant="outline" onClick={onAssignGuide}>
                 <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                Assign Guide
+                Assign in Command Center
               </Button>
             ) : undefined
           }

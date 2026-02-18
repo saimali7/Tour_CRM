@@ -32,13 +32,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { QuickGuideAssignSheet } from "@/components/scheduling/quick-guide-assign-sheet";
 import { Button, Badge } from "@tour/ui";
 import { toast } from "sonner";
 import { PageSpinner, ButtonSpinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { getCashCollectionMetadata } from "@/lib/cash-collection";
-import { dbDateToLocalDate, formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
+import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
+import { buildCommandCenterHref } from "@/lib/command-center-links";
 
 // New booking detail components
 import {
@@ -83,7 +83,6 @@ export default function BookingDetailPage() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
-  const [showAssignGuideSheet, setShowAssignGuideSheet] = useState(false);
 
   // Form states
   const [refundAmount, setRefundAmount] = useState("");
@@ -129,12 +128,6 @@ export default function BookingDetailPage() {
   const { data: guideAssignments } = trpc.guideAssignment.getAssignmentsForBooking.useQuery(
     { bookingId },
     { enabled: !!booking }
-  );
-
-  // Query for available guides
-  const { data: availableGuides } = trpc.guide.list.useQuery(
-    { filters: { status: "active" } },
-    { enabled: showAssignGuideSheet }
   );
 
   // Query for activity log
@@ -252,15 +245,6 @@ export default function BookingDetailPage() {
       toast.success(`Payment link sent to ${booking?.customer?.email}`);
     },
     onError: (error) => toast.error(`Failed to send payment link: ${error.message}`),
-  });
-
-  const cancelAssignmentMutation = trpc.guideAssignment.cancelAssignment.useMutation({
-    onSuccess: () => {
-      utils.guideAssignment.getAssignmentsForBooking.invalidate({ bookingId });
-      utils.booking.getById.invalidate({ id: bookingId });
-      toast.success("Guide assignment removed");
-    },
-    onError: (error) => toast.error(`Failed to remove assignment: ${error.message}`),
   });
 
   const updateCashCollectionMutation = trpc.booking.updateCashCollection.useMutation({
@@ -449,15 +433,22 @@ export default function BookingDetailPage() {
     }
   };
 
-  const handleRemoveAssignment = async (assignmentId: string, guideName: string) => {
-    const confirmed = await confirmModal.confirm({
-      title: "Remove Guide Assignment",
-      description: `Are you sure you want to remove ${guideName} from this booking?`,
-      confirmLabel: "Remove",
-      variant: "destructive",
+  const openCommandCenterForAssignment = useCallback(() => {
+    const href = buildCommandCenterHref({
+      orgSlug: slug,
+      date: booking?.bookingDate ?? new Date(),
+      bookingId,
+      focus: "booking",
     });
-    if (confirmed) cancelAssignmentMutation.mutate({ id: assignmentId });
-  };
+    router.push(href);
+  }, [booking?.bookingDate, bookingId, router, slug]);
+
+  const handleManageAssignment = useCallback(
+    async (_assignmentId: string, _guideName: string) => {
+      openCommandCenterForAssignment();
+    },
+    [openCommandCenterForAssignment]
+  );
 
   // ============================================================================
   // KEYBOARD SHORTCUTS
@@ -512,11 +503,6 @@ export default function BookingDetailPage() {
     );
   }
 
-  // Format helpers
-  const formatShortDate = (date: Date) => new Intl.DateTimeFormat("en-US", {
-    weekday: "short", month: "short", day: "numeric",
-  }).format(date);
-
   // Cast booking to our type (the actual data matches)
   const bookingData = booking as unknown as BookingData;
   const balanceData: BalanceInfo | null = balanceInfo ? {
@@ -555,7 +541,7 @@ export default function BookingDetailPage() {
           guideAssignments={guideAssignments as BookingGuideAssignment[] | null | undefined}
           onConfirm={handleConfirm}
           onCollectPayment={handleOpenPaymentModal}
-          onAssignGuide={() => setShowAssignGuideSheet(true)}
+          onAssignGuide={openCommandCenterForAssignment}
           isConfirmLoading={confirmMutation.isPending}
         />
       </div>
@@ -574,8 +560,8 @@ export default function BookingDetailPage() {
           <GuideSection
             guideAssignments={guideAssignments as BookingGuideAssignment[] | null | undefined}
             bookingStatus={booking.status}
-            onAssignGuide={() => setShowAssignGuideSheet(true)}
-            onRemoveAssignment={handleRemoveAssignment}
+            onAssignGuide={openCommandCenterForAssignment}
+            onRemoveAssignment={handleManageAssignment}
           />
 
           {/* Notes & Requirements - Keep as static card since it's critical info */}
@@ -1140,34 +1126,6 @@ export default function BookingDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Guide Assignment Sheet */}
-      <QuickGuideAssignSheet
-        open={showAssignGuideSheet}
-        onOpenChange={setShowAssignGuideSheet}
-        bookingId={bookingId}
-        scheduleInfo={booking.bookingDate ? {
-          id: `${booking.tourId}-${booking.bookingDate}-${booking.bookingTime}`,
-          tourName: booking.tour?.name || "Tour",
-          date: formatShortDate(dbDateToLocalDate(booking.bookingDate)),
-          time: booking.bookingTime || "",
-        } : undefined}
-        availableGuides={availableGuides?.data
-          ?.filter((guide) => !guideAssignments?.some((a) => a.guideId === guide.id))
-          .map((guide) => ({
-            id: guide.id,
-            firstName: guide.firstName,
-            lastName: guide.lastName,
-            email: guide.email,
-            phone: guide.phone,
-            status: guide.status as "active" | "inactive" | "pending",
-          })) || []
-        }
-        onSuccess={() => {
-          utils.guideAssignment.invalidate();
-          utils.booking.invalidate();
-        }}
-      />
 
       {/* Confirm Modal */}
       {confirmModal.ConfirmModal}

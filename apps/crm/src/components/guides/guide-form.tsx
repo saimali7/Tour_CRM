@@ -324,11 +324,11 @@ export function GuideForm({ guide, onCancel, onSuccess, formId, hideActions }: G
         </div>
       </div>
 
-      {/* Qualifications */}
+      {/* Languages & Credentials */}
       <div className="bg-card rounded-lg border border-border p-6 space-y-6">
         <div className="flex items-center gap-2">
           <Award className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-lg font-semibold text-foreground">Qualifications</h2>
+          <h2 className="text-lg font-semibold text-foreground">Languages &amp; Credentials</h2>
         </div>
 
         {/* Languages */}
