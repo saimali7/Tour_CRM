@@ -13,13 +13,17 @@ export const getOrganizationBySlug = cache(
       where: eq(organizations.slug, slug),
     });
 
+    const defaultOrgSlug = process.env.DEFAULT_ORG_SLUG?.trim();
+    const isDefaultSingleTenantOrg = defaultOrgSlug === slug;
+
     // Only return active organizations with web app enabled
     if (!org || org.status !== "active") {
       return null;
     }
 
-    // Check if organization has web app access (not on free plan)
-    if (org.plan === "free") {
+    // Multi-tenant mode: enforce paid plans for storefront access.
+    // Single-tenant mode (DEFAULT_ORG_SLUG): allow the default org regardless of plan.
+    if (org.plan === "free" && !isDefaultSingleTenantOrg) {
       return null;
     }
 
