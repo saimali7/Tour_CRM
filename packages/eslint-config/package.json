@@ -2,14 +2,16 @@
   "name": "@tour/eslint-config",
   "version": "0.0.0",
   "private": true,
-  "files": ["*.js"],
+  "files": [
+    "*.js"
+  ],
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.18.0",
-    "@typescript-eslint/parser": "^8.18.0",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^15.1.0",
-    "eslint-config-prettier": "^9.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.5.9",
+    "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-react": "^7.37.2",
-    "eslint-plugin-react-hooks": "^5.1.0"
+    "eslint-plugin-react-hooks": "^5.2.0"
   }
 }

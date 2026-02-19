@@ -28,7 +28,7 @@
     "@tour/typescript-config": "workspace:*",
     "@types/node": "^22.19.2",
     "@types/sanitize-html": "^2.16.0",
-    "eslint": "^8.57.0",
+    "eslint": "^8.57.1",
     "typescript": "^5.9.3"
   }
 }
