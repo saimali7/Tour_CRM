@@ -197,6 +197,7 @@ export default function EditTourPage() {
       images: tour.images ?? [],
       tags: tour.tags ?? [],
       slug: tour.slug ?? "",
+      isPublic: tour.isPublic ?? false,
       meetingPoint: tour.meetingPoint ?? "",
       meetingPointDetails: tour.meetingPointDetails ?? "",
       pickupMode: tour.pickupMode ?? "meeting_point",

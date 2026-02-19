@@ -52,6 +52,7 @@ export interface TourFormState {
 
   // Settings
   slug: string;
+  isPublic: boolean;
   meetingPoint: string;
   meetingPointDetails: string;
   pickupMode: "meeting_point" | "hotel_pickup" | "hybrid";
@@ -118,6 +119,7 @@ const DEFAULT_FORM_STATE: TourFormState = {
 
   // Settings
   slug: "",
+  isPublic: false,
   meetingPoint: "",
   meetingPointDetails: "",
   pickupMode: "meeting_point",
@@ -521,7 +523,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           metaTitle: formState.metaTitle || undefined,
           metaDescription: formState.metaDescription || undefined,
           status: publish ? "active" as const : "draft" as const,
-          isPublic: publish ? true : undefined,
+          isPublic: formState.isPublic,
         };
 
         const normalizedPackages =
@@ -690,7 +692,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              {mode === "edit" ? "Save & Publish" : "Create & Publish"}
+              {mode === "edit" ? "Save Active" : "Create Active"}
             </button>
           </div>
 
@@ -839,7 +841,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                 className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {mode === "edit" ? "Save & Publish" : "Create & Publish"}
+                {mode === "edit" ? "Save Active" : "Create Active"}
               </button>
             </div>
           ) : (
@@ -919,7 +921,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
                 ) : (
                   <Send className="h-5 w-5" />
                 )}
-                {mode === "edit" ? "Save & Publish" : "Create & Publish"}
+                {mode === "edit" ? "Save Active" : "Create Active"}
               </button>
 
               <button

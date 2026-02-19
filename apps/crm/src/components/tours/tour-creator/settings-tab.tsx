@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Settings, MapPin, Clock, Search, Link2, CalendarClock, Timer, AlertCircle, Check } from "lucide-react";
+import { Settings, MapPin, Clock, Search, CalendarClock, Timer, Globe, Lock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   ValidatedFormField,
@@ -168,6 +168,36 @@ export function SettingsTab({ formState, updateForm }: SettingsTabProps) {
 
       {/* Meeting Point Section */}
       <div className="space-y-6">
+        <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground">Storefront Visibility</label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Control if this tour appears on your public booking website.
+              </p>
+            </div>
+            <Switch
+              checked={formState.isPublic}
+              onCheckedChange={(checked) => updateForm({ isPublic: checked })}
+              aria-label="Toggle public tour visibility"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 text-sm">
+            {formState.isPublic ? (
+              <>
+                <Globe className="h-4 w-4 text-success" />
+                <span className="text-foreground">Public: visible on storefront when tour is active</span>
+              </>
+            ) : (
+              <>
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">Private: hidden from storefront</span>
+              </>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center gap-3">
           <div className="p-2 bg-info/10 rounded-lg">
             <MapPin className="h-5 w-5 text-info" />
