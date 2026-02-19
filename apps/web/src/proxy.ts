@@ -65,6 +65,17 @@ function extractOrgSlug(hostname: string): string | null {
   return null;
 }
 
+function getDefaultOrgSlug(): string | null {
+  const value = process.env.DEFAULT_ORG_SLUG?.trim();
+  if (!value) {
+    return null;
+  }
+  if (RESERVED_SUBDOMAINS.has(value)) {
+    return null;
+  }
+  return value;
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hostname = request.headers.get("host") || "";
@@ -78,8 +89,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Always allow explicit no-org page without org rewrite.
+  if (pathname === "/no-org") {
+    return NextResponse.next();
+  }
+
   // Extract organization slug from subdomain
-  const orgSlug = extractOrgSlug(hostname);
+  const orgSlug = extractOrgSlug(hostname) || getDefaultOrgSlug();
 
   // If no org slug found, show a landing page or error
   if (!orgSlug) {

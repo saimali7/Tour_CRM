@@ -49,13 +49,16 @@ export function getOrganizationBookingUrl(
 ): string {
   const baseUrl = process.env.NEXT_PUBLIC_BOOKING_BASE_URL || "localhost:3001";
   const protocol = baseUrl.includes("localhost") ? "http" : "https";
+  const defaultOrgSlug = process.env.DEFAULT_ORG_SLUG?.trim();
+  const isSingleOrgRoot = defaultOrgSlug && org.slug === defaultOrgSlug;
+
+  // Single-org mode: use root booking domain with no subdomain slug.
+  if (isSingleOrgRoot) {
+    return `${protocol}://${baseUrl}${path}`;
+  }
 
   // In production: {slug}.book.domain.com
   // In development: {slug}.localhost:3001
-  if (baseUrl.includes("localhost")) {
-    return `${protocol}://${org.slug}.${baseUrl}${path}`;
-  }
-
   return `${protocol}://${org.slug}.${baseUrl}${path}`;
 }
 
