@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { db, organizations, eq } from "@tour/database";
+import { db, organizations, eq, asc } from "@tour/database";
 import type { Organization } from "@tour/database";
 
 /**
@@ -9,12 +9,21 @@ import type { Organization } from "@tour/database";
  */
 export const getOrganizationBySlug = cache(
   async (slug: string): Promise<Organization | null> => {
-    const org = await db.query.organizations.findFirst({
+    let org = await db.query.organizations.findFirst({
       where: eq(organizations.slug, slug),
     });
 
     const defaultOrgSlug = process.env.DEFAULT_ORG_SLUG?.trim();
     const isDefaultSingleTenantOrg = defaultOrgSlug === slug;
+
+    // Single-tenant resilience: if configured default slug does not resolve,
+    // fall back to first active organization to avoid storefront hard 404.
+    if (!org && isDefaultSingleTenantOrg) {
+      org = await db.query.organizations.findFirst({
+        where: eq(organizations.status, "active"),
+        orderBy: asc(organizations.createdAt),
+      });
+    }
 
     // Only return active organizations with web app enabled
     if (!org || org.status !== "active") {
