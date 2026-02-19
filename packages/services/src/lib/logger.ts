@@ -104,22 +104,14 @@ const baseConfig: pino.LoggerOptions = {
   },
 };
 
-// Create the base logger
-// In development, use pino-pretty for readable output
-// In production, use JSON for log aggregation
-export const logger = isDevelopment
-  ? pino({
-      ...baseConfig,
-      transport: {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-          translateTime: "HH:MM:ss",
-          ignore: "pid,hostname",
-        },
-      },
-    })
-  : pino(baseConfig);
+// Create the base logger.
+//
+// NOTE:
+// We intentionally avoid pino transport workers (e.g. pino-pretty transport) here.
+// Next.js dev server bundles server code into .next vendor chunks, and worker-based
+// transport resolution can fail there with "Cannot find module .../vendor-chunks/lib/worker.js".
+// Keeping logger initialization worker-free prevents dev-runtime crashes in CRM/Web.
+export const logger = pino(baseConfig);
 
 /**
  * Create a child logger with organization context
