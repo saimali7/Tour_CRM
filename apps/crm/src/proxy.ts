@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 
 /**
- * Authentication Middleware
+ * Authentication proxy
  *
  * SECURITY: Dev auth bypass is ONLY enabled when:
  * 1. NODE_ENV is explicitly "development"
@@ -16,7 +16,7 @@ const DEV_AUTH_BYPASS_ENABLED =
   process.env.NODE_ENV === "development" &&
   process.env.DEV_AUTH_BYPASS === "true";
 
-// Clerk middleware - used in production and when dev bypass is disabled
+// Clerk proxy - used in production and when dev bypass is disabled
 async function clerkAuth(req: NextRequest, event: NextFetchEvent) {
   const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
 
@@ -37,7 +37,7 @@ async function clerkAuth(req: NextRequest, event: NextFetchEvent) {
   })(req, event);
 }
 
-export default async function middleware(req: NextRequest, event: NextFetchEvent) {
+export async function proxy(req: NextRequest, event: NextFetchEvent) {
   // Dev auth bypass - ONLY in development with explicit flag
   // NEVER bypasses in production, regardless of env vars
   if (DEV_AUTH_BYPASS_ENABLED) {

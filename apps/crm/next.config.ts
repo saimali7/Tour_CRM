@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
@@ -7,7 +8,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@tour/ui", "@tour/database", "@tour/validators", "@tour/config"],
   typedRoutes: true,
   turbopack: {
-    root: "../..",
+    root: path.resolve(__dirname, "../.."),
   },
   typescript: {
     // We run typecheck separately

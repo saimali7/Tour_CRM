@@ -1,7 +1,7 @@
 import { inngest } from "../client";
 import { createEmailService, type OrganizationEmailConfig } from "@tour/emails";
 import { createServices, logger } from "@tour/services";
-import { eq, and, gte, lte, db, bookings, organizations, guideAssignments, tours } from "@tour/database";
+import { eq, and, gte, lte, db, bookings, organizations, guideAssignments } from "@tour/database";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 
 /**
@@ -44,7 +44,6 @@ export const sendGuideAssignmentEmail = inngest.createFunction(
     // Guide portal URLs - guides access via magic link authentication
     const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/confirm`;
     const declineUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/decline`;
-    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${data.scheduleId}/manifest`;
 
     // Send the email
     const result = await step.run("send-email", async () => {
@@ -59,7 +58,6 @@ export const sendGuideAssignmentEmail = inngest.createFunction(
         meetingPointDetails: data.meetingPointDetails,
         confirmUrl,
         declineUrl,
-        manifestUrl,
       });
     });
 
@@ -152,7 +150,6 @@ export const sendPendingAssignmentReminder = inngest.createFunction(
 
     const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/confirm`;
     const declineUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/assignments/${data.assignmentId}/decline`;
-    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${data.scheduleId}/manifest`;
 
     // Send reminder email
     const result = await step.run("send-email", async () => {
@@ -167,7 +164,6 @@ export const sendPendingAssignmentReminder = inngest.createFunction(
         meetingPointDetails: data.meetingPointDetails,
         confirmUrl,
         declineUrl,
-        manifestUrl,
       });
     });
 
@@ -228,7 +224,6 @@ export const sendGuideScheduleReminder = inngest.createFunction(
     const endTime = formatInTimeZone(new Date(data.endsAt), timezone, "h:mm a");
     const tourTime = `${startTime} - ${endTime}`;
 
-    const manifestUrl = `${process.env.NEXT_PUBLIC_APP_URL}/guide/schedules/${data.scheduleId}/manifest`;
 
     // Send reminder email
     const result = await step.run("send-email", async () => {
@@ -242,7 +237,6 @@ export const sendGuideScheduleReminder = inngest.createFunction(
         participantCount: data.participantCount,
         meetingPoint: data.meetingPoint,
         meetingPointDetails: data.meetingPointDetails,
-        manifestUrl,
       });
     });
 

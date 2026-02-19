@@ -113,7 +113,7 @@ No backup strategy              →    Automated daily backups
 │  │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐                │ │
 │  │  │   CRM APP    │   │   WEB APP    │   │   WORKER     │                │ │
 │  │  │              │   │              │   │              │                │ │
-│  │  │  Next.js 15  │   │  Next.js 15  │   │   Inngest    │                │ │
+│  │  │  Next.js 16  │   │  Next.js 16  │   │   Inngest    │                │ │
 │  │  │  Staff UI    │   │  Public UI   │   │  Functions   │                │ │
 │  │  │              │   │              │   │              │                │ │
 │  │  │  Port 3000   │   │  Port 3001   │   │  Port 3002   │                │ │

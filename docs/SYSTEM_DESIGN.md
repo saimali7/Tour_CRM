@@ -488,8 +488,8 @@ book.amazingtours.com/             # Custom domain
 
 **Organization Resolution:**
 ```typescript
-// middleware.ts - Resolve organization from domain/subdomain
-export async function middleware(req: NextRequest) {
+// proxy.ts - Resolve organization from domain/subdomain
+export async function proxy(req: NextRequest) {
   const host = req.headers.get('host');
   
   // Check for custom domain first
@@ -589,7 +589,7 @@ tour-platform/
 │   │   ├── lib/
 │   │   │   ├── org-context.ts      # Organization resolution
 │   │   │   └── theme.ts            # Dynamic org theming
-│   │   ├── middleware.ts           # Org resolution middleware
+│   │   ├── proxy.ts                # Org resolution proxy
 │   │   └── package.json
 │   │
 │   └── crm/                        # Staff CRM + Platform Admin
@@ -636,7 +636,7 @@ tour-platform/
 │       ├── lib/
 │       │   ├── org-context.ts      # Org from URL
 │       │   └── permissions.ts      # RBAC
-│       ├── middleware.ts
+│       ├── proxy.ts
 │       └── package.json
 │
 ├── packages/
@@ -1227,7 +1227,7 @@ export const apiKeys = pgTable('api_keys', {
 // Clerk Organizations map to our Organizations
 // Users can be members of multiple organizations
 
-// apps/crm/middleware.ts
+// apps/crm/proxy.ts
 import { authMiddleware, clerkClient } from '@clerk/nextjs';
 
 export default authMiddleware({

@@ -27,7 +27,7 @@
 │   ═══════════════════ WEB APPLICATION ═══════════════════════               │
 │                                                                              │
 │   Phase 8: Web App & Booking ───────────────────────► ✅ COMPLETE           │
-│   Phase 9: Storefront Design & Integration ─────────► ⏳ PENDING            │
+│   Phase 9: Storefront Design & Integration ─────────► 🔄 IN PROGRESS        │
 │                                                                              │
 │   ═══════════════════ PLATFORM (FUTURE) ═══════════════════════             │
 │                                                                              │
@@ -71,6 +71,21 @@
 ---
 
 ## Recent Updates
+
+### Platform Hardening Pass (February 19, 2026)
+
+- Next.js 16 proxy migration completed in active apps:
+  - `apps/crm/src/middleware.ts` -> `apps/crm/src/proxy.ts`
+  - `apps/web/src/middleware.ts` -> `apps/web/src/proxy.ts`
+- Dispatch temp-guide day-scope logic hardened at root:
+  - temp guides now persist canonical day-scope marker in `guides.availabilityNotes` (`TEMP_DAY_SCOPE:YYYY-MM-DD`),
+  - availability and batch assignment guards now read canonical marker first, with legacy note/email fallback for backwards compatibility.
+- Removed stale guide manifest links from notification functions (`/guide/schedules/...`) to prevent dead navigation paths.
+- Documentation sync completed for runtime reality:
+  - Next.js 16 references updated in architecture/infrastructure/system design docs,
+  - roadmap/progress consistency corrected where Phase 9 status drifted.
+- Dependency/runtime stability fix:
+  - moved `tailwindcss` into `packages/ui` runtime dependencies to avoid workspace CSS import resolution issues in local dev toolchains.
 
 ### Phase 9 Execution Sprint (February 19, 2026)
 
@@ -278,8 +293,8 @@ pnpm test                 # Run tests
 | Component | Status | Location |
 |-----------|--------|----------|
 | Turborepo monorepo | ✅ | `turbo.json`, `pnpm-workspace.yaml` |
-| Next.js 15 (CRM) | ✅ | `apps/crm` |
-| Next.js 15 (Web) | ✅ | `apps/web` |
+| Next.js 16 (CRM) | ✅ | `apps/crm` |
+| Next.js 16 (Web) | ✅ | `apps/web` |
 | Drizzle ORM | ✅ | `packages/database` |
 | tRPC | ✅ | `apps/crm/src/server` |
 | Clerk Auth | ✅ | Multi-tenant with organizations |
@@ -414,8 +429,8 @@ pnpm test                 # Run tests
 ### Services Added
 | Service | File | Status |
 |---------|------|--------|
-| GuideAvailabilityService | `guide-availability-service.ts` | ✅ |
-| TourGuideQualificationService | `tour-guide-qualification-service.ts` | ✅ |
+| GuideAvailabilityService | `guide-availability-service.ts` | ✅ (legacy phase artifact, retired from dispatch runtime) |
+| TourGuideQualificationService | `tour-guide-qualification-service.ts` | ✅ (legacy phase artifact, qualification gating removed) |
 | GuideAssignmentService | `guide-assignment-service.ts` | ✅ |
 | ManifestService | `manifest-service.ts` | ✅ |
 

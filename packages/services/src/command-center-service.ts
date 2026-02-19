@@ -848,7 +848,11 @@ export class CommandCenterService extends BaseService {
       for (const assignment of assignments) {
         if (
           assignment.guide &&
-          !this.isGuideAvailableOnDate(assignment.guide.email, assignment.guide.notes, dateStr)
+          !this.isGuideAvailableOnDate({
+            email: assignment.guide.email,
+            notes: assignment.guide.notes,
+            availabilityNotes: assignment.guide.availabilityNotes,
+          }, dateStr)
         ) {
           continue;
         }
@@ -951,7 +955,14 @@ export class CommandCenterService extends BaseService {
 
     // Temp guides are day-only and must only appear on their original date.
     const allGuides = activeGuides.filter((guide) =>
-      this.isGuideAvailableOnDate(guide.email, guide.notes, dateKey)
+      this.isGuideAvailableOnDate(
+        {
+          email: guide.email,
+          notes: guide.notes,
+          availabilityNotes: guide.availabilityNotes,
+        },
+        dateKey
+      )
     );
 
     if (allGuides.length === 0) {
@@ -2258,6 +2269,7 @@ export class CommandCenterService extends BaseService {
           status: "active",
           isPublic: false,
           notes: `Temporary outsourced guide for ${dateKey}`,
+          availabilityNotes: `TEMP_DAY_SCOPE:${dateKey}`,
           vehicleCapacity: input.vehicleCapacity,
         })
         .returning({
@@ -2464,6 +2476,7 @@ export class CommandCenterService extends BaseService {
             vehicleCapacity: true,
             email: true,
             notes: true,
+            availabilityNotes: true,
           },
         })
       : [];
@@ -2475,7 +2488,7 @@ export class CommandCenterService extends BaseService {
     }
 
     for (const guide of guideRows) {
-      if (this.isGuideAvailableOnDate(guide.email, guide.notes, dateKey)) {
+      if (this.isGuideAvailableOnDate(guide, dateKey)) {
         continue;
       }
       const guideName = `${guide.firstName} ${guide.lastName}`.trim();
@@ -3354,11 +3367,18 @@ export class CommandCenterService extends BaseService {
   }
 
   private isGuideAvailableOnDate(
-    email: string | null | undefined,
-    notes: string | null | undefined,
+    guide: {
+      email?: string | null;
+      notes?: string | null;
+      availabilityNotes?: string | null;
+    },
     dateKey: string
   ): boolean {
-    const tempGuideDateKey = this.extractTempGuideDateKey(notes, email);
+    const tempGuideDateKey = this.extractTempGuideDateKey(
+      guide.availabilityNotes,
+      guide.notes,
+      guide.email
+    );
     if (!tempGuideDateKey) {
       return true;
     }
@@ -3366,9 +3386,15 @@ export class CommandCenterService extends BaseService {
   }
 
   private extractTempGuideDateKey(
+    availabilityNotes: string | null | undefined,
     notes: string | null | undefined,
     email: string | null | undefined
   ): string | null {
+    const scopedMatch = availabilityNotes?.match(/temp_day_scope:(\d{4}-\d{2}-\d{2})/i);
+    if (scopedMatch?.[1]) {
+      return scopedMatch[1];
+    }
+
     const notesMatch = notes?.match(/temporary outsourced guide for (\d{4}-\d{2}-\d{2})/i);
     if (notesMatch?.[1]) {
       return notesMatch[1];

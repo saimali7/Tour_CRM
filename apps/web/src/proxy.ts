@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Subdomain routing middleware for the public booking website.
+ * Subdomain routing proxy for the public booking website.
  *
  * Domain patterns:
  * - Production: {slug}.book.platform.com
  * - Development: {slug}.localhost:3001
  *
- * The middleware extracts the organization slug from the subdomain and
+ * The proxy extracts the organization slug from the subdomain and
  * rewrites the URL to include the slug as a path parameter.
  */
 
@@ -25,9 +25,6 @@ const RESERVED_SUBDOMAINS = new Set([
   "static",
   "assets",
 ]);
-
-// Note: PUBLIC_ROUTES can be used for future route-based access control
-// Currently, middleware skips static files via pathname checks below
 
 /**
  * Extract organization slug from the hostname.
@@ -68,11 +65,11 @@ function extractOrgSlug(hostname: string): string | null {
   return null;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hostname = request.headers.get("host") || "";
 
-  // Skip middleware for static files and Next.js internals
+  // Skip proxy for static files and Next.js internals
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/static") ||

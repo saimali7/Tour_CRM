@@ -465,7 +465,7 @@ function OnboardingContent() {
   );
 }
 
-// Wrapper with Suspense boundary for useSearchParams (required by Next.js 15)
+// Wrapper with Suspense boundary for useSearchParams (required by Next.js App Router)
 export default function OnboardingPage() {
   return (
     <Suspense

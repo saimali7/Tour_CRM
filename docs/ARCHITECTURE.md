@@ -39,8 +39,8 @@ This is not a generic CRM with tour features bolted on, but a system designed fr
 | Decision | Choice | Primary Rationale |
 |----------|--------|-------------------|
 | **Repository Structure** | Turborepo monorepo | Shared code, atomic changes, single CI pipeline |
-| **Applications** | 2 Next.js 15 apps | Independent deployment, optimized bundles per audience |
-| **Frontend Framework** | Next.js 15 (App Router) | React ecosystem maturity, server components for speed |
+| **Applications** | 2 Next.js 16 apps | Independent deployment, optimized bundles per audience |
+| **Frontend Framework** | Next.js 16 (App Router) | React ecosystem maturity, server components for speed |
 | **Backend/API** | tRPC (internal) + REST (external) | End-to-end type safety internally, standards for partners |
 | **Database** | Supabase (PostgreSQL) | Managed DB, real-time, RLS, storage included |
 | **Deployment** | Hostinger VPS + Coolify | Self-hosted apps, cost-effective, git-push deploys |
@@ -794,7 +794,7 @@ interface RefundProcessed extends BaseEvent {
 
 ### Technology Stack Decisions
 
-#### Frontend: Next.js 15 with App Router
+#### Frontend: Next.js 16 with App Router
 
 **Why Next.js over alternatives:**
 
@@ -3286,7 +3286,7 @@ Dependency: None
 
 Deliverables:
 ├── Project scaffolding
-│   ├── Next.js 15 with App Router
+│   ├── Next.js 16 with App Router
 │   ├── TypeScript strict mode
 │   ├── ESLint + Prettier config
 │   ├── Tailwind CSS + shadcn/ui
