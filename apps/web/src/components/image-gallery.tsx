@@ -16,8 +16,11 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
 
   if (safeImages.length === 0) {
     return (
-      <div className="relative aspect-[16/9] rounded-xl border border-dashed border-border bg-muted/50">
-        <div className="absolute inset-0 flex items-center justify-center text-6xl">🗺️</div>
+      <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-border bg-gradient-to-br from-stone-200 via-stone-100 to-amber-50">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-stone-400">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" /></svg>
+          <p className="text-sm font-medium">Photos coming soon</p>
+        </div>
       </div>
     );
   }
@@ -53,11 +56,10 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
                 key={`${image}-${index}`}
                 type="button"
                 onClick={() => setActiveIndex(index)}
-                className={`relative aspect-[4/3] w-24 flex-none snap-start overflow-hidden rounded-lg border transition md:w-auto ${
-                  index === activeIndex
+                className={`relative aspect-[4/3] w-24 flex-none snap-start overflow-hidden rounded-lg border transition md:w-auto ${index === activeIndex
                     ? "border-primary ring-1 ring-primary/40"
                     : "border-border hover:border-primary/50"
-                }`}
+                  }`}
                 aria-label={`Preview image ${index + 1}`}
               >
                 <Image

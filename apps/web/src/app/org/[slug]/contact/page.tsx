@@ -9,6 +9,7 @@ import { MapPin, Mail, Phone, Clock, MessageSquare, ExternalLink } from "lucide-
 import { ContactForm } from "@/components/contact-form";
 import { BreadcrumbStructuredData, FAQStructuredData } from "@/components/structured-data";
 import { Breadcrumb, CardSurface, PageShell, Section, SectionHeader } from "@/components/layout";
+import { Button } from "@tour/ui";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -71,7 +72,7 @@ export default async function ContactPage({ params }: PageProps) {
       <PageShell>
         <Breadcrumb
           items={[
-            { label: "Tours", href: `/org/${slug}` },
+            { label: "Home", href: `/org/${slug}` },
             { label: "Contact Us" },
           ]}
         />
@@ -82,6 +83,14 @@ export default async function ContactPage({ params }: PageProps) {
             title="Contact Us"
             subtitle="Have questions before booking or need help with an existing reservation? We’re here to help."
           />
+          <div className="mb-6 flex flex-wrap justify-center gap-3">
+            <Button asChild variant="outline">
+              <Link href="/booking">Manage booking</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/private-tours">Private inquiry</Link>
+            </Button>
+          </div>
 
           <Section spacing="compact" className="pt-2">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

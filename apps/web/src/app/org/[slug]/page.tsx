@@ -9,6 +9,7 @@ import { TrustBar } from "@/components/trust-bar";
 import { PageShell, Section, SectionHeader, HeroSection } from "@/components/layout";
 import { FadeIn, StaggerChildren } from "@/components/layout/animate";
 import { Button } from "@tour/ui";
+import { ArrowRight, Sparkles } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -158,7 +159,7 @@ export default async function ToursPage({ params, searchParams }: PageProps) {
   const yearsOperating = Math.max(1, new Date().getFullYear() - new Date(org.createdAt).getFullYear());
 
   return (
-    <PageShell className="pb-10 pt-6" contentClassName="space-y-8">
+    <PageShell className="pb-10 pt-0" contentClassName="space-y-12 max-w-none px-0">
       <FadeIn>
         <HeroSection
           eyebrow="Direct Booking Experience"
@@ -166,8 +167,17 @@ export default async function ToursPage({ params, searchParams }: PageProps) {
           subtitle={`Book in minutes with live availability, clear pricing, and instant confirmations directly with ${org.name}.`}
           imageUrl={heroTour?.coverImageUrl}
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/20 px-3 py-1.5 text-xs text-amber-100 backdrop-blur">
-            {tours.length} experiences ready to book
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/20 px-3 py-1.5 text-xs text-amber-100 backdrop-blur">
+              {tours.length} experiences ready to book
+            </div>
+            <Button asChild className="h-10 border border-white/30 bg-white/95 text-foreground hover:bg-white">
+              <Link href="/private-tours" className="inline-flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-600" />
+                Plan a private experience
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
           </div>
         </HeroSection>
       </FadeIn>
@@ -187,25 +197,10 @@ export default async function ToursPage({ params, searchParams }: PageProps) {
             title="Featured This Week"
             subtitle="Handpicked experiences travelers are booking most right now"
           />
-          <StaggerChildren className="hidden grid-cols-1 gap-6 md:grid md:grid-cols-3" stepMs={90}>
-            {featuredTours.slice(0, 3).map((tour) => (
-              <TourCard
-                key={`featured-desktop-${tour.id}`}
-                tour={tour}
-                currency={currency}
-                availabilityLabel={availabilityLabels.get(tour.id) || null}
-                socialProofLabel={
-                  weeklyBookingsByTour.get(tour.id)
-                    ? `${weeklyBookingsByTour.get(tour.id)} booked this week`
-                    : "Popular with returning guests"
-                }
-              />
-            ))}
-          </StaggerChildren>
-
-          <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 md:hidden">
+          {/* Scrollable Rail (Desktop & Mobile) */}
+          <div className="-mx-4 flex snap-x snap-mandatory gap-4 sm:gap-6 overflow-x-auto px-4 sm:px-6 pb-6 pt-2 hide-scrollbar">
             {featuredTours.map((tour) => (
-              <div key={`featured-mobile-${tour.id}`} className="w-[88%] max-w-sm flex-none snap-start">
+              <div key={`featured-mobile-${tour.id}`} className="w-[85%] sm:w-[320px] lg:w-[360px] flex-none snap-start">
                 <TourCard
                   tour={tour}
                   currency={currency}
@@ -224,27 +219,33 @@ export default async function ToursPage({ params, searchParams }: PageProps) {
 
       {categories.length > 0 && (
         <FadeIn delayMs={120}>
-          <TourFilters categories={categories} selectedCategory={category} selectedSort={sort} />
+          <TourFilters
+            categories={categories}
+            selectedCategory={category}
+            selectedSort={sort}
+            totalCount={total}
+          />
         </FadeIn>
       )}
 
-      <Section spacing="compact" className="pt-0">
+      <Section spacing="compact" className="pt-0 mx-auto max-w-[1560px] px-4 sm:px-6 lg:px-8 w-full" id="tours">
         <SectionHeader
-          title="All Tours"
+          title="All Tours & Experiences"
           subtitle="Browse departures, compare options, and reserve instantly"
           action={
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Showing {tours.length} of {total} tours
             </p>
           }
         />
 
-        <StaggerChildren className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" stepMs={60}>
+        <StaggerChildren className="grid grid-cols-1 gap-5 xl:gap-6" stepMs={60}>
           {tours.map((tour) => (
             <TourCard
               key={tour.id}
               tour={tour}
               currency={currency}
+              variant="expanded"
               availabilityLabel={availabilityLabels.get(tour.id) || null}
               socialProofLabel={
                 weeklyBookingsByTour.get(tour.id)

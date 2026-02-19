@@ -37,27 +37,32 @@ export function Lightbox({ images, title, index, open, onClose, onChange }: Ligh
   const current = images[index] || images[0]!;
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/90 p-4" role="dialog" aria-modal="true" aria-label="Image viewer">
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
-        aria-label="Close image viewer"
-      >
-        <X className="h-5 w-5" />
-      </button>
-
-      <div className="mx-auto flex h-full max-w-6xl items-center justify-center">
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl p-4 sm:p-6 animate-fade-in flex flex-col" role="dialog" aria-modal="true" aria-label="Image viewer">
+      <div className="flex justify-between items-center w-full max-w-7xl mx-auto mb-4 relative z-10">
+        <p className="rounded-full bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 text-xs font-medium text-white shadow-sm">
+          {index + 1} / {images.length}
+        </p>
         <button
           type="button"
-          onClick={() => onChange((index - 1 + images.length) % images.length)}
-          className="mr-2 hidden rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 sm:inline-flex"
+          onClick={onClose}
+          className="rounded-full bg-white/10 backdrop-blur-md border border-white/20 p-2 text-white transition-all hover:bg-white/20 hover:scale-105 active:scale-95 shadow-sm"
+          aria-label="Close image viewer"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="mx-auto flex flex-1 w-full max-w-7xl items-center justify-center relative">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onChange((index - 1 + images.length) % images.length); }}
+          className="absolute left-2 sm:left-4 z-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 p-3 text-white transition-all hover:bg-white/20 hover:scale-105 active:scale-95 shadow-lg"
           aria-label="Previous image"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
         </button>
 
-        <div className="relative h-[78vh] w-full overflow-hidden rounded-xl border border-white/20">
+        <div className="relative h-full max-h-[85vh] w-full overflow-hidden rounded-2xl shadow-2xl">
           <Image
             src={current}
             alt={`${title} image ${index + 1}`}
@@ -70,17 +75,13 @@ export function Lightbox({ images, title, index, open, onClose, onChange }: Ligh
 
         <button
           type="button"
-          onClick={() => onChange((index + 1) % images.length)}
-          className="ml-2 hidden rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 sm:inline-flex"
+          onClick={(e) => { e.stopPropagation(); onChange((index + 1) % images.length); }}
+          className="absolute right-2 sm:right-4 z-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 p-3 text-white transition-all hover:bg-white/20 hover:scale-105 active:scale-95 shadow-lg"
           aria-label="Next image"
         >
-          <ChevronRight className="h-5 w-5" />
+          <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
         </button>
       </div>
-
-      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-xs text-white">
-        {index + 1} / {images.length}
-      </p>
     </div>
   );
 }

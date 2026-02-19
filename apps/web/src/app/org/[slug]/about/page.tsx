@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { MapPin, Mail, Phone, Globe, Clock, Users, CalendarDays, Star } from "lucide-react";
 import { requireOrganization, getOrganizationBranding } from "@/lib/organization";
 import { createServices } from "@tour/services";
 import { Breadcrumb, CardSurface, PageShell, Section, SectionHeader } from "@/components/layout";
 import { FadeIn, StaggerChildren } from "@/components/layout/animate";
+import { Button } from "@tour/ui";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -47,7 +49,7 @@ export default async function AboutPage({ params }: PageProps) {
     <PageShell>
       <Breadcrumb
         items={[
-          { label: "Tours", href: `/org/${slug}` },
+          { label: "Home", href: `/org/${slug}` },
           { label: "About Us" },
         ]}
       />
@@ -59,6 +61,14 @@ export default async function AboutPage({ params }: PageProps) {
             title={`About ${branding.name}`}
             subtitle="We design small-group and private experiences that balance local insight, smooth operations, and memorable moments."
           />
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <Button asChild variant="outline">
+              <Link href="/">Browse tours</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/private-tours">Request private itinerary</Link>
+            </Button>
+          </div>
           {branding.logo ? (
             <div className="mx-auto mt-5 h-24 w-24 overflow-hidden rounded-2xl border border-border bg-card p-2">
               <Image src={branding.logo} alt={branding.name} width={96} height={96} className="h-full w-full object-contain" />

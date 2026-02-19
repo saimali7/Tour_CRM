@@ -5,6 +5,7 @@ interface SectionProps {
   className?: string;
   as?: ElementType;
   spacing?: "compact" | "default" | "spacious";
+  id?: string;
 }
 
 const spacingClasses: Record<NonNullable<SectionProps["spacing"]>, string> = {
@@ -18,9 +19,10 @@ export function Section({
   className,
   as: Component = "section",
   spacing = "default",
+  id,
 }: SectionProps) {
   return (
-    <Component className={`${spacingClasses[spacing]} ${className ?? ""}`}>
+    <Component id={id} className={`${spacingClasses[spacing]} ${className ?? ""}`}>
       {children}
     </Component>
   );

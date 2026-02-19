@@ -56,22 +56,44 @@ export function TrustBar({
   const ratingText = useMemo(() => averageRating.toFixed(1), [averageRating]);
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-border bg-card/90 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-      <div className="flex items-center gap-2 text-amber-700">
-        <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-        <span className="font-medium">{ratingText} average rating</span>
-      </div>
-      <div className="flex items-center gap-2 text-slate-700">
-        <Users className="h-4 w-4 text-sky-700" />
-        <span className="font-medium">{formatGuests(guestsDisplay)}</span>
-      </div>
-      <div className="flex items-center gap-2 text-slate-700">
-        <CalendarClock className="h-4 w-4 text-emerald-700" />
-        <span className="font-medium">{bookingsDisplay} bookings this week</span>
-      </div>
-      <div className="flex items-center gap-2 text-slate-700">
-        <ShieldCheck className="h-4 w-4 text-emerald-700" />
-        <span className="font-medium">{yearsDisplay}+ years operating</span>
+    <div className="mx-auto max-w-[1560px] px-4 sm:px-6 lg:px-8 relative z-20 -mt-8 sm:-mt-12">
+      <div className="grid gap-4 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl p-5 sm:p-6 shadow-lg sm:grid-cols-2 lg:grid-cols-4 transition-all hover:shadow-xl">
+        <div className="flex items-center justify-center sm:justify-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100/50">
+            <Star className="h-5 w-5 fill-amber-500 text-amber-500" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground leading-none mb-1">{ratingText} / 5.0</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Average Rating</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center sm:justify-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100/50">
+            <Users className="h-5 w-5 text-sky-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground leading-none mb-1">{formatGuests(guestsDisplay)}</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Happy Travelers</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center sm:justify-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100/50">
+            <CalendarClock className="h-5 w-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground leading-none mb-1">{bookingsDisplay}</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Booked This Week</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center sm:justify-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100/50">
+            <ShieldCheck className="h-5 w-5 text-indigo-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground leading-none mb-1">{yearsDisplay}+ Years</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Verified Operator</p>
+          </div>
+        </div>
       </div>
     </div>
   );

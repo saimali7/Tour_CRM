@@ -12,6 +12,7 @@ import { CustomerDetailsForm } from "./customer-details-form";
 import { PaymentStep } from "./payment-step";
 import { WaiverStep } from "./waiver-step";
 import { BookingConfirmation } from "./booking-confirmation";
+import { CardSurface } from "@/components/layout/card-surface";
 import type {
   BookingOption,
   OrganizationSettings,
@@ -162,42 +163,40 @@ function BookingFlowContent({
   const endTime = calculateEndTime(bookingTime, tour.durationMinutes);
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-      <div className="lg:col-span-2">
-        <div className="mb-3 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground sm:hidden">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 max-w-[1280px] mx-auto py-4">
+      <div className="lg:col-span-7 xl:col-span-8">
+        <div className="mb-4 rounded-xl border border-border/50 bg-secondary/30 px-4 py-3 text-sm font-medium text-muted-foreground sm:hidden">
           Step {Math.min(currentStepIndex + 1, steps.length)} of {steps.length}
         </div>
 
-        <div className="mb-8 hidden items-center justify-between sm:flex">
+        <div className="mb-10 hidden items-center justify-between sm:flex">
           {steps.map((step, index) => (
-            <div key={step.id} className="flex items-center">
+            <div key={step.id} className="flex flex-1 items-center last:flex-none">
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-                  index < currentStepIndex
-                    ? "bg-green-500 text-white"
-                    : index === currentStepIndex
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold shadow-sm transition-all duration-300 ${index < currentStepIndex
+                  ? "bg-emerald-500 text-white ring-4 ring-emerald-500/20"
+                  : index === currentStepIndex
+                    ? "bg-primary text-primary-foreground ring-4 ring-primary/20 scale-110"
+                    : "bg-secondary text-muted-foreground"
+                  }`}
               >
-                {index < currentStepIndex ? <Check className="h-4 w-4" /> : index + 1}
+                {index < currentStepIndex ? <Check className="h-5 w-5" /> : index + 1}
               </div>
               <span
-                className={`ml-2 text-sm ${
-                  index <= currentStepIndex ? "font-medium text-foreground" : "text-muted-foreground"
-                }`}
+                className={`ml-3 text-sm tracking-wide ${index <= currentStepIndex ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
+                  }`}
               >
                 {step.label}
               </span>
               {index < steps.length - 1 && (
-                <div className={`mx-3 h-0.5 w-8 ${index < currentStepIndex ? "bg-green-500" : "bg-muted"}`} />
+                <div className={`mx-4 h-[2px] flex-1 rounded-full ${index < currentStepIndex ? "bg-emerald-500/50" : "bg-border/60"}`} />
               )}
             </div>
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-card p-6">
-          <div key={state.step} className="animate-[reveal-up_260ms_var(--ease-out)_both]">
+        <CardSurface className="p-0 sm:p-0 overflow-hidden shadow-lg border-border/50">
+          <div key={state.step} className="animate-fade-in p-6 sm:p-8">
             {state.step === "options" && <BookingOptionSelection />}
             {state.step === "select" && (
               <TicketSelection
@@ -225,13 +224,13 @@ function BookingFlowContent({
               />
             )}
           </div>
-        </div>
+        </CardSurface>
       </div>
 
-      {state.step !== "confirmation" && (
-        <div className="lg:col-span-1">
-          <div className="sticky top-24 rounded-lg border bg-card p-6">
-            <h3 className="mb-4 font-semibold">Booking Summary</h3>
+      {state.step !== "confirmation" ? (
+        <div className="lg:col-span-5 xl:col-span-4 relative">
+          <CardSurface className="sticky top-28 p-6 shadow-xl border-border/60 bg-gradient-to-b from-card to-card/95 backdrop-blur-xl">
+            <h3 className="mb-5 font-bold text-xl border-b border-border/40 pb-4">Booking Summary</h3>
 
             {tour.coverImageUrl ? (
               <div className="relative mb-4 aspect-[16/10] overflow-hidden rounded-lg border border-border">
@@ -340,23 +339,23 @@ function BookingFlowContent({
                   <span>{formatPrice(state.tax, state.currency)}</span>
                 </div>
               )}
-              <div className="flex items-center justify-between border-t pt-2 text-base font-semibold">
+              <div className="flex items-center justify-between border-t border-border/40 pt-4 text-lg font-bold">
                 <span>Total</span>
-                <span>{formatPrice(state.total, state.currency)}</span>
+                <span className="text-foreground">{formatPrice(state.total, state.currency)}</span>
               </div>
             </div>
 
-            <div className="pt-4">
+            <div className="pt-6 mt-4 border-t border-border/40 text-center">
               <p className="text-xs text-muted-foreground">
-                Need help?{" "}
-                <a href={`/org/${organizationSlug}/contact`} className="text-primary hover:underline">
-                  Contact us
+                Need help? Call us or{" "}
+                <a href={`/org/${organizationSlug}/contact`} className="text-primary font-medium hover:underline">
+                  contact support
                 </a>
               </p>
             </div>
-          </div>
+          </CardSurface>
         </div>
-      )}
+      ) : <div className="hidden lg:block lg:col-span-5 xl:col-span-4" />}
     </div>
   );
 }

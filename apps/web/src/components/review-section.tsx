@@ -46,14 +46,7 @@ export function ReviewSection({
   reviews,
 }: ReviewSectionProps) {
   if (totalReviews === 0) {
-    return (
-      <section className="rounded-xl border border-border bg-card p-6">
-        <h3 className="mb-2 font-display text-xl">Guest Reviews</h3>
-        <p className="text-sm text-muted-foreground">
-          Reviews are coming in soon. This tour has active bookings and fresh guest feedback will appear here.
-        </p>
-      </section>
-    );
+    return null;
   }
 
   const distribution = getDistribution(reviews);
@@ -105,11 +98,10 @@ export function ReviewSection({
                 {Array.from({ length: 5 }).map((_, idx) => (
                   <Star
                     key={`${review.id}-star-${idx}`}
-                    className={`h-3.5 w-3.5 ${
-                      idx < review.overallRating
+                    className={`h-3.5 w-3.5 ${idx < review.overallRating
                         ? "fill-amber-500 text-amber-500"
                         : "text-muted-foreground/40"
-                    }`}
+                      }`}
                   />
                 ))}
               </div>

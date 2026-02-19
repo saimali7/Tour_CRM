@@ -160,8 +160,8 @@ export default async function TourDetailPage({ params }: PageProps) {
           ]}
         />
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          <div className="space-y-8 lg:col-span-2">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+          <div className="space-y-8 lg:col-span-8">
             <FadeIn>
               <ImageGallery images={images} title={tour.name} />
             </FadeIn>
@@ -199,12 +199,36 @@ export default async function TourDetailPage({ params }: PageProps) {
                 </div>
 
                 {tour.description && (
-                  <div className="prose prose-neutral max-w-none">
-                    <p className="whitespace-pre-wrap">{tour.description}</p>
+                  <div className="prose prose-neutral max-w-none text-muted-foreground">
+                    <p className="whitespace-pre-wrap leading-relaxed">{tour.description}</p>
                   </div>
                 )}
               </section>
             </FadeIn>
+
+            {/* Trust Stack - Elevated for immediate visibility */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-2">
+              {tour.cancellationPolicy && (
+                <div className="flex items-start gap-3 rounded-xl border border-border/50 bg-emerald-50/30 p-4">
+                  <Shield className="mt-0.5 h-5 w-5 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <h3 className="font-semibold text-sm text-foreground mb-1">Cancellation Policy</h3>
+                    {tour.cancellationHours ? (
+                      <p className="text-xs text-muted-foreground">Free cancellation up to {tour.cancellationHours} hours before the tour starts.</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">{tour.cancellationPolicy}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-start gap-3 rounded-xl border border-border/50 bg-secondary/20 p-4">
+                <Calendar className="mt-0.5 h-5 w-5 text-blue-600 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-sm text-foreground mb-1">Instant Booking</h3>
+                  <p className="text-xs text-muted-foreground">Your booking is confirmed immediately after payment.</p>
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {tour.includes && tour.includes.length > 0 && (
@@ -311,13 +335,13 @@ export default async function TourDetailPage({ params }: PageProps) {
             />
 
             {similarTours.length > 0 && (
-              <section className="space-y-4">
+              <section className="space-y-4 pt-8 border-t border-border/40">
                 <SectionHeader
                   title="You Might Also Love"
                   subtitle="Similar experiences in this collection"
                 />
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {similarTours.slice(0, 3).map((similarTour) => (
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  {similarTours.slice(0, 4).map((similarTour) => (
                     <TourCard
                       key={`similar-desktop-${similarTour.id}`}
                       tour={similarTour}
@@ -328,7 +352,7 @@ export default async function TourDetailPage({ params }: PageProps) {
                 </div>
                 <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1 md:hidden">
                   {similarTours.map((similarTour) => (
-                    <div key={`similar-mobile-${similarTour.id}`} className="w-[88%] max-w-sm flex-none snap-start">
+                    <div key={`similar-mobile-${similarTour.id}`} className="w-[85%] max-w-sm flex-none snap-start">
                       <TourCard
                         tour={similarTour}
                         currency={currency}
@@ -341,60 +365,56 @@ export default async function TourDetailPage({ params }: PageProps) {
             )}
           </div>
 
-          <aside className="lg:col-span-1">
-            <div className="sticky top-24 space-y-6">
-              <CardSurface className="shadow-sm">
-                <div className="mb-4">
-                  <p className="text-sm text-muted-foreground">From</p>
-                  <p className="text-3xl font-bold">{basePriceLabel}</p>
-                  <p className="text-sm text-muted-foreground">per person</p>
+          {/* Sticky Booking Widget Column */}
+          <aside className="lg:col-span-4 hidden lg:block relative">
+            <div className="sticky top-28 space-y-6">
+              <CardSurface className="shadow-lg border-border/50 bg-card/95 backdrop-blur overflow-hidden rounded-2xl">
+                <div className="bg-surface-dark text-surface-dark-foreground p-5 -mx-6 -mt-6 mb-6">
+                  <p className="text-xs uppercase tracking-wider text-amber-200/80 mb-1 font-medium text-center">Price starting from</p>
+                  <p className="text-4xl font-bold text-center leading-none">{basePriceLabel}</p>
                 </div>
 
-                <p className="mb-4 inline-flex items-center gap-2 rounded-md bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {weeklyBookings > 0
-                    ? `${weeklyBookings} people booked this tour this week`
-                    : "Popular departure times fill up quickly"}
-                </p>
+                <div className="px-1 text-center">
+                  <p className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 mx-auto">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {weeklyBookings > 0
+                      ? `${weeklyBookings} people booked this week`
+                      : "Popular departure times fill up quickly"}
+                  </p>
+                </div>
 
                 {activeTiers.length > 0 && (
-                  <div className="mb-6 space-y-2 border-t pt-4">
+                  <div className="mb-6 space-y-2 border-t border-border/40 pt-4 px-1">
                     {activeTiers.map((tier) => (
                       <div key={tier.id} className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
+                        <span className="text-muted-foreground font-medium">
                           {tier.label}
                           {tier.minAge !== null && tier.maxAge !== null && (
-                            <span className="ml-1 text-xs">({tier.minAge}-{tier.maxAge})</span>
+                            <span className="ml-1 text-xs opacity-80">({tier.minAge}-{tier.maxAge})</span>
                           )}
                         </span>
-                        <span className="font-medium">{formatPrice(tier.price, currency)}</span>
+                        <span className="font-semibold">{formatPrice(tier.price, currency)}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div className="space-y-2 border-t pt-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Shield className="h-4 w-4 text-green-500" />
-                    <span>Secure Payment</span>
+                <div className="space-y-3 border-t border-border/40 pt-4 px-1 bg-secondary/30 rounded-xl p-4 mt-2">
+                  <div className="flex items-center gap-3 text-sm text-foreground font-medium">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-100"><Shield className="h-3 w-3 text-green-600" /></div>
+                    <span>Secure Payment Checkout</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4 text-blue-500" />
-                    <span>Instant Confirmation</span>
+                  <div className="flex items-center gap-3 text-sm text-foreground font-medium">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100"><Calendar className="h-3 w-3 text-blue-600" /></div>
+                    <span>Instant Ticket Confirmation</span>
                   </div>
-                  {tour.cancellationHours && tour.cancellationHours >= 24 && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 text-green-500" />
-                      <span>Free Cancellation</span>
-                    </div>
-                  )}
                 </div>
               </CardSurface>
 
-              <CardSurface className="shadow-sm" id="availability">
-                <h2 className="mb-4 flex items-center gap-2 font-semibold">
-                  <Calendar className="h-5 w-5" />
-                  Check Availability
+              <CardSurface className="shadow-lg border-border/50 bg-card rounded-2xl" id="availability">
+                <h2 className="mb-4 flex items-center gap-2 font-semibold text-lg border-b border-border/40 pb-3">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Select Date
                 </h2>
                 <AvailabilityCalendar
                   availableDates={availableDates}
@@ -408,6 +428,25 @@ export default async function TourDetailPage({ params }: PageProps) {
               </CardSurface>
             </div>
           </aside>
+
+          {/* Mobile Calendar (appears in flow on small screens) */}
+          <div className="lg:hidden mt-8" id="availability-mobile">
+            <CardSurface className="shadow-sm border-border/50 bg-card rounded-2xl">
+              <h2 className="mb-4 flex items-center gap-2 font-semibold border-b border-border/40 pb-3">
+                <Calendar className="h-5 w-5 text-primary" />
+                Select Date
+              </h2>
+              <AvailabilityCalendar
+                availableDates={availableDates}
+                currency={currency}
+                tourId={tour.id}
+                organizationSlug={slug}
+                tourSlug={tourSlug}
+                initialYear={currentMonthAvailability.year}
+                initialMonth={currentMonthAvailability.month}
+              />
+            </CardSurface>
+          </div>
         </div>
       </PageShell>
 

@@ -8,7 +8,7 @@ import { createServices } from "@tour/services";
  * Generates URLs for:
  * - Homepage (tour listing)
  * - Individual tour pages
- * - Static pages (about, contact, terms, privacy)
+ * - Static pages (about, contact, private tours, terms, privacy)
  */
 export default async function sitemap({
   params,
@@ -57,6 +57,12 @@ export default async function sitemap({
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/private-tours`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
     },
     {
       url: `${baseUrl}/terms`,

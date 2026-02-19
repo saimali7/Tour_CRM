@@ -70,7 +70,37 @@
 
 ---
 
+## Infrastructure Hardening Backlog (Deferred)
+
+> Post-Phase 9 production operations plan for Coolify and shared infra.
+>
+> **Infra checklist baseline:** 8/15 complete, 7/15 pending.
+
+| ID | Task | Priority | Status | Acceptance Criteria |
+|----|------|----------|--------|---------------------|
+| **INF-01** | Add web health route (`/api/health`) | P0 | ⏳ Pending | `book.*` returns 200/503 health payload and Coolify health check uses this endpoint |
+| **INF-02** | Clean Coolify build/runtime env split | P0 | ⏳ Pending | `NODE_ENV=production` runtime-only, no build-time warning, build remains reproducible |
+| **INF-03** | Verify and enforce PgBouncer wiring | P0 | ⏳ Pending | CRM + Web runtime use `DATABASE_URL` via PgBouncer; migrations use `DIRECT_URL` direct Postgres |
+| **INF-04** | Automated backups + restore drill | P0 | ⏳ Pending | Daily Postgres backups retained; documented restore rehearsal succeeds on non-prod target |
+| **INF-05** | Production alerting and error visibility | P1 | ⏳ Pending | Alerting active for webhook failures, booking create failures, and app healthcheck failures |
+| **INF-06** | Staging environment parity | P1 | ⏳ Pending | Separate staging apps + DB/Redis/MinIO with branch-based deploy and smoke route checks |
+| **INF-07** | Release/migration runbook enforcement | P1 | ⏳ Pending | Versioned checklist used for every deploy (migrate order, rollback, verification gates) |
+
+### Planned Execution Order
+
+1. **Wave A (stability first):** INF-01, INF-02, INF-03
+2. **Wave B (safety net):** INF-04, INF-05
+3. **Wave C (scale process):** INF-06, INF-07
+
+---
+
 ## Recent Updates
+
+### Infra Hardening Plan Added (February 19, 2026)
+
+- Added deferred production infra backlog and acceptance gates (`INF-01` to `INF-07`).
+- Locked execution order for future implementation waves (A/B/C).
+- Baseline recorded for tracking: 8/15 infra checklist items complete, 7/15 pending.
 
 ### Platform Hardening Pass (February 19, 2026)
 

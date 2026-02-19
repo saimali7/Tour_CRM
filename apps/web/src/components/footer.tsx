@@ -28,9 +28,12 @@ export function Footer({
 
   return (
     <footer className="border-t border-border bg-surface-soft">
-      <div className="container px-4 py-12">
-        <div className="mb-8 rounded-2xl border border-border bg-card p-5 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mx-auto w-full max-w-[1560px] px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mb-12 rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/20 p-8 sm:p-10 shadow-sm relative overflow-hidden">
+          {/* Decorative background element */}
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between relative z-10">
             <div>
               <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Plan your next adventure</p>
               <h3 className="mt-1 font-display text-2xl">Ready to lock your dates?</h3>
@@ -38,10 +41,10 @@ export function Footer({
                 Check live availability, secure your seats, and get instant booking confirmation with {orgName}.
               </p>
             </div>
-            <Button asChild className="bg-foreground text-background hover:bg-foreground/90 sm:min-w-[220px]">
-              <Link href="/" className="inline-flex items-center justify-center gap-2">
-                Book your next adventure
-                <ArrowRight className="h-4 w-4" />
+            <Button asChild className="h-12 bg-foreground text-background hover:bg-foreground/90 sm:min-w-[240px] shadow-md transition-all hover:scale-[1.02] active:scale-95 text-base">
+              <Link href="/#tours" className="inline-flex items-center justify-center gap-2">
+                Check Availability
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </Button>
           </div>
@@ -77,6 +80,8 @@ export function Footer({
             <h4 className="mb-3 font-semibold">Quick Links</h4>
             <nav className="flex flex-col space-y-2">
               <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-primary">All Tours</Link>
+              <Link href="/private-tours" className="text-sm text-muted-foreground transition-colors hover:text-primary">Private Tours</Link>
+              <Link href="/booking" className="text-sm text-muted-foreground transition-colors hover:text-primary">Manage Booking</Link>
               <Link href="/about" className="text-sm text-muted-foreground transition-colors hover:text-primary">About Us</Link>
               <Link href="/contact" className="text-sm text-muted-foreground transition-colors hover:text-primary">Contact</Link>
               <Link href="/terms" className="text-sm text-muted-foreground transition-colors hover:text-primary">Terms & Conditions</Link>
