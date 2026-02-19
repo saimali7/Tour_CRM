@@ -1,7 +1,12 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@tour/ui", "@tour/database", "@tour/services", "@tour/validators", "@tour/config"],
+  turbopack: {
+    root: path.resolve(__dirname, "../.."),
+  },
+  outputFileTracingRoot: path.resolve(__dirname, "../.."),
   // Note: typedRoutes disabled until all static pages (about, contact, terms, privacy) are created
   // typedRoutes: true,
   typescript: {

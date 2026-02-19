@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
+  outputFileTracingRoot: path.resolve(__dirname, "../.."),
   typescript: {
     // We run typecheck separately
     ignoreBuildErrors: process.env.CI === "true",

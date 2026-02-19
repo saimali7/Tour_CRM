@@ -27,6 +27,13 @@ export const metadata: Metadata = {
   },
   description: "Book amazing tours and experiences with trusted local operators.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"),
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
   robots: {
     index: true,
     follow: true,

@@ -1,7 +1,7 @@
 # Tour Operations Platform - Progress Tracker
 
 **Last Updated:** February 19, 2026
-**Status:** Phase 9 implementation in progress, core storefront overhaul merged
+**Status:** Phase 9 implementation in progress, storefront UAT + runtime hardening completed
 **Current Phase:** Phase 9 - Web-App Storefront Design & Feature Integration (Execution)
 **Main Branch:** `main`
 
@@ -58,7 +58,7 @@
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
 | **8** | Web App & Booking Flow | ✅ COMPLETE | 100% |
-| **9** | Web-App Storefront Design & Feature Integration | 🔄 IN PROGRESS | 80% |
+| **9** | Web-App Storefront Design & Feature Integration | 🔄 IN PROGRESS | 90% |
 
 ### Platform (SaaS & API)
 
@@ -87,6 +87,24 @@
 - Dependency/runtime stability fix:
   - moved `tailwindcss` into `packages/ui` runtime dependencies to avoid workspace CSS import resolution issues in local dev toolchains.
 
+### Phase 9 UAT + Runtime Hardening (February 19, 2026)
+
+- Next.js runtime hardening completed for monorepo dev/build stability:
+  - `apps/web/next.config.ts` now uses monorepo-root `turbopack.root` and `outputFileTracingRoot`,
+  - `apps/crm/next.config.ts` now uses monorepo-root `outputFileTracingRoot`.
+- Storefront icon metadata wired and `apps/web/src/app/icon.svg` added to eliminate browser favicon 404 console noise during UAT.
+- Phase 9 vision verification pass completed against `docs/PHASE_9_VISION.md`:
+  - desktop storefront paths validated (landing, about, contact, terms, privacy, booking lookup, tour detail, booking flow),
+  - mobile storefront paths validated (mobile nav, fixed booking bar, date-slot-to-book flow, compact booking step indicator).
+- Validation gate for this pass:
+  - `pnpm --filter @tour/web typecheck` ✅
+  - `pnpm --filter @tour/web lint` ✅
+  - `pnpm --filter @tour/web build` ✅
+  - `pnpm --filter @tour/crm build` ✅
+  - Playwright UAT pass ✅ (desktop + mobile, zero console errors in clean production run)
+- Remaining to close Phase 9 at 100%:
+  - Lighthouse benchmark pass to lock target scores (`90+` performance, `95+` accessibility) from `PHASE_9_VISION.md` verification checklist.
+
 ### Phase 9 Execution Sprint (February 19, 2026)
 
 - Phase 9.1 foundation layer completed:
@@ -113,7 +131,8 @@
 - Validation status:
   - `pnpm --filter @tour/web typecheck` ✅
   - `pnpm --filter @tour/web lint` ✅
-  - Playwright UI validation currently blocked in this environment due MCP Playwright tool timeout despite running local web server; manual code-level QA and compile/lint verification performed while this blocker is investigated.
+  - `pnpm --filter @tour/web build` ✅
+  - Playwright UAT completed on desktop/mobile against `demo-tours.localhost:3001` ✅
 
 ### Phase 8 Rollup (February 18, 2026)
 
