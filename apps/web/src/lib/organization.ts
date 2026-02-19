@@ -63,6 +63,8 @@ export function getOrganizationBookingUrl(
  * Extract branding information from organization for theming
  */
 export function getOrganizationBranding(org: Organization) {
+  const socialLinks = extractSocialLinks(org);
+
   return {
     name: org.name,
     logo: org.logoUrl,
@@ -72,6 +74,8 @@ export function getOrganizationBranding(org: Organization) {
     website: org.website,
     address: formatAddress(org),
     timezone: org.timezone,
+    currency: org.settings?.defaultCurrency || org.currency || "USD",
+    socialLinks,
   };
 }
 
@@ -84,4 +88,24 @@ function formatAddress(org: Organization): string | null {
   );
 
   return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function extractSocialLinks(org: Organization): Record<string, string> {
+  const settings = (org.settings || {}) as Record<string, unknown>;
+  const socialSettings = settings.socialLinks as Record<string, unknown> | undefined;
+
+  const raw = {
+    instagram: socialSettings?.instagram,
+    facebook: socialSettings?.facebook,
+    tiktok: socialSettings?.tiktok,
+    youtube: socialSettings?.youtube,
+    x: socialSettings?.x,
+    tripadvisor: socialSettings?.tripadvisor,
+  };
+
+  return Object.fromEntries(
+    Object.entries(raw).filter((entry): entry is [string, string] => {
+      return typeof entry[1] === "string" && entry[1].trim().length > 0;
+    })
+  );
 }

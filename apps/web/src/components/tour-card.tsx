@@ -1,11 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Clock, Users, MapPin } from "lucide-react";
+import { Clock, Users, MapPin, Sparkles } from "lucide-react";
 import type { Tour } from "@tour/database";
 
 interface TourCardProps {
   tour: Tour;
   currency: string;
+  availabilityLabel?: string | null;
+  socialProofLabel?: string | null;
 }
 
 function formatDuration(minutes: number): string {
@@ -30,11 +32,16 @@ function formatPrice(price: string | number, currency: string): string {
   }).format(numericPrice);
 }
 
-export function TourCard({ tour, currency }: TourCardProps) {
+export function TourCard({
+  tour,
+  currency,
+  availabilityLabel,
+  socialProofLabel,
+}: TourCardProps) {
   return (
     <Link
       href={`/tours/${tour.slug}`}
-      className="group block bg-card rounded-lg border overflow-hidden hover:shadow-lg transition-all duration-200"
+      className="group block overflow-hidden rounded-xl border border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
@@ -63,14 +70,33 @@ export function TourCard({ tour, currency }: TourCardProps) {
 
         {/* Price Badge */}
         <div className="absolute bottom-3 right-3">
-          <span className="px-3 py-1.5 text-sm font-semibold bg-primary text-primary-foreground rounded-full">
+          <span className="rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground">
             From {formatPrice(tour.basePrice, currency)}
           </span>
+        </div>
+
+        {availabilityLabel && (
+          <div className="absolute bottom-3 left-3">
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+              {availabilityLabel}
+            </span>
+          </div>
+        )}
+
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/65 px-3 py-1 text-xs font-medium text-white opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          View Details
         </div>
       </div>
 
       {/* Content */}
       <div className="p-4">
+        {socialProofLabel && (
+          <p className="mb-2 inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+            <Sparkles className="h-3 w-3 text-amber-600" />
+            {socialProofLabel}
+          </p>
+        )}
         <h3 className="font-semibold text-lg mb-2 line-clamp-2 group-hover:text-primary transition-colors">
           {tour.name}
         </h3>

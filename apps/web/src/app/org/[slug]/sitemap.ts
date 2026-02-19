@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getOrganizationBySlug } from "@/lib/organization";
+import { getOrganizationBySlug, getOrganizationBookingUrl } from "@/lib/organization";
 import { createServices } from "@tour/services";
 
 /**
@@ -22,7 +22,7 @@ export default async function sitemap({
     return [];
   }
 
-  const baseUrl = `https://${org.slug}.book.tourplatform.com`;
+  const baseUrl = getOrganizationBookingUrl(org).replace(/\/$/, "");
   const services = createServices({ organizationId: org.id });
 
   // Get all public, active tours

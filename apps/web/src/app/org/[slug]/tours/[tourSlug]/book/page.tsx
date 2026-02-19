@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { requireOrganization } from "@/lib/organization";
 import { createServices, logger } from "@tour/services";
 import { BookingFlow } from "@/components/booking-flow";
+import { parseDateKeyToLocalDate } from "@/lib/date-key";
+import { Breadcrumb, PageShell, SectionHeader } from "@/components/layout";
 
 interface PageProps {
   params: Promise<{ slug: string; tourSlug: string }>;
@@ -35,10 +37,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function BookTourPage({ params, searchParams }: PageProps) {
   const { slug, tourSlug } = await params;
   const { date, time } = await searchParams;
+  const tourPath = `/org/${slug}/tours/${tourSlug}`;
 
-  // Redirect back to tour page if no date/time selected
   if (!date || !time) {
-    redirect(`/tours/${tourSlug}`);
+    redirect(tourPath);
   }
 
   const org = await requireOrganization(slug);
@@ -52,49 +54,48 @@ export default async function BookTourPage({ params, searchParams }: PageProps) 
     notFound();
   }
 
-  // Only allow booking of active, public tours
   if (tour.status !== "active" || !tour.isPublic) {
     notFound();
   }
 
-  // Parse booking date and time
-  const bookingDate = new Date(date);
+  let bookingDate: Date;
+  try {
+    bookingDate = parseDateKeyToLocalDate(date);
+  } catch {
+    redirect(tourPath);
+  }
   const bookingTime = time;
 
-  // Check slot availability
   const availability = await services.tourAvailability.checkSlotAvailability({
     tourId: tour.id,
     date: bookingDate,
     time: bookingTime,
-    requestedSpots: 1, // Basic check - actual spots checked during booking
+    requestedSpots: 1,
   });
 
   if (!availability.available) {
-    redirect(`/tours/${tourSlug}?error=${availability.reason || "unavailable"}`);
+    redirect(`${tourPath}?error=${availability.reason || "unavailable"}`);
   }
 
-  // Get pricing tiers
-  const pricingTiers = await services.tour.getPricingTiers(tour.id);
+  const [pricingTiers, bookingOptions] = await Promise.all([
+    services.tour.getPricingTiers(tour.id),
+    services.bookingOption.getActiveByTourId(tour.id),
+  ]);
   const activeTiers = pricingTiers.filter((tier) => tier.isActive);
 
   const currency = org.settings?.defaultCurrency || "USD";
 
   return (
-    <div className="container px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-muted-foreground mb-6">
-        <a href="/" className="hover:text-primary">
-          Tours
-        </a>
-        <span className="mx-2">/</span>
-        <a href={`/tours/${tourSlug}`} className="hover:text-primary">
-          {tour.name}
-        </a>
-        <span className="mx-2">/</span>
-        <span>Book</span>
-      </nav>
+    <PageShell>
+      <Breadcrumb
+        items={[
+          { label: "Tours", href: `/org/${slug}` },
+          { label: tour.name, href: tourPath },
+          { label: "Book" },
+        ]}
+      />
 
-      <h1 className="text-2xl font-bold mb-8">Complete Your Booking</h1>
+      <SectionHeader title="Complete Your Booking" subtitle="Review your details carefully before secure checkout." />
 
       <BookingFlow
         tour={tour}
@@ -102,9 +103,12 @@ export default async function BookTourPage({ params, searchParams }: PageProps) 
         bookingTime={bookingTime}
         availableSpots={availability.spotsRemaining ?? tour.maxParticipants}
         pricingTiers={activeTiers}
+        bookingOptions={bookingOptions}
         currency={currency}
+        taxConfig={org.settings?.tax}
         organizationName={org.name}
+        organizationSlug={slug}
       />
-    </div>
+    </PageShell>
   );
 }

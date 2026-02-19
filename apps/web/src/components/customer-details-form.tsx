@@ -7,6 +7,7 @@ import { useBooking, type CustomerDetails, type BookingParticipant } from "@/lib
 
 interface CustomerDetailsFormProps {
   requireParticipantNames?: boolean;
+  organizationSlug: string;
 }
 
 function formatPrice(price: number, currency: string): string {
@@ -18,7 +19,10 @@ function formatPrice(price: number, currency: string): string {
   }).format(price);
 }
 
-export function CustomerDetailsForm({ requireParticipantNames = false }: CustomerDetailsFormProps) {
+export function CustomerDetailsForm({
+  requireParticipantNames = false,
+  organizationSlug,
+}: CustomerDetailsFormProps) {
   const { state, setCustomer, updateParticipant, nextStep, prevStep } = useBooking();
 
   const [customer, setCustomerLocal] = useState<CustomerDetails>({
@@ -402,11 +406,11 @@ export function CustomerDetailsForm({ requireParticipantNames = false }: Custome
 
       <p className="text-xs text-muted-foreground text-center">
         By continuing, you agree to our{" "}
-        <a href="/terms" className="text-primary hover:underline">
+        <a href={`/org/${organizationSlug}/terms`} className="text-primary hover:underline">
           Terms of Service
         </a>{" "}
         and{" "}
-        <a href="/privacy" className="text-primary hover:underline">
+        <a href={`/org/${organizationSlug}/privacy`} className="text-primary hover:underline">
           Privacy Policy
         </a>
         .

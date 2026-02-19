@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization, getOrganizationBranding } from "@/lib/organization";
+import { Breadcrumb, CardSurface, PageShell } from "@/components/layout";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -15,169 +16,126 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
+interface TermsSection {
+  id: string;
+  title: string;
+  body?: string;
+  bullets?: string[];
+}
+
+const sections: TermsSection[] = [
+  {
+    id: "agreement",
+    title: "Agreement to Terms",
+    body: "By accessing or using our booking services, you agree to these Terms of Service. If you do not agree, please do not use our services.",
+  },
+  {
+    id: "booking",
+    title: "Booking and Reservations",
+    bullets: [
+      "Provide accurate and complete booking information",
+      "Be at least 18 years of age or have parental consent",
+      "Pay all fees associated with your reservation",
+      "Arrive at the designated meeting point on time",
+      "Follow all safety instructions from guides",
+    ],
+  },
+  {
+    id: "pricing",
+    title: "Pricing and Payment",
+    body: "Prices are shown in the displayed currency and may include taxes depending on jurisdiction. Payment processing is handled through our secure payment partners.",
+  },
+  {
+    id: "cancellation",
+    title: "Cancellation Policy",
+    body: "Cancellation windows and refund eligibility vary by tour. The policy shown on each tour page applies to that booking.",
+  },
+  {
+    id: "liability",
+    title: "Limitation of Liability",
+    body: "While we prioritize safety and quality, participation in tours may involve inherent risk. Liability is limited to the maximum extent permitted by applicable law.",
+  },
+  {
+    id: "updates",
+    title: "Changes to Terms",
+    body: "We may update these terms from time to time. Continued use of our services after updates are published constitutes acceptance.",
+  },
+];
+
 export default async function TermsPage({ params }: PageProps) {
   const { slug } = await params;
   const org = await requireOrganization(slug);
   const branding = getOrganizationBranding(org);
 
-  const lastUpdated = "January 1, 2025";
+  const lastUpdated = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
 
   return (
-    <div className="container px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-muted-foreground mb-6">
-        <a href="/" className="hover:text-primary">
-          Tours
-        </a>
-        <span className="mx-2">/</span>
-        <span>Terms of Service</span>
-      </nav>
+    <PageShell>
+      <Breadcrumb
+        items={[
+          { label: "Tours", href: `/org/${slug}` },
+          { label: "Terms of Service" },
+        ]}
+      />
 
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-4xl font-bold mb-4">Terms of Service</h1>
-        <p className="text-muted-foreground mb-8">Last updated: {lastUpdated}</p>
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
+          <div className="sticky top-24 rounded-lg border border-border bg-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">On this page</p>
+            <nav className="mt-3 space-y-2">
+              {sections.map((section) => (
+                <a key={section.id} href={`#${section.id}`} className="block text-sm text-muted-foreground hover:text-primary">
+                  {section.title}
+                </a>
+              ))}
+            </nav>
+          </div>
+        </aside>
 
-        <div className="prose prose-neutral max-w-none space-y-8">
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">1. Agreement to Terms</h2>
-            <p className="text-muted-foreground">
-              By accessing or using the services provided by {branding.name}
-              (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), you agree to be
-              bound by these Terms of Service. If you do not agree to these terms,
-              please do not use our services.
-            </p>
-          </section>
+        <div className="mx-auto w-full max-w-3xl">
+          <h1 className="mb-3 text-4xl font-bold">Terms of Service</h1>
+          <p className="mb-8 text-sm text-muted-foreground">Last updated: {lastUpdated}</p>
 
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">2. Booking and Reservations</h2>
-            <p className="text-muted-foreground mb-3">
-              When you make a booking through our platform, you agree to:
-            </p>
-            <ul className="list-disc pl-6 text-muted-foreground space-y-2">
-              <li>Provide accurate and complete information</li>
-              <li>Be at least 18 years of age or have parental consent</li>
-              <li>Pay all fees associated with your booking</li>
-              <li>Arrive at the designated meeting point on time</li>
-              <li>Follow all safety instructions provided by guides</li>
-            </ul>
-          </section>
+          <div className="space-y-6">
+            {sections.map((section, index) => (
+              <CardSurface key={section.id} className="scroll-mt-24" id={section.id}>
+                <h2 className="mb-3 text-2xl font-semibold">{index + 1}. {section.title}</h2>
+                {section.body ? <p className="text-muted-foreground">{section.body}</p> : null}
+                {section.bullets ? (
+                  <ul className="list-disc space-y-2 pl-6 text-muted-foreground">
+                    {section.bullets.map((bullet) => (
+                      <li key={bullet}>{bullet}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </CardSurface>
+            ))}
 
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">3. Pricing and Payment</h2>
-            <p className="text-muted-foreground mb-3">
-              All prices displayed are in the currency specified and include
-              applicable taxes unless otherwise stated. Payment is required at the
-              time of booking to secure your reservation.
-            </p>
-            <p className="text-muted-foreground">
-              We accept major credit cards and other payment methods as displayed
-              during checkout. Your payment information is processed securely through
-              our payment provider.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">4. Cancellation Policy</h2>
-            <p className="text-muted-foreground mb-3">
-              Cancellation policies vary by tour and are displayed on each tour&apos;s
-              detail page. Generally:
-            </p>
-            <ul className="list-disc pl-6 text-muted-foreground space-y-2">
-              <li>
-                Cancellations made within the free cancellation window receive a full
-                refund
-              </li>
-              <li>
-                Late cancellations may be subject to partial or no refund depending on
-                the tour&apos;s specific policy
-              </li>
-              <li>No-shows are not eligible for refunds</li>
-              <li>
-                We reserve the right to cancel tours due to weather, safety concerns,
-                or insufficient participants, with full refunds provided in such cases
-              </li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">5. Modifications</h2>
-            <p className="text-muted-foreground">
-              Booking modifications are subject to availability. Please contact us as
-              early as possible if you need to change your booking date or other
-              details. Additional fees may apply for certain modifications.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">
-              6. Participant Responsibilities
-            </h2>
-            <p className="text-muted-foreground mb-3">As a tour participant, you:</p>
-            <ul className="list-disc pl-6 text-muted-foreground space-y-2">
-              <li>Are responsible for your own safety and belongings</li>
-              <li>
-                Must disclose any medical conditions that may affect your
-                participation
-              </li>
-              <li>Agree to follow all rules and instructions given by guides</li>
-              <li>Will treat other participants, guides, and locals with respect</li>
-              <li>Accept that certain activities involve inherent risks</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">7. Limitation of Liability</h2>
-            <p className="text-muted-foreground">
-              While we take every precaution to ensure your safety and satisfaction,
-              {branding.name} is not liable for any injuries, losses, or damages that
-              occur during tours, except where caused by our negligence. We recommend
-              appropriate travel insurance for all bookings.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">8. Intellectual Property</h2>
-            <p className="text-muted-foreground">
-              All content on our website, including text, images, logos, and
-              multimedia, is owned by {branding.name} and protected by copyright law.
-              You may not reproduce, distribute, or use our content without prior
-              written permission.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">9. Changes to Terms</h2>
-            <p className="text-muted-foreground">
-              We may update these terms from time to time. Continued use of our
-              services after changes are posted constitutes acceptance of the revised
-              terms. We encourage you to review this page periodically.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">10. Contact Information</h2>
-            <p className="text-muted-foreground mb-3">
-              If you have questions about these Terms of Service, please contact us:
-            </p>
-            {branding.email && (
+            <CardSurface id="contact" className="scroll-mt-24">
+              <h2 className="mb-3 text-2xl font-semibold">Contact Information</h2>
               <p className="text-muted-foreground">
-                Email:{" "}
+                If you have questions about these terms, contact us at{" "}
                 <a href={`mailto:${branding.email}`} className="text-primary hover:underline">
                   {branding.email}
                 </a>
+                {branding.phone ? (
+                  <>
+                    {" "}or call{" "}
+                    <a href={`tel:${branding.phone}`} className="text-primary hover:underline">
+                      {branding.phone}
+                    </a>
+                  </>
+                ) : null}
+                .
               </p>
-            )}
-            {branding.phone && (
-              <p className="text-muted-foreground">
-                Phone:{" "}
-                <a href={`tel:${branding.phone}`} className="text-primary hover:underline">
-                  {branding.phone}
-                </a>
-              </p>
-            )}
-          </section>
+            </CardSurface>
+          </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

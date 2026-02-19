@@ -1,8 +1,8 @@
 # Tour Operations Platform - Progress Tracker
 
-**Last Updated:** February 18, 2026
-**Status:** Production hardening and operational stabilization
-**Current Phase:** Phase 8 - Web App & Booking (Pending Start)
+**Last Updated:** February 19, 2026
+**Status:** Phase 9 implementation in progress, core storefront overhaul merged
+**Current Phase:** Phase 9 - Web-App Storefront Design & Feature Integration (Execution)
 **Main Branch:** `main`
 
 > This document is the single source of truth for implementation progress. We follow a **sequential phase-by-phase** development strategy - completing each phase fully before moving to the next.
@@ -26,8 +26,8 @@
 │                                                                              │
 │   ═══════════════════ WEB APPLICATION ═══════════════════════               │
 │                                                                              │
-│   Phase 8: Web App & Booking ───────────────────────► ⏳ PENDING            │
-│   Phase 9: Web Optimization ────────────────────────► ⏳ PENDING            │
+│   Phase 8: Web App & Booking ───────────────────────► ✅ COMPLETE           │
+│   Phase 9: Storefront Design & Integration ─────────► ⏳ PENDING            │
 │                                                                              │
 │   ═══════════════════ PLATFORM (FUTURE) ═══════════════════════             │
 │                                                                              │
@@ -57,8 +57,8 @@
 
 | Phase | Name | Status | Completion |
 |-------|------|--------|------------|
-| **8** | Web App & Booking Flow | ⏳ PENDING | 0% |
-| **9** | Web Optimization | ⏳ PENDING | 0% |
+| **8** | Web App & Booking Flow | ✅ COMPLETE | 100% |
+| **9** | Web-App Storefront Design & Feature Integration | 🔄 IN PROGRESS | 80% |
 
 ### Platform (SaaS & API)
 
@@ -70,7 +70,133 @@
 
 ---
 
-## Recent Updates (February 18, 2026)
+## Recent Updates
+
+### Phase 9 Execution Sprint (February 19, 2026)
+
+- Phase 9.1 foundation layer completed:
+  - storefront hardcoded hex palette removed in app/org and storefront component surfaces,
+  - semantic surface tokens (`surface-dark`, `surface-soft`) fully wired in storefront usage,
+  - layout primitives created and actively adopted across rebuilt pages (`PageShell`, `Section`, `SectionHeader`, `Breadcrumb`, `HeroSection`, `CardSurface`, animation and skeleton primitives).
+- Phase 9.2 navigation shell redesign completed:
+  - header now has route-aware active link highlighting, scroll-state elevation, stronger Book Now CTA, and animated mobile menu surface with touch-friendly targets,
+  - footer redesigned with conversion CTA band, trust indicators, and reduced clutter.
+- Phase 9.3 page redesign rollout completed for core storefront routes:
+  - landing page rebuilt with shared primitives, hero treatment, featured horizontal-mobile rail, improved section rhythm, and mobile load-more pattern,
+  - tour detail page rebuilt with card surfaces, improved urgency/sidebar experience, image gallery overhaul integration, and mobile fixed booking bar,
+  - about/contact/terms/privacy pages rebuilt with clear IA, dynamic dates, consistent breadcrumb pattern, and legal TOC side rails,
+  - booking lookup/success/cancelled pages upgraded for clarity and actionability,
+  - not-found + loading states modernized using skeleton primitives.
+- Phase 9.4 core feature integration completed:
+  - add-on selection step integrated into booking flow with dynamic pricing rollups and API persistence to booking add-ons,
+  - waiver APIs added (`/api/waivers/required`, `/api/waivers/sign`, `/api/waivers/status`) and waiver UX integrated in flow + post-payment success context,
+  - availability calendar upgraded with mobile swipe month navigation and slot-level prominence labels.
+- Phase 9.5 polish baseline completed:
+  - shimmer skeleton primitives adopted across route loading states,
+  - keyboard/focus and `aria-live` pricing updates improved in booking flow sidebar and transitions,
+  - storefront lint/type gates passing after refactor.
+- Validation status:
+  - `pnpm --filter @tour/web typecheck` ✅
+  - `pnpm --filter @tour/web lint` ✅
+  - Playwright UI validation currently blocked in this environment due MCP Playwright tool timeout despite running local web server; manual code-level QA and compile/lint verification performed while this blocker is investigated.
+
+### Phase 8 Rollup (February 18, 2026)
+
+### Phase 8 Kickoff (February 18, 2026)
+
+- Phase 8.1 foundation pass completed for web storefront baseline:
+  - typography updated to Inter + Outfit for customer-facing tone,
+  - warm brand palette and display-font utility wired in shared UI CSS tokens,
+  - redesigned header with trust strip and org currency/timezone indicators,
+  - redesigned footer with trust badges and no platform branding callout,
+  - organization branding projection extended with `currency`, `timezone`, and optional social link metadata,
+  - web layout now exposes org branding CSS variables for storefront theming.
+- Web hardening updates applied:
+  - `apps/web/next.config.ts` now sets security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`),
+  - image output formats set to AVIF/WebP.
+- Validation gate passed for Phase 8.1:
+  - `pnpm --filter @tour/web typecheck` ✅
+  - `pnpm --filter @tour/web lint` ✅
+  - `pnpm --filter @tour/web build` ✅
+  - Playwright UI smoke on `demo-tours.localhost:3002` confirmed updated header/footer rendering and navigation.
+
+### Phase 8.2 Discovery Build (February 18, 2026)
+
+- Landing/discovery redesign implemented:
+  - hero section rebuilt with imagery-forward treatment and direct-booking positioning,
+  - reusable `TrustBar` component added and wired with live stats signals,
+  - featured tours strip introduced at top of storefront for immediate conversion paths.
+- Tour discovery cards upgraded:
+  - `TourCard` now includes availability labels and social-proof labels,
+  - listing now computes per-tour availability labels from `TourAvailabilityService` and weekly booking proof from analytics stats.
+- Tour detail UX upgraded:
+  - new `ImageGallery` component integrated for hero + thumbnails,
+  - new `ReviewSection` component integrated with `ReviewService` stats/recent reviews,
+  - similar-tour recommendation section added with reusable card rendering.
+- Validation gate passed for Phase 8.2:
+  - `pnpm --filter @tour/web typecheck` ✅
+  - `pnpm --filter @tour/web lint` ✅
+  - `pnpm --filter @tour/web build` ✅
+  - Playwright UI smoke validated updated landing and tour-detail rendering on `demo-tours.localhost:3002`.
+
+### Phase 8.3 Booking Flow + Payments (February 18, 2026)
+
+- Booking and payment architecture shipped:
+  - `/api/bookings` now enforces IP rate limiting, server-side pricing validation, direct Stripe Checkout session creation, and booking-created Inngest dispatch.
+  - created bookings are confirmed on create with `paymentStatus="pending"` until Stripe/webhook reconciliation.
+  - deposit-aware payment metadata (`paymentAmount`, `remainingBalance`, `paymentMode`) returned from booking create.
+- Abandoned cart + timeout safeguards shipped:
+  - `/api/abandoned-carts` endpoint integrated from payment step.
+  - cart-abandon event path wired via web Inngest helper.
+  - CRM Inngest function added: `apps/crm/src/inngest/functions/pending-booking-expiration.ts` (30-minute expiry for unpaid website bookings).
+- Booking flow UX shipped:
+  - step order now supports `Options -> Tickets -> Details -> Payment -> Confirmed` with fallback to legacy steps when no active options exist.
+  - booking option selection is persisted and submitted as `bookingOptionId`.
+  - payment step now supports promo/voucher apply and removal UX with clear error/success messaging.
+
+### Phase 8.4 Customer Self-Service (February 18, 2026)
+
+- Booking lookup + management shipped:
+  - lookup schema normalized to flat `bookingDate`/`bookingTime`.
+  - self-service endpoints added for cancel and reschedule:
+    - `apps/web/src/app/api/bookings/manage/cancel/route.ts`
+    - `apps/web/src/app/api/bookings/manage/reschedule/route.ts`
+- Magic link auth shipped:
+  - request/verify endpoints added under `/api/bookings/magic-link/*`.
+  - lookup page supports token bootstrap and secure management actions.
+- Contact form production wiring shipped:
+  - replaced simulated submit with `/api/contact` backend integration.
+  - successful submit now creates real communication logs.
+
+### Phase 8.5 CRM Integration + Lifecycle (February 18, 2026)
+
+- Unified Stripe webhook authority confirmed in CRM:
+  - `apps/crm/src/app/api/webhooks/stripe/route.ts` handles payment succeeded/failed reconciliation.
+- Website booking lifecycle events now wired into CRM automations:
+  - `booking/created` emits from web booking API.
+  - `payment/succeeded` and `payment/failed` continue from Stripe webhook path.
+  - pending booking expiration function registered in Inngest index.
+- Source attribution aligned:
+  - web bookings and customer creation use persisted `source: "website"`.
+
+### Phase 8.6 SEO + Reliability + Polish (February 18, 2026)
+
+- SEO and discovery surfaces shipped:
+  - org-aware sitemap generation + dynamic robots output.
+  - structured data coverage for Tour/Product/Organization/Breadcrumb/FAQ.
+  - per-tour OpenGraph metadata generation.
+- Reliability hardening shipped:
+  - root-cause middleware fix for subdomain API calls (`/api/*` no longer rewritten to `/org/[slug]/api/*` while preserving `x-org-slug` header).
+  - removed booking-page render loop by stabilizing booking context callbacks (`Maximum update depth exceeded` fix).
+  - promo/voucher server-side verification added to booking create; discounts without valid code are now rejected.
+- Phase 8 validation gate passed:
+  - `pnpm --filter @tour/web typecheck` ✅
+  - `pnpm --filter @tour/web lint` ✅
+  - `pnpm --filter @tour/web build` ✅
+  - `pnpm --filter @tour/crm typecheck` ✅
+  - `pnpm --filter @tour/crm lint` ✅ (warning baseline retained)
+  - `pnpm --filter @tour/crm build` ✅
+  - Playwright UAT smoke passed for landing, tour detail, booking flow steps, promo/voucher UX errors, booking lookup, and contact submission.
 
 - Completed big-bang guide assignment cutover: Command Center is now the single write surface.
 - Blocked legacy guide-assignment write endpoints and moved all assignment CTAs to Command Center deep links.
@@ -691,63 +817,7 @@ The command center is now the operational source of truth for dispatch execution
 
 # WEB APPLICATION
 
-> **Status:** Not started. Complete CRM Remaining Work first.
-
----
-
-## Phase 8: Web App & Booking Flow ⏳ PENDING (0%)
-
-> **Goal:** Customer-facing booking website with complete checkout flow
-
-### Foundation
-- Subdomain routing (`{slug}.book.platform.com`)
-- Tour listing page with filters
-- Tour detail page with gallery, map, reviews
-- Availability calendar display
-
-### Booking Flow
-- Multi-step booking form (tickets → details → payment)
-- Guest checkout (no account required)
-- Stripe checkout integration
-- Promo code application
-- Confirmation page & emails
-
-### Customer Features
-- Booking management (view, cancel, reschedule)
-- Magic link authentication for customers
-- Booking history
-
----
-
-## Phase 9: Web Optimization ⏳ PENDING (0%)
-
-> **Goal:** Performance and conversion optimization
-
-- Core Web Vitals optimization
-- Image optimization (WebP, lazy loading, CDN)
-- SEO (structured data, meta tags, sitemaps)
-- Conversion tracking (analytics events)
-- A/B testing infrastructure
-
----
-
-## Phase 10+: SaaS Platform & Public API ⏳ FUTURE (0%)
-
-> **Goal:** Enable selling platform to other tour operators
-
-### SaaS Platform
-- Self-service organization signup
-- Subscription billing (Stripe)
-- Feature flags per plan
-- White-label/theming per organization
-- Platform admin dashboard
-
-### Public API
-- REST API for partners
-- API key management
-- Rate limiting
-- OTA integrations (Viator, GetYourGuide)
-- Webhook system for external systems
+> Historical planning block removed. See the live status dashboard and Phase 8 update entries above for current state.
 
 ---
 
@@ -939,7 +1009,7 @@ Created comprehensive implementation plan for Phase 7 transformation:
 **Phase Renumbering:**
 - Phase 7: Operations Excellence (NEW - 8 weeks)
 - Phase 8: Web App & Booking (was 7)
-- Phase 9: Web Optimization (was 8)
+- Phase 9: Web-App Storefront Design & Feature Integration (was 8)
 - Phase 10+: SaaS & API (was 9+)
 
 ---

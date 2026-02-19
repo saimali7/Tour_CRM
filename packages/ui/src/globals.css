@@ -14,6 +14,9 @@
   /* Background & Surface */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
+  --color-surface-dark: hsl(var(--surface-dark));
+  --color-surface-dark-foreground: hsl(var(--surface-dark-foreground));
+  --color-surface-soft: hsl(var(--surface-soft));
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
   --color-popover: hsl(var(--popover));
@@ -54,6 +57,7 @@
 
   /* Font family */
   --font-sans: var(--font-sans-custom, ui-sans-serif, system-ui, sans-serif);
+  --font-display: var(--font-display-custom, var(--font-sans-custom, ui-sans-serif, system-ui, sans-serif));
   --font-mono: var(
     --font-mono-custom,
     ui-monospace,
@@ -164,35 +168,38 @@
 
 :root {
   /* Background & Foreground */
-  --background: 0 0% 100%;           /* #FFFFFF */
-  --foreground: 220 13% 9%;          /* #111827 (gray-900) */
+  --background: 34 100% 99%;         /* warm white */
+  --foreground: 20 28% 14%;          /* deep brown slate */
+  --surface-dark: 20 40% 12%;
+  --surface-dark-foreground: 40 100% 96%;
+  --surface-soft: 31 63% 97%;
 
   /* Card surfaces */
   --card: 0 0% 100%;
-  --card-foreground: 220 13% 9%;
+  --card-foreground: 20 28% 14%;
 
   /* Popover surfaces */
   --popover: 0 0% 100%;
-  --popover-foreground: 220 13% 9%;
+  --popover-foreground: 20 28% 14%;
 
-  /* Primary - Blue (#2563EB / #1D4ED8 hover) */
-  --primary: 221 83% 53%;            /* #2563EB */
+  /* Primary - Sandstone orange */
+  --primary: 24 71% 43%;
   --primary-foreground: 210 40% 98%;
 
-  /* Secondary - Subtle gray */
-  --secondary: 220 14% 96%;          /* #F3F4F6 (gray-100) */
-  --secondary-foreground: 220 9% 24%; /* #374151 (gray-700) */
+  /* Secondary - Warm neutral */
+  --secondary: 29 57% 95%;
+  --secondary-foreground: 20 25% 22%;
 
   /* Muted - For disabled, secondary text */
-  --muted: 220 14% 96%;
-  --muted-foreground: 220 9% 43%;    /* #6B7280 (gray-500) */
+  --muted: 30 37% 95%;
+  --muted-foreground: 22 15% 42%;
 
   /* Accent - For hover states */
-  --accent: 220 14% 96%;
-  --accent-foreground: 220 9% 24%;
+  --accent: 30 55% 93%;
+  --accent-foreground: 20 25% 22%;
 
   /* Destructive - Red (#DC2626) */
-  --destructive: 0 72% 51%;          /* #DC2626 */
+  --destructive: 0 72% 51%;
   --destructive-foreground: 210 40% 98%;
 
   /* Success - Green (#059669) */
@@ -208,13 +215,13 @@
   --info-foreground: 0 0% 100%;
 
   /* Brand Accent - Sunset Orange */
-  --brand: 20 90% 52%;               /* #F05A28 - warm sunset orange */
+  --brand: 22 86% 50%;
   --brand-foreground: 0 0% 100%;     /* White text on brand */
 
   /* Borders & Inputs */
-  --border: 220 13% 91%;             /* #E5E7EB (gray-200) */
-  --input: 220 13% 91%;
-  --ring: 221 83% 53%;               /* Same as primary */
+  --border: 28 36% 86%;
+  --input: 28 36% 86%;
+  --ring: 24 71% 43%;
 
   /* Border radius base */
   --radius: 0.5rem;                  /* 8px */
@@ -230,6 +237,9 @@
   /* Deep blue-black base — 4% sat at hue 225 is felt, never seen */
   --background: 225 4% 3.5%;
   --foreground: 210 5% 94%;             /* Cool crisp white (94% avoids OLED glow) */
+  --surface-dark: 225 6% 11%;
+  --surface-dark-foreground: 210 5% 94%;
+  --surface-soft: 225 5% 8%;
 
   /* Elevated surfaces — 3% gap between bg and card for reliable separation */
   --card: 225 4% 6.5%;
@@ -294,6 +304,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.font-display {
+  font-family: var(--font-display);
+}
+
 /* Focus visible - consistent focus ring */
 *:focus-visible {
   outline: 2px solid var(--color-ring);
@@ -316,6 +330,11 @@ body {
 :root [class*="rounded-lg"][class*="border"][class*="bg-card"] {
   box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.03),
               0 1px 3px 0 hsl(0 0% 0% / 0.05);
+}
+
+.glass-surface {
+  background: linear-gradient(135deg, hsl(0 0% 100% / 0.86), hsl(29 70% 97% / 0.64));
+  backdrop-filter: blur(14px);
 }
 
 /* Elevated cards (hover, focus) */

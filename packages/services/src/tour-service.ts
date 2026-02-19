@@ -295,6 +295,7 @@ export class TourService extends BaseService {
    */
   async create(input: CreateTourInput): Promise<TourWithProduct> {
     const slug = input.slug || this.slugify(input.name);
+    const resolvedIsPublic = input.isPublic ?? input.status === "active";
 
     // Check if slug already exists in products (unified catalog)
     const existingProduct = await this.db.query.products.findFirst({
@@ -336,7 +337,7 @@ export class TourService extends BaseService {
           description: input.description,
           shortDescription: input.shortDescription,
           status: productStatus,
-          visibility: input.isPublic ? "public" : "private",
+          visibility: resolvedIsPublic ? "public" : "private",
           basePrice: input.basePrice,
           currency: input.currency || "AED",
           featuredImage: input.coverImageUrl,
@@ -391,7 +392,7 @@ export class TourService extends BaseService {
           allowSameDayBooking: input.allowSameDayBooking,
           sameDayCutoffTime: input.sameDayCutoffTime,
           status: input.status || "draft",
-          isPublic: input.isPublic,
+          isPublic: resolvedIsPublic,
           metaTitle: input.metaTitle,
           metaDescription: input.metaDescription,
         })
@@ -427,31 +428,38 @@ export class TourService extends BaseService {
   async update(id: string, input: UpdateTourInput): Promise<Tour> {
     // Ensure tour exists and belongs to org
     const existingTour = await this.getById(id);
+    const shouldAutoPublicizeOnActivate =
+      input.status === "active" &&
+      existingTour.status !== "active" &&
+      input.isPublic === undefined;
+    const effectiveInput: UpdateTourInput = shouldAutoPublicizeOnActivate
+      ? { ...input, isPublic: true }
+      : input;
 
     // If updating slug, check for conflicts in both products and tours
-    if (input.slug) {
+    if (effectiveInput.slug) {
       const existingProduct = await this.db.query.products.findFirst({
         where: and(
-          eq(products.slug, input.slug),
+          eq(products.slug, effectiveInput.slug),
           eq(products.organizationId, this.organizationId),
           existingTour.productId ? sql`${products.id} != ${existingTour.productId}` : sql`1=1`
         ),
       });
 
       if (existingProduct) {
-        throw new ConflictError(`Product with slug "${input.slug}" already exists`);
+        throw new ConflictError(`Product with slug "${effectiveInput.slug}" already exists`);
       }
 
       const existingTourSlug = await this.db.query.tours.findFirst({
         where: and(
-          eq(tours.slug, input.slug),
+          eq(tours.slug, effectiveInput.slug),
           eq(tours.organizationId, this.organizationId),
           sql`${tours.id} != ${id}`
         ),
       });
 
       if (existingTourSlug) {
-        throw new ConflictError(`Tour with slug "${input.slug}" already exists`);
+        throw new ConflictError(`Tour with slug "${effectiveInput.slug}" already exists`);
       }
     }
 
@@ -459,22 +467,22 @@ export class TourService extends BaseService {
     if (existingTour.productId) {
       const productUpdates: Partial<Product> = {};
 
-      if (input.name !== undefined) productUpdates.name = input.name;
-      if (input.slug !== undefined) productUpdates.slug = input.slug;
-      if (input.description !== undefined) productUpdates.description = input.description;
-      if (input.shortDescription !== undefined) productUpdates.shortDescription = input.shortDescription;
-      if (input.basePrice !== undefined) productUpdates.basePrice = input.basePrice;
-      if (input.currency !== undefined) productUpdates.currency = input.currency;
-      if (input.coverImageUrl !== undefined) productUpdates.featuredImage = input.coverImageUrl;
-      if (input.images !== undefined) productUpdates.gallery = input.images;
-      if (input.metaTitle !== undefined) productUpdates.metaTitle = input.metaTitle;
-      if (input.metaDescription !== undefined) productUpdates.metaDescription = input.metaDescription;
-      if (input.tags !== undefined) productUpdates.tags = input.tags;
-      if (input.status !== undefined) {
-        productUpdates.status = this.mapTourStatusToProductStatus(input.status);
+      if (effectiveInput.name !== undefined) productUpdates.name = effectiveInput.name;
+      if (effectiveInput.slug !== undefined) productUpdates.slug = effectiveInput.slug;
+      if (effectiveInput.description !== undefined) productUpdates.description = effectiveInput.description;
+      if (effectiveInput.shortDescription !== undefined) productUpdates.shortDescription = effectiveInput.shortDescription;
+      if (effectiveInput.basePrice !== undefined) productUpdates.basePrice = effectiveInput.basePrice;
+      if (effectiveInput.currency !== undefined) productUpdates.currency = effectiveInput.currency;
+      if (effectiveInput.coverImageUrl !== undefined) productUpdates.featuredImage = effectiveInput.coverImageUrl;
+      if (effectiveInput.images !== undefined) productUpdates.gallery = effectiveInput.images;
+      if (effectiveInput.metaTitle !== undefined) productUpdates.metaTitle = effectiveInput.metaTitle;
+      if (effectiveInput.metaDescription !== undefined) productUpdates.metaDescription = effectiveInput.metaDescription;
+      if (effectiveInput.tags !== undefined) productUpdates.tags = effectiveInput.tags;
+      if (effectiveInput.status !== undefined) {
+        productUpdates.status = this.mapTourStatusToProductStatus(effectiveInput.status);
       }
-      if (input.isPublic !== undefined) {
-        productUpdates.visibility = input.isPublic ? "public" : "private";
+      if (effectiveInput.isPublic !== undefined) {
+        productUpdates.visibility = effectiveInput.isPublic ? "public" : "private";
       }
 
       if (Object.keys(productUpdates).length > 0) {
@@ -492,7 +500,7 @@ export class TourService extends BaseService {
     const [tour] = await this.db
       .update(tours)
       .set({
-        ...input,
+        ...effectiveInput,
         updatedAt: new Date(),
       })
       .where(and(eq(tours.id, id), eq(tours.organizationId, this.organizationId)))

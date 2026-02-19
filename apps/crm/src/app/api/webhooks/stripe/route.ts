@@ -189,7 +189,11 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
   }
 
   // Check if we've already processed this payment intent (idempotency)
-  if (booking.stripePaymentIntentId === paymentIntent.id && booking.paymentStatus === "paid") {
+  if (
+    booking.stripePaymentIntentId === paymentIntent.id &&
+    booking.paymentStatus === "paid" &&
+    booking.status === "confirmed"
+  ) {
     webhookLogger.info({
       paymentIntentId: paymentIntent.id,
       bookingId,
@@ -199,6 +203,12 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
 
   // Update booking payment status
   const amountInDollars = (paymentIntent.amount / 100).toFixed(2);
+  const shouldPreserveStatus =
+    booking.status === "cancelled" ||
+    booking.status === "completed" ||
+    booking.status === "no_show";
+  const shouldConfirmBooking =
+    !shouldPreserveStatus && booking.status !== "confirmed";
 
   await db
     .update(bookings)
@@ -206,6 +216,8 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
       paymentStatus: "paid",
       paidAmount: amountInDollars,
       stripePaymentIntentId: paymentIntent.id,
+      status: shouldConfirmBooking ? "confirmed" : booking.status,
+      confirmedAt: shouldConfirmBooking ? new Date() : booking.confirmedAt,
       updatedAt: new Date(),
     })
     .where(
@@ -217,7 +229,19 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
     paymentIntentId: paymentIntent.id,
     amount: amountInDollars,
     status: "paid",
+    bookingStatus: shouldConfirmBooking ? "confirmed" : booking.status,
   }, "Booking payment status updated");
+
+  if (shouldPreserveStatus) {
+    webhookLogger.warn(
+      {
+        bookingId,
+        paymentIntentId: paymentIntent.id,
+        bookingStatus: booking.status,
+      },
+      "Payment succeeded for booking in terminal status; status preserved"
+    );
+  }
 
   // Get customer details for the email
   const customer = await db.query.customers.findFirst({

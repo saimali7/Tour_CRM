@@ -24,6 +24,9 @@ export default async function OrgLayout({ children, params }: OrgLayoutProps) {
       style={
         {
           "--primary-color": branding.primaryColor,
+          "--org-primary-color": branding.primaryColor,
+          "--org-currency": branding.currency,
+          "--org-timezone": branding.timezone,
         } as React.CSSProperties
       }
     >
@@ -31,6 +34,8 @@ export default async function OrgLayout({ children, params }: OrgLayoutProps) {
         orgName={branding.name}
         logo={branding.logo}
         primaryColor={branding.primaryColor}
+        timezone={branding.timezone}
+        currency={branding.currency}
       />
       <main className="flex-1">{children}</main>
       <Footer
@@ -39,6 +44,9 @@ export default async function OrgLayout({ children, params }: OrgLayoutProps) {
         phone={branding.phone}
         website={branding.website}
         address={branding.address}
+        timezone={branding.timezone}
+        currency={branding.currency}
+        socialLinks={branding.socialLinks}
       />
     </div>
   );

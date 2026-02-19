@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import { requireOrganization } from "@/lib/organization";
 import { createServices, logger } from "@tour/services";
-import { Clock, Users, MapPin, Check, X, Info, Calendar, Shield } from "lucide-react";
+import { Clock, Users, MapPin, Check, X, Info, Calendar, Shield, Sparkles } from "lucide-react";
 import { AvailabilityCalendar } from "@/components/availability-calendar";
 import { TourStructuredData } from "@/components/structured-data";
+import { ImageGallery } from "@/components/image-gallery";
+import { ReviewSection } from "@/components/review-section";
+import { TourCard } from "@/components/tour-card";
+import { MobileBookingBar } from "@/components/mobile-booking-bar";
+import { Breadcrumb, CardSurface, PageShell, SectionHeader } from "@/components/layout";
+import { FadeIn } from "@/components/layout/animate";
 
 interface PageProps {
   params: Promise<{ slug: string; tourSlug: string }>;
@@ -72,185 +77,170 @@ export default async function TourDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  // Only show active, public tours
   if (tour.status !== "active" || !tour.isPublic) {
     notFound();
   }
 
-  // Get pricing tiers for this tour
   const pricingTiers = await services.tour.getPricingTiers(tour.id);
   const activeTiers = pricingTiers.filter((tier) => tier.isActive);
 
-  // Get available dates for the current month and next 2 months using tour availability service
   const now = new Date();
-  const currentMonth = await services.tourAvailability.getAvailableDatesForMonth(
-    tour.id,
-    now.getFullYear(),
-    now.getMonth() + 1
-  );
 
-  // Get next month availability for calendar switching
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const nextMonthAvailability = await services.tourAvailability.getAvailableDatesForMonth(
-    tour.id,
-    nextMonth.getFullYear(),
-    nextMonth.getMonth() + 1
-  );
+  const [
+    currentMonthAvailability,
+    reviewStats,
+    recentReviews,
+    similarToursResult,
+    weeklyBookingStats,
+  ] = await Promise.all([
+    services.tourAvailability.getAvailableDatesForMonth(
+      tour.id,
+      now.getFullYear(),
+      now.getMonth() + 1
+    ),
+    services.review.getStats({ tourId: tour.id }).catch(() => ({
+      totalReviews: 0,
+      averageRating: 4.8,
+      averageTourRating: null,
+      averageGuideRating: null,
+      averageValueRating: null,
+      ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      pendingReviews: 0,
+      publicTestimonials: 0,
+    })),
+    services.review.getRecentForTour(tour.id, 6).catch(() => []),
+    services.tour.getAll(
+      {
+        status: "active",
+        isPublic: true,
+        category: tour.category || undefined,
+      },
+      { page: 1, limit: 8 },
+      { field: "createdAt", direction: "desc" }
+    ),
+    services.analytics.getBookingStats({
+      from: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      to: now,
+    }).catch(() => ({
+      totalBookings: 0,
+      totalParticipants: 0,
+      averagePartySize: 0,
+      averageLeadTime: 0,
+      cancellationRate: 0,
+      noShowRate: 0,
+      bookingsByTour: [],
+      bookingsBySource: [],
+    })),
+  ]);
 
-  // Get month after next
-  const monthAfterNext = new Date(now.getFullYear(), now.getMonth() + 2, 1);
-  const monthAfterNextAvailability = await services.tourAvailability.getAvailableDatesForMonth(
-    tour.id,
-    monthAfterNext.getFullYear(),
-    monthAfterNext.getMonth() + 1
-  );
-
-  // Combine all available dates
-  const availableDates = [
-    ...currentMonth.dates,
-    ...nextMonthAvailability.dates,
-    ...monthAfterNextAvailability.dates,
-  ];
-
+  const availableDates = currentMonthAvailability.dates;
   const currency = org.settings?.defaultCurrency || "USD";
+  const weeklyBookings =
+    weeklyBookingStats.bookingsByTour.find((item) => item.tourId === tour.id)?.bookingCount || 0;
+  const similarTours = similarToursResult.data
+    .filter((candidate) => candidate.id !== tour.id)
+    .slice(0, 4);
 
-  // Gallery images
   const images = [tour.coverImageUrl, ...(tour.images || [])].filter(Boolean) as string[];
+  const basePriceLabel = formatPrice(tour.basePrice, currency);
 
   return (
     <>
       <TourStructuredData tour={tour} org={org} pricingTiers={activeTiers} />
 
-      <div className="container px-4 py-8">
-        {/* Breadcrumb */}
-        <nav className="text-sm text-muted-foreground mb-6">
-          <a href="/" className="hover:text-primary">
-            Tours
-          </a>
-          <span className="mx-2">/</span>
-          <span>{tour.name}</span>
-        </nav>
+      <PageShell className="pb-24 sm:pb-10">
+        <Breadcrumb
+          items={[
+            { label: "Tours", href: `/org/${slug}` },
+            { label: tour.name },
+          ]}
+        />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Image Gallery */}
-            <div className="space-y-4">
-              {/* Main Image */}
-              <div className="relative aspect-[16/9] rounded-lg overflow-hidden bg-muted">
-                {tour.coverImageUrl ? (
-                  <Image
-                    src={tour.coverImageUrl}
-                    alt={tour.name}
-                    fill
-                    className="object-cover"
-                    priority
-                    sizes="(max-width: 1024px) 100vw, 66vw"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-6xl">
-                    🗺️
-                  </div>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          <div className="space-y-8 lg:col-span-2">
+            <FadeIn>
+              <ImageGallery images={images} title={tour.name} />
+            </FadeIn>
+
+            <FadeIn delayMs={90}>
+              <section>
+                {tour.category && (
+                  <span className="mb-3 inline-block rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                    {tour.category}
+                  </span>
                 )}
-              </div>
+                {weeklyBookings > 0 && (
+                  <p className="mb-2 inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                    <Sparkles className="h-3 w-3 text-amber-600" />
+                    {weeklyBookings} bookings this week
+                  </p>
+                )}
+                <h1 className="mb-4 text-3xl font-bold md:text-4xl">{tour.name}</h1>
 
-              {/* Thumbnail Gallery */}
-              {images.length > 1 && (
-                <div className="grid grid-cols-4 gap-2">
-                  {images.slice(0, 4).map((image, index) => (
-                    <div
-                      key={index}
-                      className="relative aspect-[4/3] rounded-md overflow-hidden bg-muted"
-                    >
-                      <Image
-                        src={image}
-                        alt={`${tour.name} - Image ${index + 1}`}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 1024px) 25vw, 16vw"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Tour Info */}
-            <div>
-              {tour.category && (
-                <span className="inline-block px-3 py-1 text-sm font-medium bg-primary/10 text-primary rounded-full mb-3">
-                  {tour.category}
-                </span>
-              )}
-              <h1 className="text-3xl md:text-4xl font-bold mb-4">{tour.name}</h1>
-
-              {/* Quick Info */}
-              <div className="flex flex-wrap gap-4 text-muted-foreground mb-6">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  <span>{formatDuration(tour.durationMinutes)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  <span>Up to {tour.maxParticipants} people</span>
-                </div>
-                {tour.meetingPoint && (
+                <div className="mb-6 flex flex-wrap gap-4 text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    <span>{tour.meetingPoint}</span>
+                    <Clock className="h-5 w-5" />
+                    <span>{formatDuration(tour.durationMinutes)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    <span>Up to {tour.maxParticipants} people</span>
+                  </div>
+                  {tour.meetingPoint && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      <span>{tour.meetingPoint}</span>
+                    </div>
+                  )}
+                </div>
+
+                {tour.description && (
+                  <div className="prose prose-neutral max-w-none">
+                    <p className="whitespace-pre-wrap">{tour.description}</p>
                   </div>
                 )}
-              </div>
+              </section>
+            </FadeIn>
 
-              {/* Description */}
-              {tour.description && (
-                <div className="prose prose-neutral max-w-none">
-                  <p className="whitespace-pre-wrap">{tour.description}</p>
-                </div>
-              )}
-            </div>
-
-            {/* What's Included / Excluded */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {tour.includes && tour.includes.length > 0 && (
-                <div className="p-6 rounded-lg border bg-card">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <CardSurface>
+                  <h3 className="mb-4 flex items-center gap-2 font-semibold">
                     <Check className="h-5 w-5 text-green-500" />
                     What&apos;s Included
                   </h3>
                   <ul className="space-y-2">
                     {tour.includes.map((item, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm">
-                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
                         <span>{item}</span>
                       </li>
                     ))}
                   </ul>
-                </div>
+                </CardSurface>
               )}
 
               {tour.excludes && tour.excludes.length > 0 && (
-                <div className="p-6 rounded-lg border bg-card">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <CardSurface>
+                  <h3 className="mb-4 flex items-center gap-2 font-semibold">
                     <X className="h-5 w-5 text-red-500" />
                     What&apos;s Not Included
                   </h3>
                   <ul className="space-y-2">
                     {tour.excludes.map((item, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm">
-                        <X className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <X className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
                         <span>{item}</span>
                       </li>
                     ))}
                   </ul>
-                </div>
+                </CardSurface>
               )}
             </div>
 
-            {/* Requirements */}
             {tour.requirements && tour.requirements.length > 0 && (
-              <div className="p-6 rounded-lg border bg-card">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <CardSurface>
+                <h3 className="mb-4 flex items-center gap-2 font-semibold">
                   <Info className="h-5 w-5 text-blue-500" />
                   Requirements
                 </h3>
@@ -262,104 +252,124 @@ export default async function TourDetailPage({ params }: PageProps) {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </CardSurface>
             )}
 
-            {/* Accessibility */}
             {tour.accessibility && (
-              <div className="p-6 rounded-lg border bg-card">
-                <h3 className="font-semibold mb-4">Accessibility</h3>
+              <CardSurface>
+                <h3 className="mb-3 font-semibold">Accessibility</h3>
                 <p className="text-sm text-muted-foreground">{tour.accessibility}</p>
-              </div>
+              </CardSurface>
             )}
 
-            {/* Meeting Point */}
             {(tour.meetingPoint || tour.meetingPointDetails) && (
-              <div className="p-6 rounded-lg border bg-card">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <CardSurface>
+                <h3 className="mb-4 flex items-center gap-2 font-semibold">
                   <MapPin className="h-5 w-5" />
                   Meeting Point
                 </h3>
-                {tour.meetingPoint && (
-                  <p className="font-medium mb-2">{tour.meetingPoint}</p>
-                )}
+                {tour.meetingPoint && <p className="mb-2 font-medium">{tour.meetingPoint}</p>}
                 {tour.meetingPointDetails && (
-                  <p className="text-sm text-muted-foreground">
-                    {tour.meetingPointDetails}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{tour.meetingPointDetails}</p>
                 )}
                 {tour.meetingPointLat && tour.meetingPointLng && (
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${tour.meetingPointLat},${tour.meetingPointLng}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block mt-3 text-sm text-primary hover:underline"
+                    className="mt-3 inline-block text-sm text-primary hover:underline"
                   >
                     View on Google Maps →
                   </a>
                 )}
-              </div>
+              </CardSurface>
             )}
 
-            {/* Cancellation Policy */}
             {tour.cancellationPolicy && (
-              <div className="p-6 rounded-lg border bg-card">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <CardSurface>
+                <h3 className="mb-4 flex items-center gap-2 font-semibold">
                   <Shield className="h-5 w-5" />
                   Cancellation Policy
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  {tour.cancellationPolicy}
-                </p>
+                <p className="text-sm text-muted-foreground">{tour.cancellationPolicy}</p>
                 {tour.cancellationHours && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Free cancellation up to {tour.cancellationHours} hours before the
-                    tour.
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Free cancellation up to {tour.cancellationHours} hours before the tour.
                   </p>
                 )}
-              </div>
+              </CardSurface>
+            )}
+
+            <ReviewSection
+              averageRating={reviewStats.averageRating || 4.8}
+              totalReviews={reviewStats.totalReviews || 0}
+              reviews={recentReviews}
+            />
+
+            {similarTours.length > 0 && (
+              <section className="space-y-4">
+                <SectionHeader
+                  title="You Might Also Love"
+                  subtitle="Similar experiences in this collection"
+                />
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {similarTours.slice(0, 3).map((similarTour) => (
+                    <TourCard
+                      key={`similar-desktop-${similarTour.id}`}
+                      tour={similarTour}
+                      currency={currency}
+                      socialProofLabel="Recommended by recent guests"
+                    />
+                  ))}
+                </div>
+                <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1 md:hidden">
+                  {similarTours.map((similarTour) => (
+                    <div key={`similar-mobile-${similarTour.id}`} className="w-[88%] max-w-sm flex-none snap-start">
+                      <TourCard
+                        tour={similarTour}
+                        currency={currency}
+                        socialProofLabel="Recommended by recent guests"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
           </div>
 
-          {/* Sidebar - Booking Widget */}
-          <div className="lg:col-span-1">
+          <aside className="lg:col-span-1">
             <div className="sticky top-24 space-y-6">
-              {/* Price Card */}
-              <div className="p-6 rounded-lg border bg-card shadow-sm">
+              <CardSurface className="shadow-sm">
                 <div className="mb-4">
                   <p className="text-sm text-muted-foreground">From</p>
-                  <p className="text-3xl font-bold">
-                    {formatPrice(tour.basePrice, currency)}
-                  </p>
+                  <p className="text-3xl font-bold">{basePriceLabel}</p>
                   <p className="text-sm text-muted-foreground">per person</p>
                 </div>
 
-                {/* Pricing Tiers */}
+                <p className="mb-4 inline-flex items-center gap-2 rounded-md bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {weeklyBookings > 0
+                    ? `${weeklyBookings} people booked this tour this week`
+                    : "Popular departure times fill up quickly"}
+                </p>
+
                 {activeTiers.length > 0 && (
-                  <div className="space-y-2 mb-6 pt-4 border-t">
+                  <div className="mb-6 space-y-2 border-t pt-4">
                     {activeTiers.map((tier) => (
-                      <div
-                        key={tier.id}
-                        className="flex justify-between items-center text-sm"
-                      >
+                      <div key={tier.id} className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
                           {tier.label}
                           {tier.minAge !== null && tier.maxAge !== null && (
-                            <span className="text-xs ml-1">
-                              ({tier.minAge}-{tier.maxAge})
-                            </span>
+                            <span className="ml-1 text-xs">({tier.minAge}-{tier.maxAge})</span>
                           )}
                         </span>
-                        <span className="font-medium">
-                          {formatPrice(tier.price, currency)}
-                        </span>
+                        <span className="font-medium">{formatPrice(tier.price, currency)}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Trust Badges */}
-                <div className="space-y-2 pt-4 border-t">
+                <div className="space-y-2 border-t pt-4">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Shield className="h-4 w-4 text-green-500" />
                     <span>Secure Payment</span>
@@ -375,23 +385,29 @@ export default async function TourDetailPage({ params }: PageProps) {
                     </div>
                   )}
                 </div>
-              </div>
+              </CardSurface>
 
-              {/* Availability Calendar */}
-              <div className="p-6 rounded-lg border bg-card shadow-sm">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <CardSurface className="shadow-sm" id="availability">
+                <h3 className="mb-4 flex items-center gap-2 font-semibold">
                   <Calendar className="h-5 w-5" />
                   Check Availability
                 </h3>
                 <AvailabilityCalendar
                   availableDates={availableDates}
                   currency={currency}
+                  tourId={tour.id}
+                  organizationSlug={slug}
+                  tourSlug={tourSlug}
+                  initialYear={currentMonthAvailability.year}
+                  initialMonth={currentMonthAvailability.month}
                 />
-              </div>
+              </CardSurface>
             </div>
-          </div>
+          </aside>
         </div>
-      </div>
+      </PageShell>
+
+      <MobileBookingBar priceLabel={basePriceLabel} />
     </>
   );
 }

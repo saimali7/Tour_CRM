@@ -49,6 +49,9 @@ export {
 export {
   sendTeamInviteEmail,
 } from "./functions/team-notifications";
+export {
+  expirePendingWebsiteBooking,
+} from "./functions/pending-booking-expiration";
 
 // Aggregate all functions for the serve handler
 import {
@@ -97,6 +100,9 @@ import {
 import {
   sendTeamInviteEmail,
 } from "./functions/team-notifications";
+import {
+  expirePendingWebsiteBooking,
+} from "./functions/pending-booking-expiration";
 
 export const inngestFunctions = [
   // Booking emails
@@ -130,4 +136,6 @@ export const inngestFunctions = [
   sendPaymentFailedEmail,
   // Team notifications
   sendTeamInviteEmail,
+  // Booking payment timeout
+  expirePendingWebsiteBooking,
 ];

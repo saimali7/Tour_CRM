@@ -1,9 +1,54 @@
 import type { Tour, Organization, TourPricingTier } from "@tour/database";
+import { getOrganizationBookingUrl } from "@/lib/organization";
+
+export interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
+export interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+export interface ReviewSummary {
+  ratingValue: number;
+  reviewCount: number;
+  bestRating?: number;
+  worstRating?: number;
+}
 
 interface TourStructuredDataProps {
   tour: Tour;
   org: Organization;
   pricingTiers: TourPricingTier[];
+  baseUrl?: string;
+  reviewSummary?: ReviewSummary;
+  breadcrumbs?: BreadcrumbItem[];
+  faqs?: FAQItem[];
+}
+
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/$/, "");
+}
+
+function getCanonicalBaseUrl(org: Organization, baseUrl?: string): string {
+  if (baseUrl && baseUrl.trim()) {
+    return normalizeBaseUrl(baseUrl.trim());
+  }
+  return normalizeBaseUrl(getOrganizationBookingUrl(org));
+}
+
+function toAbsoluteUrl(url: string, baseUrl: string): string {
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  if (url.startsWith("/")) {
+    return `${baseUrl}${url}`;
+  }
+
+  return `${baseUrl}/${url}`;
 }
 
 /**
@@ -14,11 +59,30 @@ export function TourStructuredData({
   tour,
   org,
   pricingTiers,
+  baseUrl,
+  reviewSummary,
+  breadcrumbs,
+  faqs,
 }: TourStructuredDataProps) {
+  const orgBaseUrl = getCanonicalBaseUrl(org, baseUrl);
+  const tourUrl = toAbsoluteUrl(`/tours/${tour.slug}`, orgBaseUrl);
+  const organizationUrl = org.website ? org.website : orgBaseUrl;
   const currency = org.settings?.defaultCurrency || "USD";
   const lowestPrice = pricingTiers.length > 0
     ? Math.min(...pricingTiers.map((t) => parseFloat(t.price)))
     : parseFloat(tour.basePrice);
+  const highestPrice = pricingTiers.length > 0
+    ? Math.max(...pricingTiers.map((t) => parseFloat(t.price)))
+    : lowestPrice;
+  const aggregateRating = reviewSummary && reviewSummary.reviewCount > 0
+    ? {
+        "@type": "AggregateRating",
+        ratingValue: reviewSummary.ratingValue,
+        reviewCount: reviewSummary.reviewCount,
+        bestRating: reviewSummary.bestRating ?? 5,
+        worstRating: reviewSummary.worstRating ?? 1,
+      }
+    : undefined;
 
   // Schema.org TouristAttraction with Product offer
   const structuredData = {
@@ -27,7 +91,7 @@ export function TourStructuredData({
     name: tour.name,
     description: tour.description || tour.shortDescription,
     image: tour.coverImageUrl || undefined,
-    url: `https://${org.slug}.book.tourplatform.com/tours/${tour.slug}`,
+    url: tourUrl,
 
     // Location/Meeting Point
     ...(tour.meetingPoint && {
@@ -51,7 +115,7 @@ export function TourStructuredData({
       name: org.name,
       ...(org.email && { email: org.email }),
       ...(org.phone && { telephone: org.phone }),
-      ...(org.website && { url: org.website }),
+      url: organizationUrl,
       ...(org.address && {
         address: {
           "@type": "PostalAddress",
@@ -69,14 +133,15 @@ export function TourStructuredData({
       "@type": "AggregateOffer",
       priceCurrency: currency,
       lowPrice: lowestPrice,
-      highPrice: pricingTiers.length > 0
-        ? Math.max(...pricingTiers.map((t) => parseFloat(t.price)))
-        : lowestPrice,
+      highPrice: highestPrice,
       offerCount: pricingTiers.length || 1,
       availability: tour.status === "active" && tour.isPublic
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
     },
+    ...(aggregateRating && {
+      aggregateRating,
+    }),
 
     // Duration
     ...(tour.durationMinutes && {
@@ -96,19 +161,37 @@ export function TourStructuredData({
     name: tour.name,
     description: tour.description || tour.shortDescription,
     image: tour.coverImageUrl || undefined,
+    url: tourUrl,
     brand: {
       "@type": "Brand",
       name: org.name,
     },
-    offers: pricingTiers.map((tier) => ({
-      "@type": "Offer",
-      name: tier.label,
-      price: tier.price,
-      priceCurrency: currency,
-      availability: tour.status === "active" && tour.isPublic
-        ? "https://schema.org/InStock"
-        : "https://schema.org/OutOfStock",
-    })),
+    offers: (
+      pricingTiers.length > 0
+        ? pricingTiers.map((tier) => ({
+            "@type": "Offer",
+            name: tier.label,
+            price: tier.price,
+            priceCurrency: currency,
+            availability: tour.status === "active" && tour.isPublic
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+          }))
+        : [
+            {
+              "@type": "Offer",
+              name: tour.name,
+              price: lowestPrice.toFixed(2),
+              priceCurrency: currency,
+              availability: tour.status === "active" && tour.isPublic
+                ? "https://schema.org/InStock"
+                : "https://schema.org/OutOfStock",
+            },
+          ]
+    ),
+    ...(aggregateRating && {
+      aggregateRating,
+    }),
   };
 
   return (
@@ -121,6 +204,10 @@ export function TourStructuredData({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productData) }}
       />
+      {breadcrumbs && breadcrumbs.length > 0 && (
+        <BreadcrumbStructuredData items={breadcrumbs} baseUrl={orgBaseUrl} />
+      )}
+      {faqs && faqs.length > 0 && <FAQStructuredData items={faqs} />}
     </>
   );
 }
@@ -128,12 +215,19 @@ export function TourStructuredData({
 /**
  * Organization structured data for the entire booking site
  */
-export function OrganizationStructuredData({ org }: { org: Organization }) {
+export function OrganizationStructuredData({
+  org,
+  baseUrl,
+}: {
+  org: Organization;
+  baseUrl?: string;
+}) {
+  const organizationUrl = org.website || getCanonicalBaseUrl(org, baseUrl);
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "TourOperator",
     name: org.name,
-    url: `https://${org.slug}.book.tourplatform.com`,
+    url: organizationUrl,
     ...(org.logoUrl && { logo: org.logoUrl }),
     ...(org.email && { email: org.email }),
     ...(org.phone && { telephone: org.phone }),
@@ -162,9 +256,15 @@ export function OrganizationStructuredData({ org }: { org: Organization }) {
  */
 export function BreadcrumbStructuredData({
   items,
+  baseUrl,
 }: {
-  items: { name: string; url: string }[];
+  items: BreadcrumbItem[];
+  baseUrl?: string;
 }) {
+  if (!items || items.length === 0) {
+    return null;
+  }
+
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -172,7 +272,36 @@ export function BreadcrumbStructuredData({
       "@type": "ListItem",
       position: index + 1,
       name: item.name,
-      item: item.url,
+      item: baseUrl ? toAbsoluteUrl(item.url, baseUrl) : item.url,
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+    />
+  );
+}
+
+/**
+ * FAQPage structured data
+ */
+export function FAQStructuredData({ items }: { items: FAQItem[] }) {
+  if (!items || items.length === 0) {
+    return null;
+  }
+
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
     })),
   };
 

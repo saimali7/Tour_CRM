@@ -9,9 +9,10 @@ interface ContactFormProps {
   organizationName: string;
 }
 
-export function ContactForm({ organizationName }: ContactFormProps) {
+export function ContactForm({ organizationId, organizationName }: ContactFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -27,18 +28,46 @@ export function ContactForm({ organizationName }: ContactFormProps) {
       ...prev,
       [e.target.name]: e.target.value,
     }));
+    if (submitError) {
+      setSubmitError(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    // Simulate form submission
-    // In production, this would send to an API endpoint
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...formData,
+          organizationId,
+        }),
+      });
 
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message || "Failed to send message");
+      }
+
+      setIsSubmitted(true);
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        subject: "",
+        message: "",
+      });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Failed to send message");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSubmitted) {
@@ -164,6 +193,10 @@ export function ContactForm({ organizationName }: ContactFormProps) {
           )}
         </Button>
       </div>
+
+      {submitError && (
+        <p className="text-sm text-red-600">{submitError}</p>
+      )}
     </form>
   );
 }

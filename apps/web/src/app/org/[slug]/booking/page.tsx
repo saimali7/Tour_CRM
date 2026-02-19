@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { requireOrganization } from "@/lib/organization";
 import { BookingLookup } from "@/components/booking-lookup";
+import { Breadcrumb, CardSurface, PageShell, SectionHeader } from "@/components/layout";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ ref?: string; token?: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -16,29 +18,40 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function BookingLookupPage({ params }: PageProps) {
+export default async function BookingLookupPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
-  const org = await requireOrganization(slug);
+  const { ref, token } = await searchParams;
+  await requireOrganization(slug);
 
   return (
-    <div className="container px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-muted-foreground mb-6">
-        <a href="/" className="hover:text-primary">
-          Tours
-        </a>
-        <span className="mx-2">/</span>
-        <span>Find Booking</span>
-      </nav>
+    <PageShell>
+      <Breadcrumb
+        items={[
+          { label: "Tours", href: `/org/${slug}` },
+          { label: "Find Booking" },
+        ]}
+      />
 
-      <div className="max-w-md mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-2">Find Your Booking</h1>
-        <p className="text-center text-muted-foreground mb-8">
-          Enter your booking reference number and email to view your booking details.
-        </p>
+      <div className="mx-auto max-w-2xl space-y-6">
+        <SectionHeader
+          align="center"
+          title="Find Your Booking"
+          subtitle="Use your booking reference and email to view details, update dates, or request support."
+        />
 
-        <BookingLookup organizationId={org.id} />
+        <CardSurface className="text-center" padded>
+          <p className="text-5xl">🎟️</p>
+          <p className="mt-2 text-sm text-muted-foreground">Have your confirmation email handy for faster lookup.</p>
+        </CardSurface>
+
+        <CardSurface className="p-6">
+          <BookingLookup
+            organizationSlug={slug}
+            initialReferenceNumber={ref}
+            magicToken={token}
+          />
+        </CardSurface>
       </div>
-    </div>
+    </PageShell>
   );
 }

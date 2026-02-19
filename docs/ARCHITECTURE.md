@@ -3535,11 +3535,11 @@ Phase 8: OTA Integration
 ├── Availability sync
 └── Booking import
 
-Phase 9: Mobile App
-├── React Native app
-├── Guide-focused features
-├── Offline manifest access
-└── Push notifications
+Phase 9: Web-App Storefront Design & Feature Integration
+├── Storefront UX system refinement
+├── Conversion-focused discovery/booking enhancements
+├── CRM-integrated customer self-service expansion
+└── Web performance and accessibility hardening
 
 Phase 10: Advanced Features
 ├── Multi-currency support

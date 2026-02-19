@@ -252,7 +252,7 @@ export function TicketSelection({
         className="w-full"
         size="lg"
       >
-        Continue to Details
+        {state.availableAddOns.length > 0 ? "Continue to Add-ons" : "Continue to Details"}
       </Button>
 
       {/* Disclaimer */}

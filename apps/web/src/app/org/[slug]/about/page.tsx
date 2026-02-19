@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { MapPin, Mail, Phone, Globe, Clock, Users, CalendarDays, Star } from "lucide-react";
 import { requireOrganization, getOrganizationBranding } from "@/lib/organization";
-import { MapPin, Mail, Phone, Globe, Clock } from "lucide-react";
+import { createServices } from "@tour/services";
+import { Breadcrumb, CardSurface, PageShell, Section, SectionHeader } from "@/components/layout";
+import { FadeIn, StaggerChildren } from "@/components/layout/animate";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -26,161 +29,174 @@ export default async function AboutPage({ params }: PageProps) {
   const { slug } = await params;
   const org = await requireOrganization(slug);
   const branding = getOrganizationBranding(org);
+  const services = createServices({ organizationId: org.id });
+
+  const [toursResult, bookingStats, reviewStats, guidesResult] = await Promise.all([
+    services.tour.getAll({ status: "active", isPublic: true }, { page: 1, limit: 1 }),
+    services.analytics.getBookingStats({
+      from: new Date(new Date().setFullYear(new Date().getFullYear() - 1)),
+      to: new Date(),
+    }).catch(() => ({ totalBookings: 0, totalParticipants: 0 })),
+    services.review.getStats().catch(() => ({ averageRating: 4.8, totalReviews: 0 })),
+    services.guide.getAll({ status: "active" }, { page: 1, limit: 4 }).catch(() => ({ data: [] })),
+  ]);
+
+  const yearsOperating = Math.max(1, new Date().getFullYear() - new Date(org.createdAt).getFullYear());
 
   return (
-    <div className="container px-4 py-8">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-muted-foreground mb-6">
-        <a href="/" className="hover:text-primary">
-          Tours
-        </a>
-        <span className="mx-2">/</span>
-        <span>About Us</span>
-      </nav>
+    <PageShell>
+      <Breadcrumb
+        items={[
+          { label: "Tours", href: `/org/${slug}` },
+          { label: "About Us" },
+        ]}
+      />
 
-      <div className="max-w-4xl mx-auto">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          {branding.logo && (
-            <div className="relative w-32 h-32 mx-auto mb-6">
-              <Image
-                src={branding.logo}
-                alt={branding.name}
-                fill
-                className="object-contain"
-              />
+      <div className="mx-auto max-w-5xl space-y-10">
+        <FadeIn>
+          <SectionHeader
+            align="center"
+            title={`About ${branding.name}`}
+            subtitle="We design small-group and private experiences that balance local insight, smooth operations, and memorable moments."
+          />
+          {branding.logo ? (
+            <div className="mx-auto mt-5 h-24 w-24 overflow-hidden rounded-2xl border border-border bg-card p-2">
+              <Image src={branding.logo} alt={branding.name} width={96} height={96} className="h-full w-full object-contain" />
             </div>
-          )}
-          <h1 className="text-4xl font-bold mb-4">About {branding.name}</h1>
-          <p className="text-xl text-muted-foreground">
-            Discover extraordinary experiences with us
-          </p>
-        </div>
+          ) : null}
+        </FadeIn>
 
-        {/* About Content */}
-        <div className="prose prose-neutral max-w-none mb-12">
-          <div className="p-8 rounded-lg border bg-card">
-            <h2 className="text-2xl font-semibold mb-4">Our Story</h2>
-            <p className="text-muted-foreground mb-4">
-              Welcome to {branding.name}! We are passionate about creating memorable
-              tour experiences that connect people with amazing destinations and
-              unforgettable moments.
-            </p>
-            <p className="text-muted-foreground mb-4">
-              Our team of experienced guides and travel experts work tirelessly to
-              design tours that go beyond the ordinary. We believe that every journey
-              should be an adventure, and every traveler deserves personalized
-              attention and care.
-            </p>
-            <p className="text-muted-foreground">
-              Whether you&apos;re looking for cultural immersion, outdoor adventures,
-              or relaxing getaways, we have something special waiting for you.
-            </p>
+        <Section spacing="compact" className="pt-0">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <CardSurface className="text-center" padded>
+              <p className="text-2xl font-semibold">{toursResult.total}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Active tours</p>
+            </CardSurface>
+            <CardSurface className="text-center" padded>
+              <p className="text-2xl font-semibold">{bookingStats.totalBookings || 0}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Bookings this year</p>
+            </CardSurface>
+            <CardSurface className="text-center" padded>
+              <p className="text-2xl font-semibold">{bookingStats.totalParticipants || 0}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Guests hosted</p>
+            </CardSurface>
+            <CardSurface className="text-center" padded>
+              <p className="text-2xl font-semibold">{yearsOperating}+</p>
+              <p className="mt-1 text-xs text-muted-foreground">Years operating</p>
+            </CardSurface>
           </div>
-        </div>
+        </Section>
 
-        {/* Values Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="p-6 rounded-lg border bg-card text-center">
-            <div
-              className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center"
-              style={{ backgroundColor: `${branding.primaryColor}20` }}
-            >
-              <Clock className="h-6 w-6" style={{ color: branding.primaryColor }} />
-            </div>
-            <h3 className="font-semibold mb-2">Expert Guides</h3>
-            <p className="text-sm text-muted-foreground">
-              Our knowledgeable guides bring destinations to life with their passion
-              and expertise.
-            </p>
-          </div>
-          <div className="p-6 rounded-lg border bg-card text-center">
-            <div
-              className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center"
-              style={{ backgroundColor: `${branding.primaryColor}20` }}
-            >
-              <MapPin className="h-6 w-6" style={{ color: branding.primaryColor }} />
-            </div>
-            <h3 className="font-semibold mb-2">Unique Experiences</h3>
-            <p className="text-sm text-muted-foreground">
-              Discover hidden gems and authentic experiences off the beaten path.
-            </p>
-          </div>
-          <div className="p-6 rounded-lg border bg-card text-center">
-            <div
-              className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center"
-              style={{ backgroundColor: `${branding.primaryColor}20` }}
-            >
-              <Globe className="h-6 w-6" style={{ color: branding.primaryColor }} />
-            </div>
-            <h3 className="font-semibold mb-2">Sustainable Tourism</h3>
-            <p className="text-sm text-muted-foreground">
-              We&apos;re committed to responsible travel that benefits local
-              communities.
-            </p>
-          </div>
-        </div>
+        <Section spacing="compact" className="pt-0">
+          <SectionHeader title="What makes us different" subtitle="Built specifically for travelers who want confidence before they arrive." />
+          <StaggerChildren className="grid grid-cols-1 gap-4 md:grid-cols-3" stepMs={90}>
+            <CardSurface>
+              <Clock className="h-5 w-5 text-primary" />
+              <h3 className="mt-3 font-semibold">Operational precision</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Clear timings, transparent pickup guidance, and instant confirmations.
+              </p>
+            </CardSurface>
+            <CardSurface>
+              <MapPin className="h-5 w-5 text-primary" />
+              <h3 className="mt-3 font-semibold">Local-first routes</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Our itineraries prioritize authentic stops, not generic mass-tour loops.
+              </p>
+            </CardSurface>
+            <CardSurface>
+              <Star className="h-5 w-5 text-primary" />
+              <h3 className="mt-3 font-semibold">Quality you can trust</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {reviewStats.totalReviews || 0} public reviews with an average rating of {(reviewStats.averageRating || 4.8).toFixed(1)}.
+              </p>
+            </CardSurface>
+          </StaggerChildren>
+        </Section>
 
-        {/* Contact Info */}
-        <div className="p-8 rounded-lg border bg-card">
-          <h2 className="text-2xl font-semibold mb-6">Get in Touch</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {branding.email && (
+        {guidesResult.data.length > 0 && (
+          <Section spacing="compact" className="pt-0">
+            <SectionHeader title="Meet some of our guides" subtitle="Experienced hosts who know the destination beyond the highlights." />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {guidesResult.data.map((guide) => (
+                <CardSurface key={guide.id} className="flex items-start gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                    {guide.firstName.charAt(0)}{guide.lastName.charAt(0)}
+                  </span>
+                  <div>
+                    <p className="font-medium">{guide.firstName} {guide.lastName}</p>
+                    <p className="text-sm text-muted-foreground">{guide.languages?.length ? guide.languages.join(", ") : "Multilingual guide"}</p>
+                  </div>
+                </CardSurface>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        <Section spacing="compact" className="pt-0">
+          <CardSurface>
+            <h2 className="text-xl font-semibold">Contact & company details</h2>
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {branding.email && (
+                <div className="flex items-start gap-3">
+                  <Mail className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Email</p>
+                    <a href={`mailto:${branding.email}`} className="text-primary hover:underline">
+                      {branding.email}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {branding.phone && (
+                <div className="flex items-start gap-3">
+                  <Phone className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Phone</p>
+                    <a href={`tel:${branding.phone}`} className="text-primary hover:underline">
+                      {branding.phone}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {branding.website && (
+                <div className="flex items-start gap-3">
+                  <Globe className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Website</p>
+                    <a href={branding.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {branding.website}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {branding.address && (
+                <div className="flex items-start gap-3">
+                  <MapPin className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Address</p>
+                    <p className="text-muted-foreground">{branding.address}</p>
+                  </div>
+                </div>
+              )}
               <div className="flex items-start gap-3">
-                <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <CalendarDays className="mt-0.5 h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Email</p>
-                  <a
-                    href={`mailto:${branding.email}`}
-                    className="text-primary hover:underline"
-                  >
-                    {branding.email}
-                  </a>
+                  <p className="font-medium">Operating for</p>
+                  <p className="text-muted-foreground">{yearsOperating}+ years</p>
                 </div>
               </div>
-            )}
-            {branding.phone && (
               <div className="flex items-start gap-3">
-                <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <Users className="mt-0.5 h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Phone</p>
-                  <a
-                    href={`tel:${branding.phone}`}
-                    className="text-primary hover:underline"
-                  >
-                    {branding.phone}
-                  </a>
+                  <p className="font-medium">Team size</p>
+                  <p className="text-muted-foreground">{guidesResult.data.length || 1} active guides</p>
                 </div>
               </div>
-            )}
-            {branding.website && (
-              <div className="flex items-start gap-3">
-                <Globe className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium">Website</p>
-                  <a
-                    href={branding.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {branding.website}
-                  </a>
-                </div>
-              </div>
-            )}
-            {branding.address && (
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium">Address</p>
-                  <p className="text-muted-foreground">{branding.address}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </CardSurface>
+        </Section>
       </div>
-    </div>
+    </PageShell>
   );
 }

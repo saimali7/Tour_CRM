@@ -1,10 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter, Outfit, JetBrains_Mono } from "next/font/google";
 import "@tour/ui/globals.css";
 
-const instrumentSans = Instrument_Sans({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans-custom",
+  display: "swap",
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-display-custom",
   display: "swap",
 });
 
@@ -30,7 +36,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0066FF",
+  themeColor: "#B45A2A",
 };
 
 export default function RootLayout({
@@ -41,7 +47,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${instrumentSans.variable} ${jetBrainsMono.variable} font-sans antialiased`}
+        className={`${inter.variable} ${outfit.variable} ${jetBrainsMono.variable} font-sans antialiased`}
       >
         {children}
       </body>

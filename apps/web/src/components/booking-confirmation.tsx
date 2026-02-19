@@ -7,10 +7,10 @@ import { useBooking } from "@/lib/booking-context";
 
 interface BookingConfirmationProps {
   organizationName: string;
+  organizationSlug: string;
 }
 
 function formatTime(time: string): string {
-  // time is in HH:MM format
   const [hours, minutes] = time.split(":");
   const hour = parseInt(hours!, 10);
   const ampm = hour >= 12 ? "PM" : "AM";
@@ -31,7 +31,6 @@ function formatPrice(price: number, currency: string): string {
   }).format(price);
 }
 
-// Calculate end time based on tour duration
 function calculateEndTime(startTime: string, durationMinutes: number): string {
   const [hours, minutes] = startTime.split(":").map(Number);
   const totalMinutes = hours! * 60 + minutes! + durationMinutes;
@@ -40,13 +39,12 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
   return `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`;
 }
 
-export function BookingConfirmation({ organizationName }: BookingConfirmationProps) {
+export function BookingConfirmation({ organizationName, organizationSlug }: BookingConfirmationProps) {
   const { state, reset } = useBooking();
 
   const handleAddToCalendar = () => {
     if (!state.bookingDate || !state.bookingTime || !state.tour) return;
 
-    // Create start and end dates from booking date and time
     const [hours, minutes] = state.bookingTime.split(":").map(Number);
     const startDate = new Date(state.bookingDate);
     startDate.setHours(hours!, minutes!, 0, 0);
@@ -54,7 +52,6 @@ export function BookingConfirmation({ organizationName }: BookingConfirmationPro
     const endDate = new Date(startDate);
     endDate.setMinutes(endDate.getMinutes() + state.tour.durationMinutes);
 
-    // Create ICS file content
     const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Tour Platform//Booking//EN
@@ -67,7 +64,6 @@ LOCATION:${state.tour.meetingPoint || ""}
 END:VEVENT
 END:VCALENDAR`;
 
-    // Download ICS file
     const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -88,13 +84,9 @@ END:VCALENDAR`;
       if (navigator.share) {
         await navigator.share(shareData);
       } else {
-        await navigator.clipboard.writeText(
-          `${shareData.text} Check it out: ${shareData.url}`
-        );
-        alert("Link copied to clipboard!");
+        await navigator.clipboard.writeText(`${shareData.text} Check it out: ${shareData.url}`);
       }
     } catch (error) {
-      // User cancelled share dialog or clipboard error - expected behavior
       console.debug("Share action cancelled or failed:", error);
     }
   };
@@ -106,48 +98,39 @@ END:VCALENDAR`;
   const endTime = calculateEndTime(state.bookingTime, state.tour.durationMinutes);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 text-center">
-      {/* Success Icon */}
-      <div className="flex justify-center">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-          <CheckCircle className="h-12 w-12 text-green-600" />
+    <div className="mx-auto max-w-2xl space-y-8 text-center">
+      <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_transparent_55%)]" />
+        <div className="relative">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-white">
+            <CheckCircle className="h-12 w-12 text-green-600" />
+          </div>
+          <h2 className="mt-4 text-2xl font-bold">Booking Confirmed!</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            A confirmation email has been sent to <span className="font-medium">{state.customer?.email}</span>.
+          </p>
         </div>
       </div>
 
-      {/* Success Message */}
-      <div>
-        <h2 className="text-2xl font-bold mb-2">Booking Confirmed!</h2>
-        <p className="text-muted-foreground">
-          Thank you for your booking. A confirmation email has been sent to{" "}
-          <span className="font-medium">{state.customer?.email}</span>.
-        </p>
+      <div className="inline-block rounded-lg bg-muted/50 p-4">
+        <p className="mb-1 text-sm text-muted-foreground">Booking Reference</p>
+        <p className="font-mono text-2xl font-bold tracking-wider">{state.referenceNumber}</p>
       </div>
 
-      {/* Reference Number */}
-      <div className="p-4 rounded-lg bg-muted/50 inline-block">
-        <p className="text-sm text-muted-foreground mb-1">Booking Reference</p>
-        <p className="text-2xl font-mono font-bold tracking-wider">
-          {state.referenceNumber}
-        </p>
-      </div>
+      <div className="space-y-4 rounded-lg border bg-card p-6 text-left">
+        <h3 className="text-lg font-semibold">{state.tour.name}</h3>
 
-      {/* Booking Details */}
-      <div className="text-left p-6 rounded-lg border bg-card space-y-4">
-        <h3 className="font-semibold text-lg">{state.tour.name}</h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex items-start gap-3">
-            <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <Calendar className="mt-0.5 h-5 w-5 text-muted-foreground" />
             <div>
               <p className="font-medium">Date</p>
-              <p className="text-sm text-muted-foreground">
-                {formatDate(state.bookingDate)}
-              </p>
+              <p className="text-sm text-muted-foreground">{formatDate(state.bookingDate)}</p>
             </div>
           </div>
 
           <div className="flex items-start gap-3">
-            <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <Clock className="mt-0.5 h-5 w-5 text-muted-foreground" />
             <div>
               <p className="font-medium">Time</p>
               <p className="text-sm text-muted-foreground">
@@ -158,7 +141,7 @@ END:VCALENDAR`;
 
           {state.tour.meetingPoint && (
             <div className="flex items-start gap-3">
-              <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <MapPin className="mt-0.5 h-5 w-5 text-muted-foreground" />
               <div>
                 <p className="font-medium">Meeting Point</p>
                 <p className="text-sm text-muted-foreground">{state.tour.meetingPoint}</p>
@@ -167,7 +150,7 @@ END:VCALENDAR`;
           )}
 
           <div className="flex items-start gap-3">
-            <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <Mail className="mt-0.5 h-5 w-5 text-muted-foreground" />
             <div>
               <p className="font-medium">Lead Contact</p>
               <p className="text-sm text-muted-foreground">
@@ -177,29 +160,27 @@ END:VCALENDAR`;
           </div>
         </div>
 
-        {/* Participants */}
-        <div className="pt-4 border-t">
-          <p className="font-medium mb-2">Participants</p>
+        <div className="border-t pt-4">
+          <p className="mb-2 font-medium">Participants</p>
           <p className="text-sm text-muted-foreground">
-            {state.participants.length} participant
-            {state.participants.length !== 1 ? "s" : ""}
+            {state.participants.length} participant{state.participants.length !== 1 ? "s" : ""}
           </p>
+          {state.selectedAddOns.length > 0 && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              Add-ons: {state.selectedAddOns.map((item) => `${item.name} x ${item.quantity}`).join(", ")}
+            </div>
+          )}
         </div>
 
-        {/* Payment Summary */}
-        <div className="pt-4 border-t">
-          <div className="flex justify-between text-sm mb-1">
+        <div className="border-t pt-4">
+          <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Total Paid</span>
             <span className="font-semibold">{formatPrice(state.total, state.currency)}</span>
           </div>
-          {state.total === 0 && (
-            <p className="text-xs text-green-600">Free booking - no payment required</p>
-          )}
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+      <div className="flex flex-col justify-center gap-3 sm:flex-row">
         <Button onClick={handleAddToCalendar} variant="outline" className="gap-2">
           <Download className="h-4 w-4" />
           Add to Calendar
@@ -210,42 +191,24 @@ END:VCALENDAR`;
         </Button>
       </div>
 
-      {/* What's Next */}
-      <div className="text-left p-6 rounded-lg border bg-muted/30 space-y-3">
-        <h4 className="font-semibold">What&apos;s Next?</h4>
+      <div className="space-y-3 rounded-lg border bg-muted/30 p-6 text-left">
+        <h4 className="font-semibold">What&apos;s next?</h4>
         <ul className="space-y-2 text-sm text-muted-foreground">
-          <li className="flex items-start gap-2">
-            <span className="text-green-500">✓</span>
-            <span>Check your email for the confirmation with full details</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-500">✓</span>
-            <span>Add the tour to your calendar so you don&apos;t forget</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-500">✓</span>
-            <span>
-              Arrive at the meeting point 10-15 minutes before the start time
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-green-500">✓</span>
-            <span>Bring your booking reference: {state.referenceNumber}</span>
-          </li>
+          <li>Check your inbox for full tour instructions and meeting-point details.</li>
+          <li>Arrive 10-15 minutes before departure time.</li>
+          <li>Keep your reference handy: {state.referenceNumber}</li>
         </ul>
       </div>
 
-      {/* Back to Tours */}
-      <div className="pt-4">
+      <div className="pt-2">
         <Button asChild onClick={() => reset()}>
-          <a href="/">Browse More Tours</a>
+          <a href={`/org/${organizationSlug}`}>Browse More Tours</a>
         </Button>
       </div>
 
-      {/* Support */}
       <p className="text-sm text-muted-foreground">
         Questions about your booking?{" "}
-        <a href="/contact" className="text-primary hover:underline">
+        <a href={`/org/${organizationSlug}/contact`} className="text-primary hover:underline">
           Contact us
         </a>
       </p>

@@ -103,6 +103,13 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-org-slug", orgSlug);
 
+  // Keep API routes at /api/* while still injecting organization context header.
+  if (pathname.startsWith("/api")) {
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
+
   // If already on an org-scoped route, just add the header
   if (pathname.startsWith(`/org/${orgSlug}`)) {
     return NextResponse.next({

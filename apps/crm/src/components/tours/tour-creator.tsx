@@ -521,6 +521,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           metaTitle: formState.metaTitle || undefined,
           metaDescription: formState.metaDescription || undefined,
           status: publish ? "active" as const : "draft" as const,
+          isPublic: publish ? true : undefined,
         };
 
         const normalizedPackages =

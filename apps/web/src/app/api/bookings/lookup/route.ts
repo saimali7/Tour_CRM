@@ -76,6 +76,8 @@ export async function GET(request: NextRequest) {
         bookingTime: booking.bookingTime,
         tour: booking.tour
           ? {
+              id: booking.tour.id,
+              slug: booking.tour.slug,
               name: booking.tour.name,
               meetingPoint: booking.tour.meetingPoint,
             }
