@@ -38,7 +38,7 @@ export function Footer({
                 Check live availability, secure your seats, and get instant booking confirmation with {orgName}.
               </p>
             </div>
-            <Button asChild className="sm:min-w-[220px]">
+            <Button asChild className="bg-foreground text-background hover:bg-foreground/90 sm:min-w-[220px]">
               <Link href="/" className="inline-flex items-center justify-center gap-2">
                 Book your next adventure
                 <ArrowRight className="h-4 w-4" />

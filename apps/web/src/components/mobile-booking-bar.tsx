@@ -22,7 +22,7 @@ export function MobileBookingBar({
           <p className="text-base font-semibold leading-none">{priceLabel}</p>
           <p className="mt-1 text-xs text-muted-foreground">{helperLabel}</p>
         </div>
-        <Button asChild className="min-h-11 px-4">
+        <Button asChild className="min-h-11 bg-foreground px-4 text-background hover:bg-foreground/90">
           <a href={ctaHref}>{ctaLabel}</a>
         </Button>
       </div>

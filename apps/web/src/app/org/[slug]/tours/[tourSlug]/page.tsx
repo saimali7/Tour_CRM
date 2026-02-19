@@ -26,7 +26,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     return {
       title: tour.metaTitle || `${tour.name} | ${org.name}`,
-      description: tour.metaDescription || tour.shortDescription || tour.description?.slice(0, 160),
+      description:
+        tour.metaDescription ||
+        tour.shortDescription ||
+        tour.description?.slice(0, 160) ||
+        `Book ${tour.name} with ${org.name}. Live availability, secure checkout, and instant confirmation.`,
       openGraph: {
         title: tour.metaTitle || `${tour.name} | ${org.name}`,
         description: tour.metaDescription || tour.shortDescription || undefined,
@@ -165,7 +169,7 @@ export default async function TourDetailPage({ params }: PageProps) {
             <FadeIn delayMs={90}>
               <section>
                 {tour.category && (
-                  <span className="mb-3 inline-block rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                  <span className="mb-3 inline-block rounded-full border border-border bg-secondary px-3 py-1 text-sm font-medium text-foreground">
                     {tour.category}
                   </span>
                 )}
@@ -205,10 +209,10 @@ export default async function TourDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {tour.includes && tour.includes.length > 0 && (
                 <CardSurface>
-                  <h3 className="mb-4 flex items-center gap-2 font-semibold">
+                  <h2 className="mb-4 flex items-center gap-2 font-semibold">
                     <Check className="h-5 w-5 text-green-500" />
                     What&apos;s Included
-                  </h3>
+                  </h2>
                   <ul className="space-y-2">
                     {tour.includes.map((item, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm">
@@ -222,10 +226,10 @@ export default async function TourDetailPage({ params }: PageProps) {
 
               {tour.excludes && tour.excludes.length > 0 && (
                 <CardSurface>
-                  <h3 className="mb-4 flex items-center gap-2 font-semibold">
+                  <h2 className="mb-4 flex items-center gap-2 font-semibold">
                     <X className="h-5 w-5 text-red-500" />
                     What&apos;s Not Included
-                  </h3>
+                  </h2>
                   <ul className="space-y-2">
                     {tour.excludes.map((item, index) => (
                       <li key={index} className="flex items-start gap-2 text-sm">
@@ -240,10 +244,10 @@ export default async function TourDetailPage({ params }: PageProps) {
 
             {tour.requirements && tour.requirements.length > 0 && (
               <CardSurface>
-                <h3 className="mb-4 flex items-center gap-2 font-semibold">
+                <h2 className="mb-4 flex items-center gap-2 font-semibold">
                   <Info className="h-5 w-5 text-blue-500" />
                   Requirements
-                </h3>
+                </h2>
                 <ul className="space-y-2">
                   {tour.requirements.map((item, index) => (
                     <li key={index} className="flex items-start gap-2 text-sm">
@@ -257,17 +261,17 @@ export default async function TourDetailPage({ params }: PageProps) {
 
             {tour.accessibility && (
               <CardSurface>
-                <h3 className="mb-3 font-semibold">Accessibility</h3>
+                <h2 className="mb-3 font-semibold">Accessibility</h2>
                 <p className="text-sm text-muted-foreground">{tour.accessibility}</p>
               </CardSurface>
             )}
 
             {(tour.meetingPoint || tour.meetingPointDetails) && (
               <CardSurface>
-                <h3 className="mb-4 flex items-center gap-2 font-semibold">
+                <h2 className="mb-4 flex items-center gap-2 font-semibold">
                   <MapPin className="h-5 w-5" />
                   Meeting Point
-                </h3>
+                </h2>
                 {tour.meetingPoint && <p className="mb-2 font-medium">{tour.meetingPoint}</p>}
                 {tour.meetingPointDetails && (
                   <p className="text-sm text-muted-foreground">{tour.meetingPointDetails}</p>
@@ -287,10 +291,10 @@ export default async function TourDetailPage({ params }: PageProps) {
 
             {tour.cancellationPolicy && (
               <CardSurface>
-                <h3 className="mb-4 flex items-center gap-2 font-semibold">
+                <h2 className="mb-4 flex items-center gap-2 font-semibold">
                   <Shield className="h-5 w-5" />
                   Cancellation Policy
-                </h3>
+                </h2>
                 <p className="text-sm text-muted-foreground">{tour.cancellationPolicy}</p>
                 {tour.cancellationHours && (
                   <p className="mt-2 text-sm text-muted-foreground">
@@ -388,10 +392,10 @@ export default async function TourDetailPage({ params }: PageProps) {
               </CardSurface>
 
               <CardSurface className="shadow-sm" id="availability">
-                <h3 className="mb-4 flex items-center gap-2 font-semibold">
+                <h2 className="mb-4 flex items-center gap-2 font-semibold">
                   <Calendar className="h-5 w-5" />
                   Check Availability
-                </h3>
+                </h2>
                 <AvailabilityCalendar
                   availableDates={availableDates}
                   currency={currency}

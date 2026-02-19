@@ -28,9 +28,9 @@ export function HeroSection({
             src={imageUrl}
             alt={title}
             fill
-            className="object-cover opacity-35"
-            priority
-            sizes="100vw"
+            className="hidden object-cover opacity-35 sm:block"
+            quality={60}
+            sizes="(max-width: 768px) 100vw, 1200px"
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/40 to-black/30" />

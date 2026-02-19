@@ -70,7 +70,7 @@ export function TourCard({
 
         {/* Price Badge */}
         <div className="absolute bottom-3 right-3">
-          <span className="rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground">
+          <span className="rounded-full bg-foreground px-3 py-1.5 text-sm font-semibold text-background">
             From {formatPrice(tour.basePrice, currency)}
           </span>
         </div>

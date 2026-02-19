@@ -38,7 +38,7 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
             alt={`${title} image ${activeIndex + 1}`}
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-            priority
+            quality={55}
             sizes="(max-width: 1024px) 100vw, 66vw"
           />
           <span className="absolute bottom-3 right-3 rounded-full bg-black/55 px-2 py-1 text-xs text-white backdrop-blur">
@@ -65,6 +65,7 @@ export function ImageGallery({ images, title }: ImageGalleryProps) {
                   alt={`${title} thumbnail ${index + 1}`}
                   fill
                   className="object-cover"
+                  quality={55}
                   sizes="(max-width: 1024px) 30vw, 16vw"
                 />
               </button>
