@@ -6,6 +6,11 @@ import { createServices } from "@tour/services";
 import { NotFoundError } from "@tour/services";
 import { createBookingMagicToken } from "@/lib/booking-magic-link";
 import { getOrganizationBookingUrl } from "@/lib/organization";
+import {
+  buildCustomerRateLimitIdentifier,
+  checkCompositeRateLimits,
+  getRequestIp,
+} from "@/lib/booking-rate-limit";
 
 interface RequestBody {
   referenceNumber?: string;
@@ -14,6 +19,7 @@ interface RequestBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const ipAddress = getRequestIp(request);
     const headersList = await headers();
     const orgSlug = headersList.get("x-org-slug");
 
@@ -40,6 +46,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { message: "referenceNumber and email are required" },
         { status: 400 }
+      );
+    }
+
+    const rateLimit = await checkCompositeRateLimits([
+      { scope: "magic_request_ip", identifier: ipAddress },
+      {
+        scope: "magic_request_customer",
+        identifier: buildCustomerRateLimitIdentifier(referenceNumber, email),
+      },
+    ]);
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: "Too many magic link requests. Please try again shortly." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        }
       );
     }
 

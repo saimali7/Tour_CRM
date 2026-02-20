@@ -146,14 +146,14 @@ export type ReviewRequestData = z.infer<typeof reviewRequestSchema>;
  * Validate event data and throw with descriptive error if invalid
  */
 export function validateEventData<T>(
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
   data: unknown,
   eventName: string
 ): T {
   const result = schema.safeParse(data);
 
   if (!result.success) {
-    const errors = result.error.errors
+    const errors = result.error.issues
       .map((e) => `${e.path.join(".")}: ${e.message}`)
       .join(", ");
 

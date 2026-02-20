@@ -285,6 +285,67 @@ export function BreadcrumbStructuredData({
 }
 
 /**
+ * ItemList structured data for category hub pages.
+ * Helps Google understand a list of tours within a category.
+ */
+export function TourCategoryStructuredData({
+  categoryTitle,
+  categoryDescription,
+  categoryUrl,
+  tours,
+  org,
+}: {
+  categoryTitle: string;
+  categoryDescription: string;
+  categoryUrl: string;
+  tours: Array<{ name: string; slug: string; coverImageUrl: string | null }>;
+  org: Organization;
+}) {
+  const orgBaseUrl = normalizeBaseUrl(getOrganizationBookingUrl(org));
+
+  const itemListData = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: categoryTitle,
+    description: categoryDescription,
+    url: categoryUrl,
+    itemListElement: tours.map((tour, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: tour.name,
+      url: `${orgBaseUrl}/tours/${tour.slug}`,
+      image: tour.coverImageUrl || undefined,
+    })),
+  };
+
+  const touristAttractionData = {
+    "@context": "https://schema.org",
+    "@type": "TouristAttraction",
+    name: categoryTitle,
+    description: categoryDescription,
+    url: categoryUrl,
+    provider: {
+      "@type": "TourOperator",
+      name: org.name,
+      url: org.website || orgBaseUrl,
+    },
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListData) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(touristAttractionData) }}
+      />
+    </>
+  );
+}
+
+/**
  * FAQPage structured data
  */
 export function FAQStructuredData({ items }: { items: FAQItem[] }) {

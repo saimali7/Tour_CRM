@@ -11,6 +11,7 @@ import { TourCard } from "@/components/tour-card";
 import { MobileBookingBar } from "@/components/mobile-booking-bar";
 import { Breadcrumb, CardSurface, PageShell, SectionHeader } from "@/components/layout";
 import { FadeIn } from "@/components/layout/animate";
+import { getCategoryConfigByDbCategory } from "@/lib/category-config";
 
 interface PageProps {
   params: Promise<{ slug: string; tourSlug: string }>;
@@ -155,7 +156,15 @@ export default async function TourDetailPage({ params }: PageProps) {
       <PageShell className="pb-24 sm:pb-10">
         <Breadcrumb
           items={[
-            { label: "Tours", href: `/org/${slug}` },
+            { label: "Home", href: "/" },
+            ...(tour.category
+              ? (() => {
+                  const catConfig = getCategoryConfigByDbCategory(tour.category);
+                  return catConfig
+                    ? [{ label: catConfig.label, href: `/experiences/${catConfig.slug}` }]
+                    : [{ label: "Tours", href: "/" }];
+                })()
+              : [{ label: "Tours", href: "/" }]),
             { label: tour.name },
           ]}
         />

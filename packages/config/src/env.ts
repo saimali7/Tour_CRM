@@ -134,7 +134,7 @@ export function validateServerEnv(): ValidationResult {
 
   if (!parsed.success) {
     result.success = false;
-    result.errors = parsed.error.errors.map(
+    result.errors = parsed.error.issues.map(
       (e) => `${e.path.join(".")}: ${e.message}`
     );
     return result;
@@ -195,7 +195,7 @@ export function validateClientEnv(): ValidationResult {
 
   if (!parsed.success) {
     result.success = false;
-    result.errors = parsed.error.errors.map(
+    result.errors = parsed.error.issues.map(
       (e) => `${e.path.join(".")}: ${e.message}`
     );
   }

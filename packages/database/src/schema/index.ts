@@ -11,6 +11,7 @@ export * from "./bookings";
 export * from "./activity-logs";
 export * from "./refunds";
 export * from "./payments";
+export * from "./checkout-operations";
 
 // Phase 2: Communications & Customer engagement
 export * from "./communications";

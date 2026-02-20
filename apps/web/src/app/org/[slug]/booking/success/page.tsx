@@ -71,6 +71,9 @@ export default async function PaymentSuccessPage({ params, searchParams }: PageP
     customer?: { firstName: string; lastName: string; email: string } | null;
   }) | null;
   const tour = booking?.tour;
+  const paidAmount = booking ? parseFloat(booking.paidAmount || "0") : 0;
+  const totalAmount = booking ? parseFloat(booking.total || "0") : 0;
+  const remainingBalance = Math.max(0, totalAmount - paidAmount);
 
   return (
     <PageShell>
@@ -131,8 +134,18 @@ export default async function PaymentSuccessPage({ params, searchParams }: PageP
               </div>
 
               <div className="flex justify-between gap-3 border-t pt-3">
-                <dt className="font-semibold">Total Paid</dt>
-                <dd className="font-semibold">{booking.currency} {booking.total}</dd>
+                <dt className="font-semibold">Paid now</dt>
+                <dd className="font-semibold">{booking.currency} {paidAmount.toFixed(2)}</dd>
+              </div>
+
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Balance due</dt>
+                <dd className="font-medium">{booking.currency} {remainingBalance.toFixed(2)}</dd>
+              </div>
+
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Payment status</dt>
+                <dd className="font-medium capitalize">{booking.paymentStatus.replace("_", " ")}</dd>
               </div>
             </dl>
           </CardSurface>

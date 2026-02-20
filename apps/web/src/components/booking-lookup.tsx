@@ -25,7 +25,9 @@ interface BookingDetails {
   id: string;
   referenceNumber: string;
   status: string;
+  cancellationReason?: string | null;
   paymentStatus: string;
+  canResumePayment?: boolean;
   totalParticipants: number;
   total: string;
   currency: string;
@@ -105,6 +107,11 @@ export function BookingLookup({
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [magicLinkUrl, setMagicLinkUrl] = useState<string | null>(null);
+
+  const showManageActions =
+    (booking?.status === "confirmed" || booking?.status === "pending") &&
+    booking?.customer?.email;
+  const canResumePayment = Boolean(booking?.canResumePayment);
 
   const lookupBooking = async (ref: string, customerEmail: string) => {
     const response = await fetch(
@@ -276,6 +283,50 @@ export function BookingLookup({
     }
   };
 
+  const handleResumePayment = async () => {
+    if (!booking?.customer?.email) return;
+
+    setIsActionLoading(true);
+    setError(null);
+    setActionMessage(null);
+
+    try {
+      const response = await fetch("/api/bookings/manage/resume-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          referenceNumber: booking.referenceNumber,
+          email: booking.customer.email,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | {
+            message?: string;
+            paymentUrl?: string;
+            status?: string;
+          }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to resume payment.");
+      }
+
+      if (data?.paymentUrl) {
+        window.location.href = data.paymentUrl;
+        return;
+      }
+
+      setActionMessage(data?.message || "Payment is already completed.");
+      const refreshed = await lookupBooking(booking.referenceNumber, booking.customer.email);
+      setBooking(refreshed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resume payment");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const handleClear = () => {
     setBooking(null);
     setReferenceNumber("");
@@ -363,7 +414,19 @@ export function BookingLookup({
           </div>
         </div>
 
-        {(booking.status === "confirmed" || booking.status === "pending") && booking.customer?.email && (
+        {canResumePayment ? (
+          <div className="space-y-3 rounded-lg border border-green-200 bg-green-50/50 p-4">
+            <h4 className="text-sm font-semibold text-green-900">Payment</h4>
+            <p className="text-sm text-green-800">
+              Your booking has an outstanding balance. Continue to secure checkout.
+            </p>
+            <Button onClick={handleResumePayment} disabled={isActionLoading} className="w-full">
+              Pay Now
+            </Button>
+          </div>
+        ) : null}
+
+        {showManageActions ? (
           <div className="space-y-3 rounded-lg border bg-card p-4">
             <h4 className="text-sm font-semibold">Manage Booking</h4>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -400,7 +463,7 @@ export function BookingLookup({
               </p>
             )}
           </div>
-        )}
+        ) : null}
 
         {actionMessage && <p className="text-sm text-green-700">{actionMessage}</p>}
 

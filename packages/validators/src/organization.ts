@@ -13,7 +13,7 @@ export const organizationSettingsSchema = z.object({
   smsNotifications: z.boolean().optional(),
   cancellationPolicy: z.string().optional(),
   refundPolicy: z.string().optional(),
-  customFields: z.record(z.unknown()).optional(),
+  customFields: z.record(z.string(), z.unknown()).optional(),
 }).optional();
 
 export const createOrganizationSchema = z.object({

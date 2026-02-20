@@ -211,7 +211,19 @@
       "Bash(git -C /Users/saim/Desktop/Tour_CRM stash push:*)",
       "Bash(git -C /Users/saim/Desktop/Tour_CRM log --oneline -10)",
       "Bash(git -C /Users/saim/Desktop/Tour_CRM merge dev -m \"Merge dev: Production security hardening\")",
-      "Bash(pnpm --filter @tour/database exec tsx:*)"
+      "Bash(pnpm --filter @tour/database exec tsx:*)",
+      "Bash(pnpm --filter @tour/web build:*)",
+      "Bash(pnpm --filter @tour/web typecheck:*)",
+      "Bash(pnpm --filter @tour/web add:*)",
+      "Bash(pnpm update:*)",
+      "Bash(pnpm --filter @tour/ui --filter @tour/crm add tailwind-merge@latest)",
+      "Bash(pnpm --filter @tour/crm --filter @tour/ui --filter @tour/web add lucide-react@latest)",
+      "Bash(pnpm --filter @tour/eslint-config add:*)",
+      "Bash(pnpm --filter @tour/validators --filter @tour/config --filter @tour/crm add:*)",
+      "Bash(pnpm --filter @tour/web --filter @tour/crm add:*)",
+      "Bash(pnpm --filter @tour/database add:*)",
+      "Bash(pnpm --filter @tour/services add:*)",
+      "Bash(pnpm --filter @tour/crm add:*)"
     ]
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import type { ZodSchema, ZodError } from "zod";
+import type { ZodType, ZodError } from "zod";
 
 // ============================================================================
 // Types
@@ -435,7 +435,7 @@ export function useFormValidation<T extends Record<string, unknown>>(
  */
 export function useZodFieldValidation<T>(
   value: T,
-  schema: ZodSchema<T>,
+  schema: ZodType<T>,
   options?: Omit<UseFieldValidationOptions<T>, "validate">
 ) {
   const validate = useCallback(
@@ -445,7 +445,7 @@ export function useZodFieldValidation<T>(
         return undefined;
       } catch (err) {
         const zodError = err as ZodError;
-        return zodError.errors[0]?.message;
+        return zodError.issues[0]?.message;
       }
     },
     [schema]

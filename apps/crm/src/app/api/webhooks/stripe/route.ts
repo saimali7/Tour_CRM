@@ -4,12 +4,20 @@ import Stripe from "stripe";
 import * as Sentry from "@sentry/nextjs";
 import { stripe } from "@/lib/stripe";
 import { db } from "@tour/database";
-import { bookings, customers, tours } from "@tour/database";
+import {
+  bookings,
+  checkoutAttempts,
+  customers,
+  stripeWebhookEvents,
+  tours,
+} from "@tour/database";
 import { eq, and } from "drizzle-orm";
 import { inngest } from "@/inngest";
 import { format } from "date-fns";
 import { webhookLogger } from "@tour/services";
 import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
+
+const AUTO_EXPIRED_REASON = "Booking expired after 30 minutes without payment";
 
 /**
  * Stripe Webhook Handler
@@ -22,6 +30,43 @@ import { formatDbDateKey, parseDateKeyToLocalDate } from "@/lib/date-time";
  * - charge.refunded - Refund processed
  * - checkout.session.completed - Checkout session completed
  */
+
+function extractEventScope(event: Stripe.Event): {
+  organizationId: string | null;
+  bookingId: string | null;
+} {
+  const object = event.data.object as {
+    metadata?: Record<string, string | undefined> | null;
+  };
+  const metadata = object?.metadata ?? null;
+  const organizationId = metadata?.organizationId ?? null;
+  const bookingId = metadata?.bookingId ?? null;
+  return { organizationId, bookingId };
+}
+
+async function registerWebhookEvent(event: Stripe.Event): Promise<boolean> {
+  const scope = extractEventScope(event);
+  const inserted = await db
+    .insert(stripeWebhookEvents)
+    .values({
+      eventId: event.id,
+      type: event.type,
+      organizationId: scope.organizationId,
+      bookingId: scope.bookingId,
+      metadata: {
+        livemode: event.livemode,
+        apiVersion: event.api_version,
+        pendingWebhooks: event.pending_webhooks,
+      },
+      processedAt: new Date(),
+    })
+    .onConflictDoNothing({
+      target: stripeWebhookEvents.eventId,
+    })
+    .returning({ id: stripeWebhookEvents.id });
+
+  return inserted.length > 0;
+}
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -80,6 +125,18 @@ export async function POST(req: Request) {
     livemode: event.livemode,
   }, "Stripe webhook received");
 
+  const isNewEvent = await registerWebhookEvent(event);
+  if (!isNewEvent) {
+    webhookLogger.info(
+      {
+        eventType: event.type,
+        eventId: event.id,
+      },
+      "Duplicate webhook event ignored (already processed)"
+    );
+    return NextResponse.json({ received: true, duplicate: true, eventId: event.id });
+  }
+
   try {
     switch (event.type) {
       case "payment_intent.succeeded":
@@ -111,6 +168,11 @@ export async function POST(req: Request) {
       eventId: event.id,
     });
   } catch (error) {
+    await db
+      .delete(stripeWebhookEvents)
+      .where(eq(stripeWebhookEvents.eventId, event.id))
+      .catch(() => undefined);
+
     // Log detailed error for debugging but don't expose to client
     webhookLogger.error({
       eventType: event.type,
@@ -153,6 +215,7 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
   webhookLogger.info({
+    event: "payment_succeeded",
     paymentIntentId: paymentIntent.id,
     amount: paymentIntent.amount,
     currency: paymentIntent.currency,
@@ -188,51 +251,82 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event) {
     return;
   }
 
-  // Check if we've already processed this payment intent (idempotency)
-  if (
-    booking.stripePaymentIntentId === paymentIntent.id &&
-    booking.paymentStatus === "paid" &&
-    booking.status === "confirmed"
-  ) {
-    webhookLogger.info({
-      paymentIntentId: paymentIntent.id,
-      bookingId,
-    }, "Idempotent: Payment already processed");
-    return;
-  }
+  const paymentAmount = (paymentIntent.amount_received || paymentIntent.amount) / 100;
+  const amountInDollars = paymentAmount.toFixed(2);
+  const previousPaidAmount = parseFloat(booking.paidAmount || "0");
+  const totalAmount = parseFloat(booking.total || "0");
+  const nextPaidAmount = Math.min(totalAmount, previousPaidAmount + paymentAmount);
+  const depositRequired = parseFloat(booking.depositRequired || "0");
+  const previousDepositPaid = parseFloat(booking.depositPaid || "0");
+  const nextDepositPaid =
+    depositRequired > 0
+      ? Math.min(depositRequired, previousDepositPaid + paymentAmount)
+      : previousDepositPaid;
 
-  // Update booking payment status
-  const amountInDollars = (paymentIntent.amount / 100).toFixed(2);
-  const shouldPreserveStatus =
-    booking.status === "cancelled" ||
-    booking.status === "completed" ||
-    booking.status === "no_show";
-  const shouldConfirmBooking =
-    !shouldPreserveStatus && booking.status !== "confirmed";
+  const shouldPreserveTerminalStatus =
+    booking.status === "completed" || booking.status === "no_show";
+  const isAutoExpiredCancelled =
+    booking.status === "cancelled" &&
+    booking.cancellationReason === AUTO_EXPIRED_REASON;
+  const shouldKeepManualCancel =
+    booking.status === "cancelled" && !isAutoExpiredCancelled;
+
+  const nextPaymentStatus =
+    nextPaidAmount >= totalAmount ? "paid" : nextPaidAmount > 0 ? "partial" : "pending";
+
+  const nextStatus = shouldPreserveTerminalStatus
+    ? booking.status
+    : shouldKeepManualCancel
+      ? booking.status
+      : "confirmed";
+  const shouldConfirmBooking = nextStatus === "confirmed" && booking.status !== "confirmed";
 
   await db
     .update(bookings)
     .set({
-      paymentStatus: "paid",
-      paidAmount: amountInDollars,
+      paymentStatus: nextPaymentStatus,
+      paidAmount: nextPaidAmount.toFixed(2),
       stripePaymentIntentId: paymentIntent.id,
-      status: shouldConfirmBooking ? "confirmed" : booking.status,
+      depositPaid: depositRequired > 0 ? nextDepositPaid.toFixed(2) : booking.depositPaid,
+      depositPaidAt:
+        depositRequired > 0 && nextDepositPaid > 0
+          ? booking.depositPaidAt || new Date()
+          : booking.depositPaidAt,
+      balancePaidAt:
+        nextPaymentStatus === "paid" ? booking.balancePaidAt || new Date() : booking.balancePaidAt,
+      status: nextStatus,
       confirmedAt: shouldConfirmBooking ? new Date() : booking.confirmedAt,
+      cancelledAt: isAutoExpiredCancelled ? null : booking.cancelledAt,
+      cancellationReason: isAutoExpiredCancelled ? null : booking.cancellationReason,
       updatedAt: new Date(),
     })
     .where(
       and(eq(bookings.id, bookingId), eq(bookings.organizationId, organizationId))
     );
 
+  await db
+    .update(checkoutAttempts)
+    .set({
+      status: "paid",
+      stripePaymentIntentId: paymentIntent.id,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(checkoutAttempts.organizationId, organizationId),
+        eq(checkoutAttempts.bookingId, bookingId)
+      )
+    );
+
   webhookLogger.info({
     bookingId,
     paymentIntentId: paymentIntent.id,
     amount: amountInDollars,
-    status: "paid",
-    bookingStatus: shouldConfirmBooking ? "confirmed" : booking.status,
+    status: nextPaymentStatus,
+    bookingStatus: nextStatus,
   }, "Booking payment status updated");
 
-  if (shouldPreserveStatus) {
+  if (shouldKeepManualCancel || shouldPreserveTerminalStatus) {
     webhookLogger.warn(
       {
         bookingId,
@@ -300,6 +394,7 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
   webhookLogger.warn({
+    event: "payment_failed",
     paymentIntentId: paymentIntent.id,
     amount: paymentIntent.amount,
     metadata: paymentIntent.metadata,
@@ -326,11 +421,14 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
     return;
   }
 
-  // Update booking payment status to failed
+  const currentPaidAmount = parseFloat(booking.paidAmount || "0");
+  const nextPaymentStatus = currentPaidAmount > 0 ? "partial" : "failed";
+
+  // Update booking payment status
   await db
     .update(bookings)
     .set({
-      paymentStatus: "failed",
+      paymentStatus: nextPaymentStatus,
       stripePaymentIntentId: paymentIntent.id,
       updatedAt: new Date(),
     })
@@ -338,7 +436,22 @@ async function handlePaymentIntentFailed(event: Stripe.Event) {
       and(eq(bookings.id, bookingId), eq(bookings.organizationId, organizationId))
     );
 
-  webhookLogger.info({ bookingId }, "Updated booking to failed payment status");
+  await db
+    .update(checkoutAttempts)
+    .set({
+      status: "failed",
+      stripePaymentIntentId: paymentIntent.id,
+      lastError: paymentIntent.last_payment_error?.message || "Payment failed",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(checkoutAttempts.organizationId, organizationId),
+        eq(checkoutAttempts.bookingId, bookingId)
+      )
+    );
+
+  webhookLogger.info({ bookingId, paymentStatus: nextPaymentStatus }, "Updated booking payment status after failure");
 
   // Get customer details for the email
   const customer = await db.query.customers.findFirst({
@@ -452,6 +565,29 @@ async function handleCheckoutSessionCompleted(event: Stripe.Event) {
 
   // Payment intent succeeded event will handle the actual booking update
   // This event is just for logging/tracking
+  const organizationId = session.metadata?.organizationId;
+  const bookingId = session.metadata?.bookingId;
+
+  if (organizationId && bookingId) {
+    await db
+      .update(checkoutAttempts)
+      .set({
+        stripeSessionId: session.id,
+        stripePaymentIntentId:
+          typeof session.payment_intent === "string"
+            ? session.payment_intent
+            : session.payment_intent?.id || null,
+        status: session.payment_status === "paid" ? "paid" : "session_created",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(checkoutAttempts.organizationId, organizationId),
+          eq(checkoutAttempts.bookingId, bookingId)
+        )
+      );
+  }
+
   if (session.payment_status === "paid") {
     webhookLogger.info({ sessionId: session.id }, "Checkout session paid successfully");
   }

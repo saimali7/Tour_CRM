@@ -18,12 +18,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "zod": "^3.24.0"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tour/eslint-config": "workspace:*",
     "@tour/typescript-config": "workspace:*",
-    "@types/node": "^22.19.2",
+    "@types/node": "^22.19.11",
     "eslint": "^8.57.1",
     "typescript": "^5.9.3"
   }

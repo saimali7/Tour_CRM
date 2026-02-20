@@ -9,6 +9,7 @@ import { BookingOptionSelection } from "./booking-option-selection";
 import { TicketSelection } from "./ticket-selection";
 import { AddonSelection } from "./addon-selection";
 import { CustomerDetailsForm } from "./customer-details-form";
+import { ReviewStep } from "./review-step";
 import { PaymentStep } from "./payment-step";
 import { WaiverStep } from "./waiver-step";
 import { BookingConfirmation } from "./booking-confirmation";
@@ -153,6 +154,7 @@ function BookingFlowContent({
     ordered.push({ id: "select", label: "Tickets" });
     if (hasAddOns) ordered.push({ id: "addons", label: "Add-ons" });
     ordered.push({ id: "details", label: "Details" });
+    ordered.push({ id: "review", label: "Review" });
     ordered.push({ id: "payment", label: "Payment" });
     if (hasWaiverStep) ordered.push({ id: "waiver", label: "Waiver" });
     ordered.push({ id: "confirmation", label: "Done" });
@@ -213,6 +215,7 @@ function BookingFlowContent({
                 organizationSlug={organizationSlug}
               />
             )}
+            {state.step === "review" && <ReviewStep />}
             {state.step === "payment" && (
               <PaymentStep organizationName={organizationName} organizationSlug={organizationSlug} />
             )}
@@ -360,7 +363,15 @@ function BookingFlowContent({
   );
 }
 
-type BookingFlowStep = "options" | "select" | "addons" | "details" | "payment" | "waiver" | "confirmation";
+type BookingFlowStep =
+  | "options"
+  | "select"
+  | "addons"
+  | "details"
+  | "review"
+  | "payment"
+  | "waiver"
+  | "confirmation";
 
 export function BookingFlow(props: BookingFlowProps) {
   return (

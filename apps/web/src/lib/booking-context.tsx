@@ -94,7 +94,7 @@ export interface BookingState {
   currency: string;
   taxConfig: BookingTaxConfig;
 
-  step: "options" | "select" | "addons" | "details" | "payment" | "waiver" | "confirmation";
+  step: "options" | "select" | "addons" | "details" | "review" | "payment" | "waiver" | "confirmation";
   isSubmitting: boolean;
   error: string | null;
 
@@ -102,6 +102,7 @@ export interface BookingState {
   bookingId: string | null;
   referenceNumber: string | null;
   abandonedCartId: string | null;
+  idempotencyKey: string | null;
 
   requiredWaivers: RequiredWaiver[];
 }
@@ -130,6 +131,7 @@ type BookingAction =
   | { type: "SET_STEP"; step: BookingState["step"] }
   | { type: "SET_SUBMITTING"; isSubmitting: boolean }
   | { type: "SET_ERROR"; error: string | null }
+  | { type: "SET_IDEMPOTENCY_KEY"; idempotencyKey: string | null }
   | { type: "SET_PAYMENT_INTENT"; clientSecret: string }
   | { type: "SET_BOOKING_RESULT"; bookingId: string; referenceNumber: string }
   | { type: "SET_ABANDONED_CART_ID"; cartId: string | null }
@@ -169,6 +171,7 @@ const initialState: BookingState = {
   bookingId: null,
   referenceNumber: null,
   abandonedCartId: null,
+  idempotencyKey: null,
   requiredWaivers: [],
 };
 
@@ -193,7 +196,7 @@ function getFlowSteps({
     steps.push("addons");
   }
 
-  steps.push("details", "payment");
+  steps.push("details", "review", "payment");
 
   if (hasWaiverStep) {
     steps.push("waiver");
@@ -261,6 +264,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         currency: action.currency,
         taxConfig: action.taxConfig ?? initialState.taxConfig,
         step: action.bookingOptions.length > 0 ? "options" : "select",
+        idempotencyKey: null,
       };
     }
 
@@ -270,6 +274,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       return {
         ...state,
         participants: newParticipants,
+        idempotencyKey: null,
         ...totals,
       };
     }
@@ -280,6 +285,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       return {
         ...state,
         participants: newParticipants,
+        idempotencyKey: null,
         ...totals,
       };
     }
@@ -292,6 +298,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       return {
         ...state,
         participants: newParticipants,
+        idempotencyKey: null,
         ...totals,
       };
     }
@@ -300,12 +307,14 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       return {
         ...state,
         customer: action.customer,
+        idempotencyKey: null,
       };
 
     case "SET_BOOKING_OPTION":
       return {
         ...state,
         bookingOptionId: action.bookingOptionId,
+        idempotencyKey: null,
       };
 
     case "SET_AVAILABLE_ADDONS": {
@@ -341,6 +350,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         ...state,
         availableAddOns: action.addOns,
         selectedAddOns: mergedSelections,
+        idempotencyKey: null,
         ...totals,
       };
     }
@@ -383,6 +393,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
       return {
         ...state,
         selectedAddOns: nextSelected,
+        idempotencyKey: null,
         ...totals,
       };
     }
@@ -393,6 +404,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         ...state,
         discountCode: action.code,
         discount: action.amount,
+        idempotencyKey: null,
         ...totals,
       };
     }
@@ -403,6 +415,7 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         ...state,
         discountCode: null,
         discount: 0,
+        idempotencyKey: null,
         ...totals,
       };
     }
@@ -425,6 +438,12 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         ...state,
         error: action.error,
         isSubmitting: false,
+      };
+
+    case "SET_IDEMPOTENCY_KEY":
+      return {
+        ...state,
+        idempotencyKey: action.idempotencyKey,
       };
 
     case "SET_PAYMENT_INTENT":
@@ -497,6 +516,7 @@ interface BookingContextValue {
   setAvailableAddOns: (addOns: AvailableAddOn[]) => void;
   setAddOnQuantity: (addOnProductId: string, quantity: number) => void;
   setAbandonedCartId: (cartId: string | null) => void;
+  setIdempotencyKey: (idempotencyKey: string | null) => void;
   setRequiredWaivers: (waivers: RequiredWaiver[]) => void;
   markWaiverSigned: (waiverTemplateId: string, signedAt?: string) => void;
   nextStep: () => void;
@@ -576,6 +596,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_ABANDONED_CART_ID", cartId });
   }, []);
 
+  const setIdempotencyKey = useCallback((idempotencyKey: string | null) => {
+    dispatch({ type: "SET_IDEMPOTENCY_KEY", idempotencyKey });
+  }, []);
+
   const setRequiredWaivers = useCallback((waivers: RequiredWaiver[]) => {
     dispatch({ type: "SET_REQUIRED_WAIVERS", waivers });
   }, []);
@@ -630,6 +654,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         setAvailableAddOns,
         setAddOnQuantity,
         setAbandonedCartId,
+        setIdempotencyKey,
         setRequiredWaivers,
         markWaiverSigned,
         nextStep,

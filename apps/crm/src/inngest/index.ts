@@ -45,6 +45,9 @@ export {
   sendPaymentSucceededEmail,
   sendPaymentFailedEmail,
 } from "./functions/payment-emails";
+export {
+  reconcilePendingWebsitePayments,
+} from "./functions/payment-reconciliation";
 
 export {
   sendTeamInviteEmail,
@@ -96,6 +99,9 @@ import {
   sendPaymentSucceededEmail,
   sendPaymentFailedEmail,
 } from "./functions/payment-emails";
+import {
+  reconcilePendingWebsitePayments,
+} from "./functions/payment-reconciliation";
 
 import {
   sendTeamInviteEmail,
@@ -134,6 +140,8 @@ export const inngestFunctions = [
   // Payment emails
   sendPaymentSucceededEmail,
   sendPaymentFailedEmail,
+  // Payment reconciliation
+  reconcilePendingWebsitePayments,
   // Team notifications
   sendTeamInviteEmail,
   // Booking payment timeout

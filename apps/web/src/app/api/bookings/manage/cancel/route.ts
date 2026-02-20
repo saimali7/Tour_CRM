@@ -9,6 +9,11 @@ import {
   ValidationError,
 } from "@tour/services";
 import { verifyBookingMagicToken } from "@/lib/booking-magic-link";
+import {
+  buildCustomerRateLimitIdentifier,
+  checkCompositeRateLimits,
+  getRequestIp,
+} from "@/lib/booking-rate-limit";
 
 interface CancelBookingBody {
   referenceNumber?: string;
@@ -19,6 +24,7 @@ interface CancelBookingBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const ipAddress = getRequestIp(request);
     const headersList = await headers();
     const orgSlug = headersList.get("x-org-slug");
 
@@ -58,6 +64,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { message: "referenceNumber and email are required" },
         { status: 400 }
+      );
+    }
+
+    const rateLimit = await checkCompositeRateLimits([
+      { scope: "booking_manage_ip", identifier: ipAddress },
+      {
+        scope: "booking_manage_customer",
+        identifier: buildCustomerRateLimitIdentifier(referenceNumber, email),
+      },
+    ]);
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: "Too many booking management attempts. Please try again shortly." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        }
       );
     }
 

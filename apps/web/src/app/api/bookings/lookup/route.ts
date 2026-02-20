@@ -3,9 +3,15 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db, organizations, eq } from "@tour/database";
 import { createServices, logger } from "@tour/services";
+import {
+  buildCustomerRateLimitIdentifier,
+  checkCompositeRateLimits,
+  getRequestIp,
+} from "@/lib/booking-rate-limit";
 
 export async function GET(request: NextRequest) {
   try {
+    const AUTO_EXPIRED_REASON = "Booking expired after 30 minutes without payment";
     const { searchParams } = new URL(request.url);
     const referenceNumber = searchParams.get("reference");
     const email = searchParams.get("email");
@@ -14,6 +20,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { message: "Reference number and email are required" },
         { status: 400 }
+      );
+    }
+
+    const ipAddress = getRequestIp(request);
+    const rateLimit = await checkCompositeRateLimits([
+      { scope: "booking_lookup_ip", identifier: ipAddress },
+      {
+        scope: "booking_lookup_customer",
+        identifier: buildCustomerRateLimitIdentifier(referenceNumber, email),
+      },
+    ]);
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: "Too many lookup attempts. Please try again shortly." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        }
       );
     }
 
@@ -63,12 +91,23 @@ export async function GET(request: NextRequest) {
     }
 
     // Return booking details (without sensitive internal data)
+    const canResumePayment =
+      (booking.paymentStatus === "pending" ||
+        booking.paymentStatus === "partial" ||
+        booking.paymentStatus === "failed") &&
+      (booking.status === "confirmed" ||
+        booking.status === "pending" ||
+        (booking.status === "cancelled" &&
+          booking.cancellationReason === AUTO_EXPIRED_REASON));
+
     return NextResponse.json({
       booking: {
         id: booking.id,
         referenceNumber: booking.referenceNumber,
         status: booking.status,
+        cancellationReason: booking.cancellationReason,
         paymentStatus: booking.paymentStatus,
+        canResumePayment,
         totalParticipants: booking.totalParticipants,
         total: booking.total,
         currency: booking.currency,

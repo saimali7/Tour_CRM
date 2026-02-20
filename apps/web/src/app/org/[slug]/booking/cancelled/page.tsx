@@ -4,6 +4,7 @@ import { requireOrganization } from "@/lib/organization";
 import { db, bookings, eq, and } from "@tour/database";
 import { XCircle, RotateCcw, LifeBuoy } from "lucide-react";
 import { Breadcrumb, CardSurface, PageShell, SectionHeader } from "@/components/layout";
+import { ResumePaymentButton } from "@/components/resume-payment-button";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -44,12 +45,14 @@ export default async function PaymentCancelledPage({ params, searchParams }: Pag
         ),
         with: {
           tour: true,
+          customer: true,
         },
       })
     : null;
 
   const booking = bookingResult as (typeof bookingResult & {
     tour?: { name: string } | null;
+    customer?: { email: string | null } | null;
   }) | null;
 
   return (
@@ -104,13 +107,19 @@ export default async function PaymentCancelledPage({ params, searchParams }: Pag
         )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {ref ? (
+          {booking?.customer?.email && ref ? (
+            <ResumePaymentButton
+              referenceNumber={ref}
+              email={booking.customer.email}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+            />
+          ) : ref ? (
             <Link
               href={`/org/${slug}/booking?ref=${ref}`}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
             >
               <RotateCcw className="h-4 w-4" />
-              Resume Payment
+              Find Booking
             </Link>
           ) : null}
           <Link

@@ -9,7 +9,7 @@ function getStripeClient(): Stripe {
 
   if (!stripeClient) {
     stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2025-11-17.clover",
+      apiVersion: "2026-01-28.clover",
     });
   }
 
@@ -30,6 +30,7 @@ export interface CreateBookingCheckoutSessionInput {
   participants: number;
   successUrl: string;
   cancelUrl: string;
+  idempotencyKey?: string;
 }
 
 export async function createBookingCheckoutSession(
@@ -73,7 +74,21 @@ export async function createBookingCheckoutSession(
     },
   };
 
-  return stripe.checkout.sessions.create(createParams, {
-    stripeAccount: input.stripeAccountId,
+  return stripe.checkout.sessions.create(
+    createParams,
+    {
+      stripeAccount: input.stripeAccountId,
+      idempotencyKey: input.idempotencyKey,
+    }
+  );
+}
+
+export async function retrieveBookingCheckoutSession(
+  sessionId: string,
+  stripeAccountId?: string
+): Promise<Stripe.Checkout.Session> {
+  const stripe = getStripeClient();
+  return stripe.checkout.sessions.retrieve(sessionId, {
+    stripeAccount: stripeAccountId,
   });
 }

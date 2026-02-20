@@ -8,7 +8,7 @@ export function parseDateKeyToLocalDate(dateKey: string): Date {
     throw new Error(`Invalid date key: ${dateKey}`);
   }
 
-  return new Date(year, month - 1, day);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 }
 
 export function formatLocalDateKey(date: Date): string {

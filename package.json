@@ -19,16 +19,16 @@
     "db:studio": "pnpm --filter @tour/database studio"
   },
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
-    "@tailwindcss/postcss": "^4.1.18",
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/postcss": "^4.2.0",
     "@tour/typescript-config": "workspace:*",
     "@types/canvas-confetti": "^1.9.0",
-    "@vitest/coverage-v8": "^4.0.15",
+    "@vitest/coverage-v8": "^4.0.18",
     "postcss": "^8.5.6",
-    "prettier": "^3.4.2",
-    "tailwindcss": "^4.1.18",
-    "turbo": "^2.3.3",
-    "vitest": "^4.0.15"
+    "prettier": "^3.8.1",
+    "tailwindcss": "^4.2.0",
+    "turbo": "^2.8.10",
+    "vitest": "^4.0.18"
   },
   "packageManager": "pnpm@10.25.0",
   "engines": {
@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
-    "pino": "^10.1.0",
+    "pino": "^10.3.1",
     "pino-pretty": "^13.1.3"
   }
 }

@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin, Mail, Phone, Globe, Clock, Users, CalendarDays, Star } from "lucide-react";
+import { MapPin, Mail, Phone, Globe, Clock, Users, CalendarDays, Star, ArrowRight } from "lucide-react";
 import { requireOrganization, getOrganizationBranding } from "@/lib/organization";
 import { createServices } from "@tour/services";
 import { Breadcrumb, CardSurface, PageShell, Section, SectionHeader } from "@/components/layout";
 import { FadeIn, StaggerChildren } from "@/components/layout/animate";
 import { Button } from "@tour/ui";
+import { CATEGORY_CONFIGS } from "@/lib/category-config";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -49,7 +50,7 @@ export default async function AboutPage({ params }: PageProps) {
     <PageShell>
       <Breadcrumb
         items={[
-          { label: "Home", href: `/org/${slug}` },
+          { label: "Home", href: "/" },
           { label: "About Us" },
         ]}
       />
@@ -142,6 +143,28 @@ export default async function AboutPage({ params }: PageProps) {
             </div>
           </Section>
         )}
+
+        {/* Our Expertise — links to category hub pages */}
+        <Section spacing="compact" className="pt-0">
+          <SectionHeader
+            title="Our Expertise"
+            subtitle="We specialise in four core categories of Dubai experience"
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {CATEGORY_CONFIGS.map((cat) => (
+              <Link
+                key={cat.slug}
+                href={`/experiences/${cat.slug}`}
+                className="group flex items-center justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm"
+              >
+                <span className="font-medium text-foreground group-hover:text-primary transition-colors">
+                  {cat.label}
+                </span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+              </Link>
+            ))}
+          </div>
+        </Section>
 
         <Section spacing="compact" className="pt-0">
           <CardSurface>

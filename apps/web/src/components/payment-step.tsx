@@ -47,7 +47,14 @@ function parseAppliedDiscountCode(
 }
 
 export function PaymentStep({ organizationName, organizationSlug }: PaymentStepProps) {
-  const { state, dispatch, prevStep, setAbandonedCartId, setRequiredWaivers } = useBooking();
+  const {
+    state,
+    dispatch,
+    prevStep,
+    setAbandonedCartId,
+    setIdempotencyKey,
+    setRequiredWaivers,
+  } = useBooking();
   const [isProcessing, setIsProcessing] = useState(false);
   const [discountType, setDiscountType] = useState<DiscountType>("promo");
   const [discountCodeInput, setDiscountCodeInput] = useState("");
@@ -303,11 +310,19 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
     dispatch({ type: "SET_ERROR", error: null });
 
     try {
+      const requestIdempotencyKey =
+        state.idempotencyKey ||
+        `web-${Date.now()}-${crypto.randomUUID().replace(/-/g, "")}`;
+      if (!state.idempotencyKey) {
+        setIdempotencyKey(requestIdempotencyKey);
+      }
+
       // Create booking via API using availability-based model
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Idempotency-Key": requestIdempotencyKey,
         },
         body: JSON.stringify({
           tourId: state.tour?.id,
@@ -414,7 +429,7 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       >
         <ChevronLeft className="h-4 w-4" />
-        Back to details
+        Back to review
       </button>
 
       {/* Payment Header */}

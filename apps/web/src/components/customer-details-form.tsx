@@ -401,7 +401,7 @@ export function CustomerDetailsForm({
 
       {/* Submit button */}
       <Button type="submit" className="w-full" size="lg">
-        Continue to Payment
+        Continue to Review
       </Button>
 
       <p className="text-xs text-muted-foreground text-center">

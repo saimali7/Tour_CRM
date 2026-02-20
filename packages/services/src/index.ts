@@ -1,3 +1,4 @@
+import "server-only";
 import type { ServiceContext } from "./types";
 import { TourService } from "./tour-service";
 // Booking module - refactored into focused services

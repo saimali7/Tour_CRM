@@ -1,14 +1,31 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { db, organizations, bookings, eq, and } from "@tour/database";
-import { createServices } from "@tour/services";
-import { checkBookingRateLimit, getRequestIp } from "@/lib/booking-rate-limit";
-import { verifyAndCalculateBookingPricing } from "@/lib/booking-pricing";
-import { createBookingCheckoutSession } from "@/lib/stripe-checkout";
+import { and, bookings, db, eq, organizations } from "@tour/database";
+import { createServices, logger } from "@tour/services";
+import {
+  checkCompositeRateLimits,
+  getRequestIp,
+  type RateLimitResult,
+} from "@/lib/booking-rate-limit";
+import {
+  attachBookingToAttempt,
+  getCheckoutReusePayload,
+  hashCheckoutFingerprint,
+  isValidIdempotencyKey,
+  markCheckoutAttemptFailure,
+  markCheckoutAttemptPaid,
+  markCheckoutSessionCreated,
+  reserveCheckoutAttempt,
+} from "@/lib/checkout-attempts";
+import { parseDateKeyToLocalDate } from "@/lib/date-key";
 import { sendBookingCreatedEvent } from "@/lib/inngest-events";
 import { getOrganizationBookingUrl } from "@/lib/organization";
-import { parseDateKeyToLocalDate } from "@/lib/date-key";
+import { verifyAndCalculateBookingPricing } from "@/lib/booking-pricing";
+import {
+  createBookingCheckoutSession,
+  retrieveBookingCheckoutSession,
+} from "@/lib/stripe-checkout";
 
 interface BookingRequestBody {
   tourId: string;
@@ -95,7 +112,6 @@ function parseDiscountCode(
 
   const separatorIndex = trimmed.indexOf(":");
   if (separatorIndex === -1) {
-    // Backward compatibility for existing clients that send plain promo codes.
     return {
       type: "promo",
       code: trimmed.toUpperCase(),
@@ -129,30 +145,114 @@ function parseDiscountCode(
   };
 }
 
+function rateLimitedResponse(message: string, rateLimit: RateLimitResult) {
+  return NextResponse.json(
+    { message },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(rateLimit.retryAfterSeconds),
+        "X-RateLimit-Remaining": String(rateLimit.remaining),
+      },
+    }
+  );
+}
+
+function buildCheckoutFingerprintInput(input: {
+  tourId: string;
+  bookingDate: string;
+  bookingTime: string;
+  bookingOptionId?: string;
+  customerEmail: string;
+  participants: BookingRequestBody["participants"];
+  selectedAddOns: Array<{ addOnProductId: string; quantity: number }>;
+  subtotalCents: number;
+  discountCents: number;
+  taxCents: number;
+  totalCents: number;
+  discountCode: string | null | undefined;
+}) {
+  return {
+    tourId: input.tourId,
+    bookingDate: input.bookingDate,
+    bookingTime: input.bookingTime,
+    bookingOptionId: input.bookingOptionId ?? null,
+    customerEmail: input.customerEmail.trim().toLowerCase(),
+    participants: input.participants.map((participant) => ({
+      type: participant.type,
+      firstName: participant.firstName.trim().toLowerCase(),
+      lastName: participant.lastName.trim().toLowerCase(),
+      email: participant.email?.trim().toLowerCase() ?? null,
+    })),
+    selectedAddOns: input.selectedAddOns
+      .map((addOn) => ({
+        addOnProductId: addOn.addOnProductId,
+        quantity: addOn.quantity,
+      }))
+      .sort((a, b) => a.addOnProductId.localeCompare(b.addOnProductId)),
+    subtotalCents: input.subtotalCents,
+    discountCents: input.discountCents,
+    taxCents: input.taxCents,
+    totalCents: input.totalCents,
+    discountCode: input.discountCode?.trim() || null,
+  };
+}
+
+function getChargeAmounts(booking: {
+  total: string;
+  paidAmount: string | null;
+  depositRequired: string | null;
+  depositPaid: string | null;
+}): {
+  amountToCharge: number;
+  paymentMode: "deposit" | "full";
+  remainingBalance: number;
+} {
+  const total = parseFloat(booking.total || "0");
+  const paidAmount = parseFloat(booking.paidAmount || "0");
+  const depositRequired = parseFloat(booking.depositRequired || "0");
+  const depositPaid = parseFloat(booking.depositPaid || "0");
+
+  const remainingBalance = Math.max(0, total - paidAmount);
+  if (remainingBalance <= 0) {
+    return {
+      amountToCharge: 0,
+      paymentMode: "full",
+      remainingBalance: 0,
+    };
+  }
+
+  if (depositRequired > 0 && depositPaid < depositRequired) {
+    return {
+      amountToCharge: Math.min(remainingBalance, Math.max(0, depositRequired - depositPaid)),
+      paymentMode: "deposit",
+      remainingBalance,
+    };
+  }
+
+  return {
+    amountToCharge: remainingBalance,
+    paymentMode: "full",
+    remainingBalance,
+  };
+}
+
 export async function POST(request: NextRequest) {
+  const ipAddress = getRequestIp(request);
+  let attemptId: string | null = null;
+  let attemptOrgId: string | null = null;
+
   try {
-    const ipAddress = getRequestIp(request);
-    const rateLimit = checkBookingRateLimit(ipAddress);
-
-    if (!rateLimit.allowed) {
-      const retryAfterSeconds = Math.max(
-        1,
-        Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
-      );
-
-      return NextResponse.json(
-        { message: "Too many booking attempts. Please try again in a minute." },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(retryAfterSeconds),
-            "X-RateLimit-Remaining": String(rateLimit.remaining),
-          },
-        }
+    const ipRateLimit = await checkCompositeRateLimits([
+      { scope: "booking_create_ip", identifier: ipAddress },
+    ]);
+    if (!ipRateLimit.allowed) {
+      return rateLimitedResponse(
+        "Too many booking attempts. Please try again shortly.",
+        ipRateLimit
       );
     }
 
-    // Get organization slug from header (set by middleware)
     const headersList = await headers();
     const orgSlug = headersList.get("x-org-slug");
 
@@ -163,7 +263,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get organization
     const org = await db.query.organizations.findFirst({
       where: eq(organizations.slug, orgSlug),
     });
@@ -175,6 +274,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const idempotencyKeyHeader = request.headers.get("x-idempotency-key")?.trim() || null;
+    if (!isValidIdempotencyKey(idempotencyKeyHeader)) {
+      return NextResponse.json(
+        { message: "Missing or invalid X-Idempotency-Key header." },
+        { status: 400 }
+      );
+    }
+    const idempotencyKey = idempotencyKeyHeader as string;
+
     let body: BookingRequestBody;
     try {
       body = await request.json();
@@ -185,7 +293,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate required fields
     if (!body.tourId || !body.bookingDate || !body.bookingTime) {
       return NextResponse.json(
         { message: "Tour ID, booking date, and booking time are required" },
@@ -208,6 +315,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { message: "At least one participant is required" },
         { status: 400 }
+      );
+    }
+
+    const customerRateLimit = await checkCompositeRateLimits([
+      {
+        scope: "booking_create_customer",
+        identifier: body.customer.email.trim().toLowerCase(),
+      },
+    ]);
+    if (!customerRateLimit.allowed) {
+      return rateLimitedResponse(
+        "Too many booking attempts for this customer. Please try again shortly.",
+        customerRateLimit
       );
     }
 
@@ -249,6 +369,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
     const services = createServices({ organizationId: org.id });
 
     const getOrCreateCustomer = async () =>
@@ -479,124 +600,312 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create customer
+    const fingerprintHash = hashCheckoutFingerprint(
+      buildCheckoutFingerprintInput({
+        tourId: body.tourId,
+        bookingDate: body.bookingDate,
+        bookingTime: body.bookingTime,
+        bookingOptionId: body.bookingOptionId,
+        customerEmail: body.customer.email,
+        participants: body.participants,
+        selectedAddOns: normalizedAddOns.map((addOn) => ({
+          addOnProductId: addOn.addOnProductId,
+          quantity: addOn.quantity,
+        })),
+        subtotalCents,
+        discountCents,
+        taxCents,
+        totalCents,
+        discountCode: body.discountCode,
+      })
+    );
+
+    const reservation = await reserveCheckoutAttempt({
+      organizationId: org.id,
+      idempotencyKey,
+      fingerprintHash,
+      amountCents: totalCents,
+      currency:
+        pricingVerification.pricing.currency ||
+        org.settings?.defaultCurrency ||
+        org.currency ||
+        "USD",
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    });
+
+    attemptId = reservation.attempt.id;
+    attemptOrgId = org.id;
+
+    if (!reservation.created) {
+      if (reservation.attempt.fingerprintHash !== fingerprintHash) {
+        return NextResponse.json(
+          {
+            message:
+              "This idempotency key was already used with different checkout details.",
+          },
+          { status: 409 }
+        );
+      }
+
+      if (reservation.attempt.status === "paid") {
+        const attemptBooking = reservation.attempt.bookingId
+          ? await db.query.bookings.findFirst({
+              where: and(
+                eq(bookings.id, reservation.attempt.bookingId),
+                eq(bookings.organizationId, org.id)
+              ),
+            })
+          : null;
+
+        return NextResponse.json({
+          booking: {
+            id: attemptBooking?.id ?? reservation.attempt.bookingId ?? null,
+            referenceNumber: attemptBooking?.referenceNumber ?? null,
+          },
+          message: "Payment already completed for this checkout attempt.",
+        });
+      }
+
+      if (reservation.attempt.status === "session_created") {
+        if (process.env.STRIPE_SECRET_KEY && reservation.attempt.stripeSessionId) {
+          try {
+            const session = await retrieveBookingCheckoutSession(
+              reservation.attempt.stripeSessionId
+            );
+            if (
+              session.payment_status === "paid" ||
+              session.status === "complete"
+            ) {
+              return NextResponse.json({
+                booking: {
+                  id: reservation.attempt.bookingId,
+                  referenceNumber: null,
+                },
+                message: "Payment already completed for this checkout attempt.",
+              });
+            }
+
+            if (session.status === "open" && session.url) {
+              const payload = getCheckoutReusePayload(reservation.attempt);
+              return NextResponse.json({
+                booking: {
+                  id: reservation.attempt.bookingId,
+                  referenceNumber: payload?.bookingReference ?? null,
+                },
+                paymentUrl: session.url,
+                paymentAmount: payload?.paymentAmount ?? centsToMoney(reservation.attempt.amountCents),
+                remainingBalance:
+                  payload?.remainingBalance ?? centsToMoney(reservation.attempt.amountCents),
+                paymentMode: payload?.paymentMode ?? "full",
+                idempotentReplay: true,
+                message: "Resuming existing secure checkout session",
+              });
+            }
+          } catch (error) {
+            logger.warn(
+              { err: error, attemptId: reservation.attempt.id },
+              "Failed to retrieve existing checkout session, will create a new one"
+            );
+          }
+        }
+
+        const payload = getCheckoutReusePayload(reservation.attempt);
+        if (payload?.paymentUrl) {
+          return NextResponse.json({
+            booking: {
+              id: payload.bookingId,
+              referenceNumber: payload.bookingReference,
+            },
+            paymentUrl: payload.paymentUrl,
+            paymentAmount: payload.paymentAmount,
+            remainingBalance: payload.remainingBalance,
+            paymentMode: payload.paymentMode,
+            idempotentReplay: true,
+            message: "Resuming existing secure checkout session",
+          });
+        }
+      }
+
+      if (
+        reservation.attempt.status === "initiated" &&
+        !reservation.attempt.bookingId
+      ) {
+        const ageMs = Date.now() - new Date(reservation.attempt.updatedAt).getTime();
+        if (ageMs < 120_000) {
+          return NextResponse.json(
+            {
+              message: "Checkout is already being prepared. Please retry in a moment.",
+            },
+            {
+              status: 409,
+              headers: {
+                "Retry-After": "2",
+              },
+            }
+          );
+        }
+      }
+    }
+
     if (!customer) {
       customer = await getOrCreateCustomer();
     }
 
-    // Count participants by type
     const adultCount = body.participants.filter((p) => p.type === "adult").length;
     const childCount = body.participants.filter((p) => p.type === "child").length;
     const infantCount = body.participants.filter((p) => p.type === "infant").length;
 
-    // Create booking using verified server-side pricing
-    const booking = await services.booking.create({
-      customerId: customer.id,
-      tourId: body.tourId,
-      bookingDate,
-      bookingTime: body.bookingTime,
-      bookingOptionId: body.bookingOptionId,
-      adultCount,
-      childCount,
-      infantCount,
-      specialRequests: body.customer.specialRequests,
-      dietaryRequirements: body.customer.dietaryRequirements,
-      accessibilityNeeds: body.customer.accessibilityNeeds,
-      source: "website",
-      participants: body.participants.map((p) => ({
-        firstName: p.firstName,
-        lastName: p.lastName,
-        email: p.email,
-        type: p.type,
-      })),
-      subtotal: centsToMoney(subtotalCents),
-      discount: centsToMoney(discountCents),
-      tax: centsToMoney(taxCents),
-      total: centsToMoney(totalCents),
-    });
+    let booking =
+      !reservation.created && reservation.attempt.bookingId
+        ? await services.booking
+            .getById(reservation.attempt.bookingId)
+            .catch(() => null)
+        : null;
 
-    if (normalizedAddOns.length > 0) {
-      await Promise.all(
-        normalizedAddOns.map((addOn) =>
-          services.addOn.addToBooking({
-            bookingId: booking.id,
-            addOnProductId: addOn.addOnProductId,
-            quantity: addOn.quantity,
-            unitPrice: centsToMoney(addOn.unitPriceCents),
-          })
-        )
+    if (!booking) {
+      logger.info(
+        {
+          event: "booking_create_attempted",
+          organizationId: org.id,
+          tourId: body.tourId,
+          bookingDate: body.bookingDate,
+          bookingTime: body.bookingTime,
+        },
+        "Creating booking from website checkout"
       );
-    }
 
-    if (body.abandonedCartId) {
-      try {
-        await services.abandonedCart.markRecovered(body.abandonedCartId, booking.id);
-      } catch {
-        // Non-blocking: booking creation should not fail when cart recovery update fails.
+      booking = await services.booking.create({
+        customerId: customer.id,
+        tourId: body.tourId,
+        bookingDate,
+        bookingTime: body.bookingTime,
+        bookingOptionId: body.bookingOptionId,
+        adultCount,
+        childCount,
+        infantCount,
+        specialRequests: body.customer.specialRequests,
+        dietaryRequirements: body.customer.dietaryRequirements,
+        accessibilityNeeds: body.customer.accessibilityNeeds,
+        source: "website",
+        participants: body.participants.map((p) => ({
+          firstName: p.firstName,
+          lastName: p.lastName,
+          email: p.email,
+          type: p.type,
+        })),
+        subtotal: centsToMoney(subtotalCents),
+        discount: centsToMoney(discountCents),
+        tax: centsToMoney(taxCents),
+        total: centsToMoney(totalCents),
+      });
+      const createdBooking = booking;
+
+      await attachBookingToAttempt({
+        organizationId: org.id,
+        attemptId: reservation.attempt.id,
+        bookingId: createdBooking.id,
+      });
+
+      if (normalizedAddOns.length > 0) {
+        await Promise.all(
+          normalizedAddOns.map((addOn) =>
+            services.addOn.addToBooking({
+              bookingId: createdBooking.id,
+              addOnProductId: addOn.addOnProductId,
+              quantity: addOn.quantity,
+              unitPrice: centsToMoney(addOn.unitPriceCents),
+            })
+          )
+        );
       }
-    }
 
-    const emailTourDate = new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      timeZone: org.timezone || "UTC",
-    }).format(bookingDate);
+      if (body.abandonedCartId) {
+        try {
+          await services.abandonedCart.markRecovered(body.abandonedCartId, createdBooking.id);
+        } catch {
+          // Non-blocking: booking creation should not fail when cart recovery update fails.
+        }
+      }
 
-    await sendBookingCreatedEvent({
-      organizationId: org.id,
-      bookingId: booking.id,
-      customerId: customer.id,
-      customerEmail: body.customer.email,
-      customerName: `${body.customer.firstName} ${body.customer.lastName}`,
-      bookingReference: booking.referenceNumber,
-      tourName: booking.tour?.name || pricingVerification.tour.name,
-      tourDate: emailTourDate,
-      tourTime: booking.bookingTime || body.bookingTime,
-      participants: booking.totalParticipants,
-      totalAmount: booking.total,
-      currency: booking.currency,
-      meetingPoint: booking.tour?.meetingPoint || undefined,
-      meetingPointDetails: booking.tour?.meetingPointDetails || undefined,
-    });
+      const emailTourDate = new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: org.timezone || "UTC",
+      }).format(bookingDate);
 
-    const total = totalCents / 100;
-    const deposit = await services.deposit.calculateDeposit(
-      body.tourId,
-      total,
-      bookingDate
-    );
-    const amountToCharge = deposit.depositRequired ? deposit.depositAmount : total;
+      await sendBookingCreatedEvent({
+        organizationId: org.id,
+        bookingId: createdBooking.id,
+        customerId: customer.id,
+        customerEmail: body.customer.email,
+        customerName: `${body.customer.firstName} ${body.customer.lastName}`,
+        bookingReference: createdBooking.referenceNumber,
+        tourName: createdBooking.tour?.name || pricingVerification.tour.name,
+        tourDate: emailTourDate,
+        tourTime: createdBooking.bookingTime || body.bookingTime,
+        participants: createdBooking.totalParticipants,
+        totalAmount: createdBooking.total,
+        currency: createdBooking.currency,
+        meetingPoint: createdBooking.tour?.meetingPoint || undefined,
+        meetingPointDetails: createdBooking.tour?.meetingPointDetails || undefined,
+      });
 
-    await db
-      .update(bookings)
-      .set({
-        depositRequired: deposit.depositRequired
-          ? deposit.depositAmount.toFixed(2)
-          : null,
-        balanceDueDate: deposit.balanceDueDate,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(bookings.id, booking.id),
-          eq(bookings.organizationId, org.id)
-        )
+      logger.info(
+        {
+          event: "booking_create_succeeded",
+          organizationId: org.id,
+          bookingId: booking.id,
+          referenceNumber: booking.referenceNumber,
+        },
+        "Website booking created successfully"
       );
 
-    if (amountToCharge === 0) {
-      // Free booking - mark as paid and ensure status is confirmed
-      const confirmedBooking =
-        booking.status === "confirmed"
-          ? booking
-          : await services.booking.confirm(booking.id);
+      const total = totalCents / 100;
+      const deposit = await services.deposit.calculateDeposit(
+        body.tourId,
+        total,
+        bookingDate
+      );
 
-      await services.booking.updatePaymentStatus(booking.id, "paid", "0");
+      await db
+        .update(bookings)
+        .set({
+          depositRequired: deposit.depositRequired
+            ? deposit.depositAmount.toFixed(2)
+            : null,
+          balanceDueDate: deposit.balanceDueDate,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(bookings.id, createdBooking.id),
+            eq(bookings.organizationId, org.id)
+          )
+        );
+
+      booking = await services.booking.getById(createdBooking.id);
+    }
+
+    const chargeAmounts = getChargeAmounts({
+      total: booking.total,
+      paidAmount: booking.paidAmount,
+      depositRequired: booking.depositRequired,
+      depositPaid: booking.depositPaid,
+    });
+
+    if (chargeAmounts.amountToCharge <= 0) {
+      await services.booking.updatePaymentStatus(booking.id, "paid", booking.total);
+      await markCheckoutAttemptPaid({
+        organizationId: org.id,
+        bookingId: booking.id,
+        stripePaymentIntentId: booking.stripePaymentIntentId,
+      });
 
       return NextResponse.json({
         booking: {
-          id: confirmedBooking.id,
-          referenceNumber: confirmedBooking.referenceNumber,
+          id: booking.id,
+          referenceNumber: booking.referenceNumber,
         },
         message: "Booking confirmed successfully",
       });
@@ -613,27 +922,69 @@ export async function POST(request: NextRequest) {
           timeZone: org.timezone || "UTC",
         }).format(bookingDate);
 
+        const checkoutStartedAt = Date.now();
+        logger.info(
+          {
+            event: "checkout_started",
+            bookingId: booking.id,
+            organizationId: org.id,
+            idempotencyKey,
+          },
+          "Checkout started"
+        );
+
         const session = await createBookingCheckoutSession({
           organizationId: org.id,
           bookingId: booking.id,
-          customerId: customer.id,
+          customerId: booking.customerId,
           bookingReference: booking.referenceNumber,
           customerEmail: body.customer.email,
           currency:
             pricingVerification.pricing.currency ||
             org.settings?.defaultCurrency ||
             "USD",
-          amountInCents: Math.round(amountToCharge * 100),
+          amountInCents: Math.round(chargeAmounts.amountToCharge * 100),
           tourName: booking.tour?.name || pricingVerification.tour.name,
           tourDate: checkoutTourDate,
           participants: body.participants.length,
           successUrl: `${baseUrl}/booking/success?ref=${booking.referenceNumber}`,
           cancelUrl: `${baseUrl}/booking/cancelled?ref=${booking.referenceNumber}`,
+          idempotencyKey: `booking:${org.id}:${idempotencyKey}`,
         });
 
         if (!session.url) {
           throw new Error("Stripe checkout URL was not returned");
         }
+
+        await markCheckoutSessionCreated({
+          organizationId: org.id,
+          attemptId: reservation.attempt.id,
+          bookingId: booking.id,
+          stripeSessionId: session.id,
+          stripePaymentIntentId:
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : session.payment_intent?.id,
+          paymentUrl: session.url,
+          paymentAmount: chargeAmounts.amountToCharge.toFixed(2),
+          remainingBalance: Math.max(
+            0,
+            chargeAmounts.remainingBalance - chargeAmounts.amountToCharge
+          ).toFixed(2),
+          paymentMode: chargeAmounts.paymentMode,
+          bookingReference: booking.referenceNumber,
+        });
+
+        logger.info(
+          {
+            event: "stripe_session_created",
+            bookingId: booking.id,
+            organizationId: org.id,
+            stripeSessionId: session.id,
+            durationMs: Date.now() - checkoutStartedAt,
+          },
+          "Stripe checkout session created"
+        );
 
         return NextResponse.json({
           booking: {
@@ -641,40 +992,81 @@ export async function POST(request: NextRequest) {
             referenceNumber: booking.referenceNumber,
           },
           paymentUrl: session.url,
-          paymentAmount: amountToCharge.toFixed(2),
-          remainingBalance: Math.max(0, total - amountToCharge).toFixed(2),
-          paymentMode: deposit.depositRequired ? "deposit" : "full",
-          message: deposit.depositRequired
-            ? "Booking created, redirecting to deposit payment"
-            : "Booking created, redirecting to payment",
+          paymentAmount: chargeAmounts.amountToCharge.toFixed(2),
+          remainingBalance: Math.max(
+            0,
+            chargeAmounts.remainingBalance - chargeAmounts.amountToCharge
+          ).toFixed(2),
+          paymentMode: chargeAmounts.paymentMode,
+          message:
+            chargeAmounts.paymentMode === "deposit"
+              ? "Booking created, redirecting to deposit payment"
+              : "Booking created, redirecting to payment",
         });
       } catch (stripeError) {
-        console.error("Stripe checkout session error:", stripeError);
+        await markCheckoutAttemptFailure({
+          organizationId: org.id,
+          attemptId: reservation.attempt.id,
+          errorMessage:
+            stripeError instanceof Error
+              ? stripeError.message
+              : "Unable to create Stripe checkout session",
+        });
+
+        logger.error(
+          {
+            err: stripeError,
+            event: "checkout_failed",
+            bookingId: booking.id,
+            organizationId: org.id,
+          },
+          "Stripe checkout session creation failed"
+        );
+
         return NextResponse.json(
           {
             message: "Unable to start secure checkout. Please try again.",
+            booking: {
+              id: booking.id,
+              referenceNumber: booking.referenceNumber,
+            },
           },
           { status: 502 }
         );
       }
     }
 
-    // Stripe is not configured in this environment.
+    await markCheckoutAttemptFailure({
+      organizationId: org.id,
+      attemptId: reservation.attempt.id,
+      errorMessage: "Stripe checkout is not configured in this environment",
+    });
+
     return NextResponse.json({
       booking: {
         id: booking.id,
         referenceNumber: booking.referenceNumber,
       },
-      paymentAmount: amountToCharge.toFixed(2),
-      remainingBalance: Math.max(0, total - amountToCharge).toFixed(2),
-      paymentMode: deposit.depositRequired ? "deposit" : "full",
+      paymentAmount: chargeAmounts.amountToCharge.toFixed(2),
+      remainingBalance: Math.max(
+        0,
+        chargeAmounts.remainingBalance - chargeAmounts.amountToCharge
+      ).toFixed(2),
+      paymentMode: chargeAmounts.paymentMode,
       message: "Booking created, payment setup is unavailable right now",
     });
   } catch (error) {
-    console.error("Booking creation error:", error);
+    if (attemptId && attemptOrgId) {
+      await markCheckoutAttemptFailure({
+        organizationId: attemptOrgId,
+        attemptId,
+        errorMessage: error instanceof Error ? error.message : "Unknown checkout failure",
+      }).catch(() => undefined);
+    }
+
+    logger.error({ err: error }, "Booking creation error");
 
     if (error instanceof Error) {
-      // Handle known errors
       if (error.message.includes("Not enough availability")) {
         return NextResponse.json({ message: error.message }, { status: 400 });
       }

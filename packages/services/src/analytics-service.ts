@@ -12,6 +12,7 @@ import { type DateRangeFilter, ValidationError } from "./types";
 import { createServiceLogger } from "./lib/logger";
 import { formatDateOnlyKey, parseDateOnlyKeyToLocalDate } from "./lib/date-time";
 import { formatDateForKey } from "./lib/tour-run-utils";
+import { getCache, orgCacheKey, CacheTTL } from "./cache-service";
 
 const logger = createServiceLogger("analytics");
 

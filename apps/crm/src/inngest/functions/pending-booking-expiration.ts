@@ -1,7 +1,15 @@
 import { inngest } from "../client";
 import { validateEventData, bookingCreatedSchema } from "../schemas";
 import { logger } from "@tour/services";
-import { and, bookings, db, eq, lte, notInArray } from "@tour/database";
+import {
+  and,
+  bookings,
+  checkoutAttempts,
+  db,
+  eq,
+  lte,
+  notInArray,
+} from "@tour/database";
 
 const EXPIRATION_REASON = "Booking expired after 30 minutes without payment";
 
@@ -64,6 +72,21 @@ export const expirePendingWebsiteBooking = inngest.createFunction(
       },
       "Expired pending website booking after payment timeout"
     );
+
+    await step.run("mark-checkout-attempt-expired", async () => {
+      await db
+        .update(checkoutAttempts)
+        .set({
+          status: "expired",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(checkoutAttempts.organizationId, data.organizationId),
+            eq(checkoutAttempts.bookingId, expiredBooking.id)
+          )
+        );
+    });
 
     return {
       expired: true,

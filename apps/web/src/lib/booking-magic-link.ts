@@ -8,15 +8,19 @@ interface MagicLinkPayload {
 }
 
 const DEFAULT_TTL_MINUTES = 30;
+const DEV_FALLBACK_SECRET = "booking-magic-link-dev-secret";
 
 function getMagicSecret(): string {
-  return (
-    process.env.BOOKING_MAGIC_LINK_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    process.env.CLERK_SECRET_KEY ||
-    process.env.STRIPE_SECRET_KEY ||
-    "booking-magic-link-dev-secret"
-  );
+  const configured = process.env.BOOKING_MAGIC_LINK_SECRET?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("BOOKING_MAGIC_LINK_SECRET must be configured in production");
+  }
+
+  return DEV_FALLBACK_SECRET;
 }
 
 function encodeBase64Url(value: string): string {

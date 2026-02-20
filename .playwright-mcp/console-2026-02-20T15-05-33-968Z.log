@@ -1,0 +1,2 @@
+[   13338ms] [WARNING] Image with src "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1600&q=80" is using quality "85" which is not configured in images.qualities [75]. Please update your config to [75, 85].
+Read more: https://nextjs.org/docs/messages/next-image-unconfigured-qualities @ http://localhost:3001/_next/static/chunks/bb0e6_next_dist_e3ee776f._.js:2297
