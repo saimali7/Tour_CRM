@@ -9,9 +9,9 @@ interface SectionProps {
 }
 
 const spacingClasses: Record<NonNullable<SectionProps["spacing"]>, string> = {
-  compact: "py-8",
-  default: "py-10 sm:py-12",
-  spacious: "py-12 sm:py-16",
+  compact: "py-12 sm:py-16",
+  default: "py-16 sm:py-20",
+  spacious: "py-20 sm:py-28",
 };
 
 export function Section({

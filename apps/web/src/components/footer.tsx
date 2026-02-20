@@ -28,7 +28,7 @@ export function Footer({
 
   return (
     <footer className="border-t border-border bg-surface-soft">
-      <div className="mx-auto w-full max-w-[1560px] px-4 py-16 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mb-12 rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/20 p-8 sm:p-10 shadow-sm relative overflow-hidden">
           {/* Decorative background element */}
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/5 blur-3xl pointer-events-none" />

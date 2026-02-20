@@ -159,7 +159,7 @@ export default async function ToursPage({ params, searchParams }: PageProps) {
   const yearsOperating = Math.max(1, new Date().getFullYear() - new Date(org.createdAt).getFullYear());
 
   return (
-    <PageShell className="pb-10 pt-0" contentClassName="space-y-12 max-w-none px-0">
+    <PageShell className="pb-16 pt-0" contentClassName="space-y-0 max-w-none px-0">
       <FadeIn>
         <HeroSection
           eyebrow="Direct Booking Experience"
@@ -228,7 +228,7 @@ export default async function ToursPage({ params, searchParams }: PageProps) {
         </FadeIn>
       )}
 
-      <Section spacing="compact" className="pt-0 mx-auto max-w-[1560px] px-4 sm:px-6 lg:px-8 w-full" id="tours">
+      <Section spacing="compact" className="pt-0 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full" id="tours">
         <SectionHeader
           title="All Tours & Experiences"
           subtitle="Browse departures, compare options, and reserve instantly"
