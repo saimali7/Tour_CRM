@@ -73,14 +73,14 @@ const MEGA_TABS: MegaMenuTab[] = [
     description:
       "From thrilling dune bashing to tranquil camel rides under the stars — experience the magic of Arabian desert landscapes.",
     links: [
-      { label: "Morning Safari", href: "/?category=Desert+Tours", badge: "Popular" },
-      { label: "Evening Safari", href: "/?category=Desert+Tours", badge: "Top Seller" },
-      { label: "Overnight Camp", href: "/?category=Desert+Tours" },
-      { label: "Dune Buggy", href: "/?category=Desert+Tours" },
-      { label: "Camel Trekking", href: "/?category=Desert+Tours" },
-      { label: "VIP Safari", href: "/?category=Desert+Tours", badge: "New" },
+      { label: "Morning Safari", href: "/experiences/desert-safaris", badge: "Popular" },
+      { label: "Evening Safari", href: "/experiences/desert-safaris", badge: "Top Seller" },
+      { label: "Overnight Camp", href: "/experiences/desert-safaris" },
+      { label: "Dune Buggy", href: "/experiences/desert-safaris" },
+      { label: "Camel Trekking", href: "/experiences/desert-safaris" },
+      { label: "VIP Safari", href: "/experiences/desert-safaris", badge: "New" },
     ],
-    viewAllHref: "/?category=Desert+Tours",
+    viewAllHref: "/experiences/desert-safaris",
   },
   {
     id: "city-tours",
@@ -89,13 +89,13 @@ const MEGA_TABS: MegaMenuTab[] = [
     description:
       "Explore the modern skyline, cultural heritage, and iconic landmarks of the UAE's most vibrant cities.",
     links: [
-      { label: "Dubai City Tour", href: "/?category=City+Tours", badge: "Popular" },
-      { label: "Abu Dhabi Full Day", href: "/?category=City+Tours", badge: "Top Seller" },
-      { label: "Burj Khalifa Tickets", href: "/?category=City+Tours" },
-      { label: "Old Dubai Heritage", href: "/?category=City+Tours" },
-      { label: "Hop-On Hop-Off Bus", href: "/?category=City+Tours" },
+      { label: "Dubai City Tour", href: "/experiences/city-tours", badge: "Popular" },
+      { label: "Abu Dhabi Full Day", href: "/experiences/city-tours", badge: "Top Seller" },
+      { label: "Burj Khalifa Tickets", href: "/experiences/city-tours" },
+      { label: "Old Dubai Heritage", href: "/experiences/city-tours" },
+      { label: "Hop-On Hop-Off Bus", href: "/experiences/city-tours" },
     ],
-    viewAllHref: "/?category=City+Tours",
+    viewAllHref: "/experiences/city-tours",
   },
   {
     id: "water-sports",
@@ -104,13 +104,13 @@ const MEGA_TABS: MegaMenuTab[] = [
     description:
       "Feel the adrenaline with jet skis, parasailing, and boat adventures across the stunning Arabian Gulf.",
     links: [
-      { label: "Jet Ski Rental", href: "/?category=Water+Activities", badge: "Popular" },
-      { label: "Parasailing", href: "/?category=Water+Activities" },
-      { label: "Flyboard Experience", href: "/?category=Water+Activities" },
-      { label: "Scuba Diving", href: "/?category=Water+Activities", badge: "New" },
-      { label: "Speedboat Tour", href: "/?category=Water+Activities" },
+      { label: "Jet Ski Rental", href: "/experiences/water-activities", badge: "Popular" },
+      { label: "Parasailing", href: "/experiences/water-activities" },
+      { label: "Flyboard Experience", href: "/experiences/water-activities" },
+      { label: "Scuba Diving", href: "/experiences/water-activities", badge: "New" },
+      { label: "Speedboat Tour", href: "/experiences/water-activities" },
     ],
-    viewAllHref: "/?category=Water+Activities",
+    viewAllHref: "/experiences/water-activities",
   },
   {
     id: "private-tours",
@@ -119,12 +119,12 @@ const MEGA_TABS: MegaMenuTab[] = [
     description:
       "Exclusive VIP experiences tailored completely to your schedule, preferences, and group size.",
     links: [
-      { label: "Private Desert Safaris", href: "/private-tours?type=desert" },
-      { label: "Luxury Yacht Charters", href: "/private-tours?type=yacht", badge: "Popular" },
-      { label: "Custom City Tours", href: "/private-tours?type=city" },
-      { label: "Airport Transfers", href: "/private-tours?type=transfer" },
+      { label: "Private Desert Safaris", href: "/experiences/private-tours" },
+      { label: "Luxury Yacht Charters", href: "/experiences/private-tours", badge: "Popular" },
+      { label: "Custom City Tours", href: "/experiences/private-tours" },
+      { label: "Airport Transfers", href: "/experiences/private-tours" },
     ],
-    viewAllHref: "/private-tours",
+    viewAllHref: "/experiences/private-tours",
   },
 ];
 
@@ -216,7 +216,7 @@ function ToursPanel({
         </div>
         <div className="mt-4 border-t border-border/30 pt-3 px-1">
           <Link
-            href="/#tours"
+            href="/"
             onClick={onClose}
             className="group flex items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
           >
@@ -604,6 +604,9 @@ export function Header({
 
             {/* CTAs */}
             <Button asChild variant="ghost" className="h-9 px-3 text-sm text-muted-foreground hover:text-foreground">
+              <Link href="/trip-inspiration">Trip Inspiration</Link>
+            </Button>
+            <Button asChild variant="ghost" className="h-9 px-3 text-sm text-muted-foreground hover:text-foreground">
               <Link href="/booking">Manage booking</Link>
             </Button>
             <Button
@@ -748,6 +751,13 @@ export function Header({
               className="flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
             >
               Contact
+            </Link>
+            <Link
+              href="/trip-inspiration"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex min-h-10 items-center rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+            >
+              Trip Inspiration
             </Link>
 
             <div className="flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">

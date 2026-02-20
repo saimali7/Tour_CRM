@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Mail, Phone, Globe, MapPin, ShieldCheck, CalendarCheck2, BadgeCheck, ArrowRight } from "lucide-react";
 import { Button } from "@tour/ui";
+import { CATEGORY_CONFIGS } from "@/lib/category-config";
 
 interface FooterProps {
   orgName: string;
@@ -65,7 +66,7 @@ export function Footer({
         </div>
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-          <div className="md:col-span-2">
+          <div className="md:col-span-1">
             <h3 className="mb-3 font-display text-xl">{orgName}</h3>
             <p className="mb-4 max-w-md text-sm text-muted-foreground">
               Exceptional local tours and private experiences with clear pricing,
@@ -77,10 +78,25 @@ export function Footer({
           </div>
 
           <div>
+            <h4 className="mb-3 font-semibold">Experiences</h4>
+            <nav className="flex flex-col space-y-2">
+              {CATEGORY_CONFIGS.map((cat) => (
+                <Link
+                  key={cat.slug}
+                  href={`/experiences/${cat.slug}`}
+                  className="text-sm text-muted-foreground transition-colors hover:text-primary"
+                >
+                  {cat.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <div>
             <h4 className="mb-3 font-semibold">Quick Links</h4>
             <nav className="flex flex-col space-y-2">
               <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-primary">All Tours</Link>
-              <Link href="/private-tours" className="text-sm text-muted-foreground transition-colors hover:text-primary">Private Tours</Link>
+              <Link href="/trip-inspiration" className="text-sm text-muted-foreground transition-colors hover:text-primary">Trip Inspiration</Link>
               <Link href="/booking" className="text-sm text-muted-foreground transition-colors hover:text-primary">Manage Booking</Link>
               <Link href="/about" className="text-sm text-muted-foreground transition-colors hover:text-primary">About Us</Link>
               <Link href="/contact" className="text-sm text-muted-foreground transition-colors hover:text-primary">Contact</Link>
