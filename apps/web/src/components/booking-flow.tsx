@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Calendar, Clock, MapPin, Check } from "lucide-react";
+import { Button } from "@tour/ui";
 import { useBooking, BookingProvider, type AvailableAddOn } from "@/lib/booking-context";
 import { BookingOptionSelection } from "./booking-option-selection";
 import { TicketSelection } from "./ticket-selection";
@@ -21,6 +22,46 @@ import type {
   TourPricingTier,
 } from "@tour/database";
 
+type BookingFlowStep =
+  | "options"
+  | "select"
+  | "addons"
+  | "details"
+  | "review"
+  | "payment"
+  | "waiver"
+  | "confirmation";
+
+type BookingParticipantType = "adult" | "child" | "infant";
+
+export interface BookingFlowInitialCart {
+  cartId: string;
+  step: BookingFlowStep;
+  bookingOptionId?: string | null;
+  participantCounts: {
+    adult: number;
+    child: number;
+    infant: number;
+  };
+  selectedAddOns: Array<{
+    addOnProductId: string;
+    quantity: number;
+  }>;
+  customer?: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    specialRequests?: string;
+    dietaryRequirements?: string;
+    accessibilityNeeds?: string;
+  };
+  discount?: {
+    code: string;
+    amount: number;
+  } | null;
+}
+
 interface BookingFlowProps {
   tour: Tour;
   bookingDate: Date;
@@ -32,6 +73,7 @@ interface BookingFlowProps {
   taxConfig?: OrganizationSettings["tax"];
   organizationName: string;
   organizationSlug: string;
+  initialCart?: BookingFlowInitialCart | null;
 }
 
 function formatTime(time: string): string {
@@ -63,6 +105,17 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
   return `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`;
 }
 
+function inferParticipantTypeFromTier(tier: TourPricingTier): BookingParticipantType {
+  const normalized = `${tier.name} ${tier.label}`.toLowerCase();
+  if (normalized.includes("child")) {
+    return "child";
+  }
+  if (normalized.includes("infant")) {
+    return "infant";
+  }
+  return "adult";
+}
+
 function BookingFlowContent({
   tour,
   bookingDate,
@@ -74,8 +127,24 @@ function BookingFlowContent({
   taxConfig,
   organizationName,
   organizationSlug,
+  initialCart,
 }: BookingFlowProps) {
-  const { state, setTourAndAvailability, setAvailableAddOns } = useBooking();
+  const {
+    state,
+    dispatch,
+    addParticipant,
+    setTourAndAvailability,
+    setAvailableAddOns,
+    setAbandonedCartId,
+    setBookingOption,
+    setCustomer,
+    setAddOnQuantity,
+  } = useBooking();
+  const hydratedCartRef = useRef<string | null>(null);
+  const hydratedAddOnsRef = useRef<string | null>(null);
+  const [isSavingTripCart, setIsSavingTripCart] = useState(false);
+  const [tripCartError, setTripCartError] = useState<string | null>(null);
+  const [tripCartRecoveryPath, setTripCartRecoveryPath] = useState<string | null>(null);
 
   useEffect(() => {
     setTourAndAvailability(
@@ -105,6 +174,162 @@ function BookingFlowContent({
     taxConfig?.includeInPrice,
     setTourAndAvailability,
   ]);
+
+  useEffect(() => {
+    hydratedCartRef.current = null;
+    hydratedAddOnsRef.current = null;
+    setTripCartRecoveryPath(null);
+    setTripCartError(null);
+  }, [tour.id, initialCart?.cartId]);
+
+  useEffect(() => {
+    if (!initialCart || hydratedCartRef.current === initialCart.cartId) {
+      return;
+    }
+
+    if (state.tour?.id !== tour.id || state.participants.length > 0) {
+      return;
+    }
+
+    const activeTiers = pricingTiers.filter((tier) => tier.isActive);
+    const tierByType: Partial<Record<BookingParticipantType, TourPricingTier>> = {};
+
+    for (const tier of activeTiers) {
+      const type = inferParticipantTypeFromTier(tier);
+      if (!tierByType[type]) {
+        tierByType[type] = tier;
+      }
+    }
+
+    const fallbackPrice: Record<BookingParticipantType, number> = {
+      adult: parseFloat(tour.basePrice),
+      child: parseFloat(tour.basePrice) * 0.7,
+      infant: 0,
+    };
+
+    const participantTypes: BookingParticipantType[] = ["adult", "child", "infant"];
+    for (const type of participantTypes) {
+      const count = Math.max(0, Math.floor(initialCart.participantCounts[type] || 0));
+      const tier = tierByType[type];
+      const tierPrice = tier ? parseFloat(tier.price as string) : fallbackPrice[type];
+
+      for (let index = 0; index < count; index += 1) {
+        addParticipant(type, tierPrice, tier?.id);
+      }
+    }
+
+    if (
+      initialCart.bookingOptionId &&
+      bookingOptions.some((option) => option.id === initialCart.bookingOptionId)
+    ) {
+      setBookingOption(initialCart.bookingOptionId);
+    }
+
+    if (initialCart.customer?.email) {
+      setCustomer({
+        email: initialCart.customer.email,
+        firstName: initialCart.customer.firstName,
+        lastName: initialCart.customer.lastName,
+        phone: initialCart.customer.phone,
+        specialRequests: initialCart.customer.specialRequests,
+        dietaryRequirements: initialCart.customer.dietaryRequirements,
+        accessibilityNeeds: initialCart.customer.accessibilityNeeds,
+      });
+    }
+
+    setAbandonedCartId(initialCart.cartId);
+
+    if (
+      initialCart.discount &&
+      initialCart.discount.amount > 0 &&
+      initialCart.discount.code.trim().length > 0
+    ) {
+      dispatch({
+        type: "SET_DISCOUNT",
+        code: initialCart.discount.code,
+        amount: initialCart.discount.amount,
+      });
+    }
+
+    const totalParticipants =
+      initialCart.participantCounts.adult +
+      initialCart.participantCounts.child +
+      initialCart.participantCounts.infant;
+    const hasCustomer = Boolean(
+      initialCart.customer?.email &&
+      initialCart.customer?.firstName &&
+      initialCart.customer?.lastName
+    );
+
+    let restoredStep: BookingFlowStep = "select";
+    if (totalParticipants === 0) {
+      restoredStep =
+        initialCart.step === "options" && state.bookingOptions.length > 0
+          ? "options"
+          : "select";
+    } else if (initialCart.step === "options" && state.bookingOptions.length > 0) {
+      restoredStep = "options";
+    } else if (initialCart.step === "select") {
+      restoredStep = "select";
+    } else if (initialCart.step === "addons" && state.availableAddOns.length > 0) {
+      restoredStep = "addons";
+    } else if (initialCart.step === "details") {
+      restoredStep = "details";
+    } else if (initialCart.step === "payment" && hasCustomer) {
+      restoredStep = "payment";
+    } else if (hasCustomer) {
+      restoredStep = "review";
+    } else {
+      restoredStep = state.availableAddOns.length > 0 ? "addons" : "details";
+    }
+
+    dispatch({ type: "SET_STEP", step: restoredStep });
+    hydratedCartRef.current = initialCart.cartId;
+  }, [
+    addParticipant,
+    bookingOptions,
+    dispatch,
+    initialCart,
+    pricingTiers,
+    setAbandonedCartId,
+    setBookingOption,
+    setCustomer,
+    state.availableAddOns.length,
+    state.bookingOptions.length,
+    state.participants.length,
+    state.tour?.id,
+    tour.basePrice,
+    tour.id,
+  ]);
+
+  useEffect(() => {
+    if (
+      !initialCart ||
+      hydratedCartRef.current !== initialCart.cartId ||
+      hydratedAddOnsRef.current === initialCart.cartId
+    ) {
+      return;
+    }
+
+    if (state.availableAddOns.length === 0) {
+      return;
+    }
+
+    if (initialCart.selectedAddOns.length === 0) {
+      hydratedAddOnsRef.current = initialCart.cartId;
+      return;
+    }
+
+    for (const addOn of initialCart.selectedAddOns) {
+      const exists = state.availableAddOns.some((item) => item.id === addOn.addOnProductId);
+      if (!exists) {
+        continue;
+      }
+      setAddOnQuantity(addOn.addOnProductId, addOn.quantity);
+    }
+
+    hydratedAddOnsRef.current = initialCart.cartId;
+  }, [initialCart, setAddOnQuantity, state.availableAddOns]);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +388,96 @@ function BookingFlowContent({
 
   const currentStepIndex = Math.max(steps.findIndex((s) => s.id === state.step), 0);
   const endTime = calculateEndTime(bookingTime, tour.durationMinutes);
+  const canSaveTripCart = Boolean(
+    state.tour?.id &&
+    state.participants.length > 0 &&
+    state.customer?.email?.trim()
+  );
+
+  const handleSaveTripCart = async () => {
+    if (!state.tour?.id) {
+      setTripCartError("Tour details are missing. Please refresh and try again.");
+      return;
+    }
+
+    if (!state.customer?.email?.trim()) {
+      setTripCartError("Add your email in the details step to save this trip cart.");
+      return;
+    }
+
+    setIsSavingTripCart(true);
+    setTripCartError(null);
+
+    try {
+      const response = await fetch("/api/abandoned-carts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tourId: state.tour.id,
+          bookingDate: bookingDate ? format(bookingDate, "yyyy-MM-dd") : undefined,
+          bookingTime,
+          bookingOptionId: state.bookingOptionId ?? undefined,
+          customer: state.customer,
+          participants: state.participants.map((participant) => ({
+            type: participant.type,
+          })),
+          selectedAddOns: state.selectedAddOns.map((addOn) => ({
+            addOnProductId: addOn.addOnProductId,
+            quantity: addOn.quantity,
+          })),
+          subtotal: state.subtotal.toFixed(2),
+          discount: state.discount.toFixed(2),
+          discountCode: state.discountCode,
+          total: state.total.toFixed(2),
+          currency: state.currency,
+          lastStep: state.step,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        message?: string;
+        cartId?: string;
+        recoveryToken?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to save trip cart right now.");
+      }
+
+      if (payload.cartId) {
+        setAbandonedCartId(payload.cartId);
+      }
+
+      if (payload.recoveryToken) {
+        setTripCartRecoveryPath(
+          `/org/${organizationSlug}/recover/${encodeURIComponent(payload.recoveryToken)}`
+        );
+      } else {
+        setTripCartRecoveryPath(null);
+      }
+    } catch (error) {
+      setTripCartError(
+        error instanceof Error ? error.message : "Failed to save trip cart."
+      );
+    } finally {
+      setIsSavingTripCart(false);
+    }
+  };
+
+  const handleCopyRecoveryLink = async () => {
+    if (!tripCartRecoveryPath || typeof window === "undefined") {
+      return;
+    }
+
+    const absoluteUrl = `${window.location.origin}${tripCartRecoveryPath}`;
+    try {
+      await navigator.clipboard.writeText(absoluteUrl);
+    } catch {
+      setTripCartError("Could not copy the link automatically. Please copy it manually.");
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 max-w-[1280px] mx-auto py-4">
@@ -348,6 +663,45 @@ function BookingFlowContent({
               </div>
             </div>
 
+            <div className="mt-6 rounded-lg border border-border/60 bg-secondary/20 p-4">
+              <h5 className="text-sm font-semibold">Trip Cart</h5>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Save this itinerary and resume later from any device.
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSaveTripCart()}
+                  disabled={!canSaveTripCart || isSavingTripCart}
+                >
+                  {isSavingTripCart ? "Saving..." : "Save Trip Cart"}
+                </Button>
+                {tripCartRecoveryPath && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleCopyRecoveryLink()}
+                  >
+                    Copy Resume Link
+                  </Button>
+                )}
+              </div>
+
+              {!canSaveTripCart && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Add at least one participant and a customer email to enable cart save.
+                </p>
+              )}
+              {tripCartRecoveryPath && (
+                <p className="mt-2 break-all text-xs text-muted-foreground">{tripCartRecoveryPath}</p>
+              )}
+              {tripCartError && (
+                <p className="mt-2 text-xs text-red-600">{tripCartError}</p>
+              )}
+            </div>
+
             <div className="pt-6 mt-4 border-t border-border/40 text-center">
               <p className="text-xs text-muted-foreground">
                 Need help? Call us or{" "}
@@ -362,16 +716,6 @@ function BookingFlowContent({
     </div>
   );
 }
-
-type BookingFlowStep =
-  | "options"
-  | "select"
-  | "addons"
-  | "details"
-  | "review"
-  | "payment"
-  | "waiver"
-  | "confirmation";
 
 export function BookingFlow(props: BookingFlowProps) {
   return (

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { createRouter, protectedProcedure, adminProcedure, bulkProcedure } from "../trpc";
 import { createServices, NotFoundError, ValidationError, ServiceError } from "@tour/services";
-import { sendEvent } from "@/inngest/helpers";
+import { sendEvent, sendEvents } from "@/inngest/helpers";
 import { priceStringSchema } from "@tour/validators";
 import {
   coerceDateInputToDateKey,
@@ -695,34 +695,33 @@ export const bookingRouter = createRouter({
 
       // Send confirmation emails via Inngest for successful confirmations
       if (input.sendConfirmationEmails && result.confirmed.length > 0) {
-        // Get booking details for emails
-        for (const id of result.confirmed) {
-          const booking = await services.booking.getById(id);
-          if (booking.customer?.email && booking.bookingDate && booking.tour) {
-            await sendEvent(
-              {
-                name: "booking/confirmed",
-                data: {
-                  organizationId: ctx.orgContext.organizationId,
-                  bookingId: booking.id,
-                  customerId: booking.customerId,
-                  customerEmail: booking.customer.email,
-                  customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-                  bookingReference: booking.referenceNumber,
-                  tourName: booking.tour.name,
-                  tourDate: formatBookingDateForEmail(booking.bookingDate, "EEEE, MMMM d, yyyy"),
-                  tourTime: booking.bookingTime || "N/A",
-                  participants: booking.totalParticipants,
-                  totalAmount: booking.total,
-                  currency: booking.currency,
-                  meetingPoint: booking.tour.meetingPoint ?? undefined,
-                  meetingPointDetails: booking.tour.meetingPointDetails ?? undefined,
-                },
-              },
-              { operation: "bulkConfirm", id }
-            );
-          }
-        }
+        // Fetch all confirmed bookings in parallel (not sequentially)
+        const confirmedBookings = await Promise.all(
+          result.confirmed.map(id => services.booking.getById(id))
+        );
+        // Build events array and send as a single batch
+        const confirmEvents = confirmedBookings
+          .filter(b => b.customer?.email && b.bookingDate && b.tour)
+          .map(booking => ({
+            name: "booking/confirmed" as const,
+            data: {
+              organizationId: ctx.orgContext.organizationId,
+              bookingId: booking.id,
+              customerId: booking.customerId,
+              customerEmail: booking.customer!.email!,
+              customerName: `${booking.customer!.firstName} ${booking.customer!.lastName}`,
+              bookingReference: booking.referenceNumber,
+              tourName: booking.tour!.name,
+              tourDate: formatBookingDateForEmail(booking.bookingDate!, "EEEE, MMMM d, yyyy"),
+              tourTime: booking.bookingTime || "N/A",
+              participants: booking.totalParticipants,
+              totalAmount: booking.total,
+              currency: booking.currency,
+              meetingPoint: booking.tour!.meetingPoint ?? undefined,
+              meetingPointDetails: booking.tour!.meetingPointDetails ?? undefined,
+            },
+          }));
+        await sendEvents(confirmEvents, { operation: "bulkConfirm" });
       }
 
       return result;
@@ -740,30 +739,30 @@ export const bookingRouter = createRouter({
 
       // Send cancellation emails via Inngest for successful cancellations
       if (input.sendCancellationEmails && result.cancelled.length > 0) {
-        for (const id of result.cancelled) {
-          const booking = await services.booking.getById(id);
-          if (booking.customer?.email && booking.bookingDate && booking.tour) {
-            await sendEvent(
-              {
-                name: "booking/cancelled",
-                data: {
-                  organizationId: ctx.orgContext.organizationId,
-                  bookingId: booking.id,
-                  customerId: booking.customerId,
-                  customerEmail: booking.customer.email,
-                  customerName: `${booking.customer.firstName} ${booking.customer.lastName}`,
-                  bookingReference: booking.referenceNumber,
-                  tourName: booking.tour.name,
-                  tourDate: formatBookingDateForEmail(booking.bookingDate, "EEEE, MMMM d, yyyy"),
-                  tourTime: booking.bookingTime || "N/A",
-                  cancellationReason: input.reason,
-                  currency: booking.currency,
-                },
-              },
-              { operation: "bulkCancel", id }
-            );
-          }
-        }
+        // Fetch all cancelled bookings in parallel (not sequentially)
+        const cancelledBookings = await Promise.all(
+          result.cancelled.map(id => services.booking.getById(id))
+        );
+        // Build events array and send as a single batch
+        const cancelEvents = cancelledBookings
+          .filter(b => b.customer?.email && b.bookingDate && b.tour)
+          .map(booking => ({
+            name: "booking/cancelled" as const,
+            data: {
+              organizationId: ctx.orgContext.organizationId,
+              bookingId: booking.id,
+              customerId: booking.customerId,
+              customerEmail: booking.customer!.email!,
+              customerName: `${booking.customer!.firstName} ${booking.customer!.lastName}`,
+              bookingReference: booking.referenceNumber,
+              tourName: booking.tour!.name,
+              tourDate: formatBookingDateForEmail(booking.bookingDate!, "EEEE, MMMM d, yyyy"),
+              tourTime: booking.bookingTime || "N/A",
+              cancellationReason: input.reason,
+              currency: booking.currency,
+            },
+          }));
+        await sendEvents(cancelEvents, { operation: "bulkCancel" });
       }
 
       return result;

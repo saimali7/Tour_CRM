@@ -241,6 +241,27 @@ export const abandonedCarts = pgTable("abandoned_carts", {
 
   // Metadata
   metadata: jsonb("metadata").$type<{
+    bookingDate?: string;
+    bookingTime?: string;
+    bookingOptionId?: string;
+    selectedAddOns?: Array<{
+      addOnProductId: string;
+      quantity: number;
+    }>;
+    discount?: string;
+    discountCode?: string;
+    customerSpecialRequests?: string;
+    customerDietaryRequirements?: string;
+    customerAccessibilityNeeds?: string;
+    bookingFlowStep?:
+      | "options"
+      | "select"
+      | "addons"
+      | "details"
+      | "review"
+      | "payment"
+      | "waiver"
+      | "confirmation";
     specialRequests?: string;
     selectedVariant?: string;
     selectedPricingTier?: string;

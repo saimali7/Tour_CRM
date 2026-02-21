@@ -451,7 +451,11 @@ export function CustomerFirstBookingSheet({
       paymentAmount,
       paymentMethod,
     };
-    window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+    // Debounce localStorage writes — prevents JSON.stringify on every keystroke
+    const timer = setTimeout(() => {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+    }, 300);
+    return () => clearTimeout(timer);
   }, [
     open,
     step,

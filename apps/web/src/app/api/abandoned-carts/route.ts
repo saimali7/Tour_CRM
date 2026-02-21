@@ -5,21 +5,66 @@ import { db, organizations, eq, type AbandonedCartStep } from "@tour/database";
 import { createServices } from "@tour/services";
 import { sendCartAbandonedEvent } from "@/lib/inngest-events";
 
+type BookingFlowStep =
+  | "options"
+  | "select"
+  | "addons"
+  | "details"
+  | "review"
+  | "payment"
+  | "waiver"
+  | "confirmation";
+
 interface AbandonedCartBody {
   tourId?: string;
   bookingDate?: string;
   bookingTime?: string;
+  bookingOptionId?: string;
   customer?: {
     email?: string;
     firstName?: string;
     lastName?: string;
     phone?: string;
+    specialRequests?: string;
+    dietaryRequirements?: string;
+    accessibilityNeeds?: string;
   };
   participants?: Array<{ type?: "adult" | "child" | "infant" }>;
+  selectedAddOns?: Array<{
+    addOnProductId?: string;
+    quantity?: number;
+  }>;
   subtotal?: string;
+  discount?: string;
+  discountCode?: string | null;
   total?: string;
   currency?: string;
-  lastStep?: AbandonedCartStep;
+  lastStep?: AbandonedCartStep | BookingFlowStep;
+}
+
+function mapStepToAbandonedCartStep(
+  step: AbandonedCartBody["lastStep"]
+): AbandonedCartStep {
+  switch (step) {
+    case "tour_selected":
+    case "date_selected":
+    case "participants_added":
+    case "customer_info":
+    case "payment":
+      return step;
+    case "options":
+    case "select":
+    case "addons":
+      return "participants_added";
+    case "details":
+      return "customer_info";
+    case "review":
+    case "waiver":
+    case "confirmation":
+      return "payment";
+    default:
+      return "payment";
+  }
 }
 
 function countParticipantsByType(
@@ -65,7 +110,16 @@ export async function POST(request: NextRequest) {
 
     const services = createServices({ organizationId: org.id });
     const tour = await services.tour.getById(tourId);
+    const existingActiveCart = await services.abandonedCart.getActiveCartByEmail(email);
     const counts = countParticipantsByType(body.participants || []);
+    const selectedAddOns = (body.selectedAddOns || [])
+      .map((addOn) => ({
+        addOnProductId: addOn.addOnProductId?.trim() || "",
+        quantity: Math.max(1, Math.round(addOn.quantity || 0)),
+      }))
+      .filter((addOn) => addOn.addOnProductId.length > 0);
+
+    const lastStep = mapStepToAbandonedCartStep(body.lastStep);
 
     const cart = await services.abandonedCart.createOrUpdate({
       email,
@@ -79,7 +133,7 @@ export async function POST(request: NextRequest) {
       subtotal: body.subtotal,
       total: body.total,
       currency: body.currency || org.settings?.defaultCurrency || org.currency || "USD",
-      lastStep: body.lastStep || "payment",
+      lastStep,
       ipAddress:
         request.headers.get("x-forwarded-for") ||
         request.headers.get("x-real-ip") ||
@@ -88,10 +142,36 @@ export async function POST(request: NextRequest) {
       metadata: {
         bookingDate: body.bookingDate || null,
         bookingTime: body.bookingTime || null,
+        bookingOptionId: body.bookingOptionId?.trim() || null,
+        selectedAddOns,
+        discount: body.discount || null,
+        discountCode: body.discountCode?.trim() || null,
+        customerSpecialRequests: body.customer?.specialRequests || null,
+        customerDietaryRequirements: body.customer?.dietaryRequirements || null,
+        customerAccessibilityNeeds: body.customer?.accessibilityNeeds || null,
+        bookingFlowStep:
+          body.lastStep &&
+          [
+            "options",
+            "select",
+            "addons",
+            "details",
+            "review",
+            "payment",
+            "waiver",
+            "confirmation",
+          ].includes(body.lastStep)
+            ? (body.lastStep as BookingFlowStep)
+            : null,
       },
     });
 
-    if (cart.recoveryToken) {
+    const shouldSendRecoveryEvent =
+      !existingActiveCart ||
+      existingActiveCart.id !== cart.id ||
+      existingActiveCart.tourId !== cart.tourId;
+
+    if (cart.recoveryToken && shouldSendRecoveryEvent) {
       await sendCartAbandonedEvent({
         organizationId: org.id,
         cartId: cart.id,

@@ -149,6 +149,13 @@ export class AnalyticsService extends BaseService {
       throw new ValidationError("Both from and to dates are required for revenue stats");
     }
 
+    const cache = getCache();
+    const fromKey = from.toISOString().slice(0, 10);
+    const toKey = to.toISOString().slice(0, 10);
+    const revenueCacheKey = orgCacheKey(this.organizationId, "analytics:revenue", fromKey, toKey);
+    const cachedRevenue = await cache.get<RevenueStats>(revenueCacheKey);
+    if (cachedRevenue) return cachedRevenue;
+
     // Calculate previous period for comparison
     const duration = to.getTime() - from.getTime();
     const previousFrom = new Date(from.getTime() - duration);
@@ -273,7 +280,7 @@ export class AnalyticsService extends BaseService {
       ? ((currentBookings - previousBookings) / previousBookings) * 100
       : 0;
 
-    return {
+    const revenueResult: RevenueStats = {
       totalRevenue,
       refunds: totalRefunds,
       netRevenue,
@@ -285,6 +292,8 @@ export class AnalyticsService extends BaseService {
         bookingChange: parseFloat(bookingChange.toFixed(2)),
       },
     };
+    await cache.set(revenueCacheKey, revenueResult, CacheTTL.MEDIUM);
+    return revenueResult;
   }
 
   /**
@@ -370,6 +379,13 @@ export class AnalyticsService extends BaseService {
       throw new ValidationError("Both from and to dates are required for booking stats");
     }
 
+    const cache = getCache();
+    const fromKey = from.toISOString().slice(0, 10);
+    const toKey = to.toISOString().slice(0, 10);
+    const bookingStatsCacheKey = orgCacheKey(this.organizationId, "analytics:bookings", fromKey, toKey);
+    const cachedBookingStats = await cache.get<BookingStats>(bookingStatsCacheKey);
+    if (cachedBookingStats) return cachedBookingStats;
+
     // Overall stats (using bookingDate for lead time calculation)
     const statsQuery = await this.db
       .select({
@@ -449,7 +465,7 @@ export class AnalyticsService extends BaseService {
       percentage: totalBookings > 0 ? (Number(row.count) / totalBookings) * 100 : 0,
     }));
 
-    return {
+    const bookingStatsResult: BookingStats = {
       totalBookings,
       totalParticipants,
       averagePartySize: parseFloat(averagePartySize.toFixed(2)),
@@ -459,6 +475,8 @@ export class AnalyticsService extends BaseService {
       bookingsByTour,
       bookingsBySource,
     };
+    await cache.set(bookingStatsCacheKey, bookingStatsResult, CacheTTL.MEDIUM);
+    return bookingStatsResult;
   }
 
   /**
@@ -546,8 +564,12 @@ export class AnalyticsService extends BaseService {
       throw new ValidationError("Both from and to dates are required for capacity utilization");
     }
 
+    const cache = getCache();
     const fromStr = formatDateForKey(from);
     const toStr = formatDateForKey(to);
+    const capacityCacheKey = orgCacheKey(this.organizationId, "analytics:capacity", fromStr, toStr);
+    const cachedCapacity = await cache.get<CapacityUtilization>(capacityCacheKey);
+    if (cachedCapacity) return cachedCapacity;
 
     // Get booking-based stats grouped by tour
     const bookingsByTourQuery = await this.db
@@ -669,13 +691,15 @@ export class AnalyticsService extends BaseService {
       maxParticipants: number;
     }> = [];
 
-    return {
+    const capacityResult: CapacityUtilization = {
       overallUtilization: parseFloat(overallUtilization.toFixed(2)),
       utilizationByTour,
       utilizationByDayOfWeek,
       utilizationByTimeSlot,
       underperformingSchedules,
     };
+    await cache.set(capacityCacheKey, capacityResult, CacheTTL.MEDIUM);
+    return capacityResult;
   }
 
   /**
@@ -684,6 +708,11 @@ export class AnalyticsService extends BaseService {
    */
   async getTodaysOperations(): Promise<TodaysOperations> {
     const todayStr = await this.getOrganizationDateKey();
+
+    const cache = getCache();
+    const todayOpsCacheKey = orgCacheKey(this.organizationId, "analytics:today", todayStr);
+    const cachedTodayOps = await cache.get<TodaysOperations>(todayOpsCacheKey);
+    if (cachedTodayOps) return cachedTodayOps;
 
     // Count today's bookings (grouped by unique tour runs)
     const statsQuery = await this.db
@@ -785,12 +814,14 @@ export class AnalyticsService extends BaseService {
       };
     });
 
-    return {
+    const todayOpsResult: TodaysOperations = {
       scheduledTours,
       totalParticipants,
       guidesWorking,
       upcomingSchedules,
     };
+    await cache.set(todayOpsCacheKey, todayOpsResult, CacheTTL.SHORT);
+    return todayOpsResult;
   }
 
   /**
@@ -877,6 +908,15 @@ export class AnalyticsService extends BaseService {
     }>;
   }> {
     const now = new Date();
+    const cache = getCache();
+    const forecastCacheKey = orgCacheKey(
+      this.organizationId,
+      "analytics:forecast",
+      `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    );
+    const cachedForecast = await cache.get(forecastCacheKey);
+    if (cachedForecast) return cachedForecast as Awaited<ReturnType<typeof this.getRevenueForecasting>>;
+
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const daysInMonth = currentMonthEnd.getDate();
@@ -991,7 +1031,7 @@ export class AnalyticsService extends BaseService {
     if (daysElapsed >= 20) confidence = "high";
     else if (daysElapsed >= 10) confidence = "medium";
 
-    return {
+    const forecastResult = {
       currentMonth: {
         name: currentMonthStart.toLocaleString("default", { month: "long", year: "numeric" }),
         revenueToDate,
@@ -1011,6 +1051,8 @@ export class AnalyticsService extends BaseService {
       },
       weeklyTrend,
     };
+    await cache.set(forecastCacheKey, forecastResult, CacheTTL.LONG);
+    return forecastResult;
   }
 
   /**
@@ -1032,6 +1074,16 @@ export class AnalyticsService extends BaseService {
       trend?: "up" | "down" | "stable";
     };
   }>> {
+    const cache = getCache();
+    const now = new Date();
+    const insightsCacheKey = orgCacheKey(
+      this.organizationId,
+      "analytics:insights",
+      `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    );
+    const cachedInsights = await cache.get(insightsCacheKey);
+    if (cachedInsights) return cachedInsights as Awaited<ReturnType<typeof this.getProactiveInsights>>;
+
     const insights: Array<{
       id: string;
       type: "opportunity" | "warning" | "info" | "success";
@@ -1041,7 +1093,6 @@ export class AnalyticsService extends BaseService {
       metric?: { value: string; trend?: "up" | "down" | "stable" };
     }> = [];
 
-    const now = new Date();
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -1208,6 +1259,7 @@ export class AnalyticsService extends BaseService {
       });
     }
 
+    await cache.set(insightsCacheKey, insights, CacheTTL.MEDIUM);
     return insights;
   }
 }

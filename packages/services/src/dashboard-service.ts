@@ -3,6 +3,7 @@ import { bookings, tours, customers } from "@tour/database";
 import { BaseService } from "./base-service";
 import { type DateRangeFilter } from "./types";
 import { AnalyticsService } from "./analytics-service";
+import { getCache, orgCacheKey, CacheTTL } from "./cache-service";
 import {
   addDaysToDateKey,
   dateKeyToDate,
@@ -109,6 +110,12 @@ export class DashboardService extends BaseService {
    * This combines real-time operational data with alerts and recent activity
    */
   async getOperationsDashboard(): Promise<OperationsDashboard> {
+    const cache = getCache();
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const opsDashboardCacheKey = orgCacheKey(this.organizationId, "dashboard:operations", todayKey);
+    const cachedOpsDashboard = await cache.get<OperationsDashboard>(opsDashboardCacheKey);
+    if (cachedOpsDashboard) return cachedOpsDashboard;
+
     // Get today's operations data
     const todaysOperations = await this.analytics.getTodaysOperations();
 
@@ -151,12 +158,14 @@ export class DashboardService extends BaseService {
       }
     }
 
-    return {
+    const opsDashboardResult: OperationsDashboard = {
       todaysOperations,
       recentActivity,
       upcomingSchedules,
       alerts,
     };
+    await cache.set(opsDashboardCacheKey, opsDashboardResult, CacheTTL.SHORT);
+    return opsDashboardResult;
   }
 
   /**
@@ -167,6 +176,13 @@ export class DashboardService extends BaseService {
     // Default to last 30 days if not specified
     const to = dateRange?.to || new Date();
     const from = dateRange?.from || new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const cache = getCache();
+    const fromKey = from.toISOString().slice(0, 10);
+    const toKey = to.toISOString().slice(0, 10);
+    const businessDashboardCacheKey = orgCacheKey(this.organizationId, "dashboard:business", fromKey, toKey);
+    const cachedBusinessDashboard = await cache.get<BusinessDashboard>(businessDashboardCacheKey);
+    if (cachedBusinessDashboard) return cachedBusinessDashboard;
 
     // Get main stats
     const [revenueStats, bookingStats, capacityUtilization] = await Promise.all([
@@ -181,13 +197,15 @@ export class DashboardService extends BaseService {
     // Get trend data
     const trendData = await this.getTrendData();
 
-    return {
+    const businessDashboardResult: BusinessDashboard = {
       revenueStats,
       bookingStats,
       capacityUtilization,
       keyMetrics,
       trendData,
     };
+    await cache.set(businessDashboardCacheKey, businessDashboardResult, CacheTTL.MEDIUM);
+    return businessDashboardResult;
   }
 
   /**
@@ -327,6 +345,13 @@ export class DashboardService extends BaseService {
     recentBookings: number;
     todayRevenue: string;
   }> {
+    const cache = getCache();
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const summaryCacheKey = orgCacheKey(this.organizationId, "dashboard:summary", todayKey);
+    type SummaryResult = { todaySchedules: number; todayParticipants: number; pendingAssignments: number; recentBookings: number; todayRevenue: string };
+    const cachedSummary = await cache.get<SummaryResult>(summaryCacheKey);
+    if (cachedSummary) return cachedSummary;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -343,13 +368,15 @@ export class DashboardService extends BaseService {
       s => s.needsMoreGuides
     ).length;
 
-    return {
+    const summaryResult = {
       todaySchedules: operations.scheduledTours,
       todayParticipants: operations.totalParticipants,
       pendingAssignments,
       recentBookings: bookings.totalBookings,
       todayRevenue: revenue.totalRevenue,
     };
+    await cache.set(summaryCacheKey, summaryResult, CacheTTL.SHORT);
+    return summaryResult;
   }
 
   /**

@@ -12,7 +12,7 @@ interface MobileBookingBarProps {
 export function MobileBookingBar({
   priceLabel,
   helperLabel = "per person",
-  ctaHref = "#availability",
+  ctaHref = "#availability-mobile",
   ctaLabel = "Check Availability",
 }: MobileBookingBarProps) {
   return (

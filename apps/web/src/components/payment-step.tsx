@@ -69,7 +69,12 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
 
   useEffect(() => {
     const customerEmail = state.customer?.email?.trim();
-    if (!customerEmail || !state.tour?.id || state.participants.length === 0) {
+    if (
+      !customerEmail ||
+      !state.tour?.id ||
+      state.participants.length === 0 ||
+      state.abandonedCartId
+    ) {
       return;
     }
 
@@ -90,6 +95,7 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
             },
             bookingDate: state.bookingDate ? formatLocalDateKey(state.bookingDate) : undefined,
             bookingTime: state.bookingTime,
+            bookingOptionId: state.bookingOptionId ?? undefined,
             participants: state.participants.map((participant) => ({
               type: participant.type,
             })),
@@ -98,6 +104,8 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
               quantity: addOn.quantity,
             })),
             subtotal: state.subtotal.toFixed(2),
+            discount: state.discount.toFixed(2),
+            discountCode: state.discountCode,
             total: state.total.toFixed(2),
             currency: state.currency,
             lastStep: "payment",
@@ -127,10 +135,17 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
     state.bookingDate,
     state.bookingTime,
     state.currency,
+    state.discount,
+    state.discountCode,
     state.customer?.email,
     state.customer?.firstName,
     state.customer?.lastName,
     state.customer?.phone,
+    state.customer?.accessibilityNeeds,
+    state.customer?.dietaryRequirements,
+    state.customer?.specialRequests,
+    state.abandonedCartId,
+    state.bookingOptionId,
     state.participants,
     state.selectedAddOns,
     state.subtotal,

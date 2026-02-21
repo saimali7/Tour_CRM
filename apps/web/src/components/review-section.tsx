@@ -50,7 +50,7 @@ export function ReviewSection({
   }
 
   const distribution = getDistribution(reviews);
-  const total = Math.max(1, reviews.length);
+  const total = Math.max(1, totalReviews);
 
   return (
     <section className="rounded-xl border border-border bg-card p-6">
