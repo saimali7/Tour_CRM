@@ -58,25 +58,34 @@ function TicketRow({ tier, count, onAdd, onRemove, canAdd, currency }: TicketRow
           {tier.price === 0 ? "Free" : formatPrice(tier.price, currency)}
         </p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" role="group" aria-label={`${tier.label} quantity`}>
         <button
+          type="button"
           onClick={onRemove}
           disabled={count === 0}
           className="w-8 h-8 rounded-full border flex items-center justify-center
                      disabled:opacity-30 disabled:cursor-not-allowed
                      hover:bg-accent transition-colors"
-          aria-label={`Remove ${tier.label}`}
+          aria-label={`Remove one ${tier.label}`}
         >
           <Minus className="h-4 w-4" />
         </button>
-        <span className="w-8 text-center font-medium">{count}</span>
+        <span
+          className="w-8 text-center font-medium"
+          role="status"
+          aria-live="polite"
+          aria-label={`${count} ${tier.label} selected`}
+        >
+          {count}
+        </span>
         <button
+          type="button"
           onClick={onAdd}
           disabled={!canAdd}
           className="w-8 h-8 rounded-full border flex items-center justify-center
                      disabled:opacity-30 disabled:cursor-not-allowed
                      hover:bg-accent transition-colors"
-          aria-label={`Add ${tier.label}`}
+          aria-label={`Add one ${tier.label}`}
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -232,9 +241,14 @@ export function TicketSelection({
               <span>-{formatPrice(state.discount, currency)}</span>
             </div>
           )}
-          {state.tax > 0 && (
+          {state.taxConfig.enabled && state.taxConfig.rate > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Tax</span>
+              <span className="text-muted-foreground">
+                Tax ({state.taxConfig.rate}%)
+                {state.taxConfig.includeInPrice && (
+                  <span className="ml-1 text-[10px]">(incl.)</span>
+                )}
+              </span>
               <span>{formatPrice(state.tax, currency)}</span>
             </div>
           )}

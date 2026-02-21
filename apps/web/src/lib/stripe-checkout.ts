@@ -83,6 +83,48 @@ export async function createBookingCheckoutSession(
   );
 }
 
+export interface CreateBookingPaymentIntentInput {
+  stripeAccountId?: string;
+  organizationId: string;
+  bookingId: string;
+  customerId: string;
+  bookingReference: string;
+  customerEmail: string;
+  currency: string;
+  amountInCents: number;
+  tourName: string;
+  tourDate: string;
+  participants: number;
+  idempotencyKey?: string;
+}
+
+export async function createBookingPaymentIntent(
+  input: CreateBookingPaymentIntentInput
+): Promise<Stripe.PaymentIntent> {
+  const stripe = getStripeClient();
+
+  const createParams: Stripe.PaymentIntentCreateParams = {
+    amount: input.amountInCents,
+    currency: input.currency.toLowerCase(),
+    automatic_payment_methods: { enabled: true },
+    description: `${input.tourName} — ${input.tourDate} — ${input.participants} ${
+      input.participants === 1 ? "participant" : "participants"
+    }`,
+    receipt_email: input.customerEmail,
+    metadata: {
+      organizationId: input.organizationId,
+      bookingId: input.bookingId,
+      customerId: input.customerId,
+      bookingReference: input.bookingReference,
+    },
+  };
+
+  return stripe.paymentIntents.create(createParams, {
+    stripeAccount: input.stripeAccountId,
+    idempotencyKey: input.idempotencyKey,
+  });
+}
+
 export async function retrieveBookingCheckoutSession(
   sessionId: string,
   stripeAccountId?: string

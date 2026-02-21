@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, User, Users, AlertCircle } from "lucide-react";
 import { Button } from "@tour/ui";
 import { useBooking, type CustomerDetails, type BookingParticipant } from "@/lib/booking-context";
@@ -47,6 +47,31 @@ export function CustomerDetailsForm({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showOptional, setShowOptional] = useState(false);
+  const [isReturningCustomer, setIsReturningCustomer] = useState(false);
+
+  // Restore returning customer from localStorage
+  useEffect(() => {
+    if (state.customer?.email) return; // Already have customer data
+
+    try {
+      const saved = localStorage.getItem("tour_checkout_customer");
+      if (!saved) return;
+
+      const parsed = JSON.parse(saved) as Partial<CustomerDetails>;
+      if (parsed.email && parsed.firstName) {
+        setCustomerLocal((prev) => ({
+          ...prev,
+          email: prev.email || parsed.email || "",
+          firstName: prev.firstName || parsed.firstName || "",
+          lastName: prev.lastName || parsed.lastName || "",
+          phone: prev.phone || parsed.phone || "",
+        }));
+        setIsReturningCustomer(true);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync participant names with state
   useEffect(() => {
@@ -97,6 +122,21 @@ export function CustomerDetailsForm({
 
     if (!validate()) {
       return;
+    }
+
+    // Save to localStorage for returning customer detection
+    try {
+      localStorage.setItem(
+        "tour_checkout_customer",
+        JSON.stringify({
+          email: customer.email,
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          phone: customer.phone,
+        })
+      );
+    } catch {
+      // localStorage may be unavailable
     }
 
     setCustomer(customer);
@@ -161,10 +201,17 @@ export function CustomerDetailsForm({
           <User className="h-5 w-5" />
           <h3 className="text-lg font-semibold">Lead Contact</h3>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Enter the details of the person making the booking. Confirmation emails will be sent
-          to this address.
-        </p>
+
+        {isReturningCustomer && customer.firstName ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-800">
+            Welcome back, <span className="font-semibold">{customer.firstName}</span>! We&apos;ve filled in your details from last time.
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Enter the details of the person making the booking. Confirmation emails will be sent
+            to this address.
+          </p>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -254,6 +301,31 @@ export function CustomerDetailsForm({
           {adults.length > 0 && (
             <div className="space-y-3">
               <h4 className="text-sm font-medium text-muted-foreground">Adults</h4>
+              {/* "Same as lead" for first adult */}
+              {adults[0] && (
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-border"
+                    checked={
+                      !!customer.firstName &&
+                      participantNames[adults[0].id]?.firstName === customer.firstName &&
+                      participantNames[adults[0].id]?.lastName === customer.lastName
+                    }
+                    onChange={(e) => {
+                      const firstAdult = adults[0]!;
+                      if (e.target.checked) {
+                        handleParticipantChange(firstAdult.id, "firstName", customer.firstName);
+                        handleParticipantChange(firstAdult.id, "lastName", customer.lastName);
+                      } else {
+                        handleParticipantChange(firstAdult.id, "firstName", "");
+                        handleParticipantChange(firstAdult.id, "lastName", "");
+                      }
+                    }}
+                  />
+                  <span>Adult 1 is the same as lead contact</span>
+                </label>
+              )}
               {adults.map((participant, index) => (
                 <ParticipantNameFields
                   key={participant.id}

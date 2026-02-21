@@ -1,7 +1,8 @@
 "use client";
 
 import { format } from "date-fns";
-import { CheckCircle, Calendar, Clock, MapPin, Mail, Download, Share2 } from "lucide-react";
+import { useRef } from "react";
+import { CheckCircle, Calendar, Clock, MapPin, Mail, Download, Share2, FileText } from "lucide-react";
 import { Button } from "@tour/ui";
 import { useBooking } from "@/lib/booking-context";
 
@@ -41,6 +42,7 @@ function calculateEndTime(startTime: string, durationMinutes: number): string {
 
 export function BookingConfirmation({ organizationName, organizationSlug }: BookingConfirmationProps) {
   const { state, reset } = useBooking();
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   const handleAddToCalendar = () => {
     if (!state.bookingDate || !state.bookingTime || !state.tour) return;
@@ -69,6 +71,58 @@ END:VCALENDAR`;
     link.href = URL.createObjectURL(blob);
     link.download = `booking-${state.referenceNumber}.ics`;
     link.click();
+  };
+
+  const handleDownloadReceipt = () => {
+    if (!state.tour || !state.bookingDate || !state.bookingTime || !state.referenceNumber) return;
+
+    const endTimeStr = calculateEndTime(state.bookingTime, state.tour.durationMinutes);
+    const participantSummary = (() => {
+      const adults = state.participants.filter((p) => p.type === "adult").length;
+      const children = state.participants.filter((p) => p.type === "child").length;
+      const infants = state.participants.filter((p) => p.type === "infant").length;
+      const parts: string[] = [];
+      if (adults > 0) parts.push(`${adults} Adult(s)`);
+      if (children > 0) parts.push(`${children} Child(ren)`);
+      if (infants > 0) parts.push(`${infants} Infant(s)`);
+      return parts.join(", ");
+    })();
+
+    const lines = [
+      `BOOKING CONFIRMATION`,
+      `${"=".repeat(48)}`,
+      ``,
+      `Reference:    ${state.referenceNumber}`,
+      `Tour:         ${state.tour.name}`,
+      `Date:         ${formatDate(state.bookingDate)}`,
+      `Time:         ${formatTime(state.bookingTime)} - ${formatTime(endTimeStr)}`,
+      ...(state.tour.meetingPoint ? [`Meeting Point: ${state.tour.meetingPoint}`] : []),
+      ``,
+      `${"─".repeat(48)}`,
+      `Lead Contact: ${state.customer?.firstName} ${state.customer?.lastName}`,
+      `Email:        ${state.customer?.email}`,
+      `Participants: ${participantSummary}`,
+      ...(state.selectedAddOns.length > 0
+        ? [`Add-ons:      ${state.selectedAddOns.map((a) => `${a.name} x${a.quantity}`).join(", ")}`]
+        : []),
+      ``,
+      `${"─".repeat(48)}`,
+      `Total Paid:   ${formatPrice(state.total, state.currency)}`,
+      ``,
+      `${"=".repeat(48)}`,
+      `Organized by ${organizationName}`,
+      ``,
+      `Arrive 10-15 minutes before departure time.`,
+      `Keep this reference handy: ${state.referenceNumber}`,
+    ];
+
+    const content = lines.join("\n");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `booking-${state.referenceNumber}.txt`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   const handleShare = async () => {
@@ -184,6 +238,10 @@ END:VCALENDAR`;
         <Button onClick={handleAddToCalendar} variant="outline" className="gap-2">
           <Download className="h-4 w-4" />
           Add to Calendar
+        </Button>
+        <Button onClick={handleDownloadReceipt} variant="outline" className="gap-2">
+          <FileText className="h-4 w-4" />
+          Download Receipt
         </Button>
         <Button onClick={handleShare} variant="outline" className="gap-2">
           <Share2 className="h-4 w-4" />

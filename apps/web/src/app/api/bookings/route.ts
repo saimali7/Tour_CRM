@@ -24,6 +24,7 @@ import { getOrganizationBookingUrl } from "@/lib/organization";
 import { verifyAndCalculateBookingPricing } from "@/lib/booking-pricing";
 import {
   createBookingCheckoutSession,
+  createBookingPaymentIntent,
   retrieveBookingCheckoutSession,
 } from "@/lib/stripe-checkout";
 
@@ -57,6 +58,7 @@ interface BookingRequestBody {
   total?: string | number;
   discountCode?: string | null;
   abandonedCartId?: string | null;
+  paymentMode?: "redirect" | "embedded";
 }
 
 type DiscountCodeType = "promo" | "voucher";
@@ -912,8 +914,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (process.env.STRIPE_SECRET_KEY) {
+      const useEmbeddedPayment = body.paymentMode === "embedded";
+
       try {
-        const baseUrl = getOrganizationBookingUrl(org).replace(/\/$/, "");
         const checkoutTourDate = new Intl.DateTimeFormat("en-US", {
           weekday: "long",
           year: "numeric",
@@ -929,9 +932,79 @@ export async function POST(request: NextRequest) {
             bookingId: booking.id,
             organizationId: org.id,
             idempotencyKey,
+            paymentMode: useEmbeddedPayment ? "embedded" : "redirect",
           },
           "Checkout started"
         );
+
+        const stripeCurrency =
+          pricingVerification.pricing.currency ||
+          org.settings?.defaultCurrency ||
+          "USD";
+        const stripeAmountInCents = Math.round(chargeAmounts.amountToCharge * 100);
+        const stripeTourName = booking.tour?.name || pricingVerification.tour.name;
+
+        if (useEmbeddedPayment) {
+          // --- Embedded payment mode: create PaymentIntent, return clientSecret ---
+          const paymentIntent = await createBookingPaymentIntent({
+            organizationId: org.id,
+            bookingId: booking.id,
+            customerId: booking.customerId,
+            bookingReference: booking.referenceNumber,
+            customerEmail: body.customer.email,
+            currency: stripeCurrency,
+            amountInCents: stripeAmountInCents,
+            tourName: stripeTourName,
+            tourDate: checkoutTourDate,
+            participants: body.participants.length,
+            idempotencyKey: `pi:${org.id}:${idempotencyKey}`,
+          });
+
+          await markCheckoutSessionCreated({
+            organizationId: org.id,
+            attemptId: reservation.attempt.id,
+            bookingId: booking.id,
+            stripeSessionId: null,
+            stripePaymentIntentId: paymentIntent.id,
+            paymentUrl: null,
+            paymentAmount: chargeAmounts.amountToCharge.toFixed(2),
+            remainingBalance: Math.max(
+              0,
+              chargeAmounts.remainingBalance - chargeAmounts.amountToCharge
+            ).toFixed(2),
+            paymentMode: chargeAmounts.paymentMode,
+            bookingReference: booking.referenceNumber,
+          });
+
+          logger.info(
+            {
+              event: "stripe_payment_intent_created",
+              bookingId: booking.id,
+              organizationId: org.id,
+              paymentIntentId: paymentIntent.id,
+              durationMs: Date.now() - checkoutStartedAt,
+            },
+            "Stripe PaymentIntent created for embedded checkout"
+          );
+
+          return NextResponse.json({
+            booking: {
+              id: booking.id,
+              referenceNumber: booking.referenceNumber,
+            },
+            clientSecret: paymentIntent.client_secret,
+            paymentAmount: chargeAmounts.amountToCharge.toFixed(2),
+            remainingBalance: Math.max(
+              0,
+              chargeAmounts.remainingBalance - chargeAmounts.amountToCharge
+            ).toFixed(2),
+            paymentMode: chargeAmounts.paymentMode,
+            message: "Booking created, ready for inline payment",
+          });
+        }
+
+        // --- Redirect payment mode: create Checkout Session ---
+        const baseUrl = getOrganizationBookingUrl(org).replace(/\/$/, "");
 
         const session = await createBookingCheckoutSession({
           organizationId: org.id,
@@ -939,12 +1012,9 @@ export async function POST(request: NextRequest) {
           customerId: booking.customerId,
           bookingReference: booking.referenceNumber,
           customerEmail: body.customer.email,
-          currency:
-            pricingVerification.pricing.currency ||
-            org.settings?.defaultCurrency ||
-            "USD",
-          amountInCents: Math.round(chargeAmounts.amountToCharge * 100),
-          tourName: booking.tour?.name || pricingVerification.tour.name,
+          currency: stripeCurrency,
+          amountInCents: stripeAmountInCents,
+          tourName: stripeTourName,
           tourDate: checkoutTourDate,
           participants: body.participants.length,
           successUrl: `${baseUrl}/booking/success?ref=${booking.referenceNumber}`,
@@ -1010,7 +1080,7 @@ export async function POST(request: NextRequest) {
           errorMessage:
             stripeError instanceof Error
               ? stripeError.message
-              : "Unable to create Stripe checkout session",
+              : "Unable to create Stripe checkout",
         });
 
         logger.error(
@@ -1020,7 +1090,7 @@ export async function POST(request: NextRequest) {
             bookingId: booking.id,
             organizationId: org.id,
           },
-          "Stripe checkout session creation failed"
+          "Stripe checkout creation failed"
         );
 
         return NextResponse.json(

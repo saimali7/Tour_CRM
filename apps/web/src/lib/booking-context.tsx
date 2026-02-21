@@ -137,6 +137,7 @@ type BookingAction =
   | { type: "SET_ABANDONED_CART_ID"; cartId: string | null }
   | { type: "SET_REQUIRED_WAIVERS"; waivers: RequiredWaiver[] }
   | { type: "MARK_WAIVER_SIGNED"; waiverTemplateId: string; signedAt?: string }
+  | { type: "SET_AVAILABLE_SPOTS"; spots: number }
   | { type: "RESET" };
 
 const initialState: BookingState = {
@@ -486,6 +487,12 @@ function bookingReducer(state: BookingState, action: BookingAction): BookingStat
         ),
       };
 
+    case "SET_AVAILABLE_SPOTS":
+      return {
+        ...state,
+        availableSpots: action.spots,
+      };
+
     case "RESET":
       return initialState;
 
@@ -521,6 +528,7 @@ interface BookingContextValue {
   markWaiverSigned: (waiverTemplateId: string, signedAt?: string) => void;
   nextStep: () => void;
   prevStep: () => void;
+  goToStep: (step: BookingState["step"]) => void;
   reset: () => void;
 }
 
@@ -636,6 +644,23 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     }
   }, [state.availableAddOns.length, state.bookingId, state.bookingOptions.length, state.requiredWaivers, state.step]);
 
+  const goToStep = useCallback((targetStep: BookingState["step"]) => {
+    const hasWaiverStep = Boolean(state.bookingId) && state.requiredWaivers.some((waiver) => !waiver.isSigned);
+    const steps = getFlowSteps({
+      hasBookingOptions: state.bookingOptions.length > 0,
+      hasAddOns: state.availableAddOns.length > 0,
+      hasWaiverStep,
+    });
+
+    const currentIndex = steps.indexOf(state.step);
+    const targetIndex = steps.indexOf(targetStep);
+
+    // Only allow jumping to completed steps (before current) or the current step
+    if (targetIndex >= 0 && targetIndex <= currentIndex) {
+      dispatch({ type: "SET_STEP", step: targetStep });
+    }
+  }, [state.availableAddOns.length, state.bookingId, state.bookingOptions.length, state.requiredWaivers, state.step]);
+
   const reset = useCallback(() => {
     dispatch({ type: "RESET" });
   }, []);
@@ -659,6 +684,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         markWaiverSigned,
         nextStep,
         prevStep,
+        goToStep,
         reset,
       }}
     >

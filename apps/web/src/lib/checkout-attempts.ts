@@ -121,16 +121,16 @@ export async function markCheckoutSessionCreated(params: {
   organizationId: string;
   attemptId: string;
   bookingId: string;
-  stripeSessionId: string;
+  stripeSessionId: string | null;
   stripePaymentIntentId?: string | null;
-  paymentUrl: string;
+  paymentUrl: string | null;
   paymentAmount: string;
   remainingBalance: string;
   paymentMode: "deposit" | "full";
   bookingReference: string;
 }) {
   const metadata: CheckoutAttemptMetadata = {
-    paymentUrl: params.paymentUrl,
+    paymentUrl: params.paymentUrl ?? undefined,
     paymentAmount: params.paymentAmount,
     remainingBalance: params.remainingBalance,
     paymentMode: params.paymentMode,

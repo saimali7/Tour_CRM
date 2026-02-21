@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertCircle, ChevronLeft, ShieldCheck } from "lucide-react";
+import { AlertCircle, ChevronLeft, Pencil, RotateCcw, ShieldCheck } from "lucide-react";
 import { Button } from "@tour/ui";
 import { useBooking } from "@/lib/booking-context";
 
@@ -14,8 +14,22 @@ function formatMoney(value: number, currency: string) {
   }).format(value);
 }
 
+function EditButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+      aria-label={`Edit ${label}`}
+    >
+      <Pencil className="h-3 w-3" />
+      <span>Edit</span>
+    </button>
+  );
+}
+
 export function ReviewStep() {
-  const { state, nextStep, prevStep } = useBooking();
+  const { state, nextStep, prevStep, goToStep } = useBooking();
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const guestMix = useMemo(() => {
@@ -62,7 +76,10 @@ export function ReviewStep() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Guest mix</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Guest mix</p>
+              <EditButton onClick={() => goToStep("select")} label="guest mix" />
+            </div>
             <p className="text-sm">
               {guestMix.adults} Adult(s)
               {guestMix.children > 0 ? ` • ${guestMix.children} Child(ren)` : ""}
@@ -71,7 +88,10 @@ export function ReviewStep() {
           </div>
 
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Lead contact</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Lead contact</p>
+              <EditButton onClick={() => goToStep("details")} label="contact details" />
+            </div>
             <p className="text-sm">
               {state.customer?.firstName} {state.customer?.lastName}
             </p>
@@ -81,7 +101,10 @@ export function ReviewStep() {
 
         {state.selectedAddOns.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Add-ons</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Add-ons</p>
+              <EditButton onClick={() => goToStep("addons")} label="add-ons" />
+            </div>
             <ul className="space-y-1 text-sm">
               {state.selectedAddOns.map((addOn) => (
                 <li key={addOn.addOnProductId}>
@@ -95,11 +118,31 @@ export function ReviewStep() {
 
         {state.customer?.specialRequests ? (
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Special requests</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Special requests</p>
+              <EditButton onClick={() => goToStep("details")} label="special requests" />
+            </div>
             <p className="text-sm text-muted-foreground">{state.customer.specialRequests}</p>
           </div>
         ) : null}
       </div>
+
+      {/* ── Cancellation policy ──────────────────────────────── */}
+      {state.tour?.cancellationHours != null && state.tour.cancellationHours > 0 && (
+        <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 text-sm">
+          <RotateCcw className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+          <div>
+            <p className="font-medium text-emerald-800">
+              Free cancellation up to {state.tour.cancellationHours} hours before
+            </p>
+            {state.tour.cancellationPolicy && (
+              <p className="mt-1 text-xs text-emerald-700/80">
+                {state.tour.cancellationPolicy}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
         <div className="flex items-center justify-between text-sm">
@@ -118,9 +161,14 @@ export function ReviewStep() {
             <span>-{formatMoney(state.discount, state.currency)}</span>
           </div>
         ) : null}
-        {state.tax > 0 ? (
+        {state.taxConfig.enabled && state.taxConfig.rate > 0 ? (
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Tax</span>
+            <span className="text-muted-foreground">
+              Tax ({state.taxConfig.rate}%)
+              {state.taxConfig.includeInPrice && (
+                <span className="ml-1 text-[10px]">(incl.)</span>
+              )}
+            </span>
             <span>{formatMoney(state.tax, state.currency)}</span>
           </div>
         ) : null}

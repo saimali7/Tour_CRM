@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronLeft, CreditCard, Lock, AlertCircle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { loadStripe, type Stripe as StripeType, type StripeError } from "@stripe/stripe-js";
+import {
+  Elements,
+  PaymentElement,
+  ExpressCheckoutElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
+import type { StripeExpressCheckoutElementConfirmEvent } from "@stripe/stripe-js";
+import { ChevronLeft, CreditCard, Lock, AlertCircle, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@tour/ui";
 import { formatLocalDateKey, useBooking } from "@/lib/booking-context";
 
@@ -10,63 +19,92 @@ interface PaymentStepProps {
   organizationSlug: string;
 }
 
-type DiscountType = "promo" | "voucher";
-
 function formatPrice(price: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: currency,
+    currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(price);
 }
 
-function roundToTwoDecimals(amount: number): number {
-  return Math.round(amount * 100) / 100;
+// Lazy-load Stripe.js as a singleton
+let stripePromise: Promise<StripeType | null> | null = null;
+
+function getStripePromise(): Promise<StripeType | null> {
+  if (!stripePromise) {
+    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    if (!key) {
+      return Promise.resolve(null);
+    }
+    stripePromise = loadStripe(key);
+  }
+  return stripePromise;
 }
 
-function parseAppliedDiscountCode(
-  discountCode: string | null
-): { type: DiscountType; code: string } | null {
-  if (!discountCode) {
-    return null;
-  }
+// --- Stripe Elements appearance matching the design system ---
+const stripeAppearance = {
+  theme: "flat" as const,
+  variables: {
+    colorPrimary: "hsl(24, 71%, 43%)",
+    colorBackground: "hsl(0, 0%, 100%)",
+    colorText: "hsl(20, 28%, 14%)",
+    colorDanger: "hsl(0, 72%, 51%)",
+    colorTextSecondary: "hsl(22, 15%, 42%)",
+    colorTextPlaceholder: "hsl(22, 15%, 62%)",
+    fontSizeBase: "14px",
+    spacingUnit: "4px",
+    borderRadius: "8px",
+  },
+  rules: {
+    ".Input": {
+      border: "1px solid hsl(28, 36%, 86%)",
+      padding: "12px",
+      boxShadow: "inset 0 1px 2px hsl(0 0% 0% / 0.04)",
+      transition: "border-color 150ms ease, box-shadow 150ms ease",
+    },
+    ".Input:focus": {
+      border: "1px solid hsl(24, 71%, 43%)",
+      boxShadow: "0 0 0 3px hsl(24 71% 43% / 0.15)",
+    },
+    ".Input--invalid": {
+      border: "1px solid hsl(0, 72%, 51%)",
+      boxShadow: "0 0 0 3px hsl(0 72% 51% / 0.1)",
+    },
+    ".Label": {
+      color: "hsl(22, 15%, 42%)",
+      fontSize: "13px",
+      fontWeight: "500",
+      marginBottom: "6px",
+    },
+    ".Error": {
+      color: "hsl(0, 72%, 51%)",
+      fontSize: "13px",
+      marginTop: "6px",
+    },
+    ".Tab": {
+      border: "1px solid hsl(28, 36%, 86%)",
+      borderRadius: "8px",
+    },
+    ".Tab--selected": {
+      border: "1px solid hsl(24, 71%, 43%)",
+      backgroundColor: "hsl(24 71% 43% / 0.05)",
+    },
+  },
+};
 
-  const [rawType, ...codeParts] = discountCode.split(":");
-  const code = codeParts.join(":").trim();
-  const type = rawType?.trim().toLowerCase();
-
-  if (!code || (type !== "promo" && type !== "voucher")) {
-    return null;
-  }
-
-  return {
-    type,
-    code,
-  };
-}
-
+// ============================================================
+// Main PaymentStep — orchestrates loading, free bookings, and Elements wrapper
+// ============================================================
 export function PaymentStep({ organizationName, organizationSlug }: PaymentStepProps) {
-  const {
-    state,
-    dispatch,
-    prevStep,
-    setAbandonedCartId,
-    setIdempotencyKey,
-    setRequiredWaivers,
-  } = useBooking();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [discountType, setDiscountType] = useState<DiscountType>("promo");
-  const [discountCodeInput, setDiscountCodeInput] = useState("");
-  const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
-  const [discountFeedback, setDiscountFeedback] = useState<string | null>(null);
-  const [discountError, setDiscountError] = useState<string | null>(null);
+  const { state, dispatch, prevStep, setAbandonedCartId, setIdempotencyKey, setRequiredWaivers } =
+    useBooking();
+  const [clientSecret, setClientSecret] = useState<string | null>(state.stripeClientSecret);
+  const [isCreatingBooking, setIsCreatingBooking] = useState(false);
+  const [isProcessingFree, setIsProcessingFree] = useState(false);
+  const bookingCreatedRef = useRef(false);
 
-  const appliedDiscount = parseAppliedDiscountCode(state.discountCode);
-  const appliedDiscountLabel = appliedDiscount
-    ? `${appliedDiscount.type === "promo" ? "Promo" : "Voucher"} ${appliedDiscount.code}`
-    : state.discountCode;
-
+  // --- Abandoned cart tracking ---
   useEffect(() => {
     const customerEmail = state.customer?.email?.trim();
     if (
@@ -96,12 +134,10 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
             bookingDate: state.bookingDate ? formatLocalDateKey(state.bookingDate) : undefined,
             bookingTime: state.bookingTime,
             bookingOptionId: state.bookingOptionId ?? undefined,
-            participants: state.participants.map((participant) => ({
-              type: participant.type,
-            })),
-            selectedAddOns: state.selectedAddOns.map((addOn) => ({
-              addOnProductId: addOn.addOnProductId,
-              quantity: addOn.quantity,
+            participants: state.participants.map((p) => ({ type: p.type })),
+            selectedAddOns: state.selectedAddOns.map((a) => ({
+              addOnProductId: a.addOnProductId,
+              quantity: a.quantity,
             })),
             subtotal: state.subtotal.toFixed(2),
             discount: state.discount.toFixed(2),
@@ -112,16 +148,14 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
           }),
         });
 
-        if (!response.ok) {
-          return;
-        }
+        if (!response.ok) return;
 
         const data = await response.json();
         if (!isCancelled && data?.cartId) {
           setAbandonedCartId(data.cartId as string);
         }
       } catch {
-        // Keep checkout flow resilient if abandoned-cart tracking fails.
+        // Keep checkout resilient if abandoned-cart tracking fails.
       }
     };
 
@@ -153,174 +187,93 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
     state.tour?.id,
   ]);
 
+  // --- Create booking + PaymentIntent on mount (for paid bookings) ---
   useEffect(() => {
-    const currentAppliedDiscount = parseAppliedDiscountCode(state.discountCode);
-    if (!currentAppliedDiscount) {
-      return;
-    }
+    if (state.total === 0 || clientSecret || bookingCreatedRef.current) return;
 
-    setDiscountType((previous) =>
-      previous === currentAppliedDiscount.type
-        ? previous
-        : currentAppliedDiscount.type
-    );
-    setDiscountCodeInput((previous) =>
-      previous === currentAppliedDiscount.code
-        ? previous
-        : currentAppliedDiscount.code
-    );
-  }, [state.discountCode]);
-
-  const handleApplyDiscount = async () => {
-    const code = discountCodeInput.trim().toUpperCase();
-
-    if (!code) {
-      setDiscountError("Enter a promo or voucher code.");
-      setDiscountFeedback(null);
-      return;
-    }
-
-    if (!state.tour?.id) {
-      setDiscountError("Tour details are missing. Please go back and select a tour again.");
-      setDiscountFeedback(null);
-      return;
-    }
-
-    if (
-      !state.customer?.email ||
-      !state.customer.firstName ||
-      !state.customer.lastName
-    ) {
-      setDiscountError("Customer details are required before applying a code.");
-      setDiscountFeedback(null);
-      return;
-    }
-
-    setIsApplyingDiscount(true);
-    setDiscountError(null);
-    setDiscountFeedback(null);
+    bookingCreatedRef.current = true;
+    setIsCreatingBooking(true);
     dispatch({ type: "SET_ERROR", error: null });
 
-    try {
-      let calculatedDiscount = 0;
+    const createBooking = async () => {
+      try {
+        const requestIdempotencyKey =
+          state.idempotencyKey ||
+          `web-${Date.now()}-${crypto.randomUUID().replace(/-/g, "")}`;
+        if (!state.idempotencyKey) {
+          setIdempotencyKey(requestIdempotencyKey);
+        }
 
-      if (discountType === "promo") {
-        const response = await fetch("/api/promos/validate", {
+        const response = await fetch("/api/bookings", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "X-Idempotency-Key": requestIdempotencyKey,
           },
           body: JSON.stringify({
-            code,
-            tourId: state.tour.id,
-            bookingAmount: state.subtotal.toFixed(2),
-            customer: {
-              email: state.customer.email,
-              firstName: state.customer.firstName,
-              lastName: state.customer.lastName,
-              phone: state.customer.phone,
-            },
+            tourId: state.tour?.id,
+            bookingDate: state.bookingDate ? formatLocalDateKey(state.bookingDate) : undefined,
+            bookingTime: state.bookingTime,
+            bookingOptionId: state.bookingOptionId ?? undefined,
+            selectedAddOns: state.selectedAddOns.map((addOn) => ({
+              addOnProductId: addOn.addOnProductId,
+              quantity: addOn.quantity,
+            })),
+            customer: state.customer,
+            participants: state.participants.map((p) => ({
+              firstName: p.firstName || state.customer?.firstName,
+              lastName: p.lastName || state.customer?.lastName,
+              email: p.email,
+              type: p.type,
+            })),
+            subtotal: state.subtotal.toFixed(2),
+            discount: state.discount.toFixed(2),
+            tax: state.tax.toFixed(2),
+            total: state.total.toFixed(2),
+            discountCode: state.discountCode,
+            abandonedCartId: state.abandonedCartId,
+            paymentMode: "embedded",
           }),
         });
 
-        const data = (await response.json()) as {
-          valid?: boolean;
-          message?: string;
-          error?: string;
-          discount?: { type?: string; value?: number };
-        };
-
         if (!response.ok) {
-          throw new Error(data.message || "Unable to validate promo code.");
+          const error = await response.json();
+          throw new Error(error.message || "Failed to create booking");
         }
 
-        if (!data.valid) {
-          throw new Error(data.error || "Invalid promo code.");
-        }
+        const data = await response.json();
 
-        if (!data.discount) {
-          throw new Error("Promo code is valid but no discount was returned.");
-        }
-
-        if (data.discount.type === "percentage") {
-          calculatedDiscount = state.subtotal * ((data.discount.value || 0) / 100);
-        } else {
-          calculatedDiscount = Number(data.discount.value || 0);
-        }
-      } else {
-        const response = await fetch("/api/vouchers/validate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ code }),
+        dispatch({
+          type: "SET_BOOKING_RESULT",
+          bookingId: data.booking.id,
+          referenceNumber: data.booking.referenceNumber,
         });
 
-        const data = (await response.json()) as {
-          valid?: boolean;
-          message?: string;
-          error?: string;
-          type?: string;
-          value?: number;
-          voucher?: {
-            tourId?: string | null;
-          } | null;
-        };
-
-        if (!response.ok) {
-          throw new Error(data.message || "Unable to validate voucher.");
-        }
-
-        if (!data.valid) {
-          throw new Error(data.error || "Invalid voucher.");
-        }
-
-        if (data.type === "tour") {
-          const voucherTourId = data.voucher?.tourId;
-          if (voucherTourId && voucherTourId !== state.tour.id) {
-            throw new Error("This voucher is not valid for the selected tour.");
-          }
-          calculatedDiscount = state.subtotal;
-        } else if (data.type === "percentage") {
-          calculatedDiscount = state.subtotal * ((data.value || 0) / 100);
+        if (data.clientSecret) {
+          dispatch({ type: "SET_PAYMENT_INTENT", clientSecret: data.clientSecret });
+          setClientSecret(data.clientSecret);
         } else {
-          calculatedDiscount = Number(data.value || 0);
+          throw new Error("Payment session unavailable. Please try again.");
         }
+      } catch (error) {
+        bookingCreatedRef.current = false;
+        dispatch({
+          type: "SET_ERROR",
+          error: error instanceof Error ? error.message : "Something went wrong",
+        });
+      } finally {
+        setIsCreatingBooking(false);
       }
+    };
 
-      if (!Number.isFinite(calculatedDiscount) || calculatedDiscount < 0) {
-        throw new Error("Calculated discount is invalid. Please try another code.");
-      }
+    void createBooking();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      const amount = roundToTwoDecimals(Math.min(state.subtotal, calculatedDiscount));
-      dispatch({
-        type: "SET_DISCOUNT",
-        code: `${discountType}:${code}`,
-        amount,
-      });
-      setDiscountFeedback(
-        discountType === "promo" ? "Promo code applied." : "Voucher applied."
-      );
-      setDiscountError(null);
-    } catch (error) {
-      setDiscountError(
-        error instanceof Error ? error.message : "Failed to apply discount code."
-      );
-      setDiscountFeedback(null);
-    } finally {
-      setIsApplyingDiscount(false);
-    }
-  };
-
-  const handleRemoveDiscount = () => {
-    dispatch({ type: "CLEAR_DISCOUNT" });
-    setDiscountFeedback("Discount removed.");
-    setDiscountError(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // --- Free booking handler ---
+  const handleFreeBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsProcessing(true);
+    setIsProcessingFree(true);
     dispatch({ type: "SET_SUBMITTING", isSubmitting: true });
     dispatch({ type: "SET_ERROR", error: null });
 
@@ -332,7 +285,6 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
         setIdempotencyKey(requestIdempotencyKey);
       }
 
-      // Create booking via API using availability-based model
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: {
@@ -371,66 +323,55 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
 
       const data = await response.json();
 
-      // For free bookings, skip payment and go to confirmation
-      if (state.total === 0) {
-        dispatch({
-          type: "SET_BOOKING_RESULT",
-          bookingId: data.booking.id,
-          referenceNumber: data.booking.referenceNumber,
-        });
+      dispatch({
+        type: "SET_BOOKING_RESULT",
+        bookingId: data.booking.id,
+        referenceNumber: data.booking.referenceNumber,
+      });
 
-        if (state.tour?.id) {
-          try {
-            const waiverResponse = await fetch(
-              `/api/waivers/required?tourId=${encodeURIComponent(state.tour.id)}`,
-              { cache: "no-store" }
-            );
+      if (state.tour?.id) {
+        try {
+          const waiverResponse = await fetch(
+            `/api/waivers/required?tourId=${encodeURIComponent(state.tour.id)}`,
+            { cache: "no-store" }
+          );
 
-            if (waiverResponse.ok) {
-              const waiverPayload = (await waiverResponse.json()) as {
-                waivers?: Array<{
-                  waiverTemplateId: string;
-                  waiverName: string;
-                  waiverContent?: string | null;
-                }>;
-              };
+          if (waiverResponse.ok) {
+            const waiverPayload = (await waiverResponse.json()) as {
+              waivers?: Array<{
+                waiverTemplateId: string;
+                waiverName: string;
+                waiverContent?: string | null;
+              }>;
+            };
 
-              const requiredWaivers = (waiverPayload.waivers || []).map((waiver) => ({
-                waiverTemplateId: waiver.waiverTemplateId,
-                waiverName: waiver.waiverName,
-                waiverContent: waiver.waiverContent ?? null,
-                isSigned: false,
-              }));
+            const requiredWaivers = (waiverPayload.waivers || []).map((waiver) => ({
+              waiverTemplateId: waiver.waiverTemplateId,
+              waiverName: waiver.waiverName,
+              waiverContent: waiver.waiverContent ?? null,
+              isSigned: false,
+            }));
 
-              setRequiredWaivers(requiredWaivers);
+            setRequiredWaivers(requiredWaivers);
 
-              if (requiredWaivers.length > 0) {
-                dispatch({ type: "SET_STEP", step: "waiver" });
-                return;
-              }
+            if (requiredWaivers.length > 0) {
+              dispatch({ type: "SET_STEP", step: "waiver" });
+              return;
             }
-          } catch {
-            // Keep checkout resilient and continue to confirmation.
           }
+        } catch {
+          // Keep checkout resilient
         }
-
-        dispatch({ type: "SET_STEP", step: "confirmation" });
-        return;
       }
 
-      // For paid bookings, we would redirect to Stripe checkout
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      } else {
-        throw new Error("Payment session unavailable. Please try again in a moment.");
-      }
+      dispatch({ type: "SET_STEP", step: "confirmation" });
     } catch (error) {
       dispatch({
         type: "SET_ERROR",
         error: error instanceof Error ? error.message : "Something went wrong",
       });
     } finally {
-      setIsProcessing(false);
+      setIsProcessingFree(false);
     }
   };
 
@@ -440,7 +381,7 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
       <button
         type="button"
         onClick={prevStep}
-        disabled={isProcessing}
+        disabled={isCreatingBooking || isProcessingFree}
         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -448,212 +389,67 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
       </button>
 
       {/* Payment Header */}
-      <div className="flex items-center gap-2">
-        <CreditCard className="h-5 w-5" />
-        <h3 className="text-lg font-semibold">Payment</h3>
-      </div>
-
-      {/* Order Summary */}
-      <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
-        <h4 className="font-medium">Order Summary</h4>
-
-        <div className="space-y-2 text-sm">
-          {state.participants.filter((p) => p.type === "adult").length > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Adults x {state.participants.filter((p) => p.type === "adult").length}
-              </span>
-              <span>
-                {formatPrice(
-                  state.participants
-                    .filter((p) => p.type === "adult")
-                    .reduce((sum, p) => sum + p.price, 0),
-                  state.currency
-                )}
-              </span>
-            </div>
-          )}
-          {state.participants.filter((p) => p.type === "child").length > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Children x {state.participants.filter((p) => p.type === "child").length}
-              </span>
-              <span>
-                {formatPrice(
-                  state.participants
-                    .filter((p) => p.type === "child")
-                    .reduce((sum, p) => sum + p.price, 0),
-                  state.currency
-                )}
-              </span>
-            </div>
-          )}
-          {state.participants.filter((p) => p.type === "infant").length > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Infants x {state.participants.filter((p) => p.type === "infant").length}
-              </span>
-              <span>Free</span>
-            </div>
-          )}
-          {state.selectedAddOns.map((addOn) => (
-            <div key={addOn.addOnProductId} className="flex justify-between">
-              <span className="text-muted-foreground">
-                {addOn.name} x {addOn.quantity}
-              </span>
-              <span>{formatPrice(addOn.quantity * addOn.unitPrice, state.currency)}</span>
-            </div>
-          ))}
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+          <CreditCard className="h-4 w-4 text-primary" />
         </div>
-
-        <div className="pt-2 border-t space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span>{formatPrice(state.subtotal, state.currency)}</span>
-          </div>
-          {state.discount > 0 && (
-            <div className="flex justify-between text-green-600">
-              <span>Discount ({appliedDiscountLabel})</span>
-              <span>-{formatPrice(state.discount, state.currency)}</span>
-            </div>
-          )}
-          {state.tax > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
-              <span>{formatPrice(state.tax, state.currency)}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="pt-2 border-t">
-          <div className="flex justify-between text-lg font-semibold">
-            <span>Total</span>
-            <span>{formatPrice(state.total, state.currency)}</span>
-          </div>
+        <div>
+          <h3 className="text-lg font-semibold">Payment</h3>
+          <p className="text-xs text-muted-foreground">Secure, encrypted checkout</p>
         </div>
       </div>
 
       {/* Error Display */}
       {state.error && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 text-red-800 text-sm">
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>{state.error}</span>
         </div>
       )}
 
-      {/* Payment Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="p-4 rounded-lg border bg-card space-y-3">
-          <h4 className="font-medium">Promo or Voucher</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label htmlFor="discountType" className="block text-xs font-medium mb-1 text-muted-foreground">
-                Code type
-              </label>
-              <select
-                id="discountType"
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value as DiscountType)}
-                disabled={isProcessing || isApplyingDiscount}
-                className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-              >
-                <option value="promo">Promo</option>
-                <option value="voucher">Voucher</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label htmlFor="discountCode" className="block text-xs font-medium mb-1 text-muted-foreground">
-                Code
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  id="discountCode"
-                  value={discountCodeInput}
-                  onChange={(e) => setDiscountCodeInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void handleApplyDiscount();
-                    }
-                  }}
-                  placeholder={discountType === "promo" ? "Enter promo code" : "Enter voucher code"}
-                  disabled={isProcessing || isApplyingDiscount}
-                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void handleApplyDiscount()}
-                  disabled={isProcessing || isApplyingDiscount || discountCodeInput.trim().length === 0}
-                >
-                  {isApplyingDiscount ? "Applying..." : "Apply"}
-                </Button>
-                {state.discountCode && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleRemoveDiscount}
-                    disabled={isProcessing || isApplyingDiscount}
-                  >
-                    Remove
-                  </Button>
-                )}
-              </div>
-            </div>
+      {/* Free Booking */}
+      {state.total === 0 ? (
+        <form onSubmit={handleFreeBooking} className="space-y-4">
+          <div className="p-4 rounded-lg border bg-muted/30 text-center">
+            <p className="text-sm text-muted-foreground">
+              No payment required for this booking.
+            </p>
           </div>
-          {discountFeedback && (
-            <p className="text-sm text-green-700">{discountFeedback}</p>
-          )}
-          {discountError && (
-            <p className="text-sm text-red-600">{discountError}</p>
-          )}
-        </div>
 
-        {state.total > 0 ? (
-          <>
-            {/* Card Input Placeholder */}
-            <div className="p-4 rounded-lg border bg-card">
-              <p className="text-sm text-muted-foreground mb-4">
-                You will be redirected to our secure payment provider to complete your purchase.
-              </p>
-
-              {/* Payment Method Icons */}
-              <div className="flex items-center gap-2">
-                <div className="px-2 py-1 bg-muted rounded text-xs font-medium">Visa</div>
-                <div className="px-2 py-1 bg-muted rounded text-xs font-medium">Mastercard</div>
-                <div className="px-2 py-1 bg-muted rounded text-xs font-medium">Amex</div>
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" size="lg" disabled={isProcessing}>
-              {isProcessing ? (
-                <>
-                  <span className="animate-spin mr-2">⏳</span>
-                  Processing...
-                </>
-              ) : (
-                <>Pay {formatPrice(state.total, state.currency)}</>
-              )}
-            </Button>
-          </>
-        ) : (
-          <Button type="submit" className="w-full" size="lg" disabled={isProcessing}>
-            {isProcessing ? (
+          <Button type="submit" className="w-full" size="lg" disabled={isProcessingFree}>
+            {isProcessingFree ? (
               <>
-                <span className="animate-spin mr-2">⏳</span>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Confirming...
               </>
             ) : (
               "Complete Free Booking"
             )}
           </Button>
-        )}
-      </form>
+        </form>
+      ) : isCreatingBooking || !clientSecret ? (
+        /* Loading skeleton while booking + PaymentIntent are created */
+        <PaymentSkeleton />
+      ) : (
+        /* Stripe Elements inline payment */
+        <Elements
+          stripe={getStripePromise()}
+          options={{
+            clientSecret,
+            appearance: stripeAppearance,
+          }}
+        >
+          <InlinePaymentForm
+            organizationName={organizationName}
+            organizationSlug={organizationSlug}
+          />
+        </Elements>
+      )}
 
       {/* Security Notice */}
       <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
         <Lock className="h-3 w-3" />
-        <span>Secure payment powered by Stripe</span>
+        <span>256-bit encrypted &middot; Powered by Stripe</span>
       </div>
 
       {/* Terms */}
@@ -668,6 +464,265 @@ export function PaymentStep({ organizationName, organizationSlug }: PaymentStepP
         </a>
         .
       </p>
+    </div>
+  );
+}
+
+// ============================================================
+// InlinePaymentForm — rendered inside <Elements> with Stripe context
+// ============================================================
+function InlinePaymentForm({
+  organizationName,
+  organizationSlug,
+}: {
+  organizationName: string;
+  organizationSlug: string;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const { state, dispatch, setRequiredWaivers } = useBooking();
+  const [isPaymentReady, setIsPaymentReady] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSucceeded, setPaymentSucceeded] = useState(false);
+  const [showExpressCheckout, setShowExpressCheckout] = useState(false);
+
+  const handlePaymentSubmit = useCallback(async () => {
+    if (!stripe || !elements || isProcessing) return;
+
+    setIsProcessing(true);
+    dispatch({ type: "SET_ERROR", error: null });
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/booking/success?ref=${state.referenceNumber}`,
+        },
+        redirect: "if_required",
+      });
+
+      if (error) {
+        dispatch({
+          type: "SET_ERROR",
+          error: error.message || "Payment failed. Please try again.",
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      if (paymentIntent?.status === "succeeded") {
+        setPaymentSucceeded(true);
+
+        // Confirm payment server-side and fetch waivers
+        try {
+          const confirmResponse = await fetch("/api/bookings/confirm-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              paymentIntentId: paymentIntent.id,
+              bookingId: state.bookingId,
+            }),
+          });
+
+          if (confirmResponse.ok) {
+            const confirmData = await confirmResponse.json();
+
+            if (confirmData.requiredWaivers?.length > 0) {
+              setRequiredWaivers(
+                confirmData.requiredWaivers.map(
+                  (w: { waiverTemplateId: string; waiverName: string; waiverContent?: string | null }) => ({
+                    ...w,
+                    isSigned: false,
+                  })
+                )
+              );
+
+              // Brief success display before advancing
+              setTimeout(() => {
+                dispatch({ type: "SET_STEP", step: "waiver" });
+              }, 1500);
+              return;
+            }
+          }
+        } catch {
+          // Payment succeeded — continue to confirmation even if waiver fetch fails
+        }
+
+        // Brief success display before advancing
+        setTimeout(() => {
+          dispatch({ type: "SET_STEP", step: "confirmation" });
+        }, 1500);
+      } else {
+        // 3DS or other action required — Stripe handles redirects automatically
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      dispatch({
+        type: "SET_ERROR",
+        error: error instanceof Error ? error.message : "Payment failed",
+      });
+      setIsProcessing(false);
+    }
+  }, [stripe, elements, isProcessing, state.referenceNumber, state.bookingId, dispatch, setRequiredWaivers]);
+
+  const handleFormSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      void handlePaymentSubmit();
+    },
+    [handlePaymentSubmit]
+  );
+
+  const handleExpressCheckoutConfirm = useCallback(
+    (event: StripeExpressCheckoutElementConfirmEvent) => {
+      void handlePaymentSubmit();
+    },
+    [handlePaymentSubmit]
+  );
+
+  // Payment succeeded overlay
+  if (paymentSucceeded) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4 animate-fade-in">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+          <CheckCircle className="h-8 w-8 text-green-600" />
+        </div>
+        <h4 className="text-lg font-semibold">Payment confirmed</h4>
+        <p className="text-sm text-muted-foreground">
+          Confirmation sent to {state.customer?.email}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleFormSubmit} className="space-y-5">
+      {/* Express Checkout (Apple Pay / Google Pay) */}
+      {showExpressCheckout && (
+        <>
+          <div className="rounded-xl border border-border/60 bg-card p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
+              Express Checkout
+            </p>
+            <ExpressCheckoutElement
+              onConfirm={handleExpressCheckoutConfirm}
+              options={{
+                buttonType: { applePay: "buy", googlePay: "buy" },
+                buttonHeight: 48,
+              }}
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-background px-3 text-xs text-muted-foreground">
+                or pay with card
+              </span>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Card Payment via PaymentElement */}
+      <div className="rounded-xl border border-border/60 bg-card p-5">
+        <PaymentElement
+          onReady={() => setIsPaymentReady(true)}
+          options={{
+            layout: "tabs",
+          }}
+        />
+      </div>
+
+      {/* Express checkout visibility detection */}
+      <ExpressCheckoutDetector onAvailable={() => setShowExpressCheckout(true)} />
+
+      {/* Trust signals */}
+      <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Lock className="h-3 w-3" />
+          <span>Secure checkout</span>
+        </div>
+        <span className="text-border">|</span>
+        <div className="flex items-center gap-1.5">
+          <span className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">Visa</span>
+          <span className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">Mastercard</span>
+          <span className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">Amex</span>
+        </div>
+      </div>
+
+      {/* Pay Button */}
+      <Button
+        type="submit"
+        className="w-full"
+        size="lg"
+        disabled={!stripe || !isPaymentReady || isProcessing}
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Processing...
+          </>
+        ) : (
+          <>Pay {formatPrice(state.total, state.currency)}</>
+        )}
+      </Button>
+
+      {/* Processing overlay */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-card/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 p-6">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm font-medium">Processing your payment...</p>
+            <p className="text-xs text-muted-foreground">Please do not close this page</p>
+          </div>
+        </div>
+      )}
+    </form>
+  );
+}
+
+// ============================================================
+// ExpressCheckoutDetector — hidden element that detects Apple/Google Pay availability
+// ============================================================
+function ExpressCheckoutDetector({ onAvailable }: { onAvailable: () => void }) {
+  const calledRef = useRef(false);
+
+  useEffect(() => {
+    // Stripe's ExpressCheckoutElement auto-hides when no methods are available.
+    // This component defers rendering the express section until we know it's supported.
+    // For simplicity, we show it after a short delay to let Stripe detect methods.
+    const timer = setTimeout(() => {
+      if (!calledRef.current) {
+        calledRef.current = true;
+        onAvailable();
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [onAvailable]);
+
+  return null;
+}
+
+// ============================================================
+// PaymentSkeleton — shown while the booking + PaymentIntent are created
+// ============================================================
+function PaymentSkeleton() {
+  return (
+    <div className="space-y-5 animate-pulse">
+      <div className="rounded-xl border border-border/60 bg-card p-5 space-y-4">
+        <div className="h-4 w-32 bg-muted rounded" />
+        <div className="h-11 bg-muted rounded" />
+        <div className="flex gap-3">
+          <div className="h-11 flex-1 bg-muted rounded" />
+          <div className="h-11 flex-1 bg-muted rounded" />
+        </div>
+      </div>
+      <div className="h-12 bg-muted rounded-lg" />
     </div>
   );
 }

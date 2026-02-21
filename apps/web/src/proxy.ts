@@ -27,6 +27,17 @@ const RESERVED_SUBDOMAINS = new Set([
 ]);
 
 /**
+ * Check if a hostname is an IP address (v4 or v6).
+ */
+function isIPAddress(host: string): boolean {
+  // IPv4: all numeric segments separated by dots
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
+  // IPv6: contains colons
+  if (host.includes(":")) return true;
+  return false;
+}
+
+/**
  * Extract organization slug from the hostname.
  *
  * Examples:
@@ -34,10 +45,14 @@ const RESERVED_SUBDOMAINS = new Set([
  * - "acme.localhost" -> "acme"
  * - "book.tourplatform.com" -> null
  * - "localhost" -> null
+ * - "127.0.0.1" -> null
  */
 function extractOrgSlug(hostname: string): string | null {
   // Remove port if present
   const host = hostname.split(":")[0] || "";
+
+  // IP addresses have no subdomain to extract
+  if (isIPAddress(host)) return null;
 
   // Handle localhost development
   // Pattern: {slug}.localhost

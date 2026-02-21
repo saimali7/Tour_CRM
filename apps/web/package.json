@@ -13,6 +13,8 @@
     "@floating-ui/react": "^0.27.18",
     "@formkit/auto-animate": "^0.9.0",
     "@hookform/resolvers": "^5.2.2",
+    "@stripe/react-stripe-js": "^5.6.0",
+    "@stripe/stripe-js": "^8.8.0",
     "@tour/config": "workspace:*",
     "@tour/database": "workspace:*",
     "@tour/services": "workspace:*",

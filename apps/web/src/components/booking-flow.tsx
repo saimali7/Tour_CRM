@@ -3,9 +3,11 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Calendar, Clock, MapPin, Check } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, MapPin, Check, ShieldCheck, Lock, RotateCcw } from "lucide-react";
 import { Button } from "@tour/ui";
 import { useBooking, BookingProvider, type AvailableAddOn } from "@/lib/booking-context";
+import { useAvailabilityPoll } from "@/hooks/use-availability-poll";
+import { useSessionTimeout } from "@/hooks/use-session-timeout";
 import { BookingOptionSelection } from "./booking-option-selection";
 import { TicketSelection } from "./ticket-selection";
 import { AddonSelection } from "./addon-selection";
@@ -14,6 +16,8 @@ import { ReviewStep } from "./review-step";
 import { PaymentStep } from "./payment-step";
 import { WaiverStep } from "./waiver-step";
 import { BookingConfirmation } from "./booking-confirmation";
+import { MobileCheckoutBar } from "./mobile-checkout-summary";
+import { PromoCodeInput } from "./promo-code-input";
 import { CardSurface } from "@/components/layout/card-surface";
 import type {
   BookingOption,
@@ -139,9 +143,11 @@ function BookingFlowContent({
     setBookingOption,
     setCustomer,
     setAddOnQuantity,
+    goToStep,
   } = useBooking();
   const hydratedCartRef = useRef<string | null>(null);
   const hydratedAddOnsRef = useRef<string | null>(null);
+  const stepContentRef = useRef<HTMLDivElement>(null);
   const [isSavingTripCart, setIsSavingTripCart] = useState(false);
   const [tripCartError, setTripCartError] = useState<string | null>(null);
   const [tripCartRecoveryPath, setTripCartRecoveryPath] = useState<string | null>(null);
@@ -368,6 +374,39 @@ function BookingFlowContent({
     };
   }, [setAvailableAddOns, tour.id]);
 
+  // ── Focus management on step change (a11y) ──────────────────────────
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Move focus to the step content for screen readers
+    if (stepContentRef.current) {
+      stepContentRef.current.focus({ preventScroll: true });
+    }
+  }, [state.step]);
+
+  // ── Real-time availability polling ────────────────────────────────────
+  const isPrePaymentStep = state.step !== "payment" && state.step !== "waiver" && state.step !== "confirmation";
+  const { status: availabilityStatus } = useAvailabilityPoll({
+    tourId: tour.id,
+    bookingDate,
+    bookingTime,
+    enabled: isPrePaymentStep,
+  });
+
+  // ── Session timeout tracking ─────────────────────────────────────────
+  const isCheckoutActive = state.step !== "confirmation";
+  const { showWarning: showTimeoutWarning, isExpired: isSessionExpired, remainingSeconds, resetTimer } = useSessionTimeout({
+    enabled: isCheckoutActive,
+    warningAfterMs: 25 * 60 * 1000,
+    expireAfterMs: 30 * 60 * 1000,
+  });
+
+  // Sync polled spots into context so ticket-selection can react
+  useEffect(() => {
+    if (availabilityStatus && typeof availabilityStatus.spotsRemaining === "number") {
+      dispatch({ type: "SET_AVAILABLE_SPOTS", spots: availabilityStatus.spotsRemaining });
+    }
+  }, [availabilityStatus, dispatch]);
+
   const basePrice = parseFloat(tour.basePrice);
   const hasBookingOptions = state.bookingOptions.length > 0;
   const hasAddOns = state.availableAddOns.length > 0;
@@ -480,40 +519,146 @@ function BookingFlowContent({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 max-w-[1280px] mx-auto py-4">
+    <>
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 max-w-[1280px] mx-auto py-4 pb-28 lg:pb-4">
       <div className="lg:col-span-7 xl:col-span-8">
         <div className="mb-4 rounded-xl border border-border/50 bg-secondary/30 px-4 py-3 text-sm font-medium text-muted-foreground sm:hidden">
           Step {Math.min(currentStepIndex + 1, steps.length)} of {steps.length}
         </div>
 
-        <div className="mb-10 hidden items-center justify-between sm:flex">
-          {steps.map((step, index) => (
-            <div key={step.id} className="flex flex-1 items-center last:flex-none">
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold shadow-sm transition-all duration-300 ${index < currentStepIndex
-                  ? "bg-emerald-500 text-white ring-4 ring-emerald-500/20"
-                  : index === currentStepIndex
-                    ? "bg-primary text-primary-foreground ring-4 ring-primary/20 scale-110"
-                    : "bg-secondary text-muted-foreground"
+        <div className="mb-10 hidden items-center justify-between sm:flex" role="navigation" aria-label="Checkout progress">
+          {steps.map((step, index) => {
+            const isCompleted = index < currentStepIndex;
+            const isCurrent = index === currentStepIndex;
+            const isClickable = isCompleted;
+
+            return (
+              <div key={step.id} className="flex flex-1 items-center last:flex-none">
+                <button
+                  type="button"
+                  onClick={() => isClickable && goToStep(step.id)}
+                  disabled={!isClickable}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold shadow-sm transition-all duration-300 ${
+                    isCompleted
+                      ? "bg-emerald-500 text-white ring-4 ring-emerald-500/20 cursor-pointer hover:ring-emerald-500/40 hover:scale-105"
+                      : isCurrent
+                        ? "bg-primary text-primary-foreground ring-4 ring-primary/20 scale-110 cursor-default"
+                        : "bg-secondary text-muted-foreground cursor-default"
                   }`}
-              >
-                {index < currentStepIndex ? <Check className="h-5 w-5" /> : index + 1}
+                  aria-label={isCompleted ? `Go back to ${step.label}` : step.label}
+                  aria-current={isCurrent ? "step" : undefined}
+                >
+                  {isCompleted ? <Check className="h-5 w-5" /> : index + 1}
+                </button>
+                <span
+                  className={`ml-3 text-sm tracking-wide ${
+                    isClickable ? "cursor-pointer hover:text-primary transition-colors" : ""
+                  } ${index <= currentStepIndex ? "font-semibold text-foreground" : "font-medium text-muted-foreground"}`}
+                  onClick={() => isClickable && goToStep(step.id)}
+                  role={isClickable ? "button" : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if (isClickable && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      goToStep(step.id);
+                    }
+                  }}
+                >
+                  {step.label}
+                </span>
+                {index < steps.length - 1 && (
+                  <div className={`mx-4 h-[2px] flex-1 rounded-full ${index < currentStepIndex ? "bg-emerald-500/50" : "bg-border/60"}`} />
+                )}
               </div>
-              <span
-                className={`ml-3 text-sm tracking-wide ${index <= currentStepIndex ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
-                  }`}
-              >
-                {step.label}
-              </span>
-              {index < steps.length - 1 && (
-                <div className={`mx-4 h-[2px] flex-1 rounded-full ${index < currentStepIndex ? "bg-emerald-500/50" : "bg-border/60"}`} />
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
+        {/* ── Session timeout banners ──────────────────────────── */}
+        {isSessionExpired && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 shadow-sm" role="alert">
+            <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+            <div>
+              <p className="font-semibold">Session expired</p>
+              <p className="mt-1 text-red-700">
+                Your booking session has timed out due to inactivity. Please refresh to start again — availability may have changed.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => window.location.reload()}
+              >
+                Refresh Page
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {showTimeoutWarning && !isSessionExpired && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-sm" role="alert">
+            <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+            <div className="flex-1">
+              <p className="font-semibold">
+                Session expiring in {Math.floor(remainingSeconds / 60)}:{(remainingSeconds % 60).toString().padStart(2, "0")}
+              </p>
+              <p className="mt-1 text-amber-700">
+                Your booking session will expire soon due to inactivity.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={resetTimer}
+              >
+                Keep Booking
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Availability warning banner ─────────────────────────── */}
+        {isPrePaymentStep && availabilityStatus && !availabilityStatus.available && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 shadow-sm" role="alert">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+            <div>
+              <p className="font-semibold">This time slot is no longer available</p>
+              <p className="mt-1 text-red-700">
+                The spot you selected has sold out while you were booking. Choose a different date or time to continue.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                asChild
+              >
+                <a href={`/org/${organizationSlug}/tours/${tour.slug}`}>
+                  View Available Times
+                </a>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isPrePaymentStep && availabilityStatus?.almostFull && availabilityStatus.available && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-sm" role="status">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+            <div>
+              <p className="font-semibold">
+                Only {availabilityStatus.spotsRemaining} {availabilityStatus.spotsRemaining === 1 ? "spot" : "spots"} left!
+              </p>
+              <p className="mt-1 text-amber-700">
+                This time slot is filling up fast. Complete your booking soon to secure your place.
+              </p>
+            </div>
+          </div>
+        )}
+
         <CardSurface className="p-0 sm:p-0 overflow-hidden shadow-lg border-border/50">
-          <div key={state.step} className="animate-fade-in p-6 sm:p-8">
+          <div key={state.step} ref={stepContentRef} tabIndex={-1} className="animate-fade-in p-6 sm:p-8 outline-none">
             {state.step === "options" && <BookingOptionSelection />}
             {state.step === "select" && (
               <TicketSelection
@@ -546,7 +691,7 @@ function BookingFlowContent({
       </div>
 
       {state.step !== "confirmation" ? (
-        <div className="lg:col-span-5 xl:col-span-4 relative">
+        <div className="hidden lg:block lg:col-span-5 xl:col-span-4 relative">
           <CardSurface className="sticky top-28 p-6 shadow-xl border-border/60 bg-gradient-to-b from-card to-card/95 backdrop-blur-xl">
             <h3 className="mb-5 font-bold text-xl border-b border-border/40 pb-4">Booking Summary</h3>
 
@@ -590,6 +735,23 @@ function BookingFlowContent({
                 </div>
               )}
             </div>
+
+            {/* ── Cancellation policy badge ─────────────────────── */}
+            {tour.cancellationHours != null && tour.cancellationHours > 0 && (
+              <div className="flex items-start gap-2.5 border-b py-3">
+                <RotateCcw className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                <div className="text-sm">
+                  <p className="font-medium text-emerald-700">
+                    Free cancellation up to {tour.cancellationHours}h before
+                  </p>
+                  {tour.cancellationPolicy && (
+                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                      {tour.cancellationPolicy}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {state.participants.length > 0 && (
               <div className="border-b py-4">
@@ -651,9 +813,14 @@ function BookingFlowContent({
                   <span>-{formatPrice(state.discount, state.currency)}</span>
                 </div>
               )}
-              {state.tax > 0 && (
+              {state.taxConfig.enabled && state.taxConfig.rate > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Tax</span>
+                  <span className="text-muted-foreground">
+                    Tax ({state.taxConfig.rate}%)
+                    {state.taxConfig.includeInPrice && (
+                      <span className="ml-1 text-[10px]">(incl.)</span>
+                    )}
+                  </span>
                   <span>{formatPrice(state.tax, state.currency)}</span>
                 </div>
               )}
@@ -661,6 +828,10 @@ function BookingFlowContent({
                 <span>Total</span>
                 <span className="text-foreground">{formatPrice(state.total, state.currency)}</span>
               </div>
+            </div>
+
+            <div className="pt-4">
+              <PromoCodeInput collapsed />
             </div>
 
             <div className="mt-6 rounded-lg border border-border/60 bg-secondary/20 p-4">
@@ -702,7 +873,26 @@ function BookingFlowContent({
               )}
             </div>
 
-            <div className="pt-6 mt-4 border-t border-border/40 text-center">
+            {/* ── Trust signals ───────────────────────────────── */}
+            <div className="mt-4 space-y-3 border-t border-border/40 pt-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Lock className="h-3.5 w-3.5 text-emerald-600" />
+                <span>256-bit encrypted checkout</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Secure payment by Stripe</span>
+              </div>
+              <div className="flex items-center gap-3 pt-1">
+                <span className="rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground">VISA</span>
+                <span className="rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground">MC</span>
+                <span className="rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground">AMEX</span>
+                <span className="rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground">GPAY</span>
+                <span className="rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground">APAY</span>
+              </div>
+            </div>
+
+            <div className="pt-4 mt-3 border-t border-border/40 text-center">
               <p className="text-xs text-muted-foreground">
                 Need help? Call us or{" "}
                 <a href={`/org/${organizationSlug}/contact`} className="text-primary font-medium hover:underline">
@@ -714,6 +904,9 @@ function BookingFlowContent({
         </div>
       ) : <div className="hidden lg:block lg:col-span-5 xl:col-span-4" />}
     </div>
+
+    <MobileCheckoutBar />
+    </>
   );
 }
 
