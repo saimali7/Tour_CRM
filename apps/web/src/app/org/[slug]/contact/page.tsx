@@ -5,10 +5,10 @@ import {
   getOrganizationBranding,
   getOrganizationBookingUrl,
 } from "@/lib/organization";
-import { MapPin, Mail, Phone, Clock, MessageSquare, ExternalLink } from "lucide-react";
+import { MapPin, Mail, Phone, Clock, MessageSquare, ExternalLink, ChevronDown } from "lucide-react";
 import { ContactForm } from "@/components/contact-form";
 import { BreadcrumbStructuredData, FAQStructuredData } from "@/components/structured-data";
-import { Breadcrumb, CardSurface, PageShell, Section, SectionHeader } from "@/components/layout";
+import { Breadcrumb, Section, SectionHeader, HeroSection } from "@/components/layout";
 import { Button } from "@tour/ui";
 
 interface PageProps {
@@ -69,135 +69,138 @@ export default async function ContactPage({ params }: PageProps) {
       />
       <FAQStructuredData items={faqs} />
 
-      <PageShell>
-        <Breadcrumb
-          items={[
-            { label: "Home", href: `/org/${slug}` },
-            { label: "Contact Us" },
-          ]}
-        />
-
-        <div className="mx-auto max-w-6xl">
-          <SectionHeader
-            align="center"
-            title="Contact Us"
-            subtitle="Have questions before booking or need help with an existing reservation? We’re here to help."
-          />
-          <div className="mb-6 flex flex-wrap justify-center gap-3">
-            <Button asChild variant="outline">
-              <Link href="/booking">Manage booking</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/private-tours">Private inquiry</Link>
-            </Button>
-          </div>
-
-          <Section spacing="compact" className="pt-2">
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-              <div className="space-y-4 lg:col-span-1">
-                {branding.email && (
-                  <CardSurface>
-                    <div className="flex items-start gap-3">
-                      <Mail className="mt-0.5 h-5 w-5 text-primary" />
-                      <div>
-                        <h3 className="font-semibold">Email Us</h3>
-                        <a href={`mailto:${branding.email}`} className="text-sm text-primary hover:underline">
-                          {branding.email}
-                        </a>
-                        <p className="mt-1 text-xs text-muted-foreground">We typically respond within 24 hours</p>
-                      </div>
-                    </div>
-                  </CardSurface>
-                )}
-
-                {branding.phone && (
-                  <CardSurface>
-                    <div className="flex items-start gap-3">
-                      <Phone className="mt-0.5 h-5 w-5 text-primary" />
-                      <div>
-                        <h3 className="font-semibold">Call Us</h3>
-                        <a href={`tel:${branding.phone}`} className="text-sm text-primary hover:underline">
-                          {branding.phone}
-                        </a>
-                        <p className="mt-1 text-xs text-muted-foreground">Available during business hours</p>
-                        <Link
-                          href={`tel:${branding.phone}`}
-                          className="mt-2 inline-flex min-h-11 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent"
-                        >
-                          One-tap call
-                        </Link>
-                      </div>
-                    </div>
-                  </CardSurface>
-                )}
-
-                {branding.address && (
-                  <CardSurface>
-                    <div className="flex items-start gap-3">
-                      <MapPin className="mt-0.5 h-5 w-5 text-primary" />
-                      <div>
-                        <h3 className="font-semibold">Visit Us</h3>
-                        <p className="text-sm text-muted-foreground">{branding.address}</p>
-                      </div>
-                    </div>
-                  </CardSurface>
-                )}
-
-                <CardSurface>
-                  <div className="flex items-start gap-3">
-                    <Clock className="mt-0.5 h-5 w-5 text-primary" />
-                    <div>
-                      <h3 className="font-semibold">Business Hours</h3>
-                      <p className="text-sm text-muted-foreground">Monday - Friday: 9:00 AM - 6:00 PM</p>
-                      <p className="text-sm text-muted-foreground">Saturday: 10:00 AM - 4:00 PM</p>
-                      <p className="text-sm text-muted-foreground">Sunday: Closed</p>
-                    </div>
-                  </div>
-                </CardSurface>
-
-                {mapQuery && (
-                  <CardSurface>
-                    <h3 className="mb-3 text-sm font-semibold">Map Preview</h3>
-                    <a
-                      href={`https://maps.google.com/?q=${mapQuery}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                    >
-                      Open in Google Maps
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </CardSurface>
-                )}
-              </div>
-
-              <div className="lg:col-span-2">
-                <CardSurface className="p-8">
-                  <div className="mb-6 flex items-center gap-3">
-                    <MessageSquare className="h-6 w-6 text-primary" />
-                    <h2 className="text-2xl font-semibold">Send us a Message</h2>
-                  </div>
-                  <ContactForm organizationId={org.id} organizationName={branding.name} />
-                </CardSurface>
-              </div>
-            </div>
-          </Section>
-
-          <Section spacing="compact" className="pt-0">
-            <SectionHeader title="Frequently Asked Questions" subtitle="Quick answers before you book." />
-            <div className="space-y-3">
-              {faqs.map((faq) => (
-                <details key={faq.question} className="group rounded-lg border border-border bg-card p-4">
-                  <summary className="cursor-pointer list-none pr-6 text-sm font-medium marker:hidden">
-                    {faq.question}
-                  </summary>
-                  <p className="mt-2 text-sm text-muted-foreground">{faq.answer}</p>
-                </details>
-              ))}
-            </div>
-          </Section>
+      <HeroSection
+        eyebrow="Get in touch"
+        title="Contact Us"
+        subtitle="Have questions before booking or need help with an existing reservation? We're here to help."
+      >
+        <div className="flex flex-wrap gap-3">
+          <Button asChild className="rounded-full bg-white/95 text-stone-900 hover:bg-white px-6 h-11">
+            <Link href="/booking" className="inline-flex items-center gap-2">
+              Manage Booking
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-full border-white/30 text-white hover:bg-white/10 px-6 h-11">
+            <Link href="/private-tours">Private Inquiry</Link>
+          </Button>
         </div>
-      </PageShell>
+      </HeroSection>
+
+      {/* Contact info + form */}
+      <Section spacing="spacious">
+        <div className="mx-auto px-[var(--page-gutter)]" style={{ maxWidth: "var(--page-max-width, 1400px)" }}>
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-1">
+              {branding.email && (
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-sm)]">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                      <Mail className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Email Us</h3>
+                      <a href={`mailto:${branding.email}`} className="text-sm text-primary hover:underline">
+                        {branding.email}
+                      </a>
+                      <p className="mt-1 text-xs text-muted-foreground">We typically respond within 24 hours</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {branding.phone && (
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-sm)]">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                      <Phone className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Call Us</h3>
+                      <a href={`tel:${branding.phone}`} className="text-sm text-primary hover:underline">
+                        {branding.phone}
+                      </a>
+                      <p className="mt-1 text-xs text-muted-foreground">Available during business hours</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {branding.address && (
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-sm)]">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                      <MapPin className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Visit Us</h3>
+                      <p className="text-sm text-muted-foreground">{branding.address}</p>
+                      {mapQuery && (
+                        <a
+                          href={`https://maps.google.com/?q=${mapQuery}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          Open in Maps
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-sm)]">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <Clock className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Business Hours</h3>
+                    <p className="text-sm text-muted-foreground">Monday - Friday: 9:00 AM - 6:00 PM</p>
+                    <p className="text-sm text-muted-foreground">Saturday: 10:00 AM - 4:00 PM</p>
+                    <p className="text-sm text-muted-foreground">Sunday: Closed</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2">
+              <div className="rounded-2xl border border-border bg-card p-8 shadow-[var(--shadow-sm)]">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                  </div>
+                  <h2 className="text-title">Send us a Message</h2>
+                </div>
+                <ContactForm organizationId={org.id} organizationName={branding.name} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* FAQ */}
+      <Section spacing="spacious" variant="accent">
+        <div className="mx-auto px-[var(--page-gutter)]" style={{ maxWidth: "var(--page-max-width, 1400px)" }}>
+          <SectionHeader
+            eyebrow="FAQ"
+            title="Frequently Asked Questions"
+            subtitle="Quick answers before you book."
+          />
+          <div className="mt-8 divide-y divide-border rounded-2xl border border-border bg-card p-2 shadow-[var(--shadow-sm)]">
+            {faqs.map((faq) => (
+              <details key={faq.question} className="group px-6 py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-foreground hover:text-primary transition-colors">
+                  {faq.question}
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+                </summary>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{faq.answer}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </Section>
     </>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Mail, Phone, Globe, MapPin, ShieldCheck, CalendarCheck2, BadgeCheck, ArrowRight } from "lucide-react";
+import { Mail, Phone, Globe, MapPin, ArrowRight } from "lucide-react";
 import { Button } from "@tour/ui";
 import { CATEGORY_CONFIGS } from "@/lib/category-config";
 
@@ -20,151 +20,184 @@ export function Footer({
   phone,
   website,
   address,
-  timezone,
-  currency,
   socialLinks,
 }: FooterProps) {
   const currentYear = new Date().getFullYear();
   const socialEntries = Object.entries(socialLinks);
 
   return (
-    <footer className="border-t border-border bg-surface-soft">
-      <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mb-12 rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/20 p-8 sm:p-10 shadow-sm relative overflow-hidden">
-          {/* Decorative background element */}
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+    <footer>
+      {/* ========== PRE-FOOTER CTA ========== */}
+      <section className="relative overflow-hidden bg-stone-950 py-20 sm:py-28">
+        {/* Decorative gradient orbs */}
+        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -right-32 -bottom-32 h-96 w-96 rounded-full bg-amber-500/8 blur-3xl" />
 
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between relative z-10">
-            <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Plan your next adventure</p>
-              <h3 className="mt-1 font-display text-2xl">Ready to lock your dates?</h3>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Check live availability, secure your seats, and get instant booking confirmation with {orgName}.
-              </p>
-            </div>
-            <Button asChild className="h-12 bg-foreground text-background hover:bg-foreground/90 sm:min-w-[240px] shadow-md transition-all hover:scale-[1.02] active:scale-95 text-base">
-              <Link href="/#tours" className="inline-flex items-center justify-center gap-2">
-                Check Availability
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        <div
+          className="relative z-10 mx-auto px-[var(--page-gutter)] text-center"
+          style={{ maxWidth: "var(--page-max-width, 1400px)" }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-4">
+            Start planning
+          </p>
+          <h2 className="text-display text-white">
+            Your Dubai Adventure Starts Here
+          </h2>
+          <p className="mx-auto mt-4 max-w-lg text-base text-stone-400 leading-relaxed">
+            Browse our curated collection of tours and experiences. Instant confirmation, best price guaranteed.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Button
+              asChild
+              className="h-13 rounded-full bg-primary px-8 text-base font-semibold text-white shadow-[var(--shadow-glow)] transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-95"
+            >
+              <Link href="/#tours" className="inline-flex items-center gap-2">
+                Browse All Tours
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-          </div>
-          <div className="mt-5 grid grid-cols-1 gap-3 text-xs text-muted-foreground sm:grid-cols-3">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/70 px-3 py-2">
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              Secure Stripe checkout
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/70 px-3 py-2">
-              <CalendarCheck2 className="h-4 w-4 text-amber-700" />
-              Instant booking confirmation
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/70 px-3 py-2">
-              <BadgeCheck className="h-4 w-4 text-sky-700" />
-              Local experts, verified tours
-            </div>
+            <Button
+              asChild
+              variant="outline"
+              className="h-13 rounded-full border-stone-700 px-8 text-base text-stone-300 hover:bg-stone-800 hover:text-white"
+            >
+              <Link href="/contact">Contact Us</Link>
+            </Button>
           </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-          <div className="md:col-span-1">
-            <h3 className="mb-3 font-display text-xl">{orgName}</h3>
-            <p className="mb-4 max-w-md text-sm text-muted-foreground">
-              Exceptional local tours and private experiences with clear pricing,
-              instant confirmations, and seamless support before your trip.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {currency} · {timezone}
-            </p>
-          </div>
-
-          <div>
-            <h4 className="mb-3 font-semibold">Experiences</h4>
-            <nav className="flex flex-col space-y-2">
-              {CATEGORY_CONFIGS.map((cat) => (
-                <Link
-                  key={cat.slug}
-                  href={`/experiences/${cat.slug}`}
-                  className="text-sm text-muted-foreground transition-colors hover:text-primary"
-                >
-                  {cat.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-
-          <div>
-            <h4 className="mb-3 font-semibold">Quick Links</h4>
-            <nav className="flex flex-col space-y-2">
-              <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-primary">All Tours</Link>
-              <Link href="/trip-inspiration" className="text-sm text-muted-foreground transition-colors hover:text-primary">Trip Inspiration</Link>
-              <Link href="/booking" className="text-sm text-muted-foreground transition-colors hover:text-primary">Manage Booking</Link>
-              <Link href="/about" className="text-sm text-muted-foreground transition-colors hover:text-primary">About Us</Link>
-              <Link href="/contact" className="text-sm text-muted-foreground transition-colors hover:text-primary">Contact</Link>
-              <Link href="/terms" className="text-sm text-muted-foreground transition-colors hover:text-primary">Terms & Conditions</Link>
-              <Link href="/privacy" className="text-sm text-muted-foreground transition-colors hover:text-primary">Privacy Policy</Link>
-            </nav>
-          </div>
-
-          <div>
-            <h4 className="mb-3 font-semibold">Contact Us</h4>
-            <div className="flex flex-col space-y-3">
-              {email && (
-                <a
-                  href={`mailto:${email}`}
-                  className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
-                >
-                  <Mail className="h-4 w-4 flex-shrink-0" />
-                  <span>{email}</span>
-                </a>
-              )}
-              {phone && (
-                <a
-                  href={`tel:${phone}`}
-                  className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
-                >
-                  <Phone className="h-4 w-4 flex-shrink-0" />
-                  <span>{phone}</span>
-                </a>
-              )}
-              {website && (
-                <a
-                  href={website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
-                >
-                  <Globe className="h-4 w-4 flex-shrink-0" />
-                  <span>{website}</span>
-                </a>
-              )}
-              {address && (
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                  <span>{address}</span>
+      {/* ========== FOOTER PROPER ========== */}
+      <div className="bg-stone-950 border-t border-stone-800/50">
+        <div
+          className="mx-auto px-[var(--page-gutter)] py-16"
+          style={{ maxWidth: "var(--page-max-width, 1400px)" }}
+        >
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
+            {/* Brand */}
+            <div className="md:col-span-1">
+              <h3 className="font-display text-xl font-bold text-white">{orgName}</h3>
+              <p className="mt-3 max-w-xs text-sm text-stone-400 leading-relaxed">
+                Exceptional local tours and private experiences with clear pricing,
+                instant confirmations, and seamless support.
+              </p>
+              {socialEntries.length > 0 && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {socialEntries.map(([name, href]) => (
+                    <a
+                      key={name}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full border border-stone-800 px-3 py-1.5 text-xs capitalize text-stone-400 transition-colors hover:border-stone-600 hover:text-stone-200"
+                    >
+                      {name}
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
-            {socialEntries.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {socialEntries.map(([name, href]) => (
+
+            {/* Experiences */}
+            <div>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Experiences
+              </h4>
+              <nav className="flex flex-col space-y-2.5">
+                {CATEGORY_CONFIGS.map((cat) => (
+                  <Link
+                    key={cat.slug}
+                    href={`/experiences/${cat.slug}`}
+                    className="text-sm text-stone-400 transition-colors hover:text-white"
+                  >
+                    {cat.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Quick Links
+              </h4>
+              <nav className="flex flex-col space-y-2.5">
+                <Link href="/" className="text-sm text-stone-400 transition-colors hover:text-white">All Tours</Link>
+                <Link href="/trip-inspiration" className="text-sm text-stone-400 transition-colors hover:text-white">Trip Inspiration</Link>
+                <Link href="/booking" className="text-sm text-stone-400 transition-colors hover:text-white">Manage Booking</Link>
+                <Link href="/about" className="text-sm text-stone-400 transition-colors hover:text-white">About Us</Link>
+                <Link href="/contact" className="text-sm text-stone-400 transition-colors hover:text-white">Contact</Link>
+                <Link href="/terms" className="text-sm text-stone-400 transition-colors hover:text-white">Terms & Conditions</Link>
+                <Link href="/privacy" className="text-sm text-stone-400 transition-colors hover:text-white">Privacy Policy</Link>
+              </nav>
+            </div>
+
+            {/* Contact */}
+            <div>
+              <h4 className="mb-4 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                Contact Us
+              </h4>
+              <div className="flex flex-col space-y-3">
+                {email && (
                   <a
-                    key={name}
-                    href={href}
+                    href={`mailto:${email}`}
+                    className="flex items-center gap-2.5 text-sm text-stone-400 transition-colors hover:text-white"
+                  >
+                    <Mail className="h-4 w-4 flex-shrink-0 text-stone-600" />
+                    {email}
+                  </a>
+                )}
+                {phone && (
+                  <a
+                    href={`tel:${phone}`}
+                    className="flex items-center gap-2.5 text-sm text-stone-400 transition-colors hover:text-white"
+                  >
+                    <Phone className="h-4 w-4 flex-shrink-0 text-stone-600" />
+                    {phone}
+                  </a>
+                )}
+                {website && (
+                  <a
+                    href={website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-full border border-border bg-background px-2.5 py-1 text-xs capitalize text-muted-foreground transition-colors hover:text-foreground"
+                    className="flex items-center gap-2.5 text-sm text-stone-400 transition-colors hover:text-white"
                   >
-                    {name}
+                    <Globe className="h-4 w-4 flex-shrink-0 text-stone-600" />
+                    {website}
                   </a>
-                ))}
+                )}
+                {address && (
+                  <div className="flex items-start gap-2.5 text-sm text-stone-400">
+                    <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-stone-600" />
+                    {address}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t pt-6 sm:flex-row">
-          <p className="text-xs text-muted-foreground">© {currentYear} {orgName}. All rights reserved.</p>
-          <p className="text-xs text-muted-foreground">Built for travelers who value great experiences.</p>
+          {/* Bottom bar */}
+          <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-stone-800/50 pt-8 sm:flex-row">
+            <p className="text-xs text-stone-500">
+              &copy; {currentYear} {orgName}. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4">
+              <svg width="38" height="24" viewBox="0 0 38 24" fill="none" className="text-stone-600" aria-label="Visa">
+                <rect width="38" height="24" rx="4" fill="currentColor" opacity="0.15" />
+                <text x="19" y="15" textAnchor="middle" fill="currentColor" fontSize="8" fontWeight="bold">VISA</text>
+              </svg>
+              <svg width="38" height="24" viewBox="0 0 38 24" fill="none" className="text-stone-600" aria-label="Mastercard">
+                <rect width="38" height="24" rx="4" fill="currentColor" opacity="0.15" />
+                <circle cx="15" cy="12" r="6" fill="currentColor" opacity="0.3" />
+                <circle cx="23" cy="12" r="6" fill="currentColor" opacity="0.3" />
+              </svg>
+              <svg width="38" height="24" viewBox="0 0 38 24" fill="none" className="text-stone-600" aria-label="Apple Pay">
+                <rect width="38" height="24" rx="4" fill="currentColor" opacity="0.15" />
+                <text x="19" y="15" textAnchor="middle" fill="currentColor" fontSize="6" fontWeight="bold">Pay</text>
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
     </footer>

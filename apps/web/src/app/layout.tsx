@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Outfit, JetBrains_Mono } from "next/font/google";
+import { Inter, Playfair_Display, JetBrains_Mono } from "next/font/google";
 import "@tour/ui/globals.css";
 import { Providers } from "./providers";
 
@@ -9,9 +9,10 @@ const inter = Inter({
   display: "swap",
 });
 
-const outfit = Outfit({
+const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-display-custom",
+  weight: ["700", "900"],
   display: "swap",
 });
 
@@ -44,7 +45,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#B45A2A",
+  themeColor: "#C2410C",
 };
 
 export default function RootLayout({
@@ -55,7 +56,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${outfit.variable} ${jetBrainsMono.variable} font-sans antialiased`}
+        className={`${inter.variable} ${playfair.variable} ${jetBrainsMono.variable} font-sans antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

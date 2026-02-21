@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
     // We run typecheck separately
     ignoreBuildErrors: process.env.CI === "true",
   },
+  experimental: {
+    viewTransition: true,
+  },
   poweredByHeader: false,
   compress: true,
   images: {

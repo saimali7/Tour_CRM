@@ -16,8 +16,11 @@ export function PageShell({
   as: Component = "div",
 }: PageShellProps) {
   return (
-    <Component className={`mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8 ${className ?? ""}`}>
-      <div className={`${narrow ? "mx-auto max-w-3xl " : ""}${contentClassName ?? ""}`}>
+    <Component
+      className={`mx-auto w-full px-[var(--page-gutter)] py-10 ${className ?? ""}`}
+      style={{ maxWidth: "var(--page-max-width, 1400px)" }}
+    >
+      <div className={`${narrow ? "mx-auto" : ""}${contentClassName ?? ""}`} style={narrow ? { maxWidth: "var(--content-width, 720px)" } : undefined}>
         {children}
       </div>
     </Component>

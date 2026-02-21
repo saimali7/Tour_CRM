@@ -39,9 +39,9 @@ function useCountUp(target: number, durationMs = 900): number {
 
 function formatGuests(totalGuests: number): string {
   if (totalGuests >= 1000) {
-    return `${(totalGuests / 1000).toFixed(1).replace(".0", "")}k+ guests`;
+    return `${(totalGuests / 1000).toFixed(1).replace(".0", "")}k+`;
   }
-  return `${totalGuests}+ guests`;
+  return `${totalGuests}+`;
 }
 
 export function TrustBar({
@@ -55,45 +55,51 @@ export function TrustBar({
   const yearsDisplay = useCountUp(Math.max(yearsOperating, 0));
   const ratingText = useMemo(() => averageRating.toFixed(1), [averageRating]);
 
+  const stats = [
+    {
+      icon: Star,
+      iconClass: "fill-amber-400 text-amber-400",
+      bgClass: "bg-amber-50",
+      value: `${ratingText} / 5.0`,
+      label: "Average Rating",
+    },
+    {
+      icon: Users,
+      iconClass: "text-sky-600",
+      bgClass: "bg-sky-50",
+      value: `${formatGuests(guestsDisplay)} guests`,
+      label: "Happy Travelers",
+    },
+    {
+      icon: CalendarClock,
+      iconClass: "text-emerald-600",
+      bgClass: "bg-emerald-50",
+      value: `${bookingsDisplay}`,
+      label: "Booked This Week",
+    },
+    {
+      icon: ShieldCheck,
+      iconClass: "text-primary",
+      bgClass: "bg-primary/10",
+      value: `${yearsDisplay}+ Years`,
+      label: "Verified Operator",
+    },
+  ];
+
   return (
-    <div className="mx-auto max-w-[1560px] px-4 sm:px-6 lg:px-8 relative z-20 -mt-8 sm:-mt-12">
-      <div className="grid gap-4 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl p-5 sm:p-6 shadow-lg sm:grid-cols-2 lg:grid-cols-4 transition-all hover:shadow-xl">
-        <div className="flex items-center justify-center sm:justify-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100/50">
-            <Star className="h-5 w-5 fill-amber-500 text-amber-500" />
+    <div className="relative z-20 -mt-10 sm:-mt-14 mx-auto px-[var(--page-gutter)]" style={{ maxWidth: "var(--page-max-width, 1400px)" }}>
+      <div className="grid gap-4 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl p-6 sm:p-8 shadow-[var(--shadow-lg)] sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map(({ icon: Icon, iconClass, bgClass, value, label }) => (
+          <div key={label} className="flex items-center justify-center sm:justify-start gap-3">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${bgClass}`}>
+              <Icon className={`h-5 w-5 ${iconClass}`} />
+            </div>
+            <div>
+              <p className="font-bold text-foreground leading-none mb-1 tabular-nums">{value}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-[0.1em]">{label}</p>
+            </div>
           </div>
-          <div>
-            <p className="font-semibold text-foreground leading-none mb-1">{ratingText} / 5.0</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Average Rating</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center sm:justify-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100/50">
-            <Users className="h-5 w-5 text-sky-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-foreground leading-none mb-1">{formatGuests(guestsDisplay)}</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Happy Travelers</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center sm:justify-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100/50">
-            <CalendarClock className="h-5 w-5 text-emerald-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-foreground leading-none mb-1">{bookingsDisplay}</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Booked This Week</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-center sm:justify-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100/50">
-            <ShieldCheck className="h-5 w-5 text-indigo-600" />
-          </div>
-          <div>
-            <p className="font-semibold text-foreground leading-none mb-1">{yearsDisplay}+ Years</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">Verified Operator</p>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );

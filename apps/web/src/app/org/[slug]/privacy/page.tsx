@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireOrganization, getOrganizationBranding } from "@/lib/organization";
-import { Breadcrumb, CardSurface, PageShell } from "@/components/layout";
+import { Breadcrumb, Section } from "@/components/layout";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -79,68 +79,70 @@ export default async function PrivacyPage({ params }: PageProps) {
   }).format(new Date());
 
   return (
-    <PageShell>
-      <Breadcrumb
-        items={[
-          { label: "Tours", href: `/org/${slug}` },
-          { label: "Privacy Policy" },
-        ]}
-      />
+    <Section spacing="spacious">
+      <div className="mx-auto px-[var(--page-gutter)]" style={{ maxWidth: "var(--page-max-width, 1400px)" }}>
+        <Breadcrumb
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Privacy Policy" },
+          ]}
+        />
 
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-24 rounded-lg border border-border bg-card p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">On this page</p>
-            <nav className="mt-3 space-y-2">
+        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-24 rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-sm)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">On this page</p>
+              <nav className="mt-3 space-y-2">
+                {sections.map((section) => (
+                  <a key={section.id} href={`#${section.id}`} className="block text-sm text-muted-foreground hover:text-primary transition-colors">
+                    {section.title}
+                  </a>
+                ))}
+              </nav>
+            </div>
+          </aside>
+
+          <div className="mx-auto w-full" style={{ maxWidth: "var(--content-width, 720px)" }}>
+            <h1 className="text-display mb-3">Privacy Policy</h1>
+            <p className="mb-10 text-sm text-muted-foreground">Last updated: {lastUpdated}</p>
+
+            <div className="space-y-8">
               {sections.map((section) => (
-                <a key={section.id} href={`#${section.id}`} className="block text-sm text-muted-foreground hover:text-primary">
-                  {section.title}
-                </a>
+                <div key={section.id} id={section.id} className="scroll-mt-24 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-sm)]">
+                  <h2 className="mb-3 text-heading font-bold">{section.title}</h2>
+                  {section.body ? <p className="text-muted-foreground leading-relaxed">{section.body}</p> : null}
+                  {section.bullets ? (
+                    <ul className="list-disc space-y-2 pl-6 text-muted-foreground">
+                      {section.bullets.map((bullet) => (
+                        <li key={bullet}>{bullet}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               ))}
-            </nav>
-          </div>
-        </aside>
 
-        <div className="mx-auto w-full max-w-3xl">
-          <h1 className="mb-3 text-4xl font-bold">Privacy Policy</h1>
-          <p className="mb-8 text-sm text-muted-foreground">Last updated: {lastUpdated}</p>
-
-          <div className="space-y-6">
-            {sections.map((section) => (
-              <CardSurface key={section.id} id={section.id} className="scroll-mt-24">
-                <h2 className="mb-3 text-2xl font-semibold">{section.title}</h2>
-                {section.body ? <p className="text-muted-foreground">{section.body}</p> : null}
-                {section.bullets ? (
-                  <ul className="list-disc space-y-2 pl-6 text-muted-foreground">
-                    {section.bullets.map((bullet) => (
-                      <li key={bullet}>{bullet}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </CardSurface>
-            ))}
-
-            <CardSurface id="contact" className="scroll-mt-24">
-              <h2 className="mb-3 text-2xl font-semibold">Contact</h2>
-              <p className="text-muted-foreground">
-                Questions about this policy can be sent to{" "}
-                <a href={`mailto:${branding.email}`} className="text-primary hover:underline">
-                  {branding.email}
-                </a>
-                {branding.phone ? (
-                  <>
-                    {" "}or by phone at{" "}
-                    <a href={`tel:${branding.phone}`} className="text-primary hover:underline">
-                      {branding.phone}
-                    </a>
-                  </>
-                ) : null}
-                .
-              </p>
-            </CardSurface>
+              <div id="contact" className="scroll-mt-24 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-sm)]">
+                <h2 className="mb-3 text-heading font-bold">Contact</h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  Questions about this policy can be sent to{" "}
+                  <a href={`mailto:${branding.email}`} className="text-primary hover:underline">
+                    {branding.email}
+                  </a>
+                  {branding.phone ? (
+                    <>
+                      {" "}or by phone at{" "}
+                      <a href={`tel:${branding.phone}`} className="text-primary hover:underline">
+                        {branding.phone}
+                      </a>
+                    </>
+                  ) : null}
+                  .
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </PageShell>
+    </Section>
   );
 }
