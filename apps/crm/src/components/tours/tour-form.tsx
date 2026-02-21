@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
-import { Loader2, X, Plus } from "lucide-react";
+import { Loader2, X, Plus, Clapperboard, Play } from "lucide-react";
 import { SingleImageUploader, ImageUploader } from "@/components/uploads/image-uploader";
 import { DurationInput } from "@/components/ui/duration-input";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ export interface TourFormData {
   tags: string[];
   coverImageUrl: string | null;
   images: string[];
+  shortVideos: string[];
   includes: string[];
   excludes: string[];
   requirements: string[];
@@ -90,6 +91,7 @@ export function TourForm({
     tags: [],
     coverImageUrl: null,
     images: [],
+    shortVideos: [],
     includes: [],
     excludes: [],
     requirements: [],
@@ -111,6 +113,7 @@ export function TourForm({
     // Ensure arrays are properly initialized
     tags: initialData?.tags ?? [],
     images: initialData?.images ?? [],
+    shortVideos: initialData?.shortVideos ?? [],
     includes: initialData?.includes ?? [],
     excludes: initialData?.excludes ?? [],
     requirements: initialData?.requirements ?? [],
@@ -121,6 +124,7 @@ export function TourForm({
   const [requirementInput, setRequirementInput] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [showCustomCategory, setShowCustomCategory] = useState(false);
+  const [shortVideoInput, setShortVideoInput] = useState("");
 
   const utils = trpc.useUtils();
 
@@ -173,6 +177,21 @@ export function TourForm({
       tags: formData.tags.length > 0 ? formData.tags : undefined,
       coverImageUrl: formData.coverImageUrl || undefined,
       images: formData.images.length > 0 ? formData.images : undefined,
+      media:
+        formData.images.length > 0 || formData.shortVideos.length > 0
+          ? [
+              ...formData.images.map((url, index) => ({
+                type: "image" as const,
+                url,
+                sortOrder: index,
+              })),
+              ...formData.shortVideos.map((url, index) => ({
+                type: "short" as const,
+                url,
+                sortOrder: formData.images.length + index,
+              })),
+            ]
+          : undefined,
       includes: formData.includes.length > 0 ? formData.includes : undefined,
       excludes: formData.excludes.length > 0 ? formData.excludes : undefined,
       requirements: formData.requirements.length > 0 ? formData.requirements : undefined,
@@ -234,6 +253,31 @@ export function TourForm({
     setFormData((prev) => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index),
+    }));
+  };
+
+  const addShortVideo = () => {
+    const url = shortVideoInput.trim();
+    if (!url) {
+      return;
+    }
+
+    if (formData.shortVideos.includes(url)) {
+      setShortVideoInput("");
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      shortVideos: [...prev.shortVideos, url],
+    }));
+    setShortVideoInput("");
+  };
+
+  const removeShortVideo = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      shortVideos: prev.shortVideos.filter((_, i) => i !== index),
     }));
   };
 
@@ -420,9 +464,9 @@ export function TourForm({
         </div>
       </div>
 
-      {/* Images */}
+      {/* Media */}
       <div className="bg-card rounded-lg border border-border p-6 space-y-6">
-        <h2 className="text-lg font-semibold text-foreground">Images</h2>
+        <h2 className="text-lg font-semibold text-foreground">Media Gallery</h2>
 
         <SingleImageUploader
           value={formData.coverImageUrl}
@@ -434,7 +478,7 @@ export function TourForm({
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            Gallery Images
+            Gallery Photos
           </label>
           <ImageUploader
             value={formData.images}
@@ -447,6 +491,104 @@ export function TourForm({
             The first image will be used as the cover if no cover image is set
           </p>
         </div>
+
+        <div className="space-y-3 border-t border-border pt-5">
+          <label className="block text-sm font-medium text-foreground">
+            Vertical Shorts
+            <span className="ml-2 font-normal text-muted-foreground">Direct video URLs</span>
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={shortVideoInput}
+              onChange={(e) => setShortVideoInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addShortVideo();
+                }
+              }}
+              className="flex-1 px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+              placeholder="https://cdn.example.com/shorts/teaser.mp4"
+            />
+            <button
+              type="button"
+              onClick={addShortVideo}
+              className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Use direct MP4/WebM links. Vertical (9:16) clips look best in the storefront.
+          </p>
+
+          {formData.shortVideos.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {formData.shortVideos.map((url, index) => (
+                <div key={`${url}-${index}`} className="relative rounded-xl overflow-hidden border border-border bg-black aspect-[9/16] group">
+                  <video
+                    src={url}
+                    className="h-full w-full object-cover"
+                    muted
+                    playsInline
+                    loop
+                    autoPlay
+                    preload="metadata"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeShortVideo(index)}
+                    className="absolute top-2 right-2 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`Remove short video ${index + 1}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white">
+                    <Clapperboard className="h-3 w-3" />
+                    Short
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {(formData.coverImageUrl || formData.images.length > 0 || formData.shortVideos.length > 0) && (
+          <div className="space-y-3 border-t border-border pt-5">
+            <label className="block text-sm font-medium text-foreground">Preview</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {formData.coverImageUrl && (
+                <div className="relative rounded-xl overflow-hidden border border-border bg-muted aspect-[4/3]">
+                  <img src={formData.coverImageUrl} alt="Cover preview" className="h-full w-full object-cover" />
+                  <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white">Cover</span>
+                </div>
+              )}
+              {formData.images.map((url, index) => (
+                <div key={`${url}-${index}`} className="rounded-xl overflow-hidden border border-border bg-muted aspect-[4/3]">
+                  <img src={url} alt={`Gallery ${index + 1}`} className="h-full w-full object-cover" />
+                </div>
+              ))}
+              {formData.shortVideos.map((url, index) => (
+                <div key={`${url}-preview-${index}`} className="relative rounded-xl overflow-hidden border border-border bg-black aspect-[9/16]">
+                  <video
+                    src={url}
+                    className="h-full w-full object-cover"
+                    muted
+                    playsInline
+                    loop
+                    autoPlay
+                    preload="metadata"
+                  />
+                  <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white">
+                    <Play className="h-3 w-3" />
+                    Short
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Pricing & Capacity */}

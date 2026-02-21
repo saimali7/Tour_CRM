@@ -181,6 +181,15 @@ export default function EditTourPage() {
           return (aOption?.sortOrder ?? 0) - (bOption?.sortOrder ?? 0);
         });
 
+    const mediaItems = (tour.media ?? []) as Array<{
+      type?: string;
+      url?: string;
+    }>;
+    const shortVideos = mediaItems
+      .filter((item) => item.type === "short" && typeof item.url === "string")
+      .map((item) => item.url!.trim())
+      .filter(Boolean);
+
     return {
       name: tour.name ?? "",
       category: tour.category ?? "",
@@ -195,6 +204,7 @@ export default function EditTourPage() {
       requirements: tour.requirements ?? [],
       coverImageUrl: tour.coverImageUrl ?? null,
       images: tour.images ?? [],
+      shortVideos,
       tags: tour.tags ?? [],
       slug: tour.slug ?? "",
       isPublic: tour.isPublic ?? false,

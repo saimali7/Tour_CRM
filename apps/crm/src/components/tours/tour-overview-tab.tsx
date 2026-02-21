@@ -1,6 +1,19 @@
 "use client";
 
-import { Clock, Users, DollarSign, MapPin, Calendar, Check, X, Star, Package } from "lucide-react";
+import {
+  Clock,
+  Users,
+  DollarSign,
+  MapPin,
+  Calendar,
+  Check,
+  X,
+  Star,
+  Package,
+  Clapperboard,
+  Play,
+  Image as ImageIcon,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 interface TourOverviewTabProps {
@@ -21,6 +34,14 @@ interface TourOverviewTabProps {
     meetingPointDetails: string | null;
     includes: string[] | null;
     excludes: string[] | null;
+    coverImageUrl: string | null;
+    images: string[] | null;
+    media: Array<{
+      type: "image" | "short";
+      url: string;
+      thumbnailUrl?: string | null;
+      title?: string | null;
+    }> | null;
     productId?: string | null;
   };
 }
@@ -29,6 +50,16 @@ export function TourOverviewTab({ tour }: TourOverviewTabProps) {
   // Fetch tour ratings from reviews
   const { data: tourRatings } = trpc.review.tourRatings.useQuery();
   const thisTourRating = tourRatings?.find((r) => r.tourId === tour.id);
+
+  const mediaItems = (tour.media && tour.media.length > 0
+    ? tour.media
+    : [
+        ...(tour.coverImageUrl ? [{ type: "image" as const, url: tour.coverImageUrl }] : []),
+        ...((tour.images ?? []).map((url) => ({ type: "image" as const, url })) ?? []),
+      ]
+  ).filter((item) => item?.url);
+  const shortCount = mediaItems.filter((item) => item.type === "short").length;
+  const imageCount = mediaItems.filter((item) => item.type === "image").length;
 
   return (
     <div className="space-y-6">
@@ -125,6 +156,63 @@ export function TourOverviewTab({ tour }: TourOverviewTabProps) {
 
       {/* Description */}
       <div className="bg-card rounded-lg border border-border p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Media Gallery</h2>
+          {mediaItems.length > 0 && (
+            <div className="inline-flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <ImageIcon className="h-3.5 w-3.5" />
+                {imageCount} photo{imageCount === 1 ? "" : "s"}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Clapperboard className="h-3.5 w-3.5" />
+                {shortCount} short{shortCount === 1 ? "" : "s"}
+              </span>
+            </div>
+          )}
+        </div>
+        {mediaItems.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            {mediaItems.slice(0, 8).map((item, index) => (
+              <div
+                key={`${item.type}-${item.url}-${index}`}
+                className={`relative overflow-hidden rounded-xl border border-border ${
+                  item.type === "short" ? "aspect-[9/16] bg-black" : "aspect-[4/3] bg-muted"
+                }`}
+              >
+                {item.type === "short" ? (
+                  <>
+                    <video
+                      src={item.url}
+                      className="h-full w-full object-cover"
+                      muted
+                      playsInline
+                      loop
+                      autoPlay
+                      preload="metadata"
+                    />
+                    <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white">
+                      <Play className="h-3 w-3" />
+                      Short
+                    </span>
+                  </>
+                ) : (
+                  <img
+                    src={item.url}
+                    alt={`${tour.name} media ${index + 1}`}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mb-6 text-sm text-muted-foreground italic">
+            No media uploaded yet
+          </p>
+        )}
+
         <h2 className="text-lg font-semibold text-foreground mb-4">Description</h2>
         {tour.shortDescription && (
           <p className="text-muted-foreground mb-4 font-medium">{tour.shortDescription}</p>

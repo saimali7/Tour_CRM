@@ -19,6 +19,7 @@ interface TourDetailsTabProps {
     tags: string[] | null;
     coverImageUrl: string | null;
     images: string[] | null;
+    media: Array<{ type: "image" | "short"; url: string }> | null;
     includes: string[] | null;
     excludes: string[] | null;
     requirements: string[] | null;
@@ -39,6 +40,10 @@ interface TourDetailsTabProps {
 export function TourDetailsTab({ tourId, tour, onSuccess }: TourDetailsTabProps) {
   // Convert tour data to TourFormData format
   const initialData: Partial<TourFormData> = {
+    shortVideos:
+      (tour.media ?? [])
+        .filter((item) => item.type === "short" && item.url)
+        .map((item) => item.url) ?? [],
     name: tour.name,
     slug: tour.slug ?? "",
     description: tour.description ?? "",

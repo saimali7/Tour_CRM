@@ -48,6 +48,7 @@ export interface TourFormState {
   requirements: string[];
   coverImageUrl: string | null;
   images: string[];
+  shortVideos: string[];
   tags: string[];
 
   // Settings
@@ -115,6 +116,7 @@ const DEFAULT_FORM_STATE: TourFormState = {
   requirements: [],
   coverImageUrl: null,
   images: [],
+  shortVideos: [],
   tags: [],
 
   // Settings
@@ -336,7 +338,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
     ...DEFAULT_FORM_STATE,
     ...initialData,
   });
-  const [touchedTabs, setTouchedTabs] = useState<Set<TabId>>(new Set(["essentials"]));
+  const [_touchedTabs, setTouchedTabs] = useState<Set<TabId>>(new Set(["essentials"]));
   const [showMobileActions, setShowMobileActions] = useState(false);
 
   const utils = trpc.useUtils();
@@ -409,6 +411,7 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
       formState.description ||
       formState.includes.length > 0 ||
       formState.images.length > 0 ||
+      formState.shortVideos.length > 0 ||
       formState.coverImageUrl
     );
 
@@ -505,6 +508,21 @@ export function TourCreator({ mode = "create", tourId, initialData }: TourCreato
           tags: formState.tags.length > 0 ? formState.tags : undefined,
           coverImageUrl: formState.coverImageUrl || undefined,
           images: formState.images.length > 0 ? formState.images : undefined,
+          media:
+            formState.images.length > 0 || formState.shortVideos.length > 0
+              ? [
+                  ...formState.images.map((url, index) => ({
+                    type: "image" as const,
+                    url,
+                    sortOrder: index,
+                  })),
+                  ...formState.shortVideos.map((url, index) => ({
+                    type: "short" as const,
+                    url,
+                    sortOrder: formState.images.length + index,
+                  })),
+                ]
+              : undefined,
           includes: formState.includes.length > 0 ? formState.includes : undefined,
           excludes: formState.excludes.length > 0 ? formState.excludes : undefined,
           requirements: formState.requirements.length > 0 ? formState.requirements : undefined,

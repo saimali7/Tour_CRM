@@ -9,24 +9,20 @@ import {
   DollarSign,
   MapPin,
   Car,
-  Calendar,
   Tag,
   Image as ImageIcon,
   Eye,
   Edit,
-  Plus,
   AlertCircle,
   ExternalLink,
   CheckCircle,
   Globe,
-  FileText,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { TourStatusBadge } from "@/components/ui/status-badge";
 import {
   ContextPanelSection,
-  ContextPanelRow,
   ContextPanelSkeleton,
   ContextPanelEmpty,
 } from "@/components/layout/context-panel";
@@ -270,14 +266,29 @@ export function TourPreview({ tourId }: TourPreviewProps) {
       )}
 
       {/* Media Count */}
-      {tour.images && tour.images.length > 0 && (
+      {(() => {
+        const mediaItems = (tour.media as Array<{ type?: string; url?: string }> | null | undefined) ?? [];
+        const shortCount = mediaItems.filter((item) => item?.type === "short" && item.url).length;
+        const imageCount = mediaItems.length > 0
+          ? mediaItems.filter((item) => item?.type === "image" && item.url).length
+          : (tour.images?.length ?? 0);
+
+        if (imageCount === 0 && shortCount === 0) {
+          return null;
+        }
+
+        return (
         <ContextPanelSection>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <ImageIcon className="h-4 w-4" />
-            <span>{tour.images.length} image{tour.images.length !== 1 ? "s" : ""}</span>
+            <span>
+              {imageCount} image{imageCount !== 1 ? "s" : ""}
+              {shortCount > 0 ? ` • ${shortCount} short${shortCount !== 1 ? "s" : ""}` : ""}
+            </span>
           </div>
         </ContextPanelSection>
-      )}
+        );
+      })()}
     </>
   );
 }

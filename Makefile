@@ -5,7 +5,7 @@
 .PHONY: help install dev build lint typecheck format clean
 .PHONY: docker-up docker-down docker-logs docker-ps docker-clean
 .PHONY: db-generate db-push db-studio db-seed
-.PHONY: setup check deploy pre-deploy
+.PHONY: setup check deploy pre-deploy s3-init
 
 # Default target
 .DEFAULT_GOAL := help
@@ -54,6 +54,7 @@ setup: ## Initial project setup (install deps, start docker, setup env)
 		echo "$(YELLOW)Please update .env.local with your credentials$(RESET)"; \
 	fi
 	@make docker-up
+	@make s3-init
 	@echo ""
 	@echo "$(GREEN)Setup complete!$(RESET)"
 	@echo ""
@@ -127,6 +128,15 @@ docker-up: ## Start all Docker services
 	docker-compose up -d
 	@echo "$(GREEN)Services started!$(RESET)"
 	@make docker-ps
+	@make s3-init
+
+s3-init: ## Ensure local S3/MinIO bucket exists (uses .env.local)
+	@if [ -f .env.local ]; then \
+		set -a; . ./.env.local; set +a; \
+		pnpm --filter @tour/services run s3:init; \
+	else \
+		echo "$(YELLOW).env.local not found, skipping S3 bucket init$(RESET)"; \
+	fi
 
 docker-down: ## Stop all Docker services
 	@echo "$(CYAN)Stopping Docker services...$(RESET)"

@@ -5,6 +5,14 @@ import { slugSchema } from "./common";
 export const tourStatusSchema = z.enum(["draft", "active", "paused", "archived"]);
 export type TourStatus = z.infer<typeof tourStatusSchema>;
 
+const tourMediaItemSchema = z.object({
+  type: z.enum(["image", "short"]),
+  url: z.string().url().max(2048),
+  thumbnailUrl: z.string().url().max(2048).optional(),
+  title: z.string().max(120).optional(),
+  sortOrder: z.number().int().min(0).max(999).optional(),
+});
+
 // Base tour schema (without refinements)
 const baseTourSchema = z.object({
   name: z
@@ -36,6 +44,7 @@ const baseTourSchema = z.object({
   basePrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format"),
   currency: z.string().length(3, "Currency must be 3 characters").default("AED"),
   status: tourStatusSchema.default("draft"),
+  media: z.array(tourMediaItemSchema).max(40).optional(),
   includes: z.array(z.string()).optional(),
   excludes: z.array(z.string()).optional(),
   meetingPoint: z.string().max(200, "Meeting point must be less than 200 characters").optional(),

@@ -19,6 +19,14 @@ const sortSchema = z.object({
   direction: z.enum(["asc", "desc"]).default("desc"),
 });
 
+const tourMediaItemSchema = z.object({
+  type: z.enum(["image", "short"]),
+  url: z.string().url().max(2048),
+  thumbnailUrl: z.string().url().max(2048).optional(),
+  title: z.string().max(120).optional(),
+  sortOrder: z.number().int().min(0).max(999).optional(),
+});
+
 const createTourSchema = z.object({
   name: z.string().min(1).max(200),
   slug: z.string().max(200).regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens").optional(),
@@ -39,6 +47,7 @@ const createTourSchema = z.object({
   pickupPolicyNotes: z.string().max(2000).optional(),
   coverImageUrl: z.string().url().max(2048).optional(),
   images: z.array(z.string().url().max(2048)).max(20).optional(),
+  media: z.array(tourMediaItemSchema).max(40).optional(),
   category: z.string().max(100).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   includes: z.array(z.string().max(200)).max(30).optional(),

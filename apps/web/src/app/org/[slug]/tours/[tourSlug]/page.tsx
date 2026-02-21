@@ -17,6 +17,13 @@ interface PageProps {
   params: Promise<{ slug: string; tourSlug: string }>;
 }
 
+type TourGalleryMediaItem = {
+  type: "image" | "short";
+  url: string;
+  thumbnailUrl: string | null;
+  title: string | null;
+};
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, tourSlug } = await params;
   const org = await requireOrganization(slug);
@@ -146,6 +153,21 @@ export default async function TourDetailPage({ params }: PageProps) {
     .filter((candidate) => candidate.id !== tour.id)
     .slice(0, 4);
 
+  const media = (
+    (tour.media as Array<{
+      type?: "image" | "short";
+      url?: string;
+      thumbnailUrl?: string | null;
+      title?: string | null;
+    }> | null | undefined) ?? []
+  )
+    .filter((item) => item?.url)
+    .map<TourGalleryMediaItem>((item) => ({
+      type: item.type === "short" ? "short" : "image",
+      url: item.url!,
+      thumbnailUrl: item.thumbnailUrl ?? null,
+      title: item.title ?? null,
+    }));
   const images = [tour.coverImageUrl, ...(tour.images || [])].filter(Boolean) as string[];
   const basePriceLabel = formatPrice(tour.basePrice, currency);
 
@@ -172,7 +194,7 @@ export default async function TourDetailPage({ params }: PageProps) {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           <div className="space-y-8 lg:col-span-8">
             <FadeIn>
-              <ImageGallery images={images} title={tour.name} />
+              <ImageGallery images={images} media={media} title={tour.name} />
             </FadeIn>
 
             <FadeIn delayMs={90}>

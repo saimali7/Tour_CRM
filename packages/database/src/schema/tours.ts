@@ -4,6 +4,16 @@ import { createId } from "../utils";
 import { organizations } from "./organizations";
 import { products } from "./products";
 
+export type TourMediaType = "image" | "short";
+
+export interface TourMediaItem {
+  type: TourMediaType;
+  url: string;
+  thumbnailUrl?: string;
+  title?: string;
+  sortOrder?: number;
+}
+
 // Tours - Tour products (org-scoped)
 export const tours = pgTable("tours", {
   id: text("id").primaryKey().$defaultFn(createId),
@@ -53,6 +63,7 @@ export const tours = pgTable("tours", {
   // Media
   coverImageUrl: text("cover_image_url"),
   images: jsonb("images").$type<string[]>().default([]),
+  media: jsonb("media").$type<TourMediaItem[]>().default([]),
 
   // Categorization
   category: text("category"),

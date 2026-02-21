@@ -12,6 +12,7 @@
     }
   },
   "scripts": {
+    "s3:init": "node ./scripts/ensure-s3-bucket.mjs",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },

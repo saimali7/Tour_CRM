@@ -9,6 +9,8 @@ import {
   Check,
   AlertCircle,
   Image as ImageIcon,
+  Clapperboard,
+  Play,
 } from "lucide-react";
 import { SingleImageUploader, ImageUploader } from "@/components/uploads/image-uploader";
 import type { TourFormState } from "../tour-creator";
@@ -24,6 +26,7 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
   const [excludeInput, setExcludeInput] = useState("");
   const [requirementInput, setRequirementInput] = useState("");
   const [tagInput, setTagInput] = useState("");
+  const [shortVideoInput, setShortVideoInput] = useState("");
 
   const addToList = (
     field: "includes" | "excludes" | "requirements" | "tags",
@@ -41,6 +44,27 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
     index: number
   ) => {
     updateForm({ [field]: formState[field].filter((_, i) => i !== index) });
+  };
+
+  const addShortVideo = () => {
+    const url = shortVideoInput.trim();
+    if (!url) {
+      return;
+    }
+
+    if (formState.shortVideos.includes(url)) {
+      setShortVideoInput("");
+      return;
+    }
+
+    updateForm({ shortVideos: [...formState.shortVideos, url] });
+    setShortVideoInput("");
+  };
+
+  const removeShortVideo = (index: number) => {
+    updateForm({
+      shortVideos: formState.shortVideos.filter((_, i) => i !== index),
+    });
   };
 
   return (
@@ -300,21 +324,21 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
         )}
       </div>
 
-      {/* Images Section */}
+      {/* Media Section */}
       <div className="space-y-6 pt-6 border-t border-border">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-info/10 rounded-lg">
             <ImageIcon className="h-5 w-5 text-info" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">Images</h3>
+            <h3 className="font-semibold text-foreground">Media Gallery</h3>
             <p className="text-sm text-muted-foreground">
-              Add photos to showcase your tour
+              Showcase your tour with photos and vertical short videos
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Cover Image */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-foreground">
@@ -331,7 +355,7 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
           {/* Gallery */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-foreground">
-              Gallery
+              Gallery Photos
               <span className="text-muted-foreground font-normal ml-2">Up to 10 images</span>
             </label>
             <ImageUploader
@@ -342,7 +366,124 @@ export function ContentTab({ formState, updateForm, orgSlug }: ContentTabProps) 
               orgSlug={orgSlug}
             />
           </div>
+
+          {/* Vertical Shorts */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-foreground">
+              Vertical Shorts
+              <span className="text-muted-foreground font-normal ml-2">Direct video URLs</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={shortVideoInput}
+                onChange={(e) => setShortVideoInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addShortVideo();
+                  }
+                }}
+                placeholder="https://cdn.example.com/shorts/teaser.mp4"
+                className={cn(
+                  "flex-1 px-3 py-2 text-sm border rounded-lg transition-all",
+                  "bg-background text-foreground placeholder:text-muted-foreground",
+                  "focus:ring-2 focus:ring-primary/20 focus:border-primary border-input"
+                )}
+              />
+              <button
+                type="button"
+                onClick={addShortVideo}
+                className="px-3 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
+                aria-label="Add short video"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use direct MP4/WebM links. Keep clips vertical (9:16) for best results.
+            </p>
+
+            {formState.shortVideos.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                {formState.shortVideos.map((url, index) => (
+                  <div
+                    key={`${url}-${index}`}
+                    className="relative rounded-xl border border-border overflow-hidden bg-black aspect-[9/16] group"
+                  >
+                    <video
+                      src={url}
+                      className="h-full w-full object-cover"
+                      muted
+                      playsInline
+                      loop
+                      autoPlay
+                      preload="metadata"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeShortVideo(index)}
+                      className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label={`Remove short video ${index + 1}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                    <div className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white">
+                      <Clapperboard className="h-3 w-3" />
+                      Short
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
+        {(formState.coverImageUrl || formState.images.length > 0 || formState.shortVideos.length > 0) && (
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-foreground">Live Gallery Preview</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {formState.coverImageUrl && (
+                <div className="relative overflow-hidden rounded-xl border border-border bg-muted aspect-[4/3]">
+                  <img
+                    src={formState.coverImageUrl}
+                    alt="Cover preview"
+                    className="h-full w-full object-cover"
+                  />
+                  <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white">
+                    Cover
+                  </span>
+                </div>
+              )}
+              {formState.images.map((url, index) => (
+                <div key={`${url}-${index}`} className="relative overflow-hidden rounded-xl border border-border bg-muted aspect-[4/3]">
+                  <img
+                    src={url}
+                    alt={`Gallery preview ${index + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ))}
+              {formState.shortVideos.map((url, index) => (
+                <div key={`${url}-${index}`} className="relative overflow-hidden rounded-xl border border-border bg-black aspect-[9/16]">
+                  <video
+                    src={url}
+                    className="h-full w-full object-cover"
+                    muted
+                    playsInline
+                    loop
+                    autoPlay
+                    preload="metadata"
+                  />
+                  <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[10px] text-white">
+                    <Play className="h-3 w-3" />
+                    Short
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

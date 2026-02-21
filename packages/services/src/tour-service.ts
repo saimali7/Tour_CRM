@@ -9,6 +9,7 @@ import {
   type TourStatus,
   type TourPricingTier,
   type TourVariant,
+  type TourMediaItem,
   type PriceModifierType,
   type Product,
   type TourWithProduct,
@@ -65,6 +66,7 @@ export interface CreateTourInput {
   pickupPolicyNotes?: string;
   coverImageUrl?: string;
   images?: string[];
+  media?: TourMediaItem[];
   category?: string;
   tags?: string[];
   includes?: string[];
@@ -85,6 +87,78 @@ export interface CreateTourInput {
 }
 
 export interface UpdateTourInput extends Partial<CreateTourInput> {}
+
+const TOUR_MEDIA_TYPE_ORDER: Record<TourMediaItem["type"], number> = {
+  image: 0,
+  short: 1,
+};
+
+function normalizeTourMediaItems(
+  media: TourMediaItem[] | undefined
+): TourMediaItem[] {
+  if (!media) {
+    return [];
+  }
+
+  const cleaned = media
+    .map((item, index) => ({
+      type: item.type,
+      url: item.url?.trim() || "",
+      thumbnailUrl: item.thumbnailUrl?.trim() || undefined,
+      title: item.title?.trim() || undefined,
+      sortOrder:
+        typeof item.sortOrder === "number" && Number.isFinite(item.sortOrder)
+          ? Math.max(0, Math.round(item.sortOrder))
+          : index,
+    }))
+    .filter((item) => item.url.length > 0);
+
+  const deduped: TourMediaItem[] = [];
+  const seen = new Set<string>();
+
+  for (const item of cleaned) {
+    const key = `${item.type}:${item.url}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(item);
+  }
+
+  return deduped.sort((a, b) => {
+    const orderDiff = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    if (orderDiff !== 0) {
+      return orderDiff;
+    }
+    return TOUR_MEDIA_TYPE_ORDER[a.type] - TOUR_MEDIA_TYPE_ORDER[b.type];
+  });
+}
+
+function mediaToImageUrls(media: TourMediaItem[]): string[] {
+  return media
+    .filter((item) => item.type === "image")
+    .map((item) => item.url);
+}
+
+function mergeImageUrlsWithExistingShorts(
+  images: string[],
+  existingMedia: TourMediaItem[] | null | undefined
+): TourMediaItem[] {
+  const imageMedia: TourMediaItem[] = images.map((url, index) => ({
+    type: "image",
+    url,
+    sortOrder: index,
+  }));
+
+  const existingShorts = (existingMedia || [])
+    .filter((item) => item.type === "short" && item.url?.trim())
+    .map((item, index) => ({
+      ...item,
+      sortOrder: imageMedia.length + index,
+    }));
+
+  return normalizeTourMediaItems([...imageMedia, ...existingShorts]);
+}
 
 export class TourService extends BaseService {
   /**
@@ -296,6 +370,14 @@ export class TourService extends BaseService {
   async create(input: CreateTourInput): Promise<TourWithProduct> {
     const slug = input.slug || this.slugify(input.name);
     const resolvedIsPublic = input.isPublic ?? input.status === "active";
+    const normalizedMedia = normalizeTourMediaItems(input.media);
+    const derivedImages = mediaToImageUrls(normalizedMedia);
+    const syncedImages =
+      input.images !== undefined
+        ? input.images
+        : normalizedMedia.length > 0
+          ? derivedImages
+          : undefined;
 
     // Check if slug already exists in products (unified catalog)
     const existingProduct = await this.db.query.products.findFirst({
@@ -341,7 +423,7 @@ export class TourService extends BaseService {
           basePrice: input.basePrice,
           currency: input.currency || "AED",
           featuredImage: input.coverImageUrl,
-          gallery: input.images || [],
+          gallery: syncedImages || [],
           metaTitle: input.metaTitle,
           metaDescription: input.metaDescription,
           tags: input.tags || [],
@@ -378,7 +460,8 @@ export class TourService extends BaseService {
           pickupAirportAllowed: input.pickupAirportAllowed,
           pickupPolicyNotes: input.pickupPolicyNotes,
           coverImageUrl: input.coverImageUrl,
-          images: input.images,
+          images: syncedImages,
+          media: normalizedMedia,
           category: input.category,
           tags: input.tags,
           includes: input.includes,
@@ -432,9 +515,29 @@ export class TourService extends BaseService {
       input.status === "active" &&
       existingTour.status !== "active" &&
       input.isPublic === undefined;
-    const effectiveInput: UpdateTourInput = shouldAutoPublicizeOnActivate
+    let effectiveInput: UpdateTourInput = shouldAutoPublicizeOnActivate
       ? { ...input, isPublic: true }
       : input;
+
+    if (effectiveInput.media !== undefined) {
+      const normalizedMedia = normalizeTourMediaItems(effectiveInput.media);
+      effectiveInput = {
+        ...effectiveInput,
+        media: normalizedMedia,
+        images:
+          effectiveInput.images !== undefined
+            ? effectiveInput.images
+            : mediaToImageUrls(normalizedMedia),
+      };
+    } else if (effectiveInput.images !== undefined) {
+      effectiveInput = {
+        ...effectiveInput,
+        media: mergeImageUrlsWithExistingShorts(
+          effectiveInput.images,
+          (existingTour.media as TourMediaItem[] | null | undefined) ?? undefined
+        ),
+      };
+    }
 
     // If updating slug, check for conflicts in both products and tours
     if (effectiveInput.slug) {
@@ -595,6 +698,7 @@ export class TourService extends BaseService {
       pickupPolicyNotes: original.pickupPolicyNotes || undefined,
       coverImageUrl: original.coverImageUrl || undefined,
       images: original.images || undefined,
+      media: (original.media as TourMediaItem[] | null | undefined) || undefined,
       category: original.category || undefined,
       tags: original.tags || undefined,
       includes: original.includes || undefined,
