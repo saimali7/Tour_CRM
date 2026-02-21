@@ -51,6 +51,87 @@ export async function sendBookingCreatedEvent(
   }
 }
 
+export interface PaymentSucceededEventData {
+  organizationId: string;
+  bookingId: string;
+  customerId: string;
+  customerEmail: string;
+  customerName: string;
+  bookingReference: string;
+  tourName: string;
+  tourDate: string;
+  amount: string;
+  currency: string;
+  stripeReceiptUrl?: string;
+}
+
+export async function sendPaymentSucceededEvent(
+  data: PaymentSucceededEventData
+): Promise<void> {
+  if (!process.env.INNGEST_EVENT_KEY) {
+    inngestLogger.debug(
+      { bookingId: data.bookingId },
+      "Skipping payment/succeeded event: INNGEST_EVENT_KEY not configured"
+    );
+    return;
+  }
+
+  try {
+    await inngest.send({
+      name: "payment/succeeded",
+      data,
+    });
+
+    inngestLogger.debug(
+      { bookingId: data.bookingId, organizationId: data.organizationId },
+      "Sent payment/succeeded event"
+    );
+  } catch (error) {
+    inngestLogger.error(
+      { err: error, bookingId: data.bookingId, organizationId: data.organizationId },
+      "Failed to send payment/succeeded event"
+    );
+  }
+}
+
+export interface PaymentFailedEventData {
+  organizationId: string;
+  bookingId: string;
+  customerEmail: string;
+  customerName: string;
+  bookingReference: string;
+  errorMessage: string;
+}
+
+export async function sendPaymentFailedEvent(
+  data: PaymentFailedEventData
+): Promise<void> {
+  if (!process.env.INNGEST_EVENT_KEY) {
+    inngestLogger.debug(
+      { bookingId: data.bookingId },
+      "Skipping payment/failed event: INNGEST_EVENT_KEY not configured"
+    );
+    return;
+  }
+
+  try {
+    await inngest.send({
+      name: "payment/failed",
+      data,
+    });
+
+    inngestLogger.debug(
+      { bookingId: data.bookingId, organizationId: data.organizationId },
+      "Sent payment/failed event"
+    );
+  } catch (error) {
+    inngestLogger.error(
+      { err: error, bookingId: data.bookingId, organizationId: data.organizationId },
+      "Failed to send payment/failed event"
+    );
+  }
+}
+
 export interface CartAbandonedEventData {
   organizationId: string;
   cartId: string;

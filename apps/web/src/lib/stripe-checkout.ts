@@ -134,3 +134,16 @@ export async function retrieveBookingCheckoutSession(
     stripeAccount: stripeAccountId,
   });
 }
+
+/**
+ * Verify and construct a Stripe webhook event from a raw request body and signature.
+ * Uses the same Stripe client singleton as the rest of the web app.
+ */
+export function constructWebhookEvent(
+  payload: string,
+  signature: string,
+  webhookSecret: string
+): Stripe.Event {
+  const stripe = getStripeClient();
+  return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+}
